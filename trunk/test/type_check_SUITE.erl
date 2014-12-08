@@ -453,8 +453,8 @@ tester_type_check_rrepair(_Config) ->
              {start, 2}, %% tries to spawn processes
              {map_interval, 2}, %% second interval must be in a single quadrant
 
-             {merkle_compress_hashlist, 3}, %% needs merkle nodes with hashes
-             {merkle_decompress_hashlist, 3} %% needs a special binary to correspond to a number of bits
+             {merkle_compress_hashlist, 4}, %% needs merkle nodes with hashes
+             {merkle_decompress_hashlist, 4} %% needs a special binary to correspond to a number of bits
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -463,14 +463,15 @@ tester_type_check_rrepair(_Config) ->
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {calc_signature_size_1_to_n, 3}, %% needs float > 0
+             {min_max, 3}, %% tested via feeder
              {calc_signature_size_nm_pair, 4}, %% needs float > 0
              {compress_kv_list_p1e, 4}, %% needs float > 0, =< 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
-             {check_node, 4}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 8}, %% needs merkle_tree/nodes with hashes
-             {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
+             {check_node, 5}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 10}, %% needs merkle_tree/nodes with hashes
+             {process_tree_cmp_result, 6}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 11}, %% needs matching result and merkle nodes
              {merkle_get_sync_leaves, 5}, %% needs merkle_tree with hashes
              {merkle_resolve_add_leaf_hash, 3}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 2}, %% needs special bitstring
