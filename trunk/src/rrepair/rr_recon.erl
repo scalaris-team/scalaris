@@ -544,7 +544,7 @@ on({?check_nodes, SenderPid, ToCheck, SigSizeI, SigSizeILeafDiff}, State) ->
 on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = merkle_tree,      merkle_sync = MerkleSync,
-                           params = #merkle_params{bucket_size = BucketSize},
+                           params = #merkle_params{bucket_size = BucketSize} = Params,
                            struct = Tree,             ownerPid = OwnerL,
                            dest_rr_pid = DestNodePid, stats = Stats,
                            dest_recon_pid = DestReconPid}) ->
@@ -562,7 +562,7 @@ on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
        RTree =:= [] ->
             ?TRACE("Sync (NI): ~.2p", [MerkleSyncNew]),
             {Hashes, NStats} =
-                merkle_resolve_leaves_noninit(MerkleSyncNew, DestNodePid, Stats, OwnerL),
+                merkle_resolve_leaves_noninit(MerkleSyncNew, DestNodePid, Stats, OwnerL, Params),
             send(DestReconPid, {resolve_req, Hashes}),
             NewState#rr_recon_state{stage = resolve, stats = NStats};
        true -> NewState
@@ -646,12 +646,13 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
 on({resolve_req, Hashes} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = true,
                            method = merkle_tree,      merkle_sync = MerkleSync,
+                           params = Params,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            dest_recon_pid = DestRCPid,
                            stats = Stats}) when is_bitstring(Hashes) ->
     ?TRACE1(_Msg, State),
     {HashesReply, BinKeyList, NStats} =
-        merkle_resolve_leaves_init(MerkleSync, Hashes, DestRRPid, Stats, OwnerL),
+        merkle_resolve_leaves_init(MerkleSync, Hashes, DestRRPid, Stats, OwnerL, Params),
     comm:send(DestRCPid, {resolve_req, HashesReply, BinKeyList}),
     NewState = State#rr_recon_state{stats = NStats},
     % do not shutdown if HashesReply is non-empty!
@@ -665,14 +666,16 @@ on({resolve_req, Hashes} = _Msg,
 on({resolve_req, Hashes, BinKeyList} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = merkle_tree,      merkle_sync = MerkleSync,
+                           params = Params,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            dest_recon_pid = DestRCPid,
                            stats = Stats})
   when is_bitstring(Hashes) andalso is_list(BinKeyList) ->
     ?TRACE1(_Msg, State),
+    BucketSizeBits = merkle_max_bucket_size_bits(Params),
     {BinKeyListReq, NStats} =
         merkle_resolve_req_keys_noninit(
-          MerkleSync, Hashes, BinKeyList, DestRRPid, Stats, OwnerL, [],
+          MerkleSync, Hashes, BinKeyList, DestRRPid, Stats, OwnerL, BucketSizeBits, [],
           [], [], false, BinKeyList =/= []),
     case Hashes of
         <<>> -> ?DBG_ASSERT(BinKeyListReq =:= []),
@@ -1269,20 +1272,29 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) -
               ToSyncAcc, FoundSkipHash)
     end.
 
+%% @doc Gets the number of bits needed to encode all possible bucket sizes with
+%%      the given merkle params.
+-spec merkle_max_bucket_size_bits(Params::#merkle_params{}) -> pos_integer().
+merkle_max_bucket_size_bits(Params) ->
+    BucketSizeBits0 = erlang:max(1, util:ceil(util:log2(Params#merkle_params.bucket_size))),
+    ?IIF(config:read(rr_align_to_bytes),
+         bloom:resize(BucketSizeBits0, 8),
+         BucketSizeBits0).
+
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
--spec merkle_resolve_add_leaf_hash(LeafNode::merkle_tree:mt_node(),
-                                   SigSize0::signature_size(),
-                                   HashesReplyIn::bitstring())
+-spec merkle_resolve_add_leaf_hash(
+        LeafNode::merkle_tree:mt_node(), SigSize0::signature_size(),
+        BucketSizeBits::pos_integer(), HashesReplyIn::bitstring())
         -> HashesReplyOut::bitstring().
-merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
+merkle_resolve_add_leaf_hash(LeafNode, SigSize0, BucketSizeBits, HashesReply) ->
     % TODO: make extra version binary for better compression (?)
     % TODO: use formulae of compress_kv_list_p1e/4 for the version size (?) - have to have the same info on the other node!
     Bucket = merkle_tree:get_bucket(LeafNode),
     BucketSize = merkle_tree:get_item_count(LeafNode),
-    ?DBG_ASSERT(BucketSize < 255),
+    ?DBG_ASSERT(BucketSize < util:pow(2, BucketSizeBits)),
     ?DBG_ASSERT(BucketSize =:= length(Bucket)),
-    HashesReply1 = <<HashesReply/bitstring, BucketSize:8>>,
+    HashesReply1 = <<HashesReply/bitstring, BucketSize:BucketSizeBits>>,
 
     % note: we can reach the best compression if values and versions align to
     %       byte-boundaries
@@ -1291,13 +1303,14 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
     compress_kv_list(Bucket, HashesReply1, SigSize, VSize).
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
-%%      returned by merkle_resolve_add_leaf_hash/3 during merkle sync.
--spec merkle_resolve_retrieve_leaf_hashes(Hashes::bitstring(),
-                                          SigSize0::signature_size())
+%%      returned by merkle_resolve_add_leaf_hash/4 during merkle sync.
+-spec merkle_resolve_retrieve_leaf_hashes(
+        Hashes::bitstring(), SigSize0::signature_size(),
+        BucketSizeBits::pos_integer())
         -> {NHashes::bitstring(), OtherBucketTree::kv_tree(),
             SigSize::signature_size(), VSize::signature_size()}.
-merkle_resolve_retrieve_leaf_hashes(
-  <<BSize:8/integer-unit:1, HashesT/bitstring>>, SigSize0) ->
+merkle_resolve_retrieve_leaf_hashes(Hashes, SigSize0, BucketSizeBits) ->
+    <<BSize:BucketSizeBits/integer-unit:1, HashesT/bitstring>> = Hashes,
     {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
@@ -1309,22 +1322,23 @@ merkle_resolve_retrieve_leaf_hashes(
 %%      resolves all other leaf nodes (called on non-initiator).
 -spec merkle_resolve_leaves_noninit(
         Sync::[merkle_sync()], DestRRPid::comm:mypid(), Stats,
-        OwnerL::comm:erl_local_pid())
+        OwnerL::comm:erl_local_pid(), Params::#merkle_params{})
         -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_noninit(Sync, DestRRPid, Stats, OwnerL) ->
+merkle_resolve_leaves_noninit(Sync, DestRRPid, Stats, OwnerL, Params) ->
+    BucketSizeBits = merkle_max_bucket_size_bits(Params),
     merkle_resolve_leaves_noninit(Sync, <<>>, DestRRPid, Stats, OwnerL,
-                                  [], 0).
+                                  BucketSizeBits, [], 0).
 
-%% @doc Helper for merkle_resolve_leaves_noninit/4.
+%% @doc Helper for merkle_resolve_leaves_noninit/5.
 -spec merkle_resolve_leaves_noninit(
         Sync::[merkle_sync()], HashesAcc::bitstring(), DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid(),
+        Stats, OwnerL::comm:erl_local_pid(), BucketSizeBits::pos_integer(),
         ToSend::[?RT:key()], LeafNodesAcc::non_neg_integer())
         -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, true} | TL], HashesReply,
-                              DestRRPid, Stats, OwnerL, ToSend, LeafNAcc)
+                              DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, LeafNAcc)
   when is_list(LeafNodes) ->
     {ToSend1, NLeafNAcc} =
         lists:foldl(fun(N, {AccToSend, LeafNAccX}) ->
@@ -1333,26 +1347,26 @@ merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, true} | TL], H
                                           AccToSend),
                              LeafNAccX + 1}
                     end, {ToSend, LeafNAcc}, LeafNodes),
-    merkle_resolve_leaves_noninit(TL, HashesReply, DestRRPid, Stats, OwnerL, ToSend1,
+    merkle_resolve_leaves_noninit(TL, HashesReply, DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend1,
                                   NLeafNAcc);
 merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, _LeafNodes, false} | TL], HashesReply,
-                              DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
+                              DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, LeafNAcc) ->
     % get KV-List from initiator and resolve in second step
-    merkle_resolve_leaves_noninit(TL, HashesReply, DestRRPid, Stats, OwnerL, ToSend,
+    merkle_resolve_leaves_noninit(TL, HashesReply, DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend,
                                   LeafNAcc);
 merkle_resolve_leaves_noninit([{leaf, leaf, SigSize0, LeafNode} | TL], HashesReply,
-                              DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
+                              DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, LeafNAcc) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
-    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
-    merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, ToSend,
+    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, BucketSizeBits, HashesReply),
+    merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend,
                                   LeafNAcc + 1);
 merkle_resolve_leaves_noninit([{leaf, inner, SigSize0, LeafNode, false = _FoundSkipHash} | TL], HashesReply,
-                              DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
+                              DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, LeafNAcc) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
-    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
-    merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, ToSend,
+    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, BucketSizeBits, HashesReply),
+    merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend,
                                   LeafNAcc + 1);
-merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
+merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, _BucketSizeBits, ToSend, LeafNAcc) ->
     SID = rr_recon_stats:get(session_id, Stats),
     % resolve items from inner-leaf comparisons with leaf-hash matches as key_upd:
     KeyUpdResReqs =
@@ -1374,10 +1388,10 @@ merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, ToSend,
     {HashesReply, NStats}.
 
 %% @doc Helper for resolving an inner-leaf mismatch.
-merkle_resolve_compare_inner_leaf(SigSize0, LeafNodes, Hashes, ToSend, ToReq,
+merkle_resolve_compare_inner_leaf(SigSize0, BucketSizeBits, LeafNodes, Hashes, ToSend, ToReq,
                                   ToResolve, ResolveNonEmptyAcc) ->
     {NHashes, OBucketTree, SigSize, VSize} =
-        merkle_resolve_retrieve_leaf_hashes(Hashes, SigSize0),
+        merkle_resolve_retrieve_leaf_hashes(Hashes, SigSize0, BucketSizeBits),
     {MyBuckets, NLeafNAcc} =
         lists:foldl(fun(N, {AccBuckets, LeafNAccX}) ->
                             ?DBG_ASSERT(merkle_tree:is_leaf(N)),
@@ -1445,58 +1459,59 @@ merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
 %%      send back to the non-initiator for further syncronisation.
 -spec merkle_resolve_leaves_init(
         Sync::[merkle_sync()], Hashes::bitstring(), DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid())
+        Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{})
         -> {HashesReply::bitstring(), HashesReq::[[bitstring()]], NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, SID, OwnerL) ->
-    merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, SID, OwnerL,
+merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, SID, OwnerL, Params) ->
+    BucketSizeBits = merkle_max_bucket_size_bits(Params),
+    merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, SID, OwnerL, BucketSizeBits,
                                [], [], [], false, 0, <<>>).
 
-%% @doc Helper for merkle_resolve_leaves_init/5.
+%% @doc Helper for merkle_resolve_leaves_init/6.
 -spec merkle_resolve_leaves_init(
         Sync::[merkle_sync()], Hashes::bitstring(), DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid(),
+        Stats, OwnerL::comm:erl_local_pid(), BucketSizeBits::pos_integer(),
         ToSend::[?RT:key()], ToReq::[?RT:key()], ToResolve::[[bitstring()]],
         ResolveNonEmpty::boolean(), LeafNodesAcc::non_neg_integer(),
         HashesReplyAcc::bitstring())
         -> {HashesReply::bitstring(), HashesReq::[[bitstring()]], NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_init([{leaf, leaf, SigSize, LeafNode} | TL], Hashes,
-                           DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
+                           DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     % same handling as below inner-leaf -> simply convert:
     merkle_resolve_leaves_init(
       [{inner, leaf, SigSize, [LeafNode], false} | TL], Hashes,
-      DestRRPid, Stats, OwnerL,
+      DestRRPid, Stats, OwnerL, BucketSizeBits,
       ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc, HashesReply);
 merkle_resolve_leaves_init([{inner, leaf, SigSize0, LeafNodes, _FoundHash} | TL],
                            Hashes,
-                           DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
+                           DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1, LeafCount} =
-        merkle_resolve_compare_inner_leaf(SigSize0, LeafNodes, Hashes, ToSend,
+        merkle_resolve_compare_inner_leaf(SigSize0, BucketSizeBits, LeafNodes, Hashes, ToSend,
                                           ToReq, ToResolve, ResolveNonEmpty),
-    merkle_resolve_leaves_init(TL, NHashes, DestRRPid, Stats, OwnerL,
+    merkle_resolve_leaves_init(TL, NHashes, DestRRPid, Stats, OwnerL, BucketSizeBits,
                                ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
                                LeafNAcc + LeafCount, HashesReply);
 merkle_resolve_leaves_init([{leaf, inner, _SigSize0, _LeafNode, true = _FoundSkipHash} | TL],
                            Hashes,
-                           DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
+                           DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     % already resolved by non-initiator
-    merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL,
+    merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL, BucketSizeBits,
                                ToSend, ToReq, ToResolve, ResolveNonEmpty,
                                LeafNAcc + 1, HashesReply);
 merkle_resolve_leaves_init([{leaf, inner, SigSize0, LeafNode, false = _FoundSkipHash} | TL],
                            Hashes,
-                           DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
+                           DestRRPid, Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
-    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
-    merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL,
+    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, BucketSizeBits, HashesReply),
+    merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL, BucketSizeBits,
                                ToSend, ToReq, ToResolve, ResolveNonEmpty,
                                LeafNAcc + 1, HashesReply1);
-merkle_resolve_leaves_init([], <<>>, DestRRPid, Stats, OwnerL, ToSend, ToReq,
+merkle_resolve_leaves_init([], <<>>, DestRRPid, Stats, OwnerL, _BucketSizeBits, ToSend, ToReq,
                            ToResolve, ResolveNonEmpty, LeafNAcc, HashesReply) ->
     {ToResolve1, NStats} =
         merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
@@ -1510,23 +1525,23 @@ merkle_resolve_leaves_init([], <<>>, DestRRPid, Stats, OwnerL, ToSend, ToReq,
 %%      the initiator.
 -spec merkle_resolve_req_keys_noninit(
         Sync::[merkle_sync()], Hashes::bitstring(), BinKeyList::[[bitstring()]],
-        DestRRPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid(),
+        DestRRPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid(), BucketSizeBits::pos_integer(),
         ToSend::[?RT:key()], ToReq::[?RT:key()], ToResolve::[[bitstring()]],
         ResolveNonEmpty::boolean(), BinKeyListNonEmpty::boolean())
         -> {HashesReq::[[bitstring()]], NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_req_keys_noninit([{leaf, leaf, SigSize0, LeafNode} | TL], Hashes,
                                 [_ReqKeys | _] = BinKeyList, DestRRPid,
-                                Stats, OwnerL, ToSend, ToReq, ToResolve,
+                                Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                 ResolveNonEmpty, true) ->
     % same handling as below leaf-inner -> simply convert:
     merkle_resolve_req_keys_noninit([{leaf, inner, SigSize0, LeafNode, false} | TL], Hashes,
                                     BinKeyList, DestRRPid,
-                                    Stats, OwnerL, ToSend, ToReq, ToResolve,
+                                    Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                     ResolveNonEmpty, true);
 merkle_resolve_req_keys_noninit([{leaf, inner, SigSize0, LeafNode, false = _FoundSkipHash} | TL], Hashes,
                                 [ReqKeys | BinKeyList], DestRRPid,
-                                Stats, OwnerL, ToSend, ToReq, ToResolve,
+                                Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                 ResolveNonEmpty, true) ->
     ToSend1 =
         case ReqKeys of
@@ -1539,27 +1554,27 @@ merkle_resolve_req_keys_noninit([{leaf, inner, SigSize0, LeafNode, false = _Foun
                                           ReqSet)] ++ ToSend
         end,
     merkle_resolve_req_keys_noninit(TL, Hashes, BinKeyList, DestRRPid, Stats,
-                                    OwnerL, ToSend1, ToReq, ToResolve,
+                                    OwnerL, BucketSizeBits, ToSend1, ToReq, ToResolve,
                                     ResolveNonEmpty, true);
 merkle_resolve_req_keys_noninit([{inner, leaf, SigSize0, LeafNodes, false} | TL],
                                 Hashes, BinKeyList, DestRRPid,
-                                Stats, OwnerL, ToSend, ToReq, ToResolve,
+                                Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                 ResolveNonEmpty, BKLNonEmpty) ->
     {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1, LeafCount} =
-        merkle_resolve_compare_inner_leaf(SigSize0, LeafNodes, Hashes, ToSend,
+        merkle_resolve_compare_inner_leaf(SigSize0, BucketSizeBits, LeafNodes, Hashes, ToSend,
                                           ToReq, ToResolve, ResolveNonEmpty),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats),
     merkle_resolve_req_keys_noninit(TL, NHashes, BinKeyList, DestRRPid, NStats,
-                                    OwnerL, ToSend1, ToReq1, ToResolve1,
+                                    OwnerL, BucketSizeBits, ToSend1, ToReq1, ToResolve1,
                                     ResolveNonEmpty1, BKLNonEmpty);
 merkle_resolve_req_keys_noninit([_ | TL], Hashes, BinKeyList, DestRRPid,
-                                Stats, OwnerL, ToSend, ToReq, ToResolve,
+                                Stats, OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                 ResolveNonEmpty, BKLNonEmpty) ->
     % already resolved by initiator / in first step or optimised empty BinKeyList
     merkle_resolve_req_keys_noninit(TL, Hashes, BinKeyList, DestRRPid, Stats,
-                                    OwnerL, ToSend, ToReq, ToResolve,
+                                    OwnerL, BucketSizeBits, ToSend, ToReq, ToResolve,
                                     ResolveNonEmpty, BKLNonEmpty);
-merkle_resolve_req_keys_noninit([], <<>>, [], DestRRPid, Stats, OwnerL,
+merkle_resolve_req_keys_noninit([], <<>>, [], DestRRPid, Stats, OwnerL, _BucketSizeBits,
                                 ToSend, ToReq, ToResolve, ResolveNonEmpty,
                                 _BKLNonEmpty) ->
     merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
