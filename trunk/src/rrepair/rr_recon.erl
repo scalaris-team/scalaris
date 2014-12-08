@@ -576,11 +576,15 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
                            struct = Tree,                 stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, {SigSizeI, SigSizeL}},
-                                   {p0e, P0E}]}) ->
+                                   {p1e, P1ETotal}]}) ->
     % current node can make a mistake or any of its BranchFactor children
     % => current node's probability of 0 errors = P0E(child)^(BranchFactor+1)
-    % TODO: since P0E is near 1, its floating point representation is sub-optimal!
-    NextP0E = math:pow(P0E, 1 / (BranchFactor + 1)),
+    % however, we cannot use P0E=(1-P1E) since it is near 1 and its floating
+    % point representation is sub-optimal!
+    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/BranchFactor)
+    BF = BranchFactor + 1,
+    P1E = P1ETotal / BF +
+              (BF - 1) * P1ETotal * P1ETotal / (2 * BF * BF), % +O[p^3]
     case process_tree_cmp_result(FlagsBin, Tree, SigSizeI, SigSizeL, MerkleSync, Stats) of
         {[] = RTree, [] = MerkleSyncNew, NStats, _MyMaxLeafCount, _MyMaxItemsCount} ->
             NStage = reconciliation,
@@ -598,31 +602,40 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
             NStage = reconciliation,
             OtherMaxItemsCount = OtherMaxLeafCount * BucketSize - MaxLeafItemsCountDiff,
             % note: we need to use the same P1E for this level's signature
-            %       comparison as a children's tree has in total! 
-            P1E = 1 - NextP0E,
+            %       comparison as a children's tree has in total!
+            L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
             NextSigSizeI =
                 min_max(
                   util:ceil(
                     util:log2(erlang:min(1, MyMaxItemsCount + OtherMaxItemsCount)
                                   / P1E)), 1, 160),
+            % exact, but due to problems with precision near 1 not feasible:
+%%             NextSigSizeL =
+%%                 min_max(
+%%                   util:ceil(
+%%                     util:log2(
+%%                       % note: see TODO above for P0E precision!
+%%                       1 / (1 - math:pow(1 - P1E / (2 * BucketSize), 1 / L))
+%%                     )), 1, 160),
+
+            % approx (Puiseux Series of the above):
             NextSigSizeL =
                 min_max(
                   util:ceil(
-                    util:log2(
-                      % note: see TODO above for P0E precision!
-                      1 / (1 - math:pow(1 - P1E / (2 * BucketSize), 1 / erlang:max(MyMaxLeafCount, OtherMaxLeafCount)))
-                    )), 1, 160),
+                    (math:log(2 * BucketSize * L) - math:log(P1E)) / math:log(2) +
+                        (1 - L) * P1E / (BucketSize * L * math:log(16))
+                    ), 1, 160),
             ?DBG_ASSERT(NextSigSizeL >= NextSigSizeI),
-%%             log:pal("P1E: ~p, \tP0E: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
+%%             log:pal("P1E: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
 %%                     "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B, \tMyML: ~B, \tOtML: ~B",
-%%                     [P1E, P0E, NextSigSizeL, NextSigSizeI,
+%%                     [P1E, NextSigSizeL, NextSigSizeI,
 %%                      BucketSize, MyMaxItemsCount, OtherMaxItemsCount, MyMaxLeafCount, OtherMaxLeafCount]),
             Req = merkle_compress_hashlist(RTree, <<>>, NextSigSizeI, NextSigSizeL),
             send(DestReconPid, {?check_nodes, Req, NextSigSizeI, NextSigSizeL - NextSigSizeI})
     end,
     NewState = State#rr_recon_state{stats = NStats, struct = RTree,
                                     misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
-                                            {p0e, NextP0E}],
+                                            {p1e, P1E}],
                                     merkle_sync = MerkleSyncNew, stage = NStage},
     if RTree =:= [] andalso MerkleSyncNew =:= [] ->
            %send(DestReconPid, {shutdown, sync_finished_remote}),
@@ -762,7 +775,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize, 0}),
             State#rr_recon_state{stats = Stats1,
                                  misc = [{signature_size, {SigSize, SigSize}},
-                                         {p0e, 1 - get_p1e()}],
+                                         {p1e, get_p1e()}],
                                  kv_list = []};
         false ->
             MerkleI = merkle_tree:get_interval(MySyncStruct),
