@@ -1004,7 +1004,7 @@ merkle_compress_hashlist([], Bin, _SigSize) ->
 merkle_compress_hashlist([N1 | TL], Bin, SigSize) ->
     H1 = merkle_tree:get_hash(N1),
     IsLeaf = ?IIF(merkle_tree:is_leaf(N1), 1, 0),
-    merkle_compress_hashlist(TL, <<Bin/bitstring, H1:SigSize, IsLeaf:1>>, SigSize).
+    merkle_compress_hashlist(TL, <<Bin/bitstring, IsLeaf:1, H1:SigSize>>, SigSize).
 
 %% @doc Transforms the compact binary representation of merkle hash lists from
 %%      merkle_compress_hashlist/2 back into the original form.
@@ -1013,7 +1013,7 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSize) ->
 merkle_decompress_hashlist(<<>>, HashListR, _SigSize) ->
     lists:reverse(HashListR);
 merkle_decompress_hashlist(Bin, HashListR, SigSize) ->
-    <<Hash:SigSize/integer-unit:1, IsLeaf0:1, T/bitstring>> = Bin,
+    <<IsLeaf0:1, Hash:SigSize/integer-unit:1, T/bitstring>> = Bin,
     IsLeaf = if IsLeaf0 =:= 1 -> true;
                 true          -> false
              end,
