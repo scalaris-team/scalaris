@@ -367,7 +367,7 @@ on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
     State;
 on({set_state, Pid, F}, State) when is_function(F) ->
-    ?DBG_ASSERT(util:is_unittest()), % may only be used in unit-tests
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     NewState = F(State),
     comm:send(Pid, {set_state_response, NewState}),
     NewState;
@@ -440,7 +440,7 @@ on({unittest_get_bounds_and_data, SourcePid, Type}, State) ->
     State;
 
 on({unittest_consistent_send, Pid, _X} = Msg, State) ->
-    true = util:is_unittest(),
+    ?ASSERT(util:is_unittest()),
     comm:send_local(Pid, Msg),
     State;
 
