@@ -773,7 +773,7 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=Id,epoch=OldEpoch}, R1, R2,
                                      L1, R1, R2, Keep, ReplyTo, PostAux, '_'}),
     update_lease(Self, ContentCheck, L2, New, State),
     case Keep of
-        first -> true = false, % TS: not supported at the moment
+        first -> ?ASSERT2(false, nyi), % TS: not supported at the moment
                  lease_list:update_lease_in_dht_node_state(L1, State, active,
                                                            split_reply_step1);
         second -> lease_list:update_lease_in_dht_node_state(L1, State, passive,
@@ -977,36 +977,36 @@ on({l_on_cseq, renew_leases}, State) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc generic content check. used for almost all qwrite operations
--spec generic_content_check_(lease_t(), lease_t(), atom()) -> 
-                                   content_check_t(). %% content check
-generic_content_check_(#lease{id=OldId,owner=_OldOwner,aux = OldAux,range=OldRange,
-                             epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
-                     New, Writer) ->
-    fun(prbr_bottom, _WriteFilter, Next) ->
-            {false, {lease_does_not_exist, pbr_bottom, Next}};
-        (Current, _WriteFilter, Next) when Current =:= New ->
-            log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, Next, Old, New, Writer]),
-            {true, null};
-        (#lease{id = Id0} = Current, _, Next)    when Id0 =/= OldId->
-            {false, {unexpected_id, Current, Next}};
-        %(#lease{owner = O0} = Current, _, Next)    when O0 =/= OldOwner->
-        %    {false, {unexpected_owner, Current, Next}};
-        (#lease{aux = Aux0} = Current, _, Next)    when Aux0 =/= OldAux->
-            {false, {unexpected_aux, Current, Next}};
-        (#lease{range = R0} = Current, _, Next)    when R0 =/= OldRange->
-            {false, {unexpected_range, Current, Next}};
-        (#lease{timeout = T0} = Current, _, Next)                   when T0 =/= OldTimeout->
-            {false, {unexpected_timeout, Current, Next}};
-        (#lease{epoch = E0} = Current, _, Next)                     when E0 =/= OldEpoch ->
-            {false, {unexpected_epoch, Current, Next}};
-        (#lease{version = V0} = Current, _, Next)                   when V0 =/= OldVersion->
-            {false, {unexpected_version, Current, Next}};
-        (#lease{timeout = T0} = Current, _, #lease{timeout = T1} = Next)  when not (T0 < T1)->
-            {false, {timeout_is_not_newer_than_current_lease, Current, Next}};
-        (_, _, _) ->
-            {true, null}
-    end.
+%% % @doc generic content check. used for almost all qwrite operations
+%% -spec generic_content_check_(lease_t(), lease_t(), atom()) -> 
+%%                                    content_check_t(). %% content check
+%% generic_content_check_(#lease{id=OldId,owner=_OldOwner,aux = OldAux,range=OldRange,
+%%                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
+%%                      New, Writer) ->
+%%     fun(prbr_bottom, _WriteFilter, Next) ->
+%%             {false, {lease_does_not_exist, pbr_bottom, Next}};
+%%         (Current, _WriteFilter, Next) when Current =:= New ->
+%%             log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, Next, Old, New, Writer]),
+%%             {true, null};
+%%         (#lease{id = Id0} = Current, _, Next)    when Id0 =/= OldId->
+%%             {false, {unexpected_id, Current, Next}};
+%%         %(#lease{owner = O0} = Current, _, Next)    when O0 =/= OldOwner->
+%%         %    {false, {unexpected_owner, Current, Next}};
+%%         (#lease{aux = Aux0} = Current, _, Next)    when Aux0 =/= OldAux->
+%%             {false, {unexpected_aux, Current, Next}};
+%%         (#lease{range = R0} = Current, _, Next)    when R0 =/= OldRange->
+%%             {false, {unexpected_range, Current, Next}};
+%%         (#lease{timeout = T0} = Current, _, Next)                   when T0 =/= OldTimeout->
+%%             {false, {unexpected_timeout, Current, Next}};
+%%         (#lease{epoch = E0} = Current, _, Next)                     when E0 =/= OldEpoch ->
+%%             {false, {unexpected_epoch, Current, Next}};
+%%         (#lease{version = V0} = Current, _, Next)                   when V0 =/= OldVersion->
+%%             {false, {unexpected_version, Current, Next}};
+%%         (#lease{timeout = T0} = Current, _, #lease{timeout = T1} = Next)  when not (T0 < T1)->
+%%             {false, {timeout_is_not_newer_than_current_lease, Current, Next}};
+%%         (_, _, _) ->
+%%             {true, null}
+%%     end.
 
 % @doc generic content check. used for almost all qwrite operations
 -spec generic_content_check(lease_t(), lease_t(), atom()) -> 
