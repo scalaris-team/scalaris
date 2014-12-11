@@ -97,7 +97,8 @@
          interval       = ?required(merkle_param, interval)       :: intervals:interval(),
          reconPid       = undefined                               :: comm:mypid() | undefined,
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
-         bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer()
+         bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
+         p1e            = ?required(merkle_param, p1e)            :: float()
         }).
 
 -record(art_recon_struct,
@@ -175,11 +176,9 @@
     {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
      VSize::signature_size(), SenderPid::comm:mypid()} |
     % merkle tree sync messages
-    {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSizeI::signature_size(),
-     SigSizeILeafDiff::signature_size() % = SigSizeL - SigSizeI
-    } |
+    {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes, ToCheck::bitstring(), SigSizeI::signature_size(),
-     SigSizeILeafDiff::signature_size() % = SigSizeL - SigSizeI
+     SigSizeILeafDiff::0 | signature_size() % = SigSizeL - SigSizeI
     } |
     {?check_nodes_response, FlagsBin::bitstring(), MaxLeafCount::non_neg_integer(),
      MaxLeafItemsCountDiff::non_neg_integer() % = MaxLeafCount * BranchFactor - MaxItemsCount
@@ -537,9 +536,10 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?check_nodes, SenderPid, ToCheck, SigSizeI, SigSizeILeafDiff}, State) ->
+on({?check_nodes, SenderPid, ToCheck, SigSize}, State)
+  when is_bitstring(ToCheck) andalso is_integer(SigSize) ->
     NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
-    on({?check_nodes, ToCheck, SigSizeI, SigSizeILeafDiff}, NewState);
+    on({?check_nodes, ToCheck, SigSize, 0}, NewState);
 
 on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
@@ -547,7 +547,8 @@ on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
                            params = #merkle_params{bucket_size = BucketSize} = Params,
                            struct = Tree,             ownerPid = OwnerL,
                            dest_rr_pid = DestNodePid, stats = Stats,
-                           dest_recon_pid = DestReconPid}) ->
+                           dest_recon_pid = DestReconPid})
+  when is_bitstring(ToCheck0) andalso is_integer(SigSizeI) andalso is_integer(SigSizeILeafDiff) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
     SigSizeL = SigSizeI + SigSizeILeafDiff,
     ToCheck = merkle_decompress_hashlist(ToCheck0, [], SigSizeI, SigSizeL),
@@ -764,6 +765,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
+                                   params = Params,
                                    dest_recon_pid = DestReconPid,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
@@ -773,20 +775,23 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     case Initiator of
         true ->
             SigSize = 160,
+            P1E = Params#merkle_params.p1e,
             Req = merkle_compress_hashlist([merkle_tree:get_root(MySyncStruct)],
                                            <<>>, SigSize, SigSize),
-            send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize, 0}),
+            send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize}),
             State#rr_recon_state{stats = Stats1,
                                  misc = [{signature_size, {SigSize, SigSize}},
-                                         {p1e, get_p1e()}],
+                                         {p1e, P1E}],
                                  kv_list = []};
         false ->
             MerkleI = merkle_tree:get_interval(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
+            P1E = get_p1e(),
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
-                                          bucket_size = MerkleB},
+                                          bucket_size = MerkleB,
+                                          p1e = P1E},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
