@@ -1335,7 +1335,7 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) -
 %%      the given merkle params.
 -spec merkle_max_bucket_size_bits(Params::#merkle_params{}) -> pos_integer().
 merkle_max_bucket_size_bits(Params) ->
-    BucketSizeBits0 = erlang:max(1, util:ceil(util:log2(Params#merkle_params.bucket_size))),
+    BucketSizeBits0 = erlang:max(1, util:ceil(util:log2(Params#merkle_params.bucket_size + 1))),
     ?IIF(config:read(rr_align_to_bytes),
          bloom:resize(BucketSizeBits0, 8),
          BucketSizeBits0).
