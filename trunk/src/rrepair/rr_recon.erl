@@ -1068,7 +1068,7 @@ merkle_next_signature_sizes(
     ?DBG_ASSERT(NextSigSizeL >= NextSigSizeI),
 %%     log:pal("P1E: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
 %%             "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B, \tMyML: ~B, \tOtML: ~B",
-%%             [P1E, NextSigSizeL, NextSigSizeI,
+%%             [P1E, NextSigSizeI, NextSigSizeL,
 %%              BucketSize, MyMaxItemsCount, OtherMaxItemsCount, MyMaxLeafCount, OtherMaxLeafCount]),
     {P1E, NextSigSizeI, NextSigSizeL}.
 
