@@ -98,7 +98,9 @@
          reconPid       = undefined                               :: comm:mypid() | undefined,
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
-         p1e            = ?required(merkle_param, p1e)            :: float()
+         p1e            = ?required(merkle_param, p1e)            :: float(),
+         ni_leaf_count  = ?required(merkle_param, ni_leaf_count)  :: non_neg_integer(),
+         ni_lic_diff    = ?required(merkle_param, ni_lic_diff)    :: non_neg_integer() % = MaxLeafCount * BranchFactor - MaxItemsCount
         }).
 
 -record(art_recon_struct,
@@ -741,11 +743,25 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
           [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
     case Initiator of
         true ->
-            SigSize = 160,
-            P1E = merkle_next_p1e(Params#merkle_params.branch_factor,
-                                  Params#merkle_params.p1e),
-            Req = merkle_compress_hashlist([merkle_tree:get_root(MySyncStruct)],
-                                           <<>>, SigSize, SigSize),
+            #merkle_params{bucket_size = BucketSize,
+                           p1e = P1ETotal,
+                           ni_leaf_count = OtherLeafCount,
+                           ni_lic_diff = LeafItemsCountDiff} = Params,
+            MyLeafCount = merkle_tree:get_leaf_count(MySyncStruct),
+            MyItemCount = merkle_tree:get_item_count(MySyncStruct),
+
+            OtherItemsCount = OtherLeafCount * BucketSize - LeafItemsCountDiff,
+            {P1E, NextSigSizeI, NextSigSizeL} =
+                merkle_next_signature_sizes(Params, P1ETotal, MyLeafCount, MyItemCount,
+                                            OtherLeafCount, OtherItemsCount),
+
+            RootNode = merkle_tree:get_root(MySyncStruct),
+            SigSize = case merkle_tree:is_leaf(RootNode) of
+                          true  -> NextSigSizeL;
+                          false -> NextSigSizeI
+                      end,
+
+            Req = merkle_compress_hashlist([RootNode], <<>>, SigSize, SigSize),
             send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize}),
             State#rr_recon_state{stats = Stats1,
                                  misc = [{signature_size, {SigSize, SigSize}},
@@ -756,10 +772,18 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
             P1ETotal = get_p1e(),
+
+            LeafCount = merkle_tree:get_leaf_count(MySyncStruct),
+            ItemCount = merkle_tree:get_item_count(MySyncStruct),
+            ?DBG_ASSERT(LeafCount * MerkleB >= ItemCount),
+            LeafItemsCountDiff = LeafCount * MerkleB - ItemCount,
+
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
                                           bucket_size = MerkleB,
-                                          p1e = P1ETotal},
+                                          p1e = P1ETotal,
+                                          ni_leaf_count = LeafCount,
+                                          ni_lic_diff = LeafItemsCountDiff},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
