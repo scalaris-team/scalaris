@@ -1042,13 +1042,13 @@ merkle_next_signature_sizes(
 
     % note: we need to use the same P1E for this level's signature
     %       comparison as a children's tree has in total!
-    L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
     NextSigSizeI =
         min_max(
           util:ceil(
-            util:log2(erlang:min(1, MyMaxItemsCount + OtherMaxItemsCount)
+            util:log2(erlang:max(1, MyMaxItemsCount + OtherMaxItemsCount)
                           / P1E)), 1, 160),
 
+    L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
     % exact, but due to problems with precision near 1 not feasible:
 %%     NextSigSizeL =
 %%         min_max(
