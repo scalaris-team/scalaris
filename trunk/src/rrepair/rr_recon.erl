@@ -1783,6 +1783,39 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Calculates the signature sizes for comparing every item in Items
+%%      (at most ItemCount) with OtherItemCount other items and expecting at
+%%      most min(ItemCount, OtherItemCount) version comparisons.
+%%      Sets the bit sizes to have an error below P1E.
+-spec trivial_signature_sizes(ItemCount::non_neg_integer(),
+                              OtherItemCount::non_neg_integer(), P1E::float())
+        -> {SigSize::signature_size(), VSize::signature_size()}.
+trivial_signature_sizes(0, 0, _P1E) ->
+    {0, 0}; % invalid but since there are 0 items, this is ok!
+trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
+    VCompareCount = erlang:min(ItemCount, OtherItemCount),
+    % reduce P1E for the two parts here (key and version comparison)
+    B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
+    % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
+
+    % note: we have n one-to-one comparisons, assuming the probability of a
+    %       failure in a single one-to-one comparison is p, the overall
+    %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
+%%     VP = 1 - math:pow(1 - B * P1E, 1 / erlang:max(1, VCompareCount)),
+    % however, we cannot use (1-p1E) since it is near 1 and its floating
+    % point representation is sub-optimal!
+    % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
+    N = erlang:max(1, VCompareCount),
+    VP = B * P1E / N + B * B * (N - 1) * P1E * P1E / (2 * N * N), % +O[p^3]
+    VSize0 = erlang:max(get_min_version_bits(),
+                        calc_signature_size_1_to_n(1, VP, 128)),
+    Res = {_SigSize, _VSize} = align_bitsize(SigSize0, VSize0),
+%%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
+%%             "MyIC: ~B, \tOtIC: ~B",
+%%             [self(), P1E, _SigSize, _VSize, ItemCount, OtherItemCount]),
+    Res.
+
 %% @doc Creates a compressed key-value list comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
@@ -1791,20 +1824,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
                            OtherItemCount::non_neg_integer(), P1E::float())
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
 compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
-    VCompareCount = erlang:min(ItemCount, OtherItemCount),
-    % reduce P1E for the two parts here (key and version comparison)
-    B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
-    % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
-    % note: we have n one-to-one comparisons, assuming the probability of a
-    %       failure in a single one-to-one comparison is p, the overall
-    %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-    VP = 1 - math:pow(1 - B * P1E, 1 / erlang:max(1, VCompareCount)),
-    VSize0 = erlang:max(get_min_version_bits(),
-                        calc_signature_size_1_to_n(1, VP, 128)),
-    % note: we can reach the best compression if values and versions align to
-    %       byte-boundaries
-    {SigSize, VSize} = align_bitsize(SigSize0, VSize0),
+    {SigSize, VSize} = trivial_signature_sizes(ItemCount, OtherItemCount, P1E),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
     ?TRACE("~B vs. ~B items, SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",

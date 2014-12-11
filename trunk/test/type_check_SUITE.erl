@@ -464,6 +464,7 @@ tester_type_check_rrepair(_Config) ->
              {shutdown, 2}, %% tries to send messages
              {calc_signature_size_1_to_n, 3}, %% needs float > 0
              {min_max, 3}, %% tested via feeder
+             {trivial_signature_sizes, 3}, %% needs float > 0
              {calc_signature_size_nm_pair, 4}, %% needs float > 0
              {compress_kv_list_p1e, 4}, %% needs float > 0, =< 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
