@@ -1050,11 +1050,13 @@ merkle_next_p1e(BranchFactor, P1ETotal) ->
     % => current node's probability of 0 errors = P0E(child)^B
     % however, we cannot use P0E=(1-P1E) since it is near 1 and its floating
     % point representation is sub-optimal!
-    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/B)
+    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/B) at P1E = 0
     BI = BranchFactor + 1,
     P1E_I = P1ETotal / BI +
               (BI - 1) * P1ETotal * P1ETotal / (2 * BI * BI), % +O[p^3]
     P1E_L = P1ETotal / 2 + P1ETotal * P1ETotal / 8, % +O[p^3]
+%%     log:pal("merkle [ ~p ]~n - P1ETotal: ~p, \tP1E_I: ~p, \tP1E_L: ~p",
+%%             [self(), P1ETotal, P1E_I, P1E_L]),
     {P1E_I, P1E_L}.
 
 %% @doc Calculates the new signature sizes based on the next P1E as in
@@ -1355,10 +1357,7 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, BucketSizeBits, HashesReply) ->
     ?DBG_ASSERT(BucketSize =:= length(Bucket)),
     HashesReply1 = <<HashesReply/bitstring, BucketSize:BucketSizeBits>>,
 
-    % note: we can reach the best compression if values and versions align to
-    %       byte-boundaries
     {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
-
     compress_kv_list(Bucket, HashesReply1, SigSize, VSize).
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
@@ -1835,7 +1834,7 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {DBChunkBin, SigSize, VSize}.
 
 %% @doc Aligns the two sizes so that their sum is a multiple of 8 in order to
-%%      achieve a better compression in binaries.
+%%      (possibly) achieve a better compression in binaries.
 -spec align_bitsize(SigSize, VSize) -> {SigSize, VSize}
     when is_subtype(SigSize, pos_integer()),
          is_subtype(VSize, pos_integer()).
