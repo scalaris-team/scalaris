@@ -572,28 +572,21 @@ on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
 on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = merkle_tree,          merkle_sync = MerkleSync,
-                           params = #merkle_params{branch_factor = BranchFactor,
-                                                   bucket_size = BucketSize},
+                           params = #merkle_params{bucket_size = BucketSize} = Params,
                            struct = Tree,                 stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, {SigSizeI, SigSizeL}},
                                    {p1e, P1ETotal}]}) ->
-    % current node can make a mistake or any of its BranchFactor children
-    % => current node's probability of 0 errors = P0E(child)^(BranchFactor+1)
-    % however, we cannot use P0E=(1-P1E) since it is near 1 and its floating
-    % point representation is sub-optimal!
-    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/BranchFactor)
-    BF = BranchFactor + 1,
-    P1E = P1ETotal / BF +
-              (BF - 1) * P1ETotal * P1ETotal / (2 * BF * BF), % +O[p^3]
     case process_tree_cmp_result(FlagsBin, Tree, SigSizeI, SigSizeL, MerkleSync, Stats) of
         {[] = RTree, [] = MerkleSyncNew, NStats, _MyMaxLeafCount, _MyMaxItemsCount} ->
             NStage = reconciliation,
+            P1E = P1ETotal,
             NextSigSizeI = SigSizeI,
             NextSigSizeL = SigSizeL,
             ok;
         {[] = RTree, [_|_] = MerkleSyncNew, NStats, _MyMaxLeafCount, _MyMaxItemsCount} ->
             NStage = resolve,
+            P1E = P1ETotal,
             NextSigSizeI = SigSizeI,
             NextSigSizeL = SigSizeL,
             % note: we will get a resolve_req message from the other node
@@ -602,35 +595,9 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
         {[_|_] = RTree, MerkleSyncNew, NStats, MyMaxLeafCount, MyMaxItemsCount} ->
             NStage = reconciliation,
             OtherMaxItemsCount = OtherMaxLeafCount * BucketSize - MaxLeafItemsCountDiff,
-            % note: we need to use the same P1E for this level's signature
-            %       comparison as a children's tree has in total!
-            L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
-            NextSigSizeI =
-                min_max(
-                  util:ceil(
-                    util:log2(erlang:min(1, MyMaxItemsCount + OtherMaxItemsCount)
-                                  / P1E)), 1, 160),
-            % exact, but due to problems with precision near 1 not feasible:
-%%             NextSigSizeL =
-%%                 min_max(
-%%                   util:ceil(
-%%                     util:log2(
-%%                       % note: see TODO above for P0E precision!
-%%                       1 / (1 - math:pow(1 - P1E / (2 * BucketSize), 1 / L))
-%%                     )), 1, 160),
-
-            % approx (Puiseux Series of the above):
-            NextSigSizeL =
-                min_max(
-                  util:ceil(
-                    (math:log(2 * BucketSize * L) - math:log(P1E)) / math:log(2) +
-                        (1 - L) * P1E / (BucketSize * L * math:log(16))
-                    ), 1, 160),
-            ?DBG_ASSERT(NextSigSizeL >= NextSigSizeI),
-%%             log:pal("P1E: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
-%%                     "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B, \tMyML: ~B, \tOtML: ~B",
-%%                     [P1E, NextSigSizeL, NextSigSizeI,
-%%                      BucketSize, MyMaxItemsCount, OtherMaxItemsCount, MyMaxLeafCount, OtherMaxLeafCount]),
+            {P1E, NextSigSizeI, NextSigSizeL} =
+                merkle_next_signature_sizes(Params, P1ETotal, MyMaxLeafCount, MyMaxItemsCount,
+                                            OtherMaxLeafCount, OtherMaxItemsCount),
             Req = merkle_compress_hashlist(RTree, <<>>, NextSigSizeI, NextSigSizeL),
             send(DestReconPid, {?check_nodes, Req, NextSigSizeI, NextSigSizeL - NextSigSizeI})
     end,
@@ -775,7 +742,8 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     case Initiator of
         true ->
             SigSize = 160,
-            P1E = Params#merkle_params.p1e,
+            P1E = merkle_next_p1e(Params#merkle_params.branch_factor,
+                                  Params#merkle_params.p1e),
             Req = merkle_compress_hashlist([merkle_tree:get_root(MySyncStruct)],
                                            <<>>, SigSize, SigSize),
             send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize}),
@@ -787,11 +755,11 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             MerkleI = merkle_tree:get_interval(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
-            P1E = get_p1e(),
+            P1ETotal = get_p1e(),
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
                                           bucket_size = MerkleB,
-                                          p1e = P1E},
+                                          p1e = P1ETotal},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
@@ -1046,6 +1014,63 @@ calc_signature_size_1_to_n(0, P1E, _MaxSize) when P1E > 0 ->
     1;
 calc_signature_size_1_to_n(N, P1E, MaxSize) when P1E > 0 ->
     min_max(util:ceil(util:log2(N / P1E)), 1, MaxSize).
+
+%% @doc Calculates from a total P1E the (next) P1E to use for signature and
+%%      sub-tree reconciliations.
+-spec merkle_next_p1e(BranchFactor::pos_integer(), P1ETotal::float()) -> P1E::float().
+merkle_next_p1e(BranchFactor, P1ETotal) ->
+    % current node can make a mistake or any of its BranchFactor children
+    % => current node's probability of 0 errors = P0E(child)^(BranchFactor+1)
+    % however, we cannot use P0E=(1-P1E) since it is near 1 and its floating
+    % point representation is sub-optimal!
+    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/BranchFactor)
+    BF = BranchFactor + 1,
+    _P1E = P1ETotal / BF +
+              (BF - 1) * P1ETotal * P1ETotal / (2 * BF * BF). % +O[p^3]
+
+%% @doc Calculates the new signature sizes based on the next P1E as in
+%%      merkle_next_p1e/2
+-spec merkle_next_signature_sizes(
+        Params::#merkle_params{}, P1ETotal::float(),
+        MyMaxLeafCount::non_neg_integer(), MyMaxItemsCount::non_neg_integer(),
+        OtherMaxLeafCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer())
+    -> {P1E::float(), NextSigSizeI::signature_size(), NextSigSizeL::signature_size()}.
+merkle_next_signature_sizes(
+  #merkle_params{bucket_size = BucketSize, branch_factor = BranchFactor}, P1ETotal,
+  MyMaxLeafCount, MyMaxItemsCount, OtherMaxLeafCount, OtherMaxItemsCount) ->
+    P1E = merkle_next_p1e(BranchFactor, P1ETotal),
+
+    % note: we need to use the same P1E for this level's signature
+    %       comparison as a children's tree has in total!
+    L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
+    NextSigSizeI =
+        min_max(
+          util:ceil(
+            util:log2(erlang:min(1, MyMaxItemsCount + OtherMaxItemsCount)
+                          / P1E)), 1, 160),
+
+    % exact, but due to problems with precision near 1 not feasible:
+%%     NextSigSizeL =
+%%         min_max(
+%%           util:ceil(
+%%             util:log2(
+%%               % note: see TODO above for P0E precision!
+%%               1 / (1 - math:pow(1 - P1E / (2 * BucketSize), 1 / L))
+%%                      )), 1, 160),
+    % approx (Puiseux Series of the above):
+    NextSigSizeL =
+        min_max(
+          util:ceil(
+            (math:log(2 * BucketSize * L) - math:log(P1E)) / math:log(2) +
+                (1 - L) * P1E / (BucketSize * L * math:log(16))
+                   ), 1, 160),
+
+    ?DBG_ASSERT(NextSigSizeL >= NextSigSizeI),
+%%     log:pal("P1E: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
+%%             "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B, \tMyML: ~B, \tOtML: ~B",
+%%             [P1E, NextSigSizeL, NextSigSizeI,
+%%              BucketSize, MyMaxItemsCount, OtherMaxItemsCount, MyMaxLeafCount, OtherMaxLeafCount]),
+    {P1E, NextSigSizeI, NextSigSizeL}.
 
 -compile({nowarn_unused_function, {min_max_feeder, 3}}).
 -spec min_max_feeder(X::number(), Min::number(), Max::number())
