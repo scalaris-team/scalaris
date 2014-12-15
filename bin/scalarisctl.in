@@ -695,8 +695,8 @@ scalarisstart(){
         tmp="$tmp -scalaris nodes_per_vm \"$NODES_PER_VM\""
     fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
-    export YAWSHOME="$HOME/.scalaris/yaws/$NODE_NAME"
-    mkdir -p "$YAWSHOME"
+    # if YAWSHOME is not the logdir, make sure to create the directory!
+    export YAWSHOME="$LOGDIR/$NODE_NAME"
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
     START_CMD="\"$ERL\" -setcookie \"$SCALARIS_COOKIE\"\
