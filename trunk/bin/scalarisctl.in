@@ -82,6 +82,8 @@ usage(){
     echo "    -y <port>   - TCP port for the built-in webserver (YAWS)"
     echo "    -k <key>    - join at the given key"
     echo "    -v          - verbose"
+    echo "    -l <dir>    - use this logdir base directory (will create a sub-folder"
+    echo "                  per node)"
     echo "    --dist-erl-port <port>"
     echo "                - (single) port distributed erlang listens on"
     echo "    --nodes-per-vm <number>"
@@ -827,7 +829,7 @@ until [ -z "$1" ]; do
       DBG_CHECK_RING_TIMEOUT=$1
       shift;;
     *)
-      if getopts "dhifqmsvn:p:y:k:e:c:" optionName; then
+      if getopts "dhifqmsvn:p:y:k:e:c:l:" optionName; then
         case "$optionName" in
             c) SCALARIS_COOKIE=$OPTARG;;
             e) erl_flags=$OPTARG;;
@@ -837,6 +839,7 @@ until [ -z "$1" ]; do
             h) usage 0;;
             i) echo "WARN: interactive is now default";;
             k) join_at=$OPTARG;;
+            l) LOGDIR=$(realpath -m "$OPTARG");;
             n) NODE_NAME=$OPTARG;;
             p) port=$OPTARG;;
             y) yaws_port=$OPTARG;;
