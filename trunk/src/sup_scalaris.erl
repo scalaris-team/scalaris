@@ -218,6 +218,11 @@ start_first_services() ->
     util:if_verbose("~p start inets~n", [?MODULE]),
     _ = inets:start(),
 
+    %% for mnesia
+%    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
+%    ok = mnesia:create_schema([node()]),
+%    _ = application:start(mnesia),
+
     %% for lb_stats and wpool
     _ = application:load(sasl),
     application:set_env(sasl, sasl_error_logger, false),
