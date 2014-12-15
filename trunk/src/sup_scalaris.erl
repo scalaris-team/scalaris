@@ -220,7 +220,11 @@ start_first_services() ->
 
     %% for mnesia
 %    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
-%    ok = mnesia:create_schema([node()]),
+%    case mnesia:create_schema([node()]) of
+%        ok -> ok;
+%        Msg -> 
+%            io:format("starting mnesia: ~w", [Msg])
+%    end,
 %    _ = application:start(mnesia),
 
     %% for lb_stats and wpool
