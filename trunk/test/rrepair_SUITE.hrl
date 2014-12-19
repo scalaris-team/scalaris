@@ -275,6 +275,7 @@ dest_empty_node(Config) ->
     RingData = unittest_helper:get_ring_data(kv),
     IM = count_dbsize(RingData, IKey),
     CM = count_dbsize(RingData, CKey),
+    ?equals(CM, 0),
     %server starts sync
     ?proto_sched(start),
     api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair,
@@ -292,8 +293,12 @@ dest_empty_node(Config) ->
             IM, IMNew, IMNew - IM,
             CM, CMNew, CMNew - CM]),
     %clean up
-    ?equals(CM, 0),
-    ?compare(fun erlang:'>'/2, CMNew, CM).
+    case Method of
+        art ->
+            % ART is not able to detect this case and resolve everything
+            ?compare(fun erlang:'>'/2, CMNew, CM);
+        _   -> ?equals(CMNew, IM)
+    end.
 
 parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
