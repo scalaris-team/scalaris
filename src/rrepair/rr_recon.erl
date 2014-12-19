@@ -1875,6 +1875,16 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Splits P1E into N equal independent sub-processes and returns the P1E
+%%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
+-spec calc_n_subparts_p1e(N::pos_integer(), P1E::float()) -> P1E_sub::float().
+calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
+%%     _VP = 1 - math:pow(1 - P1E, 1 / N).
+    % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
+    % point representation is sub-optimal!
+    % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
+    _VP = P1E / N + (N - 1) * P1E * P1E / (2 * N * N). % +O[p^3]
+
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
@@ -1893,15 +1903,8 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
     SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
 
-    % note: we have n one-to-one comparisons, assuming the probability of a
-    %       failure in a single one-to-one comparison is p, the overall
-    %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-%%     VP = 1 - math:pow(1 - B * P1E, 1 / erlang:max(1, VCompareCount)),
-    % however, we cannot use (1-p1E) since it is near 1 and its floating
-    % point representation is sub-optimal!
-    % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
-    N = erlang:max(1, VCompareCount),
-    VP = B * P1E / N + B * B * (N - 1) * P1E * P1E / (2 * N * N), % +O[p^3]
+    % note: we have n one-to-one comparisons
+    VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), B * P1E),
     VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
     Res = {_SigSize, _VSize} = align_bitsize(SigSize0, VSize0),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
