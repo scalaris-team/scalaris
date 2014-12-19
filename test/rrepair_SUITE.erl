@@ -204,7 +204,7 @@ tester_find_sync_interval(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], SigSizeI::1..160, SigSizeL::1..160) -> true.
+-spec prop_merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], SigSizeI::0..160, SigSizeL::0..160) -> true.
 prop_merkle_compress_hashlist(Nodes0, SigSizeI, SigSizeL) ->
     % fix node list which may contain nil hashes:
     % let it crash if the format of a merkle tree node changes
@@ -230,7 +230,7 @@ tester_merkle_compress_hashlist(_) ->
     tester:test(?MODULE, prop_merkle_compress_hashlist, 3, 1000, [{threads, 4}]).
 
 %% -spec prop_merkle_compress_cmp_result(CmpRes::[rr_recon:merkle_cmp_result()],
-%%                                       SigSize::1..160) -> true.
+%%                                       SigSize::0..160) -> true.
 %% prop_merkle_compress_cmp_result(CmpRes, SigSize) ->
 %%     {Flags, HashesBin} =
 %%         rr_recon:merkle_compress_cmp_result(CmpRes, <<>>, <<>>, SigSize),

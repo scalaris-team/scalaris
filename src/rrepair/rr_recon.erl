@@ -29,7 +29,7 @@
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
          quadrant_intervals/0]).
 -export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
-%-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_nm_pair/4]).
+%-export([compress_kv_list/4, calc_signature_size_nm_pair/4]).
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
@@ -73,7 +73,7 @@
 -type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
 -type 'db_chunk_kvv+'():: [{?RT:key(), db_dht:version(), db_dht:value()},...].
 
--type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
+-type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
 -type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
 
 -record(trivial_recon_struct,
@@ -81,8 +81,8 @@
          interval = intervals:empty()                         :: intervals:interval(),
          reconPid = undefined                                 :: comm:mypid() | undefined,
          db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring() | kv_tree(),
-         sig_size = 128                                       :: signature_size(),
-         ver_size = 8                                         :: signature_size()
+         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
+         ver_size = ?required(trivial_recon_struct, ver_size) :: signature_size()
         }).
 
 -record(bloom_recon_struct,
@@ -377,13 +377,14 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                            method = bloom,             dhtNodePid = DhtNodePid,
                            params = #bloom_recon_struct{bloom = BF},
                            stats = Stats,              kv_list = KVList,
-                           dest_recon_pid = DestReconPid}) ->
+                           dest_recon_pid = DestReconPid,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
-    Diff = case bloom:item_count(BF) of
-               0 -> DBList0;
-               _ -> [X || X <- DBList0, not bloom:is_element(BF, X)]
+    BFCount = bloom:item_count(BF),
+    Diff = if BFCount =:= 0 -> DBList0;
+              true -> [X || X <- DBList0, not bloom:is_element(BF, X)]
            end,
     NewKVList = lists:append(KVList, Diff),
 
@@ -396,7 +397,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            FullDiffSize = length(NewKVList),
            ?TRACE("Reconcile Bloom Session=~p ; Diff=~p",
                   [rr_recon_stats:get(session_id, Stats), FullDiffSize]),
-           if FullDiffSize > 0 ->
+           if FullDiffSize > 0 andalso BFCount > 0 ->
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
                   % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
@@ -406,6 +407,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                         NewKVList, FullDiffSize,
                                         bloom:item_count(BF), ?BLOOM_B * get_p1e())
                               end),
+                  ?DBG_ASSERT(DBChunk =/= <<>>),
                   
                   send(DestReconPid,
                        {resolve_req, DBChunk, SigSize, VSize, comm:this()}),
@@ -414,6 +416,23 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                                  {build_time, BuildTime}], Stats),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
                                        kv_list = NewKVList};
+              FullDiffSize > 0 -> % andalso BFCount =:= 0 ->
+                  ?DBG_ASSERT(BFCount =:= 0),
+                  % must send resolve_req message for the non-initiator to shut down
+                  send(DestReconPid,
+                       {resolve_req, <<>>, 0, 0, comm:this()}),
+                  % empty BF with diff at our node -> the other node does not have any items!
+                  % start a resolve here:
+                  SID = rr_recon_stats:get(session_id, Stats),
+                  send_local(OwnerL, {request_resolve, SID,
+                                      {key_upd_send, DestRRPid, [K || {K, _V} <- NewKVList], []},
+                                      [{feedback_request, comm:make_global(OwnerL)},
+                                       {from_my_node, 1}]}),
+                  % we will get one reply from a subsequent ?key_upd resolve
+                  NewStats = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+                  NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
+                                                  kv_list = NewKVList},
+                  shutdown(sync_finished, NewState);
               true ->
                   % must send resolve_req message for the non-initiator to shut down
                   send(DestReconPid, {resolve_req, <<>>, 1, 1, comm:this()}),
@@ -870,13 +889,11 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
                                   P1E::float(), MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(0, 0, P1E, _MaxSize) when P1E > 0 ->
-    1;
-calc_signature_size_nm_pair(0, 1, P1E, _MaxSize) when P1E > 0 ->
-    1;
-calc_signature_size_nm_pair(1, 0, P1E, _MaxSize) when P1E > 0 ->
-    1;
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
+    0;
+calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
+    0;
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
     min_max(util:ceil(util:log2((M+N)*(M+N-1) / P1E) - 1), 1, MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
@@ -1052,16 +1069,6 @@ decompress_k_list(Bin, Set, SigSize) ->
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Calculates the minimum number of bits needed to have a hash collision
-%%      probability of P1E, given we compare one hash with N other hashes.
--spec calc_signature_size_1_to_n(N::non_neg_integer(), P1E::float(),
-                                 MaxSize::signature_size())
-        -> SigSize::signature_size().
-calc_signature_size_1_to_n(0, P1E, _MaxSize) when P1E > 0 ->
-    1;
-calc_signature_size_1_to_n(N, P1E, MaxSize) when P1E > 0 ->
-    min_max(util:ceil(util:log2(N / P1E)), 1, MaxSize).
-
 %% @doc Calculates from a total P1E the (next) P1E to use for signature and
 %%      sub-tree/trivial reconciliations.
 -spec merkle_next_p1e(BranchFactor::pos_integer(), P1ETotal::float())
@@ -1098,27 +1105,31 @@ merkle_next_signature_sizes(
     % note: we need to use the same P1E for this level's signature
     %       comparison as a children's tree has in total!
     NextSigSizeI =
-        min_max(
-          util:ceil(
-            util:log2(erlang:max(1, MyMaxItemsCount + OtherMaxItemsCount)
-                          / P1E_I)), 1, 160),
+        if MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
+               min_max(
+                 util:ceil(
+                   util:log2(erlang:max(1, MyMaxItemsCount + OtherMaxItemsCount)
+                                 / P1E_I)), 1, 160);
+           true -> 0
+        end,
 
     L = erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
-    % exact, but due to problems with precision near 1 not feasible:
-%%     NextSigSizeL =
-%%         min_max(
-%%           util:ceil(
-%%             util:log2(
-%%               % note: see TODO above for P0E precision!
-%%               1 / (1 - math:pow(1 - P1E_L / (2 * BucketSize), 1 / L))
-%%                      )), 1, 160),
-    % approx (Puiseux Series of the above):
     NextSigSizeL =
-        min_max(
-          util:ceil(
-            (math:log(2 * BucketSize * L) - math:log(P1E_L)) / math:log(2) +
-                (1 - L) * P1E_L / (BucketSize * L * math:log(16))
-                   ), 1, 160),
+        if L =/= 0 ->
+               % exact, but due to problems with precision near 1 not feasible:
+%%                min_max(
+%%                  util:ceil(
+%%                    util:log2(
+%%                      1 / (1 - math:pow(1 - P1E_L / (2 * BucketSize), 1 / L))
+%%                             )), 1, 160),
+               % approx (Puiseux Series of the above):
+               min_max(
+                 util:ceil(
+                   (math:log(2 * BucketSize * L) - math:log(P1E_L)) / math:log(2) +
+                       (1 - L) * P1E_L / (BucketSize * L * math:log(16))
+                          ), 1, 160);
+       true -> 0
+    end,
 
 %%     log:pal("P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
 %%             "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B, \tMyML: ~B, \tOtML: ~B",
@@ -1868,10 +1879,12 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
 %%      Sets the bit sizes to have an error below P1E.
--spec trivial_signature_sizes(ItemCount::non_neg_integer(),
-                              OtherItemCount::non_neg_integer(), P1E::float())
+-spec trivial_signature_sizes
+        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(), P1E::float())
         -> {SigSize::signature_size(), VSize::signature_size()}.
-trivial_signature_sizes(0, 0, _P1E) ->
+trivial_signature_sizes(0, _, _P1E) ->
+    {0, 0}; % invalid but since there are 0 items, this is ok!
+trivial_signature_sizes(_, 0, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
 trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     VCompareCount = erlang:min(ItemCount, OtherItemCount),
@@ -1889,8 +1902,7 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
     N = erlang:max(1, VCompareCount),
     VP = B * P1E / N + B * B * (N - 1) * P1E * P1E / (2 * N * N), % +O[p^3]
-    VSize0 = erlang:max(get_min_version_bits(),
-                        calc_signature_size_1_to_n(1, VP, 128)),
+    VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
     Res = {_SigSize, _VSize} = align_bitsize(SigSize0, VSize0),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
