@@ -464,6 +464,7 @@ tester_type_check_rrepair(_Config) ->
              {shutdown, 2}, %% tries to send messages
              {merkle_next_signature_sizes, 6}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
+             {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
              {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
