@@ -1939,8 +1939,8 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {SigSize, VSize} = trivial_signature_sizes(ItemCount, OtherItemCount, P1E),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
-    ?TRACE("~B vs. ~B items, SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",
-            [ItemCount, OtherItemCount, SigSize0, SigSize, VSize0, VSize, erlang:bit_size(DBChunkBin),
+    ?TRACE("~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~p / ~p bits",
+            [ItemCount, OtherItemCount, SigSize, VSize, erlang:bit_size(DBChunkBin),
              erlang:bit_size(
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
