@@ -1063,7 +1063,7 @@ compress_kv_pair(Key, Version, SigSize, VMod) ->
 -spec compress_key(Key::?RT:key(), SigSize::signature_size())
         -> BinKey::bitstring().
 compress_key(Key, SigSize) ->
-    KBin = erlang:term_to_binary(Key),
+    KBin = erlang:md5(erlang:term_to_binary(Key)),
     RestSize = erlang:bit_size(KBin) - SigSize,
     if RestSize >= 0  ->
            <<_:RestSize/bitstring, KBinCompressed:SigSize/bitstring>> = KBin,
