@@ -178,9 +178,11 @@
     {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
      VSize::signature_size(), SenderPid::comm:mypid()} |
     % merkle tree sync messages
-    {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSize::signature_size()} |
-    {?check_nodes, ToCheck::bitstring(), SigSizeI::signature_size(),
-     SigSizeILeafDiff::0 | signature_size() % = SigSizeL - SigSizeI
+    {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxLeafCount::non_neg_integer(),
+     MaxLeafItemsCountDiff::non_neg_integer() % = MaxLeafCount * BranchFactor - MaxItemsCount
+    } |
+    {?check_nodes, ToCheck::bitstring(), MaxLeafCount::non_neg_integer(),
+     MaxLeafItemsCountDiff::non_neg_integer() % = MaxLeafCount * BranchFactor - MaxItemsCount
     } |
     {?check_nodes_response, FlagsBin::bitstring(), MaxLeafCount::non_neg_integer(),
      MaxLeafItemsCountDiff::non_neg_integer() % = MaxLeafCount * BranchFactor - MaxItemsCount
@@ -538,34 +540,36 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?check_nodes, SenderPid, ToCheck, SigSize}, State)
-  when is_bitstring(ToCheck) andalso is_integer(SigSize) ->
+on({?check_nodes, SenderPid, ToCheck, OtherMaxLeafCount, OtherMaxLeafItemsCountDiff}, State) ->
     NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
-    on({?check_nodes, ToCheck, SigSize, 0}, NewState);
+    on({?check_nodes, ToCheck, OtherMaxLeafCount, OtherMaxLeafItemsCountDiff}, NewState);
 
-on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
+on({?check_nodes, ToCheck0, OtherMaxLeafCount, OtherMaxLeafItemsCountDiff},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = merkle_tree,      merkle_sync = MerkleSync,
-                           params = #merkle_params{branch_factor = BranchFactor,
-                                                   bucket_size = BucketSize} = Params,
+                           params = #merkle_params{bucket_size = BucketSize} = Params,
                            struct = Tree,             ownerPid = OwnerL,
                            dest_rr_pid = DestNodePid, stats = Stats,
                            dest_recon_pid = DestReconPid,
-                           misc = [{p1e, {P1ETotal_I, P1ETotal_L, LastP1ETotal}}]})
-  when is_bitstring(ToCheck0) andalso is_integer(SigSizeI) andalso is_integer(SigSizeILeafDiff) ->
+                           misc = [{p1e, LastP1ETotal},
+                                   {lcount, MyLastMaxLeafCount},
+                                   {icount, MyLastMaxItemsCount}]}) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
-    SigSizeL = SigSizeI + SigSizeILeafDiff,
+    OtherMaxItemsCount = OtherMaxLeafCount * BucketSize - OtherMaxLeafItemsCountDiff,
+    {P1E_I, P1E_L, SigSizeI, SigSizeL} =
+        merkle_next_signature_sizes(Params, LastP1ETotal,
+                                    OtherMaxLeafCount, OtherMaxItemsCount,
+                                    MyLastMaxLeafCount, MyLastMaxItemsCount),
     ToCheck = merkle_decompress_hashlist(ToCheck0, [], SigSizeI, SigSizeL),
-    % note: we get the new P1E values one round earlier than the
-    %       ?check_nodes_response handler on the initiator
-    {FlagsBin, RTree, MerkleSyncNew, MaxLeafCount, MaxItemsCount} =
-        check_node(ToCheck, Tree, SigSizeI, SigSizeL, LastP1ETotal, P1ETotal_L, MerkleSync),
-    ?DBG_ASSERT(MaxLeafCount * BucketSize >= MaxItemsCount),
-    MaxLeafItemsCountDiff = MaxLeafCount * BucketSize - MaxItemsCount,
-    send(DestReconPid, {?check_nodes_response, FlagsBin, MaxLeafCount, MaxLeafItemsCountDiff}),
-    {P1E_I, P1E_L} = merkle_next_p1e(BranchFactor, P1ETotal_I),
+    {FlagsBin, RTree, MerkleSyncNew, MyMaxLeafCount, MyMaxItemsCount} =
+        check_node(ToCheck, Tree, SigSizeI, SigSizeL, LastP1ETotal, P1E_L, MerkleSync),
+    ?DBG_ASSERT(MyMaxLeafCount * BucketSize >= MyMaxItemsCount),
+    MyMaxLeafItemsCountDiff = MyMaxLeafCount * BucketSize - MyMaxItemsCount,
+    send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxLeafCount, MyMaxLeafItemsCountDiff}),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew,
-                                    misc = [{p1e, {P1E_I, P1E_L, P1ETotal_I}}]},
+                                    misc = [{p1e, P1E_I},
+                                            {lcount, MyMaxLeafCount},
+                                            {icount, MyMaxItemsCount}]},
     if RTree =:= [] andalso MerkleSyncNew =:= [] ->
            shutdown(sync_finished, NewState);
        RTree =:= [] ->
@@ -577,7 +581,7 @@ on({?check_nodes, ToCheck0, SigSizeI, SigSizeILeafDiff},
        true -> NewState
     end;
 
-on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
+on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, OtherMaxLeafItemsCountDiff},
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = merkle_tree,          merkle_sync = MerkleSync,
                            params = #merkle_params{bucket_size = BucketSize} = Params,
@@ -603,12 +607,13 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount, MaxLeafItemsCountDiff},
             ok;
         {[_|_] = RTree, MerkleSyncNew, NStats, MyMaxLeafCount, MyMaxItemsCount} ->
             NStage = reconciliation,
-            OtherMaxItemsCount = OtherMaxLeafCount * BucketSize - MaxLeafItemsCountDiff,
+            OtherMaxItemsCount = OtherMaxLeafCount * BucketSize - OtherMaxLeafItemsCountDiff,
             {P1E_I, P1E_L, NextSigSizeI, NextSigSizeL} =
                 merkle_next_signature_sizes(Params, P1ETotal_I, MyMaxLeafCount, MyMaxItemsCount,
                                             OtherMaxLeafCount, OtherMaxItemsCount),
             Req = merkle_compress_hashlist(RTree, <<>>, NextSigSizeI, NextSigSizeL),
-            send(DestReconPid, {?check_nodes, Req, NextSigSizeI, NextSigSizeL - NextSigSizeI})
+            MyMaxLeafItemsCountDiff = MyMaxLeafCount * BucketSize - MyMaxItemsCount,
+            send(DestReconPid, {?check_nodes, Req, MyMaxLeafCount, MyMaxLeafItemsCountDiff})
     end,
     NewState = State#rr_recon_state{stats = NStats, struct = RTree,
                                     misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
@@ -763,15 +768,12 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                             OtherLeafCount, OtherItemsCount),
 
             RootNode = merkle_tree:get_root(MySyncStruct),
-            SigSize = case merkle_tree:is_leaf(RootNode) of
-                          true  -> NextSigSizeL;
-                          false -> NextSigSizeI
-                      end,
 
-            Req = merkle_compress_hashlist([RootNode], <<>>, SigSize, SigSize),
-            send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize}),
+            Req = merkle_compress_hashlist([RootNode], <<>>, NextSigSizeI, NextSigSizeL),
+            MyLeafItemsCountDiff = MyLeafCount * BucketSize - MyItemCount,
+            send(DestReconPid, {?check_nodes, comm:this(), Req, MyLeafCount, MyLeafItemsCountDiff}),
             State#rr_recon_state{stats = Stats1,
-                                 misc = [{signature_size, {SigSize, SigSize}},
+                                 misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
                                          {p1e, {P1E_I, P1E_L, P1ETotal}}],
                                  kv_list = []};
         false ->
@@ -779,7 +781,6 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
             P1ETotal = get_p1e(),
-            {P1E_I, P1E_L} = merkle_next_p1e(MerkleV, P1ETotal),
 
             LeafCount = merkle_tree:get_leaf_count(MySyncStruct),
             ItemCount = merkle_tree:get_item_count(MySyncStruct),
@@ -798,7 +799,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                              comm:make_global(OwnerL), SID,
                              {start_recon, merkle_tree, SyncParams}}),
             State#rr_recon_state{stats = Stats1, params = MySyncParams,
-                                 misc = [{p1e, {P1E_I, P1E_L, P1ETotal}}],
+                                 misc = [{p1e, P1ETotal},
+                                         {lcount, LeafCount},
+                                         {icount, ItemCount}],
                                  kv_list = []}
     end;
 begin_sync(MySyncStruct, OtherSyncStruct,
