@@ -77,7 +77,7 @@ new(DBName, Options) ->
     %% tables. Other table types could throw bad_argument exceptions while
     %% calling ets:next/2
   DbAtom = list_to_atom(DBName),
-    mnesia:create_table(DbAtom, list:append([{disc_copies, [node()]}, {type, ordered_set}], Options)),
+    mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set} | Options]),
     DbAtom.
 
 %% @doc Open a previously existing database. Not supported by ets.
