@@ -473,7 +473,7 @@ tester_type_check_rrepair(_Config) ->
              {check_node, 7}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 12}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 8}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 13}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
              {merkle_get_sync_leaves, 5}, %% needs merkle_tree with hashes
              {merkle_resolve_add_leaf_hash, 5}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
