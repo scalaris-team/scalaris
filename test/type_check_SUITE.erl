@@ -470,8 +470,8 @@ tester_type_check_rrepair(_Config) ->
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
-             {check_node, 7}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 12}, %% needs merkle_tree/nodes with hashes
+             {check_node, 8}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 8}, %% needs matching result and merkle nodes
              {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
              {merkle_get_sync_leaves, 5}, %% needs merkle_tree with hashes
