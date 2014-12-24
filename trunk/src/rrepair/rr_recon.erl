@@ -80,7 +80,7 @@
         {
          interval = intervals:empty()                         :: intervals:interval(),
          reconPid = undefined                                 :: comm:mypid() | undefined,
-         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring() | kv_tree(),
+         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
          sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
          ver_size = ?required(trivial_recon_struct, ver_size) :: signature_size()
         }).
@@ -174,7 +174,7 @@
     % API
     request() |
     % trivial sync messages
-    {resolve_req, BinKeys::bitstring(), SigSize::signature_size()} |
+    {resolve_req, BinReqIdxPos::bitstring()} |
     {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
      VSize::signature_size(), SenderPid::comm:mypid()} |
     % merkle tree sync messages
@@ -250,7 +250,7 @@ on({create_struct2, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     build_struct(DBList, DestI, RestI, State);
 
 on({start_recon, RMethod, Params} = _Msg,
-   State = #rr_recon_state{dest_rr_pid = DestRRPid}) ->
+   State = #rr_recon_state{dest_rr_pid = DestRRPid, misc = Misc}) ->
     ?TRACE1(_Msg, State),
     % initiator got other node's sync struct or parameters over sync interval
     % (mapped to the initiator's range)
@@ -268,7 +268,8 @@ on({start_recon, RMethod, Params} = _Msg,
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
                 decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
-            Params1 = Params#trivial_recon_struct{db_chunk = DBChunkTree},
+            ?DBG_ASSERT(Misc =:= []),
+            Misc1 = [{db_chunk, DBChunkTree}],
             Reconcile = resolve,
             Stage = resolve;
         bloom ->
@@ -276,20 +277,20 @@ on({start_recon, RMethod, Params} = _Msg,
                                 reconPid = DestReconPid} = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
-            Params1 = Params,
+            Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
-            Params1 = Params,
+            Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation;
         art ->
             MySyncI = art:get_interval(Params#art_recon_struct.art),
             DestReconPid = undefined,
-            Params1 = Params,
+            Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation
     end,
@@ -298,22 +299,25 @@ on({start_recon, RMethod, Params} = _Msg,
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
     send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
-    State#rr_recon_state{stage = Stage, params = Params1,
+    State#rr_recon_state{stage = Stage, params = Params,
                          method = RMethod, initiator = true,
                          my_sync_interval = MySyncI,
-                         dest_recon_pid = DestReconPid};
+                         dest_recon_pid = DestReconPid,
+                         misc = Misc1};
 
 on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = resolve,            initiator = true,
                            method = trivial,           dhtNodePid = DhtNodePid,
-                           params = #trivial_recon_struct{db_chunk = OtherDBChunk,
+                           params = #trivial_recon_struct{db_chunk = OtherDBChunkOrig,
                                                           sig_size = SigSize,
-                                                          ver_size = VSize} = Params,
+                                                          ver_size = VSize},
                            dest_rr_pid = DestRR_Pid,   stats = Stats,
                            ownerPid = OwnerL, to_resolve = {ToSend, ToReq},
+                           misc = [{db_chunk, OtherDBChunk}],
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
 
+    % identify items to send, request and the remaining (non-matched) DBChunk:
     {ToSend1, ToReq1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
     ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
@@ -323,7 +327,6 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
     %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
-    Params1 = Params#trivial_recon_struct{db_chunk = OtherDBChunk1},
     if SyncFinished ->
            SID = rr_recon_stats:get(session_id, Stats),
            ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
@@ -346,10 +349,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
            % let the non-initiator's rr_recon process identify the remaining keys
            Req2Count = gb_trees:size(OtherDBChunk1),
-           ToReq2 = util:gb_trees_foldl(
-                      fun(KeyBin, _VersionShort, Acc) ->
-                              <<Acc/bitstring, KeyBin/bitstring>>
-                      end, <<>>, OtherDBChunk1),
+           ToReq2 = compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
+                                    SigSize, VSize, 0, []),
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats2 =
@@ -360,16 +361,16 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
            ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
                   [SID, Req2Count, erlang:bit_size(ToReq2)]),
-           comm:send(DestReconPid, {resolve_req, ToReq2, SigSize}),
+           comm:send(DestReconPid, {resolve_req, ToReq2}),
            
-           Params2 = Params1#trivial_recon_struct{db_chunk = gb_trees:empty()},
            shutdown(sync_finished,
-                    State#rr_recon_state{stats = NewStats2, params = Params2,
-                                         to_resolve = {[], []}});
+                    State#rr_recon_state{stats = NewStats2,
+                                         to_resolve = {[], []},
+                                         misc = []});
        true ->
            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve),
-           State#rr_recon_state{params = Params1,
-                                to_resolve = {ToSend1, ToReq1}}
+           State#rr_recon_state{to_resolve = {ToSend1, ToReq1},
+                                misc = [{db_chunk, OtherDBChunk1}]}
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
@@ -469,7 +470,7 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% trivial/bloom reconciliation sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({resolve_req, BinKeys, SigSize} = _Msg,
+on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = Initiator,
                            method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
@@ -477,15 +478,11 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
   when (RMethod =:= trivial andalso not Initiator) orelse
            (RMethod =:= bloom andalso Initiator) ->
     ?TRACE1(_Msg, State),
-    ReqSet = decompress_k_list(BinKeys, gb_sets:empty(), SigSize),
+    IdxSize = bits_for_number(length(KVList)),
     NewStats =
-        case gb_sets:is_empty(ReqSet) of
-            true -> Stats;
-            _ ->
-                ReqKeys = [Key || {Key, _Version} <- KVList,
-                                  gb_sets:is_member(compress_key(Key, SigSize),
-                                                    ReqSet)],
-                
+        case decompress_k_list(BinReqIdxPos, KVList, IdxSize, 0) of
+            [] -> Stats;
+            ReqKeys ->
                 SID = rr_recon_stats:get(session_id, Stats),
                 ?TRACE("Resolve Trivial Session=~p ; ToSend=~p",
                        [SID, length(ReqKeys)]),
@@ -540,13 +537,11 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                 
                 % let the initiator's rr_recon process identify the remaining keys
                 Req2Count = gb_trees:size(DBChunkTree1),
-                ToReq2 = util:gb_trees_foldl(
-                           fun(KeyBin, _VersionShort, Acc) ->
-                                   <<Acc/bitstring, KeyBin/bitstring>>
-                           end, <<>>, DBChunkTree1),
+                ToReq2 = compress_k_list(DBChunkTree1, DBChunk,
+                                         SigSize, VSize, 0, []),
                 ?TRACE("resolve_req Bloom Session=~p ; ToReq=~p (~p bits)",
                        [SID, Req2Count, erlang:bit_size(ToReq2)]),
-                comm:send(DestReconPid, {resolve_req, ToReq2, SigSize}),
+                comm:send(DestReconPid, {resolve_req, ToReq2}),
                 if Req2Count > 0 ->
                        rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
                    true -> NewStats1
@@ -1073,16 +1068,37 @@ compress_key(Key, SigSize) ->
            <<0:FillSize, KBin/binary>>
     end.
 
-%% @doc De-compresses a bitstring with hashes of SigSize number of bits
-%%      into a gb_set with a binary key representation.
--spec decompress_k_list(CompressedBin::bitstring(), AccSet::gb_sets:set(bitstring()),
-                         SigSize::signature_size()) -> ResSet::gb_sets:set(bitstring()).
-decompress_k_list(<<>>, Set, _SigSize) ->
-    Set;
-decompress_k_list(Bin, Set, SigSize) ->
-    <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
-    Set1 = gb_sets:add(KeyBin, Set),
-    decompress_k_list(T, Set1, SigSize).
+%% @doc Creates a compressed version of the (unmatched) binary keys in the given
+%%      set using the indices in the original KV list.
+-spec compress_k_list(KVTree::kv_tree(), OtherDBChunkOrig::bitstring(),
+                      SigSize::signature_size(), VSize::signature_size(),
+                      AccPos::non_neg_integer(), ResultIdx::[?RT:key()])
+        -> CompressedIndices::bitstring().
+compress_k_list(_, <<>>, _SigSize, _VSize, DBChunkLen, AccResult) ->
+    IdxSize = bits_for_number(DBChunkLen),
+    lists:foldl(fun(Pos, Acc) ->
+                        <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
+                end, <<>>, AccResult);
+compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult) ->
+    <<KeyBin:SigSize/bitstring, _Version:VSize, T/bitstring>> = Bin,
+    case gb_trees:is_defined(KeyBin, KVTree) of
+        false ->
+            compress_k_list(KVTree, T, SigSize, VSize, AccPos + 1, AccResult);
+        true ->
+            compress_k_list(KVTree, T, SigSize, VSize, AccPos + 1, [AccPos | AccResult])
+    end.
+
+%% @doc De-compresses a bitstring with indices of SigSize number of bits
+%%      into a list of keys from the original KV list.
+-spec decompress_k_list(CompressedBin::bitstring(), KVList::db_chunk_kv(),
+                         SigSize::signature_size(), AccPos::non_neg_integer())
+        -> ResKeys::[?RT:key()].
+decompress_k_list(<<>>, _, _SigSize, _AccPos) ->
+    [];
+decompress_k_list(Bin, KVList, SigSize, AccPos) ->
+    <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    [{Key, _Version} | KVList2] = lists:nthtail(KeyPos - AccPos, KVList),
+    [Key | decompress_k_list(T, KVList2, SigSize, KeyPos + 1)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
@@ -1439,10 +1455,17 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) -
 %%      the given merkle params.
 -spec merkle_max_bucket_size_bits(Params::#merkle_params{}) -> pos_integer().
 merkle_max_bucket_size_bits(Params) ->
-    BucketSizeBits0 = erlang:max(1, util:ceil(util:log2(Params#merkle_params.bucket_size + 1))),
+    BucketSizeBits0 = bits_for_number(Params#merkle_params.bucket_size + 1),
     ?IIF(config:read(rr_align_to_bytes),
          bloom:resize(BucketSizeBits0, 8),
          BucketSizeBits0).
+
+%% @doc Gets the number of bits needed to encode the given number.
+-spec bits_for_number(Number::pos_integer()) -> pos_integer();
+                     (0) -> 0.
+bits_for_number(0) -> 0;
+bits_for_number(Number) ->
+    erlang:max(1, util:ceil(util:log2(Number + 1))).
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
