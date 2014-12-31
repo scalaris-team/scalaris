@@ -2151,14 +2151,20 @@ trivial_signature_sizes(_, 0, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
 trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     VCompareCount = erlang:min(ItemCount, OtherItemCount),
-    % reduce P1E for the two parts here (key and version comparison)
-    B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
-    % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
-
-    % note: we have n one-to-one comparisons
-    VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), B * P1E),
-    VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
+    case get_min_version_bits() of
+        variable ->
+            % reduce P1E for the two parts here (key and version comparison)
+            B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
+            % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
+            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
+            % note: we have n one-to-one comparisons
+            VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), B * P1E),
+            VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
+            ok;
+        VSize0 ->
+            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
+            ok
+    end,
     Res = {_SigSize, _VSize} = align_bitsize(SigSize0, VSize0),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
@@ -2234,11 +2240,16 @@ align_bitsize(SigSize0, VSize0) ->
     case config:read(rr_align_to_bytes) of
         false -> {SigSize0, VSize0};
         _     ->
-            FullKVSize0 = SigSize0 + VSize0,
-            FullKVSize = bloom:resize(FullKVSize0, 8),
-            VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
-            SigSize = FullKVSize - VSize,
-            {SigSize, VSize}
+            case get_min_version_bits() of
+                variable ->
+                    FullKVSize0 = SigSize0 + VSize0,
+                    FullKVSize = bloom:resize(FullKVSize0, 8),
+                    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
+                    SigSize = FullKVSize - VSize,
+                    {SigSize, VSize};
+                _ ->
+                    {bloom:resize(SigSize0, 8), VSize0}
+            end
     end.
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
@@ -2604,8 +2615,9 @@ get_p1e() ->
     config:read(rr_recon_p1e).
 
 %% @doc Use at least these many bits for compressed version numbers.
--spec get_min_version_bits() -> 16.
-get_min_version_bits() -> 16.
+-spec get_min_version_bits() -> pos_integer() | variable.
+get_min_version_bits() ->
+    config:read(rr_recon_version_bits).
 
 %% @doc Specifies how many items to retrieve from the DB at once.
 %%      Tries to reduce the load of a single request in the dht_node process.
