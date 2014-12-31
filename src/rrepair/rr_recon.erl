@@ -419,9 +419,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                        kv_list = NewKVList};
               FullDiffSize > 0 -> % andalso BFCount =:= 0 ->
                   ?DBG_ASSERT(BFCount =:= 0),
-                  % must send resolve_req message for the non-initiator to shut down
-                  send(DestReconPid,
-                       {resolve_req, <<>>, 0, 0, comm:this()}),
+                  % no need to send resolve_req message - the non-initiator already shut down
                   % empty BF with diff at our node -> the other node does not have any items!
                   % start a resolve here:
                   SID = rr_recon_stats:get(session_id, Stats),
@@ -434,9 +432,12 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
                                                   kv_list = NewKVList},
                   shutdown(sync_finished, NewState);
-              true ->
+              BFCount =:= 0 ->
+                  % note: kv_list has not changed, we can thus use the old State here:
+                  shutdown(sync_finished, State);
+              true -> % BFCount > 0
                   % must send resolve_req message for the non-initiator to shut down
-                  send(DestReconPid, {resolve_req, <<>>, 1, 1, comm:this()}),
+                  send(DestReconPid, {resolve_req, <<>>, 0, 0, comm:this()}),
                   % note: kv_list has not changed, we can thus use the old State here:
                   shutdown(sync_finished, State)
            end
@@ -780,7 +781,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                      comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
-    State#rr_recon_state{struct = {}, stage = resolve};
+    case bloom:item_count(MySyncStruct#bloom_recon_struct.bloom) of
+        0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
+        _ -> State#rr_recon_state{struct = {}, stage = resolve}
+    end;
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
