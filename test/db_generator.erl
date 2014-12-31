@@ -100,7 +100,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     ?DBG_ASSERT(Distribution =:= feeder_fix_rangen(Distribution, ItemCount)),
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
-        random -> gen_random([{Interval, ItemCount}], [], OutputType);
+        random -> gen_random(Interval, ItemCount, OutputType);
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         {non_uniform, RanGen} -> non_uniform_key_list(Interval, ItemCount, RanGen, [], OutputType)
     end.
@@ -108,18 +108,16 @@ get_db(Interval, ItemCount, Distribution, Options) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec gen_random
-        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
-         Acc::[result_k()], OutputType::list_key) -> [result_k()];
-        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
-         Acc::[result_ktpl()], OutputType::list_keytpl) -> [result_ktpl()];
-        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
-         Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
-gen_random([], Acc, _) -> Acc;
-gen_random([{I, Add} | R], Acc, OutputType) ->
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_key) -> [result_k()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_keytpl) -> [result_ktpl()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_key_val) -> [result_kv()].
+gen_random(I, Add, OutputType) ->
     SimpleI = intervals:get_bounds(I),
     ToAdd0 = gb_sets:from_list(?RT:get_random_in_interval(SimpleI, Add)),
-    ToAdd = gen_random_gb_sets(SimpleI, Add - gb_sets:size(ToAdd0), OutputType, ToAdd0, 1),
-    gen_random(R, lists:append(ToAdd, Acc), OutputType).
+    gen_random_gb_sets(SimpleI, Add - gb_sets:size(ToAdd0), OutputType, ToAdd0, 1).
 
 -spec gen_random_gb_sets
         (Interval::intervals:simple_interval2(), ToAdd::non_neg_integer(),
@@ -344,16 +342,8 @@ insert_db(KVV) ->
     _ = lists:foldl(
           fun(Node, ActKVV) ->
                   comm:send(Node, {get_state, comm:this(), my_range}),
-                  % note: receive wrapped in anonymous functions to allow
-                  %       ?SCALARIS_RECV in multiple receive statements
-                  NRange = fun() ->
-                                   trace_mpath:thread_yield(),
-                                   receive
-                               ?SCALARIS_RECV(
-                                   {get_state_response, Range}, %% ->
-                                   Range
-                                 )
-                           end end(),
+                  trace_mpath:thread_yield(),
+                  receive ?SCALARIS_RECV({get_state_response, NRange}, ok) end,
                   {NKVV, RestKVV} = lists:partition(
                                       fun(Entry) ->
                                               intervals:in(db_entry:get_key(Entry), NRange)
@@ -553,7 +543,7 @@ get_rep_group(Key) ->
     [db_entry:new(K, Value, Version) || K <- ?RT:get_replica_keys(Key)].
 
 -spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) ->
-          {[db_entry:entry()], Outdated::non_neg_integer()}.
+          {[db_entry:entry()], Outdated::0 | 1}.
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
     EKey = get_error_key(Key, RepKeys, FDest),
