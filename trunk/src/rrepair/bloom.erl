@@ -324,7 +324,7 @@ calc_HF_numEx(N, FP) ->
 
 %% @doc Calculates optimal number of hash functions for
 %%      an M-bit large BloomFilter with a maximum of N Elements.
--spec calc_HF_num(M::non_neg_integer(), N::non_neg_integer()) -> K::pos_integer().
+-spec calc_HF_num(M::pos_integer(), N::non_neg_integer()) -> K::pos_integer().
 calc_HF_num(M, N) ->
     K = math:log(2) * M / erlang:max(N, 1),
     K_Min = util:floor(K),
@@ -339,7 +339,7 @@ calc_HF_num(M, N) ->
 %%      positive probability of FP using up to N elements and the optimal
 %%      number of hash functions K = ln(2)*M/N.
 %%      M = N * log_2(1/FP) / ln(2) = - N * log_2(FP) / ln(2)
--spec calc_least_size_opt(N::non_neg_integer(), FP::float()) -> M::non_neg_integer().
+-spec calc_least_size_opt(N::non_neg_integer(), FP::float()) -> M::pos_integer().
 calc_least_size_opt(_N, FP) when FP == 0 -> 1;
 calc_least_size_opt(0, _FP) -> 1;
 calc_least_size_opt(N, FP) ->
@@ -349,7 +349,7 @@ calc_least_size_opt(N, FP) ->
 %%      positive probability of FP using K hash functions and up to N-Elements.
 %%      M = 1/(1-(1-(FP)^(1/K))^(1/(KN)))
 -spec calc_least_size(N::non_neg_integer(), FP::float(), K::pos_integer())
-        -> M::non_neg_integer().
+        -> M::pos_integer().
 calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
@@ -358,7 +358,7 @@ calc_least_size(N, FP, K) ->
 %% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
 %%      and a maximum number of N elements.
 %%      FP = (1-(1-1/M)^(K*N))^K
--spec calc_FPR(M::pos_integer(), N::pos_integer(), K::pos_integer())
+-spec calc_FPR(M::pos_integer(), N::non_neg_integer(), K::pos_integer())
         -> FP::float().
 calc_FPR(M, N, K) ->
     math:pow(1 - math:pow(1 - 1/M, K * N), K).
