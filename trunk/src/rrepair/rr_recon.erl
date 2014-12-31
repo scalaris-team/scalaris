@@ -155,6 +155,7 @@
          merkle_sync        = []                                     :: [merkle_sync()],
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          kv_list            = []                                     :: db_chunk_kv(),
+         k_list             = []                                     :: [?RT:key()],
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
          to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReq::[?RT:key()]}
          }).
@@ -399,8 +400,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = shash,             dhtNodePid = DhtNodePid,
-                           params = #shash_recon_struct{db_chunk = OtherDBChunkOrig,
-                                                        sig_size = SigSize},
+                           params = #shash_recon_struct{sig_size = SigSize} = Params,
                            stats = Stats,              kv_list = KVList,
                            misc = [{db_chunk, OtherDBChunk},
                                    {oicount, OtherItemCount}],
@@ -437,6 +437,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                         NewKVList, FullDiffSize,
                                         OtherItemCount, ?SHASH_B * get_p1e())
                               end),
+                  KList = [element(1, KV) || KV <- NewKVList],
+                  OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
+                  Params1 = Params#shash_recon_struct{db_chunk = <<>>},
                   OtherDiffIdx = shash_compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
                                                        SigSize, 0, []),
 
@@ -445,15 +448,18 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   % we will get one reply from a subsequent ?key_upd resolve
                   NewStats = rr_recon_stats:inc([{resolve_started, 1},
                                                  {build_time, BuildTime}], Stats),
-                  NewState#rr_recon_state{stats = NewStats, stage = resolve};
+                  NewState#rr_recon_state{stats = NewStats, stage = resolve,
+                                          params = Params1,
+                                          kv_list = [], k_list = KList};
               StartResolve -> % andalso OtherItemCount =:= 0 ->
                   ?DBG_ASSERT(OtherItemCount =:= 0),
                   % no need to send resolve_req message - the non-initiator already shut down
                   % the other node does not have any items but there is a diff at our node!
                   % start a resolve here:
                   SID = rr_recon_stats:get(session_id, Stats),
+                  KList = [element(1, KV) || KV <- NewKVList],
                   send_local(OwnerL, {request_resolve, SID,
-                                      {key_upd_send, DestRRPid, [K || {K, _V} <- NewKVList], []},
+                                      {key_upd_send, DestRRPid, KList, []},
                                       [{feedback_request, comm:make_global(OwnerL)},
                                        {from_my_node, 1}]}),
                   % we will get one reply from a subsequent ?key_upd resolve
@@ -472,7 +478,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
-                           params = #bloom_recon_struct{bloom = BF},
+                           params = #bloom_recon_struct{bloom = BF} = Params,
                            stats = Stats,              kv_list = KVList,
                            dest_recon_pid = DestReconPid,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
@@ -512,7 +518,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   NewStats = rr_recon_stats:inc([{resolve_started, 1},
                                                  {build_time, BuildTime}], Stats),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
-                                       kv_list = NewKVList};
+                                       params = Params#bloom_recon_struct{bloom = bloom:new_fpr(0, 0.0)},
+                                       kv_list = [],
+                                       k_list = [element(1, KV) || KV <- NewKVList]};
               FullDiffSize > 0 -> % andalso BFCount =:= 0 ->
                   ?DBG_ASSERT(BFCount =:= 0),
                   % no need to send resolve_req message - the non-initiator already shut down
@@ -520,7 +528,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   % start a resolve here:
                   SID = rr_recon_stats:get(session_id, Stats),
                   send_local(OwnerL, {request_resolve, SID,
-                                      {key_upd_send, DestRRPid, [K || {K, _V} <- NewKVList], []},
+                                      {key_upd_send, DestRRPid, [element(1, KV) || KV <- NewKVList], []},
                                       [{feedback_request, comm:make_global(OwnerL)},
                                        {from_my_node, 1}]}),
                   % we will get one reply from a subsequent ?key_upd resolve
@@ -529,8 +537,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                                   kv_list = NewKVList},
                   shutdown(sync_finished, NewState);
               BFCount =:= 0 ->
-                  % note: kv_list has not changed, we can thus use the old State here:
-                  shutdown(sync_finished, State);
+                  shutdown(sync_finished, State#rr_recon_state{kv_list = NewKVList});
               true -> % BFCount > 0
                   % must send resolve_req message for the non-initiator to shut down
                   send(DestReconPid, {resolve_req, <<>>, 0, 0, comm:this()}),
@@ -571,13 +578,13 @@ on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = Initiator,
                            method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           kv_list = KVList,          stats = Stats})
+                           k_list = KList,          stats = Stats})
   when (RMethod =:= trivial andalso not Initiator) orelse
            ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
     ?TRACE1(_Msg, State),
-    IdxSize = bits_for_number(length(KVList)),
+    IdxSize = bits_for_number(length(KList)),
     NewStats =
-        case decompress_k_list(BinReqIdxPos, KVList, IdxSize, 0) of
+        case decompress_k_list(BinReqIdxPos, KList, IdxSize, 0) of
             [] -> Stats;
             ReqKeys ->
                 SID = rr_recon_stats:get(session_id, Stats),
@@ -598,13 +605,13 @@ on({resolve_req, BinReqIdxPos} = _Msg,
 
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = shash,            kv_list = KVList}) ->
+                           method = shash,            k_list = KList}) ->
     ?TRACE1(_Msg, State),
 
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize),
-    IdxSize = bits_for_number(length(KVList)),
-    MyDiffKeys = [Key || Key <- decompress_k_list(MyDiffIdx, KVList, IdxSize, 0),
+    IdxSize = bits_for_number(length(KList)),
+    MyDiffKeys = [Key || Key <- decompress_k_list(MyDiffIdx, KList, IdxSize, 0),
                                 not gb_trees:is_defined(compress_key(Key, SigSize),
                                                         DBChunkTree)],
 
@@ -842,17 +849,18 @@ build_struct(DBList, SyncI, RestI,
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = trivial, initiator = false,
                                    ownerPid = OwnerL, stats = Stats,
-                                   dest_rr_pid = DestRRPid}) ->
+                                   dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                      comm:make_global(OwnerL), SID,
                      {start_recon, trivial, MySyncStruct}}),
-    State#rr_recon_state{struct = {}, stage = resolve};
+    State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
+                         k_list = [element(1, KV) || KV <- KVList]};
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = shash, initiator = false,
                                    ownerPid = OwnerL, stats = Stats,
-                                   dest_rr_pid = DestRRPid}) ->
+                                   dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
@@ -860,7 +868,8 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                      {start_recon, shash, MySyncStruct}}),
     case MySyncStruct#shash_recon_struct.db_chunk of
         <<>> -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
-        _    -> State#rr_recon_state{struct = {}, stage = resolve}
+        _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
+                                     k_list = [element(1, KV) || KV <- KVList]}
     end;
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = bloom, initiator = false,
@@ -1183,15 +1192,15 @@ compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult) ->
 
 %% @doc De-compresses a bitstring with indices of SigSize number of bits
 %%      into a list of keys from the original KV list.
--spec decompress_k_list(CompressedBin::bitstring(), KVList::db_chunk_kv(),
+-spec decompress_k_list(CompressedBin::bitstring(), KList::[?RT:key()],
                          SigSize::signature_size(), AccPos::non_neg_integer())
         -> ResKeys::[?RT:key()].
 decompress_k_list(<<>>, _, _SigSize, _AccPos) ->
     [];
-decompress_k_list(Bin, KVList, SigSize, AccPos) ->
+decompress_k_list(Bin, KList, SigSize, AccPos) ->
     <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    [{Key, _Version} | KVList2] = lists:nthtail(KeyPos - AccPos, KVList),
-    [Key | decompress_k_list(T, KVList2, SigSize, KeyPos + 1)].
+    [Key | KList2] = lists:nthtail(KeyPos - AccPos, KList),
+    [Key | decompress_k_list(T, KList2, SigSize, KeyPos + 1)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SHash specific
@@ -1955,7 +1964,9 @@ merkle_resolve_req_keys_noninit([{leaf, inner, _OtherMaxItemsCount, LeafNode, fa
                                 ToSend, ToReq, ToResolve, ResolveNonEmpty, true) ->
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     ToSend1 =
-        case decompress_k_list(ReqKeys, merkle_tree:get_bucket(LeafNode), IdxSize, 0) of
+        case decompress_k_list(ReqKeys,
+                               [element(1, KV) || KV <- merkle_tree:get_bucket(LeafNode)],
+                               IdxSize, 0) of
             [] -> ToSend;
             [_|_] = X -> X ++ ToSend
         end,
@@ -2003,7 +2014,9 @@ merkle_resolve_req_keys_init([{leaf, inner, _OtherMaxItemsCount, LeafNode, false
     % TODO: same as above -> extract function?
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     SendKeys1 =
-        case decompress_k_list(ReqKeys, merkle_tree:get_bucket(LeafNode), IdxSize, 0) of
+        case decompress_k_list(ReqKeys,
+                               [element(1, KV) || KV <- merkle_tree:get_bucket(LeafNode)],
+                               IdxSize, 0) of
             [] -> SendKeys;
             [_|_] = X -> X ++ SendKeys
         end,
