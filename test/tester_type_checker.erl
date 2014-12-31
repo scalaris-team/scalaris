@@ -120,6 +120,17 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, gb_trees_functions_thrown} | CheckStack]}
             end;
+        {builtin_type, gb_sets_set, ValueType} ->
+            % there is no is_gb_set/1, so try some functions on the set to check
+            try
+                _ = gb_sets:size(Value),
+                _ = gb_sets:is_member('$non_existing_key', Value),
+                _ = gb_sets:add('$non_existing_key', Value),
+                check_list(gb_sets:to_list(Value), % [Key]
+                           {list, ValueType},
+                           CheckStack, ParseState)
+            catch _:_ -> {false, [{Value, gb_sets_functions_thrown} | CheckStack]}
+            end;
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_float/1, no_float);
