@@ -228,10 +228,8 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     case intervals:is_empty(SyncI) of
         false ->
             case RMethod of
-                trivial -> fd:subscribe(DestRRPid);
-                bloom   -> fd:subscribe(DestRRPid);
-                merkle_tree -> fd:subscribe(DestRRPid);
-                _ -> ok
+                art -> ok; % legacy (no integrated trivial sync yet)
+                _   -> fd:subscribe(DestRRPid)
             end,
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
@@ -267,7 +265,7 @@ on({start_recon, RMethod, Params} = _Msg,
             fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
-                decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
+                decompress_kv_list(DBChunk, [], SigSize, VSize),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, DBChunkTree}],
             Reconcile = resolve,
@@ -406,7 +404,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        bloom:item_count(BF), ?BLOOM_B * get_p1e())
+                                        BFCount, ?BLOOM_B * get_p1e())
                               end),
                   ?DBG_ASSERT(DBChunk =/= <<>>),
                   
@@ -485,8 +483,8 @@ on({resolve_req, BinReqIdxPos} = _Msg,
             [] -> Stats;
             ReqKeys ->
                 SID = rr_recon_stats:get(session_id, Stats),
-                ?TRACE("Resolve Trivial Session=~p ; ToSend=~p",
-                       [SID, length(ReqKeys)]),
+                ?TRACE("Resolve ~s Session=~p ; ToSend=~p",
+                       [RMethod, SID, length(ReqKeys)]),
                 ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
                              {non_unique_send_list, ReqKeys}),
                 % note: the resolve request is counted at the initiator and
@@ -508,7 +506,7 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
     ?TRACE1(_Msg, State),
     
     DBChunkTree =
-        decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
+        decompress_kv_list(DBChunk, [], SigSize, VSize),
 
     NewStats2 =
         case gb_trees:is_empty(DBChunkTree) of
@@ -902,7 +900,7 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
 %%      probability of P1E, given we compare N hashes with M other hashes
-%%      pairwise with each other (assuming the worst case, i.e. we have M+N
+%%      pairwise with each other (assuming the worst case, i.e. having M+N total
 %%      hashes).
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
                                   P1E::float(), MaxSize::signature_size())
@@ -927,15 +925,14 @@ compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
 
 %% @doc De-compresses the binary from compress_kv_list/4 into a gb_tree with a
 %%      binary key representation and the integer of the (shortened) version.
--spec decompress_kv_list(CompressedBin::bitstring(), AccTree::kv_tree(),
+-spec decompress_kv_list(CompressedBin::bitstring(), AccList::[{KeyBin::bitstring(), VersionShort::non_neg_integer()}],
                          SigSize::signature_size(), VSize::signature_size())
         -> ResTree::kv_tree().
-decompress_kv_list(<<>>, Tree, _SigSize, _VSize) ->
-    Tree;
-decompress_kv_list(Bin, Tree, SigSize, VSize) ->
+decompress_kv_list(<<>>, AccList, _SigSize, _VSize) ->
+    gb_trees:from_orddict(orddict:from_list(AccList));
+decompress_kv_list(Bin, AccList, SigSize, VSize) ->
     <<KeyBin:SigSize/bitstring, Version:VSize, T/bitstring>> = Bin,
-    Tree1 = gb_trees:enter(KeyBin, Version, Tree),
-    decompress_kv_list(T, Tree1, SigSize, VSize).
+    decompress_kv_list(T, [{KeyBin, Version} | AccList], SigSize, VSize).
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
@@ -1001,7 +998,7 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
                VersionShort =:= OtherVersionShort ->
                    get_full_diff_(Rest, MyIOtKvTree2, FBItems,
                                   ReqItems, SigSize, VMod);
-               true ->
+               true -> % VersionShort < OtherVersionShort
                    get_full_diff_(Rest, MyIOtKvTree2, FBItems,
                                   [Key | ReqItems], SigSize, VMod)
             end
@@ -1499,7 +1496,7 @@ merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits
     {SigSize, VSize} = trivial_signature_sizes(BSize, MyMaxItemsCount, P1E),
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
-    OBucketTree = decompress_kv_list(OBucketBin, gb_trees:empty(), SigSize, VSize),
+    OBucketTree = decompress_kv_list(OBucketBin, [], SigSize, VSize),
     {NHashes, OBucketBin, OBucketTree, SigSize, VSize}.
 
 %% @doc Gets a compact binary merkle hash list from all leaf-inner node
