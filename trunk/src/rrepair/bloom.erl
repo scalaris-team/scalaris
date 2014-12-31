@@ -350,7 +350,7 @@ calc_least_size_opt(N, FP) ->
 %%      M = 1/(1-(1-(FP)^(1/K))^(1/(KN)))
 -spec calc_least_size(N::non_neg_integer(), FP::float(), K::pos_integer())
         -> M::non_neg_integer().
-calc_least_size(0, FP, _K) when FP == 0 -> 1;
+calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
     util:ceil(1 / (1 - (math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))).
