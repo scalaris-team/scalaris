@@ -60,7 +60,7 @@
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
--type method()         :: trivial | bloom | merkle_tree | art.% | iblt.
+-type method()         :: trivial | shash | bloom | merkle_tree | art.% | iblt.
 -type stage()          :: req_shared_interval | build_struct | reconciliation | resolve.
 
 -type exit_reason()    :: empty_interval |      %interval intersection between initator and client is empty
@@ -75,6 +75,7 @@
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
 -type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
+-type shash_kv_set()   :: gb_sets:set(KVBin::bitstring()).
 
 -record(trivial_recon_struct,
         {
@@ -83,6 +84,14 @@
          db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
          sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
          ver_size = ?required(trivial_recon_struct, ver_size) :: signature_size()
+        }).
+
+-record(shash_recon_struct,
+        {
+         interval = intervals:empty()                         :: intervals:interval(),
+         reconPid = undefined                                 :: comm:mypid() | undefined,
+         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
+         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size()
         }).
 
 -record(bloom_recon_struct,
@@ -111,11 +120,13 @@
         }).
 
 -type sync_struct() :: #trivial_recon_struct{} |
+                       #shash_recon_struct{} |
                        #bloom_recon_struct{} |
                        merkle_tree:merkle_tree() |
                        [merkle_tree:mt_node()] |
                        #art_recon_struct{}.
 -type parameters() :: #trivial_recon_struct{} |
+                      #shash_recon_struct{} |
                       #bloom_recon_struct{} |
                       #merkle_params{} |
                       #art_recon_struct{}.
@@ -151,6 +162,7 @@
 
 % Optimum for reducing P1E for the two parts: key and version comparison (factor B for the latter)
 -define(TRIVIAL_B, 0.5).
+-define(SHASH_B, 0.5). % TODO: find optimum!
 % Optimum for reducing P1E for the two parts: bloom and trivial RC (factor B for the latter)
 -define(BLOOM_B, 0.5809402158035948). % 2*math:log(2) / (1+2*math:log(2))
 
@@ -270,6 +282,19 @@ on({start_recon, RMethod, Params} = _Msg,
             Misc1 = [{db_chunk, DBChunkTree}],
             Reconcile = resolve,
             Stage = resolve;
+        shash ->
+            #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
+                                db_chunk = DBChunk, sig_size = SigSize} = Params,
+            ?DBG_ASSERT(DestReconPid =/= undefined),
+            fd:subscribe(DestRRPid),
+            % convert db_chunk to a gb_set for faster access checks
+            DBChunkSet =
+                shash_decompress_kv_list(DBChunk, [], SigSize),
+            ?DBG_ASSERT(Misc =:= []),
+            Misc1 = [{db_chunk, DBChunkSet},
+                     {oicount, gb_sets:size(DBChunkSet)}],
+            Reconcile = reconcile,
+            Stage = reconciliation;
         bloom ->
             #bloom_recon_struct{interval = MySyncI,
                                 reconPid = DestReconPid} = Params,
@@ -371,6 +396,79 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                 misc = [{db_chunk, OtherDBChunk1}]}
     end;
 
+on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
+   State = #rr_recon_state{stage = reconciliation,     initiator = true,
+                           method = shash,             dhtNodePid = DhtNodePid,
+                           params = #shash_recon_struct{db_chunk = OtherDBChunkOrig,
+                                                        sig_size = SigSize},
+                           stats = Stats,              kv_list = KVList,
+                           misc = [{db_chunk, OtherDBChunk},
+                                   {oicount, OtherItemCount}],
+                           dest_recon_pid = DestReconPid,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
+    ?TRACE1(_Msg, State),
+    % this is similar to the trivial sync above and the bloom sync below
+
+    % identify differing items and the remaining (non-matched) DBChunk:
+    {NewKVList, OtherDBChunk1} =
+        shash_get_full_diff(DBList, OtherDBChunk, KVList, SigSize),
+    NewState = State#rr_recon_state{kv_list = NewKVList,
+                                    misc = [{db_chunk, OtherDBChunk1},
+                                            {oicount, OtherItemCount}]},
+
+    %if rest interval is non empty start another sync
+    SyncFinished = intervals:is_empty(RestI),
+    if not SyncFinished ->
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile),
+           NewState;
+       true ->
+           FullDiffSize = length(NewKVList),
+           StartResolve = FullDiffSize > 0 orelse not gb_sets:is_empty(OtherDBChunk1),
+           ?TRACE("Reconcile SHash Session=~p ; Diff=~p",
+                  [rr_recon_stats:get(session_id, Stats), FullDiffSize]),
+           if StartResolve andalso OtherItemCount > 0 ->
+                  % send idx of non-matching other items & KV-List of my diff items
+                  % start resolve similar to a trivial recon but using the full diff!
+                  % (as if non-initiator in trivial recon)
+                  % NOTE: reduce P1E for the two parts here (SHash and trivial RC)
+                  {BuildTime, {MyDiff, SigSizeT, VSizeT}} =
+                      util:tc(fun() ->
+                                      compress_kv_list_p1e(
+                                        NewKVList, FullDiffSize,
+                                        OtherItemCount, ?SHASH_B * get_p1e())
+                              end),
+                  OtherDiffIdx = shash_compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
+                                                       SigSize, 0, []),
+
+                  send(DestReconPid,
+                       {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
+                  % we will get one reply from a subsequent ?key_upd resolve
+                  NewStats = rr_recon_stats:inc([{resolve_started, 1},
+                                                 {build_time, BuildTime}], Stats),
+                  NewState#rr_recon_state{stats = NewStats, stage = resolve};
+              StartResolve -> % andalso OtherItemCount =:= 0 ->
+                  ?DBG_ASSERT(OtherItemCount =:= 0),
+                  % no need to send resolve_req message - the non-initiator already shut down
+                  % the other node does not have any items but there is a diff at our node!
+                  % start a resolve here:
+                  SID = rr_recon_stats:get(session_id, Stats),
+                  send_local(OwnerL, {request_resolve, SID,
+                                      {key_upd_send, DestRRPid, [K || {K, _V} <- NewKVList], []},
+                                      [{feedback_request, comm:make_global(OwnerL)},
+                                       {from_my_node, 1}]}),
+                  % we will get one reply from a subsequent ?key_upd resolve
+                  NewStats = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+                  NewState2 = NewState#rr_recon_state{stats = NewStats, stage = resolve},
+                  shutdown(sync_finished, NewState2);
+              OtherItemCount =:= 0 ->
+                  shutdown(sync_finished, NewState);
+              true -> % OtherItemCount > 0
+                  % must send resolve_req message for the non-initiator to shut down
+                  send(DestReconPid, {resolve_req, <<>>, <<>>, 0, 0, comm:this()}),
+                  shutdown(sync_finished, NewState)
+           end
+    end;
+
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
@@ -466,7 +564,7 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% trivial/bloom reconciliation sync messages
+%% trivial/shash/bloom reconciliation sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({resolve_req, BinReqIdxPos} = _Msg,
@@ -475,7 +573,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            kv_list = KVList,          stats = Stats})
   when (RMethod =:= trivial andalso not Initiator) orelse
-           (RMethod =:= bloom andalso Initiator) ->
+           ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
     ?TRACE1(_Msg, State),
     IdxSize = bits_for_number(length(KVList)),
     NewStats =
@@ -498,55 +596,36 @@ on({resolve_req, BinReqIdxPos} = _Msg,
         end,
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
+on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = shash,            kv_list = KVList}) ->
+    ?TRACE1(_Msg, State),
+
+    DBChunkTree =
+        decompress_kv_list(OtherDBChunk, [], SigSize, VSize),
+    IdxSize = bits_for_number(length(KVList)),
+    MyDiffKeys = [Key || Key <- decompress_k_list(MyDiffIdx, KVList, IdxSize, 0),
+                                not gb_trees:is_defined(compress_key(Key, SigSize),
+                                                        DBChunkTree)],
+
+    NewStats2 = shash_bloom_perform_resolve(
+                  State, OtherDBChunk, DBChunkTree, SigSize, VSize, DestReconPid, MyDiffKeys,
+                  % nothing to do if the chunk is empty and no items to send
+                  gb_trees:is_empty(DBChunkTree) andalso MyDiffIdx =:= <<>>),
+
+    shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
+
 on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = bloom,
-                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           kv_list = KVList,          stats = Stats}) ->
+                           method = bloom}) ->
     ?TRACE1(_Msg, State),
     
-    DBChunkTree =
-        decompress_kv_list(DBChunk, [], SigSize, VSize),
+    DBChunkTree = decompress_kv_list(DBChunk, [], SigSize, VSize),
 
-    NewStats2 =
-        case gb_trees:is_empty(DBChunkTree) of
-            true ->
-                % nothing to do if the chunk is empty:
-                Stats;
-            _ ->
-                SID = rr_recon_stats:get(session_id, Stats),
-                {ToSendKeys1, ToReq1, DBChunkTree1} =
-                    get_part_diff(KVList, DBChunkTree, [], [], SigSize, VSize),
-
-                ?TRACE("Resolve Bloom Session=~p ; ToSend=~p ; ToReq=~p",
-                       [SID, length(ToSendKeys1), length(ToReq1)]),
-                ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
-                             {non_unique_send_list, ToSendKeys1}),
-                ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
-                             {non_unique_req_list, ToReq1}),
-                
-                % note: the resolve request was counted at the initiator and
-                %       thus from_my_node must be 0 on this node!
-                send_local(OwnerL, {request_resolve, SID,
-                                    {key_upd_send, DestRRPid, ToSendKeys1, ToReq1},
-                                    [{from_my_node, 0},
-                                     {feedback_request, comm:make_global(OwnerL)}]}),
-                % we will get one reply from a subsequent feedback response
-                NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
-                
-                % let the initiator's rr_recon process identify the remaining keys
-                Req2Count = gb_trees:size(DBChunkTree1),
-                ToReq2 = compress_k_list(DBChunkTree1, DBChunk,
-                                         SigSize, VSize, 0, []),
-                ?TRACE("resolve_req Bloom Session=~p ; ToReq=~p (~p bits)",
-                       [SID, Req2Count, erlang:bit_size(ToReq2)]),
-                comm:send(DestReconPid, {resolve_req, ToReq2}),
-                if Req2Count > 0 ->
-                       rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
-                   true -> NewStats1
-                end
-        end,
-
+    NewStats2 = shash_bloom_perform_resolve(
+                  State, DBChunk, DBChunkTree, SigSize, VSize, DestReconPid, [],
+                  % nothing to do if the chunk is empty
+                  gb_trees:is_empty(DBChunkTree)),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -770,6 +849,19 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                      comm:make_global(OwnerL), SID,
                      {start_recon, trivial, MySyncStruct}}),
     State#rr_recon_state{struct = {}, stage = resolve};
+begin_sync(MySyncStruct, _OtherSyncStruct = {},
+           State = #rr_recon_state{method = shash, initiator = false,
+                                   ownerPid = OwnerL, stats = Stats,
+                                   dest_rr_pid = DestRRPid}) ->
+    ?TRACE("BEGIN SYNC", []),
+    SID = rr_recon_stats:get(session_id, Stats),
+    send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
+                     comm:make_global(OwnerL), SID,
+                     {start_recon, shash, MySyncStruct}}),
+    case MySyncStruct#shash_recon_struct.db_chunk of
+        <<>> -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
+        _    -> State#rr_recon_state{struct = {}, stage = resolve}
+    end;
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = bloom, initiator = false,
                                    ownerPid = OwnerL, stats = Stats,
@@ -1056,8 +1148,8 @@ compress_kv_pair(Key, Version, SigSize, VMod) ->
 
 %% @doc Transforms a single key into a compact binary representation.
 %%      Similar to compress_kv_pair/4.
--spec compress_key(Key::?RT:key(), SigSize::signature_size())
-        -> BinKey::bitstring().
+-spec compress_key(Key::?RT:key() | {Key::?RT:key(), Version::db_dht:version()},
+                   SigSize::signature_size()) -> BinKey::bitstring().
 compress_key(Key, SigSize) ->
     KBin = erlang:md5(erlang:term_to_binary(Key)),
     RestSize = erlang:bit_size(KBin) - SigSize,
@@ -1100,6 +1192,119 @@ decompress_k_list(Bin, KVList, SigSize, AccPos) ->
     <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
     [{Key, _Version} | KVList2] = lists:nthtail(KeyPos - AccPos, KVList),
     [Key | decompress_k_list(T, KVList2, SigSize, KeyPos + 1)].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SHash specific
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Transforms a list of key and version tuples (with unique keys), into a
+%%      compact binary representation for transfer.
+-spec shash_compress_kv_list(KVList::db_chunk_kv(), Bin,
+                             SigSize::signature_size())
+        -> Bin when is_subtype(Bin, bitstring()).
+shash_compress_kv_list([], Bin, _SigSize) ->
+    Bin;
+shash_compress_kv_list([KV | TL], Bin, SigSize) ->
+    KBin = compress_key(KV, SigSize),
+    shash_compress_kv_list(TL, <<Bin/bitstring, KBin/bitstring>>, SigSize).
+
+%% @doc De-compresses the binary from shash_compress_kv_list/3 into a gb_tree with a
+%%      binary key representation and the integer of the (shortened) version.
+-spec shash_decompress_kv_list(CompressedBin::bitstring(), AccList::[bitstring()],
+                               SigSize::signature_size())
+        -> ResSet::shash_kv_set().
+shash_decompress_kv_list(<<>>, AccList, _SigSize) ->
+    gb_sets:from_list(AccList);
+shash_decompress_kv_list(Bin, AccList, SigSize) ->
+    <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
+    shash_decompress_kv_list(T, [KeyBin | AccList], SigSize).
+
+%% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
+%%      or the entry in MyEntries has a newer version than the one in the tree
+%%      and returns them as FBItems. ReqItems contains items in the tree but
+%%      where the version in MyEntries is older than the one in the tree.
+-spec shash_get_full_diff(MyEntries::KV, MyIOtherKvTree::shash_kv_set(),
+                          AccDiff::KV, SigSize::signature_size())
+        -> {Diff::KV, MyIOtherKvTree::shash_kv_set()}
+            when is_subtype(KV, db_chunk_kv()).
+shash_get_full_diff([], MyIOtKvSet, AccDiff, _SigSize) ->
+    {AccDiff, MyIOtKvSet};
+shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
+    KeyBin = compress_key(KV, SigSize),
+    case gb_sets:is_member(KeyBin, MyIOtKvSet) of
+        false ->
+            shash_get_full_diff(Rest, MyIOtKvSet, [KV | AccDiff], SigSize);
+        true ->
+            MyIOtKvSet2 = gb_sets:delete(KeyBin, MyIOtKvSet),
+            shash_get_full_diff(Rest, MyIOtKvSet2, AccDiff, SigSize)
+    end.
+
+%% @doc Creates a compressed version of the (unmatched) binary keys in the given
+%%      set using the indices in the original KV list.
+-spec shash_compress_k_list(KVSet::shash_kv_set(), OtherDBChunkOrig::bitstring(),
+                            SigSize::signature_size(), AccPos::non_neg_integer(),
+                            ResultIdx::[?RT:key()])
+        -> CompressedIndices::bitstring().
+shash_compress_k_list(_, <<>>, _SigSize, DBChunkLen, AccResult) ->
+    IdxSize = bits_for_number(DBChunkLen),
+    lists:foldl(fun(Pos, Acc) ->
+                        <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
+                end, <<>>, AccResult);
+shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult) ->
+    <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
+    case gb_sets:is_member(KeyBin, KVSet) of
+        false ->
+            shash_compress_k_list(KVSet, T, SigSize, AccPos + 1, AccResult);
+        true ->
+            shash_compress_k_list(KVSet, T, SigSize, AccPos + 1, [AccPos | AccResult])
+    end.
+
+%% @doc Part of the resolve_req message processing of the SHash and Bloom RC
+%%      processes in phase 2 (trivial RC).
+-spec shash_bloom_perform_resolve(
+        State::state(), DBChunk::bitstring(), DBChunkTree::kv_tree(),
+        SigSize::signature_size(), VSize::signature_size(),
+        DestReconPid::comm:mypid(), FBItems::[?RT:key()],
+        SkipResolve::boolean()) -> rr_recon_stats:stats().
+shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunk, _DBChunkTree,
+                            _SigSize, _VSize, _DestReconPid, [], true) ->
+    Stats;
+shash_bloom_perform_resolve(
+  #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
+                  kv_list = KVList,          stats = Stats,
+                  method = _RMethod},
+  DBChunk, DBChunkTree, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
+    SID = rr_recon_stats:get(session_id, Stats),
+    {ToSendKeys1, ToReq1, DBChunkTree1} =
+        get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
+
+    ?TRACE("Resolve ~S Session=~p ; ToSend=~p ; ToReq=~p",
+           [_RMethod, SID, length(ToSendKeys1), length(ToReq1)]),
+    ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
+                 {non_unique_send_list, ToSendKeys1}),
+    ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
+                 {non_unique_req_list, ToReq1}),
+
+    % note: the resolve request was counted at the initiator and
+    %       thus from_my_node must be 0 on this node!
+    send_local(OwnerL, {request_resolve, SID,
+                        {key_upd_send, DestRRPid, ToSendKeys1, ToReq1},
+                        [{from_my_node, 0},
+                         {feedback_request, comm:make_global(OwnerL)}]}),
+    % we will get one reply from a subsequent feedback response
+    NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+
+    % let the initiator's rr_recon process identify the remaining keys
+    Req2Count = gb_trees:size(DBChunkTree1),
+    ToReq2 = compress_k_list(DBChunkTree1, DBChunk,
+                             SigSize, VSize, 0, []),
+    ?TRACE("resolve_req ~s Session=~p ; ToReq=~p (~p bits)",
+           [_RMethod, SID, Req2Count, erlang:bit_size(ToReq2)]),
+    comm:send(DestReconPid, {resolve_req, ToReq2}),
+    if Req2Count > 0 ->
+           rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
+       true -> NewStats1
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
@@ -1978,6 +2183,48 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
                                        [{minor_version, 1}, {compressed, 2}]))]),
     {DBChunkBin, SigSize, VSize}.
 
+%% @doc Calculates the signature size for comparing ItemCount items with
+%%      OtherItemCount other items (including versions into the hashes).
+%%      Sets the bit size to have an error below P1E.
+-spec shash_signature_sizes
+        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(), P1E::float())
+        -> SigSize::signature_size().
+shash_signature_sizes(0, _, _P1E) ->
+    0; % invalid but since there are 0 items, this is ok!
+shash_signature_sizes(_, 0, _P1E) ->
+    0; % invalid but since there are 0 items, this is ok!
+shash_signature_sizes(ItemCount, OtherItemCount, P1E) ->
+    % reduce P1E for the two parts here (hash and trivial phases)
+    A = 1 - ?SHASH_B,
+    % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
+    % align if required
+    Res = case config:read(rr_align_to_bytes) of
+              false -> SigSize0;
+              _     -> bloom:resize(SigSize0, 8)
+          end,
+%%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
+%%             [self(), P1E, Res, ItemCount, OtherItemCount]),
+    Res.
+
+%% @doc Creates a compressed key-value list comparing every item in Items
+%%      (at most ItemCount) with OtherItemCount other items (including versions
+%%      into the hashes).
+%%      Sets the bit size to have an error below P1E.
+-spec shash_compress_k_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(),
+                                OtherItemCount::non_neg_integer(), P1E::float())
+        -> {DBChunk::bitstring(), SigSize::signature_size()}.
+shash_compress_k_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
+    SigSize = shash_signature_sizes(ItemCount, OtherItemCount, P1E),
+    DBChunkBin = shash_compress_kv_list(DBItems, <<>>, SigSize),
+    % debug compressed and uncompressed sizes:
+    ?TRACE("~B vs. ~B items, SigSize: ~B, ChunkSize: ~p / ~p bits",
+            [ItemCount, OtherItemCount, SigSize, erlang:bit_size(DBChunkBin),
+             erlang:bit_size(
+                 erlang:term_to_binary(DBChunkBin,
+                                       [{minor_version, 1}, {compressed, 2}]))]),
+    {DBChunkBin, SigSize}.
+
 %% @doc Aligns the two sizes so that their sum is a multiple of 8 in order to
 %%      (possibly) achieve a better compression in binaries.
 -spec align_bitsize(SigSize, VSize) -> {SigSize, VSize}
@@ -2006,6 +2253,13 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     #trivial_recon_struct{interval = I, reconPid = comm:this(),
                           db_chunk = DBChunkBin,
                           sig_size = SigSize, ver_size = VSize};
+build_recon_struct(shash, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+    ?DBG_ASSERT(not intervals:is_empty(I)),
+    ItemCount = length(DBItems),
+    {DBChunkBin, SigSize} =
+        shash_compress_k_list_p1e(DBItems, ItemCount, ItemCount, get_p1e()),
+    #shash_recon_struct{interval = I, reconPid = comm:this(),
+                        db_chunk = DBChunkBin, sig_size = SigSize};
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
@@ -2332,7 +2586,7 @@ check_percent(Atom) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art, trivial]) andalso
+    config:cfg_is_in(rr_recon_method, [trivial, shash, bloom, merkle_tree, art]) andalso
         config:cfg_is_float(rr_recon_p1e) andalso
         config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
         config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso
