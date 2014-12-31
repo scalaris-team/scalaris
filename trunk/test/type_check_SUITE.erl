@@ -466,11 +466,16 @@ tester_type_check_rrepair(_Config) ->
              {min_max, 3}, %% tested via feeder
              {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
+             {shash_signature_sizes, 3}, %% needs float > 0, < 1
              {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
+             {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
+             {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_k_list, 6}, %% needs a special binary to correspond to a number of bits
+             {shash_compress_k_list, 5}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 4}, %% needs a special binary to correspond to a number of bits
+             {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 8}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 8}, %% needs matching result and merkle nodes

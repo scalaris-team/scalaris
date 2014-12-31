@@ -78,14 +78,17 @@ init_per_group(Group, Config) ->
     ct:comment(io_lib:format("BEGIN ~p", [Group])),
     case Group of
         upd_trivial -> [{ru_method, trivial}, {ftype, update}];
+        upd_shash -> [{ru_method, shash}, {ftype, update}];
         upd_bloom -> [{ru_method, bloom}, {ftype, update}];
         upd_merkle -> [{ru_method, merkle_tree}, {ftype, update}];
         upd_art -> [{ru_method, art}, {ftype, update}];
         regen_trivial -> [{ru_method, trivial}, {ftype, regen}];
+        regen_shash -> [{ru_method, shash}, {ftype, regen}];
         regen_bloom -> [{ru_method, bloom}, {ftype, regen}];
         regen_merkle -> [{ru_method, merkle_tree}, {ftype, regen}];
         regen_art -> [{ru_method, art}, {ftype, regen}];
         mixed_trivial -> [{ru_method, trivial}, {ftype, mixed}];
+        mixed_shash -> [{ru_method, shash}, {ftype, mixed}];
         mixed_bloom -> [{ru_method, bloom}, {ftype, mixed}];
         mixed_merkle -> [{ru_method, merkle_tree}, {ftype, mixed}];
         mixed_art -> [{ru_method, art}, {ftype, mixed}];

@@ -54,14 +54,17 @@ groups() ->
                           ]},
      {repair, [sequence], [
                            {upd_trivial,  [sequence], repair_default()},
+                           {upd_shash,    [sequence], repair_default()},
                            {upd_bloom,    [sequence], repair_default()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_default()},
                            {upd_art,      [sequence], repair_default()},
                            {regen_trivial,[sequence], repair_default() ++ regen_special()},
+                           {regen_shash,  [sequence], repair_default() ++ regen_special()},
                            {regen_bloom,  [sequence], repair_default() ++ regen_special()},
                            {regen_merkle, [sequence], repair_default() ++ regen_special()},
                            {regen_art,    [sequence], repair_default() ++ regen_special()},
                            {mixed_trivial,[sequence], repair_default()},
+                           {mixed_shash,  [sequence], repair_default()},
                            {mixed_bloom,  [sequence], repair_default()},
                            {mixed_merkle, [sequence], repair_default()},
                            {mixed_art,    [sequence], repair_default()}
