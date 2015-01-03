@@ -35,7 +35,6 @@
          do_throw/1,
          extract_from_list_may_not_exist/2,
          minus_all/2, minus_first/2,
-         delete_if_exists/2,
          map_with_nr/3,
          par_map/2, par_map/3,
          lists_take/2,
@@ -339,30 +338,14 @@ minus_first([], _ExcludeList) ->
 -spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T]
     when is_subtype(T, any()).
 minus_first2([H | T], [_|_] = Excluded, Result) ->
-    case delete_if_exists(Excluded, H, []) of
-        {true,  Excluded2} -> minus_first2(T, Excluded2, Result);
-        {false, Excluded2} -> minus_first2(T, Excluded2, [H | Result])
+    case lists_take(H, Excluded) of
+        false     -> minus_first2(T, Excluded, [H | Result]);
+        Excluded2 -> minus_first2(T, Excluded2, Result)
     end;
 minus_first2([], _Excluded, Result) ->
     lists:reverse(Result);
 minus_first2(L, [], Result) ->
     lists:reverse(Result, L).
-
-%% @doc Removes Del from List if it is found. Stops on first occurrence.
--spec delete_if_exists(Del::T, List::[T]) -> {Found::boolean(), [T]}
-  when is_subtype(T, any()).
-delete_if_exists(Del, List) ->
-    delete_if_exists(List, Del, []).
-
-%% @doc Removes Del from List if it is found. Stops on first occurrence.
--spec delete_if_exists(List::[T], Del::T, Result::[T]) -> {Found::boolean(), [T]} 
-    when is_subtype(T, any()).
-delete_if_exists([Del | T], Del, Result) ->
-    {true, lists:reverse(Result, T)};
-delete_if_exists([H | T], Del, Result) ->
-    delete_if_exists(T, Del, [H | Result]);
-delete_if_exists([], _Del, Result) ->
-    {false, lists:reverse(Result)}.
 
 -spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->
@@ -980,15 +963,15 @@ par_map(Fun, [_|_] = List, MaxThreads) ->
 par_map(Fun, [], _MaxThreads) when is_function(Fun, 1) -> [].
 
 %% @doc Delete an element from a list (once). When not found, return false.
--spec lists_take(any(), [any()]) -> [any()] | false.
+-spec lists_take(T, [T]) -> [T] | false when is_subtype(T, any()).
 lists_take(Elem, L) ->
     lists_take_iter(Elem, L, []).
 
--spec lists_take_iter(any(), [any()], [any()]) -> [any()] | false.
-lists_take_iter(_Elem, [], _Acc) -> false;
-lists_take_iter(Elem, [Elem|T], Acc) -> lists:reverse(Acc) ++ T;
-lists_take_iter(Elem, [H|T], Acc) ->
-    lists_take_iter(Elem, T, [H|Acc]).
+-spec lists_take_iter(T, [T], [T]) -> [T] | false
+   when is_subtype(T, any()).
+lists_take_iter(Elem, [Elem|T], Acc) -> lists:reverse(Acc, T);
+lists_take_iter(Elem, [H|T], Acc)    -> lists_take_iter(Elem, T, [H|Acc]);
+lists_take_iter(_Elem, [], _Acc)     -> false.
 
 %% @doc Splits the given list into several partitions, returning a list of parts
 %%      of the original list. Both the parts and their contents are reversed

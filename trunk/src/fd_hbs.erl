@@ -467,19 +467,19 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
             %% delete cookie
             Cookies = element(2, Entry),
             Changed =
-                case util:delete_if_exists(Cookie, Cookies) of
-                    {true, NewCookies} ->
-                        EntryWithoutCookie = setelement(2, Entry, NewCookies),
-                        NewEntry =
-                            setelement(3, EntryWithoutCookie,
-                                       element(3, EntryWithoutCookie) - 1),
-                        deleted;
-                    _ ->
+                case util:lists_take(Cookie, Cookies) of
+                    false ->
                         log:log(warn,
                                 "got unsubscribe with non existing cookie ~p~n",
                                 [Cookie]),
                         NewEntry = Entry,
-                        unchanged
+                        unchanged;
+                    NewCookies ->
+                        EntryWithoutCookie = setelement(2, Entry, NewCookies),
+                        NewEntry =
+                            setelement(3, EntryWithoutCookie,
+                                       element(3, EntryWithoutCookie) - 1),
+                        deleted
                 end,
             case element(3, NewEntry) of
                 0 -> pdb:delete(element(1, Entry), Table);
