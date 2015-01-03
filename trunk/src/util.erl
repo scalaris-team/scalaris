@@ -37,7 +37,7 @@
          minus_all/2, minus_first/2,
          map_with_nr/3,
          par_map/2, par_map/3,
-         lists_take/2,
+         lists_take/2, lists_takewith/2,
          lists_split/2, lists_keystore2/5,
          lists_partition3/2,
          lists_remove_at_indices/2,
@@ -86,6 +86,7 @@
 -export([readable_utc_time_feeder/1]).
 -export([map_with_nr_feeder/3]).
 -export([par_map_feeder/2, par_map_feeder/3]).
+-export([lists_takewith_feeder/2]).
 -export([lists_partition3_feeder/2]).
 
 -export([sets_map/2]).
@@ -972,6 +973,34 @@ lists_take(Elem, L) ->
 lists_take_iter(Elem, [Elem|T], Acc) -> lists:reverse(Acc, T);
 lists_take_iter(Elem, [H|T], Acc)    -> lists_take_iter(Elem, T, [H|Acc]);
 lists_take_iter(_Elem, [], _Acc)     -> false.
+
+-spec lists_takewith_feeder(Elem::T, [T]) -> {fun((T) -> boolean()), [T]}
+     when is_subtype(T, any()).
+lists_takewith_feeder(Elem, L) ->
+    {fun(X) -> X =:= Elem end, L}.
+
+%% @doc Delete an element from a list (once) based on a predicate. When not
+%%      found, return false.
+-spec lists_takewith(fun((T) -> boolean()), [T]) -> {T, [T]} | false
+     when is_subtype(T, any()).
+lists_takewith(Pred, L) ->
+    lists_takewith_iter(Pred, L, []).
+
+-compile({nowarn_unused_function, {lists_takewith_iter_feeder, 3}}).
+-spec lists_takewith_iter_feeder(Elem::T, [T], [T]) -> {fun((T) -> boolean()), [T], [T]}
+     when is_subtype(T, any()).
+lists_takewith_iter_feeder(Elem, L, Acc) ->
+    {fun(X) -> X =:= Elem end, L, Acc}.
+
+-spec lists_takewith_iter(fun((T) -> boolean()), [T], [T]) -> {T, [T]} | false
+   when is_subtype(T, any()).
+lists_takewith_iter(Pred, [Elem | T], Acc) ->
+    case Pred(Elem) of
+        true  -> {Elem, lists:reverse(Acc, T)};
+        false -> lists_takewith_iter(Pred, T, [Elem | Acc])
+    end;
+lists_takewith_iter(_Pred, [], _Acc) ->
+    false.
 
 %% @doc Splits the given list into several partitions, returning a list of parts
 %%      of the original list. Both the parts and their contents are reversed

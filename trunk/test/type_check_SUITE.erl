@@ -746,6 +746,7 @@ tester_type_check_util(_Config) ->
              {for_to_ex, 4}, %% cannot create funs
              {for_to_fold, 5}, %% cannot create funs
              {gb_trees_foldl, 3}, %% cannot create funs
+             {lists_takewith, 2}, %% cannot create funs; tested via feeder
              {lists_keystore2, 5}, %% key id may not be larger than the tuple size in the list
              {lists_partition3, 2}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 2}, %% indices must exist in list
@@ -783,7 +784,8 @@ tester_type_check_util(_Config) ->
              {rrd_combine_gauge_slots, 4}, %% values too big
              {rrd_combine_slots, 6} %% values too big
            ],
-           [ {lists_partition3, 5}, %% cannot create funs; tested via feeder
+           [ {lists_takewith_iter, 3}, %% cannot create funs; tested via feeder
+             {lists_partition3, 5}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 4}, %% indices must exist in list
              {shuffle_helperA,2}, %% preconds must be fulfilled
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
