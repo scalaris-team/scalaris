@@ -578,7 +578,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = Initiator,
                            method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           k_list = KList,          stats = Stats})
+                           k_list = KList,            stats = Stats})
   when (RMethod =:= trivial andalso not Initiator) orelse
            ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
     ?TRACE1(_Msg, State),
@@ -605,13 +605,13 @@ on({resolve_req, BinReqIdxPos} = _Msg,
 
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = shash,            k_list = KList}) ->
+                           method = shash,            kv_list = KVList}) ->
     ?TRACE1(_Msg, State),
 
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize),
-    IdxSize = bits_for_number(length(KList)),
-    MyDiffKeys = [Key || Key <- decompress_k_list(MyDiffIdx, KList, IdxSize, 0),
+    IdxSize = bits_for_number(length(KVList)),
+    MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList, IdxSize, 0),
                                 not gb_trees:is_defined(compress_key(Key, SigSize),
                                                         DBChunkTree)],
 
@@ -868,8 +868,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                      {start_recon, shash, MySyncStruct}}),
     case MySyncStruct#shash_recon_struct.db_chunk of
         <<>> -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
-        _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
-                                     k_list = [element(1, KV) || KV <- KVList]}
+        _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = KVList}
     end;
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = bloom, initiator = false,
@@ -1191,9 +1190,9 @@ compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult) ->
     end.
 
 %% @doc De-compresses a bitstring with indices of SigSize number of bits
-%%      into a list of keys from the original KV list.
+%%      into a list of keys from the original key list.
 -spec decompress_k_list(CompressedBin::bitstring(), KList::[?RT:key()],
-                         SigSize::signature_size(), AccPos::non_neg_integer())
+                        SigSize::signature_size(), AccPos::non_neg_integer())
         -> ResKeys::[?RT:key()].
 decompress_k_list(<<>>, _, _SigSize, _AccPos) ->
     [];
@@ -1201,6 +1200,18 @@ decompress_k_list(Bin, KList, SigSize, AccPos) ->
     <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
     [Key | KList2] = lists:nthtail(KeyPos - AccPos, KList),
     [Key | decompress_k_list(T, KList2, SigSize, KeyPos + 1)].
+
+%% @doc De-compresses a bitstring with indices of SigSize number of bits
+%%      into a list of keys from the original KV list.
+-spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv(),
+                           SigSize::signature_size(), AccPos::non_neg_integer())
+         -> ResKeys::[?RT:key()].
+decompress_k_list_kv(<<>>, _, _SigSize, _AccPos) ->
+    [];
+decompress_k_list_kv(Bin, KVList, SigSize, AccPos) ->
+     <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    [{Key, _Version} | KVList2] = lists:nthtail(KeyPos - AccPos, KVList),
+    [Key | decompress_k_list_kv(T, KVList2, SigSize, KeyPos + 1)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SHash specific
@@ -1964,9 +1975,8 @@ merkle_resolve_req_keys_noninit([{leaf, inner, _OtherMaxItemsCount, LeafNode, fa
                                 ToSend, ToReq, ToResolve, ResolveNonEmpty, true) ->
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     ToSend1 =
-        case decompress_k_list(ReqKeys,
-                               [element(1, KV) || KV <- merkle_tree:get_bucket(LeafNode)],
-                               IdxSize, 0) of
+        case decompress_k_list_kv(ReqKeys, merkle_tree:get_bucket(LeafNode),
+                                  IdxSize, 0) of
             [] -> ToSend;
             [_|_] = X -> X ++ ToSend
         end,
@@ -2014,9 +2024,8 @@ merkle_resolve_req_keys_init([{leaf, inner, _OtherMaxItemsCount, LeafNode, false
     % TODO: same as above -> extract function?
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     SendKeys1 =
-        case decompress_k_list(ReqKeys,
-                               [element(1, KV) || KV <- merkle_tree:get_bucket(LeafNode)],
-                               IdxSize, 0) of
+        case decompress_k_list_kv(ReqKeys, merkle_tree:get_bucket(LeafNode),
+                                  IdxSize, 0) of
             [] -> SendKeys;
             [_|_] = X -> X ++ SendKeys
         end,
