@@ -28,6 +28,7 @@ all() ->
     [min_max, largest_smaller_than, gb_trees_foldl,
      repeat, repeat_collect, repeat_accumulate,
      repeat_p, repeat_p_collect, repeat_p_accumulate,
+     random_subsets,
      tester_minus_all, tester_minus_all_sort,
      tester_minus_first, tester_minus_first_sort,
      tester_par_map2, tester_par_map3,
@@ -129,6 +130,30 @@ repeat_p_accumulate(_) ->
     B = util:repeat(fun(X) -> X * X end, [Times], Times,
                     [parallel, {accumulate, fun(X, Y) -> X + Y end, 1000}]),     
     ?equals(B, 1000 + Times*Times*Times),   
+    ok.
+
+-spec rand_subsets_check(Rand1::[integer()], Rand2::[integer()], Rand3::[integer()]) -> ok.
+rand_subsets_check(Rand1, Rand2, Rand3) ->
+    Rand1sort = lists:sort(Rand1),
+    Rand2sort = lists:sort(Rand2),
+    Rand3sort = lists:sort(Rand3),
+    ?assert_w_note(Rand1 =/= Rand2 orelse Rand1 =/= Rand3 orelse Rand2 =/= Rand3,
+                   {Rand1, Rand2, Rand3}),
+    ?assert_w_note(Rand1sort =/= Rand2sort orelse Rand1sort =/= Rand3sort orelse Rand2sort =/= Rand3sort,
+                   {Rand1sort, Rand2sort, Rand3sort}),
+    ok.
+
+random_subsets(_) ->
+    % assume that when selecting 10 out of 1000 elements, at least one of 3
+    % calls yields a result different to the others
+    List = lists:seq(1, 1000),
+    rand_subsets_check(util:random_subset(10, List),
+                       util:random_subset(10, List),
+                       util:random_subset(10, List)),
+    rand_subsets_check(element(2, util:pop_randomsubset(10, List)),
+                       element(2, util:pop_randomsubset(10, List)),
+                       element(2, util:pop_randomsubset(10, List))),
+
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
