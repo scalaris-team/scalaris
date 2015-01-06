@@ -1239,10 +1239,8 @@ shash_decompress_kv_list(Bin, AccList, SigSize) ->
     <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
     shash_decompress_kv_list(T, [KeyBin | AccList], SigSize).
 
-%% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
-%%      or the entry in MyEntries has a newer version than the one in the tree
-%%      and returns them as FBItems. ReqItems contains items in the tree but
-%%      where the version in MyEntries is older than the one in the tree.
+%% @doc Gets all entries from MyEntries which are not encoded in MyIOtKvSet.
+%%      Also returns the tree with all these matches removed.
 -spec shash_get_full_diff(MyEntries::KV, MyIOtherKvTree::shash_kv_set(),
                           AccDiff::KV, SigSize::signature_size())
         -> {Diff::KV, MyIOtherKvTree::shash_kv_set()}
@@ -1251,11 +1249,12 @@ shash_get_full_diff([], MyIOtKvSet, AccDiff, _SigSize) ->
     {AccDiff, MyIOtKvSet};
 shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
     KeyBin = compress_key(KV, SigSize),
-    case gb_sets:is_member(KeyBin, MyIOtKvSet) of
-        false ->
-            shash_get_full_diff(Rest, MyIOtKvSet, [KV | AccDiff], SigSize);
-        true ->
-            MyIOtKvSet2 = gb_sets:delete(KeyBin, MyIOtKvSet),
+    OldSize = gb_sets:size(MyIOtKvSet),
+    MyIOtKvSet2 = gb_sets:delete_any(KeyBin, MyIOtKvSet),
+    case gb_sets:size(MyIOtKvSet2) of
+        OldSize ->
+            shash_get_full_diff(Rest, MyIOtKvSet2, [KV | AccDiff], SigSize);
+        _ ->
             shash_get_full_diff(Rest, MyIOtKvSet2, AccDiff, SigSize)
     end.
 
