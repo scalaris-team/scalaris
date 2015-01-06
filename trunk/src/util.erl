@@ -419,7 +419,7 @@ pop_randomsubset(_Size, [X]) -> {[], [X]};
 pop_randomsubset(Size0, List) ->
     A = array:fix(array:from_list(List)),
     Size = erlang:min(Size0, array:size(A)),
-    LNew = array:to_list(shuffle_helperA(A, Size - 1)),
+    LNew = array:to_list(shuffle_helperA(A, Size, 0)),
     {PoppedSet, Rest} = lists:split(Size, LNew),
     {Rest, PoppedSet}.
 
@@ -432,7 +432,7 @@ random_subset(_Size, [X]) -> [X];
 random_subset(Size0, List) ->
     A = array:fix(array:from_list(List)),
     Size = erlang:min(Size0, array:size(A)),
-    A2 = shuffle_helperA(A, Size - 1),
+    A2 = shuffle_helperA(A, Size, 0),
     array:to_list(array:resize(Size, A2)).
 
 %% @doc Fisher-Yates shuffling for lists.
@@ -442,23 +442,23 @@ shuffle([]) -> [];
 shuffle([X]) -> [X];
 shuffle(List) ->
     A = array:fix(array:from_list(List)),
-    A2 = shuffle_helperA(A, array:size(A) - 1),
+    A2 = shuffle_helperA(A, array:size(A), 0),
     array:to_list(A2).
 
 %% @doc Fisher-Yates shuffling for lists helper function: creates a shuffled
 %%      list of length ShuffleSize.
 %%      PreCond: a non-empty array, ShuffleSize &lt; size(Array)
--spec shuffle_helperA(array:array(T), ShuffleSize::non_neg_integer())
-        -> array:array(T)
+-spec shuffle_helperA(array:array(T), ShuffleSize::non_neg_integer(),
+                      StartPos::non_neg_integer()) -> array:array(T)
     when is_subtype(T, any()).
-shuffle_helperA(Array, 0) ->
+shuffle_helperA(Array, CurPos, CurPos) ->
     Array;
-shuffle_helperA(Array, N1) ->
+shuffle_helperA(Array, ShuffleSize, N1) ->
     E1 = array:get(N1, Array),
-    N2 = randoms:rand_uniform(0, N1),
+    N2 = randoms:rand_uniform(N1, array:size(Array)),
     E2 = array:get(N2, Array),
     A2 = array:set(N1, E2, array:set(N2, E1, Array)),
-    shuffle_helperA(A2, N1 - 1).
+    shuffle_helperA(A2, ShuffleSize, N1 + 1).
 
 %% @doc Find the largest key in GBTree that is smaller than Key.
 %%      Note: gb_trees offers only linear traversal or lookup of exact keys -
