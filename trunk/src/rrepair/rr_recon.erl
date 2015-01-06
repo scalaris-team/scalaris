@@ -374,7 +374,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
            % let the non-initiator's rr_recon process identify the remaining keys
            Req2Count = gb_trees:size(OtherDBChunk1),
            ToReq2 = compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
-                                    SigSize, VSize, 0, []),
+                                    SigSize, VSize, 0, [], 0),
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats2 =
@@ -441,7 +441,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
                   Params1 = Params#shash_recon_struct{db_chunk = <<>>},
                   OtherDiffIdx = shash_compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
-                                                       SigSize, 0, []),
+                                                       SigSize, 0, [], 0),
 
                   send(DestReconPid,
                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
@@ -584,7 +584,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
     ?TRACE1(_Msg, State),
     IdxSize = bits_for_number(length(KList)),
     NewStats =
-        case decompress_k_list(BinReqIdxPos, KList, IdxSize, 0) of
+        case decompress_k_list(BinReqIdxPos, KList, IdxSize) of
             [] -> Stats;
             ReqKeys ->
                 SID = rr_recon_stats:get(session_id, Stats),
@@ -611,7 +611,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize),
     IdxSize = bits_for_number(length(KVList)),
-    MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList, IdxSize, 0),
+    MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList, IdxSize),
                                 not gb_trees:is_defined(compress_key(Key, SigSize),
                                                         DBChunkTree)],
 
@@ -1171,47 +1171,50 @@ compress_key(Key, SigSize) ->
 
 %% @doc Creates a compressed version of the (unmatched) binary keys in the given
 %%      set using the indices in the original KV list.
+%% @see shash_compress_k_list/6
 -spec compress_k_list(KVTree::kv_tree(), OtherDBChunkOrig::bitstring(),
                       SigSize::signature_size(), VSize::signature_size(),
-                      AccPos::non_neg_integer(), ResultIdx::[?RT:key()])
+                      AccPos::non_neg_integer(), ResultIdx::[?RT:key()],
+                      LastPos::non_neg_integer())
         -> CompressedIndices::bitstring().
-compress_k_list(_, <<>>, _SigSize, _VSize, DBChunkLen, AccResult) ->
+compress_k_list(_, <<>>, _SigSize, _VSize, DBChunkLen, AccResult, _LastPos) ->
     IdxSize = bits_for_number(DBChunkLen),
     lists:foldl(fun(Pos, Acc) ->
                         <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
                 end, <<>>, AccResult);
-compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult) ->
+compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult, LastPos) ->
     <<KeyBin:SigSize/bitstring, _Version:VSize, T/bitstring>> = Bin,
+    NextPos = AccPos + 1,
     case gb_trees:is_defined(KeyBin, KVTree) of
         false ->
-            compress_k_list(KVTree, T, SigSize, VSize, AccPos + 1, AccResult);
+            compress_k_list(KVTree, T, SigSize, VSize, NextPos,
+                            AccResult, LastPos);
         true ->
-            compress_k_list(KVTree, T, SigSize, VSize, AccPos + 1, [AccPos | AccResult])
+            compress_k_list(KVTree, T, SigSize, VSize, NextPos,
+                            [AccPos - LastPos | AccResult], NextPos)
     end.
 
 %% @doc De-compresses a bitstring with indices of SigSize number of bits
 %%      into a list of keys from the original key list.
 -spec decompress_k_list(CompressedBin::bitstring(), KList::[?RT:key()],
-                        SigSize::signature_size(), AccPos::non_neg_integer())
-        -> ResKeys::[?RT:key()].
-decompress_k_list(<<>>, _, _SigSize, _AccPos) ->
+                        SigSize::signature_size()) -> ResKeys::[?RT:key()].
+decompress_k_list(<<>>, _, _SigSize) ->
     [];
-decompress_k_list(Bin, KList, SigSize, AccPos) ->
-    <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    [Key | KList2] = lists:nthtail(KeyPos - AccPos, KList),
-    [Key | decompress_k_list(T, KList2, SigSize, KeyPos + 1)].
+decompress_k_list(Bin, KList, SigSize) ->
+    <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    [Key | KList2] = lists:nthtail(KeyPosInc, KList),
+    [Key | decompress_k_list(T, KList2, SigSize)].
 
 %% @doc De-compresses a bitstring with indices of SigSize number of bits
 %%      into a list of keys from the original KV list.
 -spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv(),
-                           SigSize::signature_size(), AccPos::non_neg_integer())
-         -> ResKeys::[?RT:key()].
-decompress_k_list_kv(<<>>, _, _SigSize, _AccPos) ->
+                           SigSize::signature_size()) -> ResKeys::[?RT:key()].
+decompress_k_list_kv(<<>>, _, _SigSize) ->
     [];
-decompress_k_list_kv(Bin, KVList, SigSize, AccPos) ->
-     <<KeyPos:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    [{Key, _Version} | KVList2] = lists:nthtail(KeyPos - AccPos, KVList),
-    [Key | decompress_k_list_kv(T, KVList2, SigSize, KeyPos + 1)].
+decompress_k_list_kv(Bin, KVList, SigSize) ->
+     <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    [{Key, _Version} | KVList2] = lists:nthtail(KeyPosInc, KVList),
+    [Key | decompress_k_list_kv(T, KVList2, SigSize)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SHash specific
@@ -1260,22 +1263,26 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
 
 %% @doc Creates a compressed version of the (unmatched) binary keys in the given
 %%      set using the indices in the original KV list.
+%% @see compress_k_list/7
 -spec shash_compress_k_list(KVSet::shash_kv_set(), OtherDBChunkOrig::bitstring(),
                             SigSize::signature_size(), AccPos::non_neg_integer(),
-                            ResultIdx::[?RT:key()])
+                            ResultIdx::[?RT:key()], LastPos::non_neg_integer())
         -> CompressedIndices::bitstring().
-shash_compress_k_list(_, <<>>, _SigSize, DBChunkLen, AccResult) ->
+shash_compress_k_list(_, <<>>, _SigSize, DBChunkLen, AccResult, _LastPos) ->
     IdxSize = bits_for_number(DBChunkLen),
     lists:foldl(fun(Pos, Acc) ->
                         <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
                 end, <<>>, AccResult);
-shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult) ->
+shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos) ->
     <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
+    NextPos = AccPos + 1,
     case gb_sets:is_member(KeyBin, KVSet) of
         false ->
-            shash_compress_k_list(KVSet, T, SigSize, AccPos + 1, AccResult);
+            shash_compress_k_list(KVSet, T, SigSize, NextPos,
+                                  AccResult, LastPos);
         true ->
-            shash_compress_k_list(KVSet, T, SigSize, AccPos + 1, [AccPos | AccResult])
+            shash_compress_k_list(KVSet, T, SigSize, NextPos,
+                                  [AccPos - LastPos | AccResult], NextPos)
     end.
 
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
@@ -1315,8 +1322,7 @@ shash_bloom_perform_resolve(
 
     % let the initiator's rr_recon process identify the remaining keys
     Req2Count = gb_trees:size(DBChunkTree1),
-    ToReq2 = compress_k_list(DBChunkTree1, DBChunk,
-                             SigSize, VSize, 0, []),
+    ToReq2 = compress_k_list(DBChunkTree1, DBChunk, SigSize, VSize, 0, [], 0),
     ?TRACE("resolve_req ~s Session=~p ; ToReq=~p (~p bits)",
            [_RMethod, SID, Req2Count, erlang:bit_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
@@ -1824,7 +1830,7 @@ merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
     {ToSend1, ToReq1, OBucketTree1} =
         get_full_diff(MyBuckets, OBucketTree, ToSend, ToReq, SigSize, VSize),
     ToResolve1 = [compress_k_list(OBucketTree1, OBucketHashes, SigSize, VSize,
-                                  0, []) | ToResolve],
+                                  0, [], 0) | ToResolve],
     ResolveNonEmptyAcc1 =
         ?IIF(gb_trees:size(OBucketTree1) =/= 0, true, ResolveNonEmptyAcc),
     {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmptyAcc1, NLeafNAcc}.
@@ -1975,7 +1981,7 @@ merkle_resolve_req_keys_noninit([{leaf, inner, _OtherMaxItemsCount, LeafNode, fa
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     ToSend1 =
         case decompress_k_list_kv(ReqKeys, merkle_tree:get_bucket(LeafNode),
-                                  IdxSize, 0) of
+                                  IdxSize) of
             [] -> ToSend;
             [_|_] = X -> X ++ ToSend
         end,
@@ -2024,7 +2030,7 @@ merkle_resolve_req_keys_init([{leaf, inner, _OtherMaxItemsCount, LeafNode, false
     IdxSize = bits_for_number(merkle_tree:get_item_count(LeafNode)),
     SendKeys1 =
         case decompress_k_list_kv(ReqKeys, merkle_tree:get_bucket(LeafNode),
-                                  IdxSize, 0) of
+                                  IdxSize) of
             [] -> SendKeys;
             [_|_] = X -> X ++ SendKeys
         end,
