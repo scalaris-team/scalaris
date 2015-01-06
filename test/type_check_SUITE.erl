@@ -475,6 +475,7 @@ tester_type_check_rrepair(_Config) ->
              {compress_k_list, 7}, %% needs a special binary to correspond to a number of bits
              {shash_compress_k_list, 6}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_k_list_kv, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 8}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
