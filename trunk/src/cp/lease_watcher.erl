@@ -78,7 +78,7 @@ filter(Leases) ->
     F = fun({Id, L}) ->
                 LeaseId = l_on_cseq:get_id(L),
                 %log:log("~w ~w~n", [Id, L]),
-                Id =:= LeaseId andalso
+                Id =:= LeaseId andalso %% is first replica?
                     l_on_cseq:is_live_aux_field(L) andalso
                     l_on_cseq:has_timed_out(L)
         end,
