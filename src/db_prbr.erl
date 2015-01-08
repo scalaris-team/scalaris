@@ -33,7 +33,8 @@
 -define(TRACE_SNAP(X, Y), ok).
 %% -define(TRACE_CHUNK(X, Y), ct:pal(X, Y)).
 -define(TRACE_CHUNK(X, Y), ok).
--define(DB, db_ets). %% DB backend
+-define(DB, db_ets).
+%-define(DB, db_mnesia). %% DB backend
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
@@ -83,7 +84,8 @@
 -spec new() -> db().
 new() ->
     RandomName = randoms:getRandomString(),
-    DBName = "db_" ++ RandomName,
+    %DHT_Node = comm:send_local(pid_groups:get_my(dht_node), {web_debug_info, self()}),
+    DBName = pid_groups:my_groupname() ++ "_" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
     {?DB:new(DBName), ?DB:new(SubscrName), {false, 0, 0}}.
 
