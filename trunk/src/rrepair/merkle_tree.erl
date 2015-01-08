@@ -62,7 +62,6 @@
 -endif.
 
 -type mt_node_key()     :: non_neg_integer().
--type mt_interval()     :: intervals:interval().
 -type mt_bucket_entry() :: {?RT:key()} | {?RT:key(), any()} | {?RT:key(), any(), any()}. % add more, if needed
 -type mt_bucket()       :: [mt_bucket_entry()].
 -type mt_size()         :: {InnerNodes::non_neg_integer(),
@@ -80,18 +79,23 @@
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
          }).
 -type mt_config() :: #mt_config{}.
--type mt_config_params() :: [{atom(), term()}] | [].    %only key value pairs of mt_config allowed
+%only key value pairs of mt_config allowed:
+-type mt_config_params() :: [{branch_factor, pos_integer()}
+                                 | {bucket_size, pos_integer()}
+                                 | {leaf_hf, hash_fun()}
+                                 | {inner_hf, inner_hash_fun()}
+                                 | {keep_bucket, boolean()}] | [].
 
 -type mt_leaf() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items
                      ItemCount   :: non_neg_integer(),   %number of items in the leaf nodes below or in this node
                      Bucket      :: mt_bucket(),         %item storage
-                     Interval    :: mt_interval()        %represented interval
+                     Interval    :: intervals:interval() %represented interval
                     }.
 -type mt_inner() :: {Hash        :: mt_node_key() | nil, %hash of childs/containing items
                      Count       :: non_neg_integer(),   %number of subnodes including itself
                      LeafCount   :: pos_integer(),       %number of leafs below this node (if it is a leaf, LeafCount will be 1)
                      ItemCount   :: non_neg_integer(),   %number of items in the leaf nodes below or in this node
-                     Interval    :: mt_interval(),       %represented interval
+                     Interval    :: intervals:interval(),%represented interval
                      Child_list  :: [mt_leaf() | mt_inner(),...] %child nodes (in arbitrary order)
                     }.
 -type mt_node() :: mt_inner() | mt_leaf().
@@ -130,14 +134,14 @@ is_empty(_) -> false.
 
 %% @doc Creates a new empty merkle tree with default params for the given
 %%      interval.
--spec new(mt_interval()) -> merkle_tree().
+-spec new(intervals:interval()) -> merkle_tree().
 new(I) ->
     new(I, []).
 
 %% @doc Creates a new empty merkle tree with the given params and interval.
 %%      ConfParams = list of tuples defined by {config field name, value}
 %%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
--spec new(mt_interval(), mt_config_params()) -> merkle_tree().
+-spec new(intervals:interval(), mt_config_params()) -> merkle_tree().
 new(I, ConfParams) ->
     new(I, [], ConfParams).
 
@@ -145,7 +149,7 @@ new(I, ConfParams) ->
 %%      inserts entries from EntryList.
 %%      ConfParams = list of tuples defined by {config field name, value}
 %%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
--spec new(mt_interval(), EntryList::mt_bucket(), mt_config_params())
+-spec new(intervals:interval(), EntryList::mt_bucket(), mt_config_params())
         -> merkle_tree().
 new(I, EntryList, ConfParams) ->
     gen_hash(bulk_build(I, EntryList, ConfParams)).
@@ -154,7 +158,7 @@ new(I, EntryList, ConfParams) ->
 
 %% @doc Checks whether an interval is present in the merkle tree and returns
 %%      the node responsible for it (exact match!).
--spec lookup(mt_interval(), merkle_tree()) -> mt_node() | not_found.
+-spec lookup(intervals:interval(), merkle_tree()) -> mt_node() | not_found.
 lookup(I, {merkle_tree, _, Root}) ->
     case intervals:is_subset(I, get_interval(Root)) of
         true  -> lookup_(I, Root);
@@ -163,7 +167,7 @@ lookup(I, {merkle_tree, _, Root}) ->
 
 %% @doc Helper for lookup/2. In contrast to lookup/2, assumes that I is a
 %%      subset of the current node's interval.
--spec lookup_(mt_interval(), mt_node()) -> mt_node() | not_found.
+-spec lookup_(intervals:interval(), mt_node()) -> mt_node() | not_found.
 lookup_(I, {_H, _ICnt, _Bkt, I} = Node) ->
     Node;
 lookup_(_I, {_H, _ICnt, _Bkt, _NodeI}) ->
@@ -300,7 +304,7 @@ insert_to_node(Key, CheckKey, {Hash, Count, LeafCount, ItemCount, Interval,
 
 %% @doc Builds a merkle tree with all given keys but does not create the hash
 %%      values yet (use gen_hash/1 for that).
--spec bulk_build(Interval::mt_interval(), KeyList::mt_bucket(),
+-spec bulk_build(Interval::intervals:interval(), KeyList::mt_bucket(),
                  Params::mt_config_params()) -> MerkleTree::merkle_tree().
 bulk_build(I, KeyList0, Params) ->
     KeyList = lists:ukeysort(1, KeyList0),
