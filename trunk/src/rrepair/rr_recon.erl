@@ -1169,7 +1169,7 @@ compress_key(Key, SigSize) ->
 
 %% @doc Creates a compressed version of the (unmatched) binary keys in the given
 %%      set using the indices in the original KV list.
-%% @see shash_compress_k_list/6
+%% @see shash_compress_k_list/7
 -spec compress_k_list(KVTree::kv_tree(), OtherDBChunkOrig::bitstring(),
                       SigSize::signature_size(), VSize::signature_size(),
                       AccPos::non_neg_integer(), ResultIdx::[?RT:key()],
@@ -1202,8 +1202,8 @@ compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult, LastPos, Max) ->
                             [CurIdx | AccResult], NextPos, erlang:max(CurIdx, Max))
     end.
 
-%% @doc De-compresses a bitstring with indices from compress_k_list/7 or
-%%      shash_compress_k_list/6 into a list of keys from the original key list.
+%% @doc De-compresses a bitstring with indices from compress_k_list/8 or
+%%      shash_compress_k_list/7 into a list of keys from the original key list.
 -spec decompress_k_list(CompressedBin::bitstring(), KList::[?RT:key()])
         -> ResKeys::[?RT:key()].
 decompress_k_list(<<>>, _KList) ->
@@ -1224,15 +1224,15 @@ decompress_k_list_(Bin, KList, SigSize) ->
     [Key | KList2] = lists:nthtail(KeyPosInc, KList),
     [Key | decompress_k_list_(T, KList2, SigSize)].
 
-%% @doc De-compresses a bitstring with indices from compress_k_list/7 or
-%%      shash_compress_k_list/6 into a list of keys from the original KV list.
+%% @doc De-compresses a bitstring with indices from compress_k_list/8 or
+%%      shash_compress_k_list/7 into a list of keys from the original KV list.
 -spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv())
         -> ResKeys::[?RT:key()].
 decompress_k_list_kv(Bin, KVList) ->
     decompress_k_list_kv(Bin, KVList, length(KVList)).
 
-%% @doc De-compresses a bitstring with indices from compress_k_list/7 or
-%%      shash_compress_k_list/6 into a list of keys from the original KV list.
+%% @doc De-compresses a bitstring with indices from compress_k_list/8 or
+%%      shash_compress_k_list/7 into a list of keys from the original KV list.
 -spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv(),
                            KVListLen::non_neg_integer())
         -> ResKeys::[?RT:key()].
@@ -1245,7 +1245,7 @@ decompress_k_list_kv(Bin, KVList, DBChunkLen) ->
     <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     decompress_k_list_kv_(Bin2, KVList, SigSize).
 
-%% @doc Helper for decompress_k_list_kv/2.
+%% @doc Helper for decompress_k_list_kv/3.
 -spec decompress_k_list_kv_(CompressedBin::bitstring(), KVList::db_chunk_kv(),
                             SigSize::signature_size()) -> ResKeys::[?RT:key()].
 decompress_k_list_kv_(<<>>, _, _SigSize) ->
@@ -1302,7 +1302,7 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
 
 %% @doc Creates a compressed version of the (unmatched) binary keys in the given
 %%      set using the indices in the original KV list.
-%% @see compress_k_list/7
+%% @see compress_k_list/8
 -spec shash_compress_k_list(KVSet::shash_kv_set(), OtherDBChunkOrig::bitstring(),
                             SigSize::signature_size(), AccPos::non_neg_integer(),
                             ResultIdx::[?RT:key()], LastPos::non_neg_integer(),
