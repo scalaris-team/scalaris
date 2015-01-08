@@ -223,15 +223,6 @@ start_first_services() ->
     %% for mnesia
     start_mnesia(),
 
-    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
-    case mnesia:create_schema([node()]) of
-        ok -> ok;
-        Msg -> 
-            io:format("starting mnesia: ~w", [Msg])
-    end,
-    _ = application:start(mnesia),
-
-
     %% for lb_stats and wpool
     _ = application:load(sasl),
     application:set_env(sasl, sasl_error_logger, false),
