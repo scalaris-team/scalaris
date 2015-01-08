@@ -33,8 +33,15 @@
 -define(TRACE_SNAP(X, Y), ok).
 %% -define(TRACE_CHUNK(X, Y), ct:pal(X, Y)).
 -define(TRACE_CHUNK(X, Y), ok).
--define(DB, db_ets).
-%-define(DB, db_mnesia). %% DB backend
+
+-ifdef(PRBR_MNESIA).
+-define(DB, db_mnesia). %% DB backend
+-endif.
+
+-ifdef(PRBR_ETS).
+-define(DB, db_ets). %% DB backend
+-endif.
+
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
