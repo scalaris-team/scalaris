@@ -21,6 +21,9 @@
 %% Version of Scalaris
 -define(SCALARIS_VERSION, "0.7.2+svn").
 
+%-define(PRBR_MNESIA, ok).
+-define(PRBR_ETS, ok).
+
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
 %%one that is desired.
@@ -84,7 +87,7 @@
 -ifdef(have_ctline_support).
 % allows the retrieval of the current function and line number a process is in
 % (process dictionary, key test_server_loc)
-%-compile({parse_transform, ct_line}).
+-compile({parse_transform, ct_line}).
 -endif.
 
 -define(ASSERT(X), true = X).

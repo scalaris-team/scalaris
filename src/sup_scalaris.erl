@@ -24,6 +24,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 -behaviour(supervisor).
 -export([init/1]).
 
@@ -219,13 +221,16 @@ start_first_services() ->
     _ = inets:start(),
 
     %% for mnesia
-%    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
-%    case mnesia:create_schema([node()]) of
-%        ok -> ok;
-%        Msg -> 
-%            io:format("starting mnesia: ~w", [Msg])
-%    end,
-%    _ = application:start(mnesia),
+    start_mnesia(),
+
+    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
+    case mnesia:create_schema([node()]) of
+        ok -> ok;
+        Msg -> 
+            io:format("starting mnesia: ~w", [Msg])
+    end,
+    _ = application:start(mnesia),
+
 
     %% for lb_stats and wpool
     _ = application:load(sasl),
@@ -260,6 +265,22 @@ stop_first_services() ->
     _ = application:stop(sasl),
     _ = inets:stop(),
     ok.
+
+-ifdef(PRBR_MNESIA).
+-spec start_mnesia() -> ok.
+start_mnesia() ->
+    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
+    case mnesia:create_schema([node()]) of
+        ok -> ok;
+        Msg -> 
+            io:format("starting mnesia: ~w", [Msg])
+    end,
+    _ = application:start(mnesia),
+    ok.
+-else.
+-spec start_mnesia() -> ok.
+start_mnesia() -> ok.
+-endif.
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
