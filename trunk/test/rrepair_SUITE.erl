@@ -227,8 +227,15 @@ prop_merkle_compress_hashlist(Nodes0, SigSizeI, SigSizeL) ->
     Bin = rr_recon:merkle_compress_hashlist(Nodes, <<>>, SigSizeI, SigSizeL),
     HashesRed = [begin
                      H0 = merkle_tree:get_hash(N),
-                     SigSize = ?IIF(merkle_tree:is_leaf(N), SigSizeL, SigSizeI),
-                     <<H:SigSize/integer-unit:1>> = <<H0:SigSize>>,
+                     case merkle_tree:is_leaf(N) of
+                         true ->
+                             case merkle_tree:get_item_count(N) of
+                                 0 -> H = none;
+                                 _ -> <<H:SigSizeL/integer-unit:1>> = <<H0:SigSizeL>>
+                             end;
+                         false ->
+                             <<H:SigSizeI/integer-unit:1>> = <<H0:SigSizeI>>
+                     end,
                      {H, merkle_tree:is_leaf(N)}
                  end || N <- Nodes],
     ?equals(rr_recon:merkle_decompress_hashlist(Bin, [], SigSizeI, SigSizeL), HashesRed).

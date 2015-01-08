@@ -174,7 +174,7 @@
 -define(recon_fail_stop_inner_notfound, 4). % mismatch, sending node has inner node, no match found
 -define(recon_fail_cont_inner,          0). % mismatch, both inner nodes (continue!)
 
--type merkle_cmp_request() :: {Hash::merkle_tree:mt_node_key(), IsLeaf::boolean()}.
+-type merkle_cmp_request() :: {Hash::merkle_tree:mt_node_key() | none, IsLeaf::boolean()}.
 
 -type request() ::
     {start, method(), DestKey::recon_dest()} |
@@ -1483,8 +1483,11 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSizeI, SigSizeL) ->
     H1 = merkle_tree:get_hash(N1),
     case merkle_tree:is_leaf(N1) of
         true ->
-            merkle_compress_hashlist(TL, <<Bin/bitstring, 1:1, H1:SigSizeL>>,
-                                     SigSizeI, SigSizeL);
+            Bin2 = case merkle_tree:get_item_count(N1) of
+                       0 -> <<Bin/bitstring, 1:1, 0:1>>;
+                       _ -> <<Bin/bitstring, 1:1, 1:1, H1:SigSizeL>>
+                   end,
+            merkle_compress_hashlist(TL, Bin2, SigSizeI, SigSizeL);
         false ->
             merkle_compress_hashlist(TL, <<Bin/bitstring, 0:1, H1:SigSizeI>>,
                                      SigSizeI, SigSizeL)
@@ -1499,15 +1502,16 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSizeI, SigSizeL) ->
 merkle_decompress_hashlist(<<>>, HashListR, _SigSizeI, _SigSizeL) ->
     lists:reverse(HashListR);
 merkle_decompress_hashlist(Bin, HashListR, SigSizeI, SigSizeL) ->
-    <<IsLeaf0:1, T0/bitstring>> = Bin,
-    IsLeaf = if IsLeaf0 =:= 1 ->
-                    <<Hash:SigSizeL/integer-unit:1, T1/bitstring>> = T0,
-                    true;
-                true ->
-                    <<Hash:SigSizeI/integer-unit:1, T1/bitstring>> = T0,
-                    false
-    end,
-    merkle_decompress_hashlist(T1, [{Hash, IsLeaf} | HashListR], SigSizeI, SigSizeL).
+    IsLeaf = case Bin of
+                 <<1:1, 1:1, Hash:SigSizeL/integer-unit:1, Bin2/bitstring>> ->
+                     true;
+                 <<1:1, 0:1, Bin2/bitstring>> ->
+                     Hash = none,
+                     true;
+                 <<0:1, Hash:SigSizeI/integer-unit:1, Bin2/bitstring>> ->
+                     false
+             end,
+    merkle_decompress_hashlist(Bin2, [{Hash, IsLeaf} | HashListR], SigSizeI, SigSizeL).
 
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes
 %%      (executed on non-initiator).
@@ -1707,7 +1711,7 @@ p_process_tree_cmp_result(<<?recon_fail_cont_inner:3, TR/bitstring>>, [Node | TN
                               NewAccMLC, NewAccMIC, AccCmp + 1, AccSkip).
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
--spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, SigSize::signature_size(),
+-spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash | none, SigSize::signature_size(),
                              LeafAcc::NodeL, FoundSkipHash::boolean())
         -> {ToSync::NodeL, FoundSkipHash::boolean()}
     when
@@ -1716,20 +1720,23 @@ p_process_tree_cmp_result(<<?recon_fail_cont_inner:3, TR/bitstring>>, [Node | TN
 merkle_get_sync_leaves([], _Skip, _SigSize, ToSyncAcc, FoundSkipHash) ->
     {ToSyncAcc, FoundSkipHash};
 merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) ->
-    case merkle_tree:is_leaf(Node) of
-        true  ->
-            NodeHash0 = merkle_tree:get_hash(Node),
-            <<NodeHash:SigSize/integer-unit:1>> = <<NodeHash0:SigSize>>,
-            if NodeHash =:= Skip ->
-                   merkle_get_sync_leaves(Rest, Skip, SigSize, ToSyncAcc, true);
-               true ->
-                   merkle_get_sync_leaves(Rest, Skip, SigSize, [Node | ToSyncAcc],
-                                          FoundSkipHash)
-            end;
-        false ->
-            merkle_get_sync_leaves(
-              lists:append(merkle_tree:get_childs(Node), Rest), Skip, SigSize,
-              ToSyncAcc, FoundSkipHash)
+    IsLeafNode = merkle_tree:is_leaf(Node),
+    if IsLeafNode andalso Skip =/= none ->
+           NodeHash0 = merkle_tree:get_hash(Node),
+           <<NodeHash:SigSize/integer-unit:1>> = <<NodeHash0:SigSize>>,
+           if NodeHash =:= Skip ->
+                  merkle_get_sync_leaves(Rest, Skip, SigSize, ToSyncAcc, true);
+              true ->
+                  merkle_get_sync_leaves(Rest, Skip, SigSize, [Node | ToSyncAcc],
+                                         FoundSkipHash)
+           end;
+       IsLeafNode ->
+           merkle_get_sync_leaves(Rest, Skip, SigSize, [Node | ToSyncAcc],
+                                  FoundSkipHash);
+       true ->
+           merkle_get_sync_leaves(
+             lists:append(merkle_tree:get_childs(Node), Rest), Skip, SigSize,
+             ToSyncAcc, FoundSkipHash)
     end.
 
 %% @doc Gets the number of bits needed to encode all possible bucket sizes with
