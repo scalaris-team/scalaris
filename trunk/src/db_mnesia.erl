@@ -147,7 +147,10 @@ get_load(DB) ->
 -spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(DB, Fun, Acc) ->
   ?TRACE("foldl/3:~n",[]),
-  foldl(DB, Fun, Acc, {'[', ets:first(DB), ets:last(DB), ']'}, ets:info(DB, size)).
+  foldl(DB, Fun, Acc, {'[', 
+                       mnesia:transaction(fun()-> mnesia:first(DB) end), 
+                       mnesia:transaction(fun()-> mnesia:last(DB) end), 
+                       ']'}, ets:info(DB, size)).
 
 %% @doc foldl/4 iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
