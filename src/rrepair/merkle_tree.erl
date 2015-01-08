@@ -36,6 +36,7 @@
          get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
+-export([leaf_hash_sha/2]).
 
 % exports for tests
 -export([bulk_build/3]).
@@ -57,7 +58,8 @@
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
+-export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0,
+              mt_bucket/0]).
 -export_type([mt_iter/0, mt_config_params/0]).
 -endif.
 
@@ -67,22 +69,22 @@
 -type mt_size()         :: {InnerNodes::non_neg_integer(),
                             LeafNodes::non_neg_integer(),
                             Items::non_neg_integer()}.
--type hash_fun()        :: fun((binary()) -> binary()).
+-type leaf_hash_fun()   :: fun((mt_bucket(), intervals:interval()) -> binary()).
 -type inner_hash_fun()  :: fun(([mt_node_key(),...]) -> mt_node_key()).
 
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation -
+         leaf_hf        = fun leaf_hash_sha/2  :: leaf_hash_fun(), %hash function for leaf signature creation
+         inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
          }).
 -type mt_config() :: #mt_config{}.
 %only key value pairs of mt_config allowed:
 -type mt_config_params() :: [{branch_factor, pos_integer()}
                                  | {bucket_size, pos_integer()}
-                                 | {leaf_hf, hash_fun()}
+                                 | {leaf_hf, leaf_hash_fun()}
                                  | {inner_hf, inner_hash_fun()}
                                  | {keep_bucket, boolean()}] | [].
 
@@ -365,7 +367,7 @@ gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
     {merkle_tree, Config#mt_config{keep_bucket = not CleanBuckets}, RootNew}.
 
 %% @doc Helper for gen_hash/2.
--spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
+-spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::leaf_hash_fun(),
                     KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
 gen_hash_node({_H, Count, LeafCount, ItemCount, Interval, ChildList = [_|_]},
@@ -394,15 +396,11 @@ run_inner_hf(Childs, InnerHf) ->
     InnerHf([get_hash(C) || C <- Childs]).
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
--spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun())
+-spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::leaf_hash_fun())
         -> mt_node_key().
 run_leaf_hf(Bucket, I, LeafHf) ->
     ?DBG_ASSERT(lists:ukeysort(1, Bucket) =:= Bucket),
-    BinBucket = case Bucket of
-                    [_|_] -> term_to_binary(Bucket);
-                    []    -> term_to_binary({0, I})
-                end,
-    Hash = LeafHf(BinBucket),
+    Hash = LeafHf(Bucket, I),
     Size = erlang:bit_size(Hash),
     <<SmallHash:Size/integer-unit:1>> = Hash,
     SmallHash.
@@ -608,11 +606,18 @@ p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
 inner_hash_XOR([H|T]) ->
     lists:foldl(fun(X, Acc) -> X bxor Acc end, H, T).
 
+%% @doc Leaf hash fun to use for the embedded merkle tree.
+-spec leaf_hash_sha(merkle_tree:mt_bucket(), intervals:interval()) -> binary().
+leaf_hash_sha([], _I) ->
+    <<0:160>>;
+leaf_hash_sha([_|_] = Bucket, _I) ->
+    ?CRYPTO_SHA(term_to_binary(Bucket)).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % allow future versions to create more hash funs by having an integer parameter
--spec tester_create_hash_fun(I::1) -> hash_fun().
-tester_create_hash_fun(1) -> fun(V) -> ?CRYPTO_SHA(V) end.
+-spec tester_create_hash_fun(I::1) -> leaf_hash_fun().
+tester_create_hash_fun(1) -> fun leaf_hash_sha/2.
 
 % allow future versions to create more hash funs by having an integer parameter
 -spec tester_create_inner_hash_fun(I::1) -> inner_hash_fun().

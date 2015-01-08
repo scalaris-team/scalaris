@@ -32,6 +32,7 @@
 -export([new/1, new/2, default_config/0,
          get_interval/1, get_correction_factor/1, get_config/1,
          lookup/2]).
+-export([merkle_leaf_hf/2]).
 
 -ifdef(with_export_type_support).
 -export_type([art/0, config/0]).
@@ -181,4 +182,10 @@ merge_prop_lists(DefList, ListB) ->
     lists:foldl(fun({Key, Val}, Acc) ->
                         [{Key, proplists:get_value(Key, ListB, Val)} | Acc]
                 end, [], DefList).
-    
+
+%% @doc Leaf hash fun to use for the embedded merkle tree.
+-spec merkle_leaf_hf(merkle_tree:mt_bucket(), intervals:interval()) -> binary().
+merkle_leaf_hf([], I) ->
+    ?CRYPTO_SHA(term_to_binary(I));
+merkle_leaf_hf([_|_] = Bucket, _I) ->
+    ?CRYPTO_SHA(term_to_binary(Bucket)).

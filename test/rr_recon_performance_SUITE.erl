@@ -117,7 +117,7 @@ art(_) ->
     DB = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
 
     {TreeTime, Tree} =
-        util:tc(fun() -> merkle_tree:new(I, DB, []) end, []),
+        util:tc(fun() -> merkle_tree:new(I, DB, [{leaf_hf, fun art:merkle_leaf_hf/2}]) end, []),
     BuildTime =
         measure_util:time_avg(fun() -> art:new(Tree) end, ExecTimes, []),
 
