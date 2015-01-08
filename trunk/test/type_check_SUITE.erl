@@ -416,7 +416,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
     tester:register_value_creator({typedef, intervals, non_empty_interval, []}, intervals, tester_create_non_empty_interval, 2),
-    tester:register_value_creator({typedef, merkle_tree, hash_fun, []}, merkle_tree, tester_create_hash_fun, 1),
+    tester:register_value_creator({typedef, merkle_tree, leaf_hash_fun, []}, merkle_tree, tester_create_hash_fun, 1),
     tester:register_value_creator({typedef, merkle_tree, inner_hash_fun, []}, merkle_tree, tester_create_inner_hash_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs_fun, []}, hfs_lhsp, tester_create_hfs_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs, []}, hfs_lhsp, tester_create_hfs, 1),
@@ -525,7 +525,7 @@ tester_type_check_rrepair(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_value_creator({typedef, merkle_tree, hash_fun, []}),
+    tester:unregister_value_creator({typedef, merkle_tree, leaf_hash_fun, []}),
     tester:unregister_value_creator({typedef, merkle_tree, inner_hash_fun, []}),
     tester:unregister_value_creator({typedef, random_bias, generator, []}),
     tester:unregister_value_creator({typedef, intervals, interval, []}),

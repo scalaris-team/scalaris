@@ -2369,20 +2369,21 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    case Params of
-        {} ->
-            BranchFactor = get_merkle_branch_factor(),
-            BucketSize = get_merkle_bucket_size();
-        #merkle_params{branch_factor = BranchFactor,
-                       bucket_size = BucketSize} ->
-            ok;
-        #art_recon_struct{branch_factor = BranchFactor,
-                          bucket_size = BucketSize} ->
-            ok
-    end,
-    merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
-                                 {bucket_size, BucketSize},
-                                 {keep_bucket, true}]);
+    MOpts = case Params of
+                {} -> % merkle_tree only!
+                    [{branch_factor, get_merkle_branch_factor()},
+                     {bucket_size, get_merkle_bucket_size()}];
+                #merkle_params{branch_factor = BranchFactor,
+                               bucket_size = BucketSize} ->
+                    [{branch_factor, BranchFactor},
+                     {bucket_size, BucketSize}];
+                #art_recon_struct{branch_factor = BranchFactor,
+                                  bucket_size = BucketSize} ->
+                    [{branch_factor, BranchFactor},
+                     {bucket_size, BucketSize},
+                     {leaf_hf, fun art:merkle_leaf_hf/2}]
+            end,
+    merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]);
 build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, BeginSync) ->
     ?DBG_ASSERT(not intervals:is_empty(_I)),
     ?DBG_ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
@@ -2400,6 +2401,7 @@ build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
                                         {bucket_size, BucketSize},
+                                        {leaf_hf, fun art:merkle_leaf_hf/2},
                                         {keep_bucket, true}]),
     if BeginSync ->
            % no more DB items -> create art struct:

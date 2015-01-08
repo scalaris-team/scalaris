@@ -51,7 +51,7 @@ prop_new(L, R) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
     Conf1 = art:default_config(),
-    Art2 = art:new(merkle_tree:new(I, DB, []), 
+    Art2 = art:new(merkle_tree:new(I, DB, [{leaf_hf, fun art:merkle_leaf_hf/2}]),
                    [{correction_factor, proplists:get_value(correction_factor, Conf1) + 1},
                     {inner_bf_fpr, proplists:get_value(inner_bf_fpr, Conf1) + 0.1},
                     {leaf_bf_fpr, proplists:get_value(leaf_bf_fpr, Conf1) + 0.1}]),
@@ -72,7 +72,7 @@ tester_new(_) ->
 prop_lookup(L, R) ->    
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
-    Tree = merkle_tree:new(I, DB, []),
+    Tree = merkle_tree:new(I, DB, [{leaf_hf, fun art:merkle_leaf_hf/2}]),
     Art = art:new(Tree),
     Found = nodes_in_art(merkle_tree:iterator(Tree), Art, 0),
     ct:pal("TreeNodes=~p ; Found=~p", [merkle_tree:size(Tree), Found]),
@@ -98,7 +98,7 @@ eprof(_) ->
     
     I = intervals:new('[', L, R, ']'),
     Keys = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
-    Merkle = merkle_tree:new(I, Keys, []),
+    Merkle = merkle_tree:new(I, Keys, [{leaf_hf, fun art:merkle_leaf_hf/2}]),
         
     _ = eprof:start(),
     Fun = fun() -> art:new(Merkle) end,
