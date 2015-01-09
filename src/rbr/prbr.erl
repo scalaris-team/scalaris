@@ -122,7 +122,7 @@ noop_write_filter(_, _, X) -> X.
 
 %% initialize: return initial state.
 -spec init(atom()) -> state().
-init(_DBName) -> ?PDB:new().
+init(DBName) -> ?PDB:new(atom_to_list(DBName)).
 
 -spec on(message(), state()) -> state().
 on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
