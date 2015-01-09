@@ -91,7 +91,8 @@
          interval = intervals:empty()                         :: intervals:interval(),
          reconPid = undefined                                 :: comm:mypid() | undefined,
          db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
-         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size()
+         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
+         p1e      = ?required(trivial_recon_struct, p1e)      :: float()
         }).
 
 -record(bloom_recon_struct,
@@ -413,7 +414,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = shash,             dhtNodePid = DhtNodePid,
-                           params = #shash_recon_struct{sig_size = SigSize} = Params,
+                           params = #shash_recon_struct{sig_size = SigSize,
+                                                        p1e = P1E} = Params,
                            stats = Stats,              kv_list = KVList,
                            misc = [{db_chunk, OtherDBChunk},
                                    {oicount, OtherItemCount}],
@@ -448,7 +450,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        OtherItemCount, ?SHASH_B * get_p1e())
+                                        OtherItemCount, ?SHASH_B * P1E)
                               end),
                   KList = [element(1, KV) || KV <- NewKVList],
                   OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
@@ -2373,10 +2375,12 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
 build_recon_struct(shash, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
+    P1E = get_p1e(),
     {DBChunkBin, SigSize} =
-        shash_compress_k_list_p1e(DBItems, ItemCount, ItemCount, get_p1e()),
+        shash_compress_k_list_p1e(DBItems, ItemCount, ItemCount, P1E),
     #shash_recon_struct{interval = I, reconPid = comm:this(),
-                        db_chunk = DBChunkBin, sig_size = SigSize};
+                        db_chunk = DBChunkBin, sig_size = SigSize,
+                        p1e = P1E};
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
