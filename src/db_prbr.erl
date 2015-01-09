@@ -91,10 +91,16 @@
 -spec new() -> db().
 new() ->
     RandomName = randoms:getRandomString(),
-    %DHT_Node = comm:send_local(pid_groups:get_my(dht_node), {web_debug_info, self()}),
-    DBName = pid_groups:my_groupname() ++ "_" ++ RandomName,
+    DBName = pid_groups:my_groupname() ++ ":" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
     {?DB:new(DBName), ?DB:new(SubscrName), {false, 0, 0}}.
+%% @doc Initializes a new database.
+-spec new(nonempty_string()) -> db().
+new(DBName) ->
+  RandomName = randoms:getRandomString(),
+  DBNameNew = DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName,
+  SubscrName = DBNameNew ++ ":subscribers",
+  {?DB:new(DBNameNew), ?DB:new(SubscrName), {false, 0, 0}}.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
