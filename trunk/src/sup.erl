@@ -336,7 +336,10 @@ sup_kill_childs(SupPid) ->
                   supervisor -> sup_kill_childs(Pid);
                   worker     -> ok
               end,
-              Tables = util:ets_tables_of(Pid),
+              %Tables = util:ets_tables_of(Pid),
+              %% TODO find out which tables are from that pidgroup and delete
+              Tables = util:mnesia_tables_of(pid_groups:my_groupname()),
+              _ = util:delete_tables(Tables),
               _ = supervisor:terminate_child(SupPid, Id),
               _ = supervisor:delete_child(SupPid, Id),
               util:wait_for_process_to_die(Pid),
