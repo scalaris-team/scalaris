@@ -24,7 +24,8 @@
          get_dht_node_specs/0,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
-         number_of_nodes/0]).
+         number_of_nodes/0,
+         check_leases/0]).
 
 -include("scalaris.hrl").
 
@@ -251,6 +252,11 @@ check_ring_deep_foldl({failed, _}, Previous) ->
     Previous;
 check_ring_deep_foldl(_, Previous) ->
     Previous.
+
+-spec check_leases() -> boolean().
+check_leases() ->
+    lease_checker:check_leases_for_all_nodes() andalso
+        lease_checker:check_leases_for_the_ring().
 
 -spec number_of_nodes() -> non_neg_integer() | timeout.
 number_of_nodes() ->
