@@ -96,9 +96,11 @@
 
 -record(bloom_recon_struct,
         {
-         interval = intervals:empty()                       :: intervals:interval(),
-         reconPid = undefined                               :: comm:mypid() | undefined,
-         bloom    = ?required(bloom_recon_struct, bloom)    :: bloom:bloom_filter()
+         interval   = intervals:empty()                         :: intervals:interval(),
+         reconPid   = undefined                                 :: comm:mypid() | undefined,
+         bf_bin     = ?required(bloom_recon_struct, bloom)      :: binary(),
+         item_count = ?required(bloom_recon_struct, item_count) :: non_neg_integer(),
+         p1e        = ?required(bloom_recon_struct, p1e)        :: float()
         }).
 
 -record(merkle_params,
@@ -274,6 +276,7 @@ on({start_recon, RMethod, Params} = _Msg,
             #trivial_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                   db_chunk = DBChunk,
                                   sig_size = SigSize, ver_size = VSize} = Params,
+            Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_tree for faster access checks
@@ -286,6 +289,7 @@ on({start_recon, RMethod, Params} = _Msg,
         shash ->
             #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                 db_chunk = DBChunk, sig_size = SigSize} = Params,
+            Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_set for faster access checks
@@ -298,14 +302,22 @@ on({start_recon, RMethod, Params} = _Msg,
             Stage = reconciliation;
         bloom ->
             #bloom_recon_struct{interval = MySyncI,
-                                reconPid = DestReconPid} = Params,
+                                reconPid = DestReconPid,
+                                bf_bin = BFBin,
+                                item_count = BFCount,
+                                p1e = P1E} = Params,
+            Params1 = Params#bloom_recon_struct{bf_bin = <<>>},
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
-            Misc1 = Misc,
+            ?DBG_ASSERT(Misc =:= []),
+            FP = bloom_fp(BFCount, P1E),
+            BF = bloom:new_bin(BFBin, ?REP_HFS:new(bloom:calc_HF_numEx(BFCount, FP)), BFCount),
+            Misc1 = [{bloom, BF}],
             Reconcile = reconcile,
             Stage = reconciliation;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
+            Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             Misc1 = Misc,
@@ -313,6 +325,7 @@ on({start_recon, RMethod, Params} = _Msg,
             Stage = reconciliation;
         art ->
             MySyncI = art:get_interval(Params#art_recon_struct.art),
+            Params1 = Params,
             DestReconPid = undefined,
             Misc1 = Misc,
             Reconcile = reconcile,
@@ -323,7 +336,7 @@ on({start_recon, RMethod, Params} = _Msg,
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
     send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
-    State#rr_recon_state{stage = Stage, params = Params,
+    State#rr_recon_state{stage = Stage, params = Params1,
                          method = RMethod, initiator = true,
                          my_sync_interval = MySyncI,
                          dest_recon_pid = DestReconPid,
@@ -478,8 +491,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
-                           params = #bloom_recon_struct{bloom = BF} = Params,
+                           params = #bloom_recon_struct{p1e = P1E},
                            stats = Stats,              kv_list = KVList,
+                           misc = [{bloom, BF}],
                            dest_recon_pid = DestReconPid,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
     ?TRACE1(_Msg, State),
@@ -508,7 +522,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        BFCount, ?BLOOM_B * get_p1e())
+                                        BFCount, ?BLOOM_B * P1E)
                               end),
                   ?DBG_ASSERT(DBChunk =/= <<>>),
                   
@@ -518,9 +532,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   NewStats = rr_recon_stats:inc([{resolve_started, 1},
                                                  {build_time, BuildTime}], Stats),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
-                                       params = Params#bloom_recon_struct{bloom = bloom:new_fpr(0, 0.0)},
                                        kv_list = [],
-                                       k_list = [element(1, KV) || KV <- NewKVList]};
+                                       k_list = [element(1, KV) || KV <- NewKVList],
+                                       misc = []};
               FullDiffSize > 0 -> % andalso BFCount =:= 0 ->
                   ?DBG_ASSERT(BFCount =:= 0),
                   % no need to send resolve_req message - the non-initiator already shut down
@@ -877,7 +891,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                      comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
-    case bloom:item_count(MySyncStruct#bloom_recon_struct.bloom) of
+    case MySyncStruct#bloom_recon_struct.item_count of
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{struct = {}, stage = resolve}
     end;
@@ -2334,6 +2348,16 @@ align_bitsize(SigSize0, VSize0) ->
             end
     end.
 
+%% @doc Calculates the bloom FP, i.e. a single comparison's failure probability,
+%%      assuming:
+%%      * the other node executes MaxItems number of checks, too
+%%      * the worst case, e.g. the other node has only items not in BF and
+%%        we need to account for the false positive probability
+%%      NOTE: reduces P1E for the two parts here (bloom and trivial RC)
+-spec bloom_fp(MaxItems::non_neg_integer(), P1E::float()) -> float().
+bloom_fp(MaxItems, P1E) ->
+    1 - math:pow(1 - (1 - ?BLOOM_B) * P1E, 1 / erlang:max(MaxItems, 1)).
+
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
                          Params::parameters() | {}, BeginSync::boolean())
@@ -2358,15 +2382,13 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
     MaxItems = length(DBItems),
-    % FP is a single comparison's failure probability
-    % * assume the other node executes MaxItems number of checks, too
-    % * assume the worst case, e.g. the other node has only items not in BF and
-    %   we need to account for the false positive probability
-    % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
-    FP = 1 - math:pow(1 - (1 - ?BLOOM_B) * get_p1e(), 1 / erlang:max(MaxItems, 1)),
-    BF0 = bloom:new_fpr(MaxItems, FP),
+    P1E = get_p1e(),
+    FP = bloom_fp(MaxItems, P1E),
+    BF0 = bloom:new_fpr(MaxItems, FP, ?REP_HFS:new(bloom:calc_HF_numEx(MaxItems, FP))),
     BF = bloom:add_list(BF0, DBItems),
-    #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
+    #bloom_recon_struct{interval = I, reconPid = comm:this(),
+                        bf_bin = bloom:get_property(BF, filter),
+                        item_count = MaxItems, p1e = P1E};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     MOpts = case Params of

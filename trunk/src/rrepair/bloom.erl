@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([new_fpr/2, new_fpr/3, new_bpi/3,
+-export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3,
          add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
@@ -79,6 +79,14 @@ new_fpr(MaxItems, FPR, Hfs) ->
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
     new_(util:ceil(BitPerItem * MaxItems), Hfs).
+
+%% @doc Creates a new bloom filter with the given binary, hash function set and
+%%      item count.
+-spec new_bin(Filter::binary(), ?REP_HFS:hfs(), ItemsCount::non_neg_integer())
+        -> bloom_filter().
+new_bin(Filter, Hfs, ItemsCount) ->
+    ?ASSERT((erlang:bit_size(Filter) rem 8) =:= 0),
+    #bloom{filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
 %% @doc Creates a new bloom filter.
 -spec new_(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
