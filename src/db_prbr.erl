@@ -45,7 +45,7 @@
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
--export([new/0]).
+-export([new/0, new/1]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
