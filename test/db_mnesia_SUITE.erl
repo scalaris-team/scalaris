@@ -29,11 +29,7 @@
 
 -include("db_backend_SUITE.hrl").
 
--ifdef(have_toke).
 all() -> lists:append(tests_avail(), [tester_reopen]).
--else.
-all() -> [].
--endif.
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
