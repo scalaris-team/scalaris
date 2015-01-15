@@ -64,7 +64,17 @@ handler(AnyOp, AnyParams) ->
                           ]}.
 
 -type request() :: {string(), client_key()} % {"read", ...}
-                 | {string(), {struct, [{client_key(), value()}]}} % {"write", {struct, [..., ...]}}
+                 | {string(), {struct, [{client_key(), value()}]}} % {"write", {struct, [Key, Value]}}
+                   % {"add_del_on_list", {struct, [...]}}
+                 | {string(), {struct, [{string(), client_key()} | % {"key", Key}
+                                        {string(), {array, [client_value()]}} % {"add", {array, ToAdd}}, {"del", {array, ToRemove}}
+                                       ]}}
+                 | {string(), {struct, [{client_key(), client_value()}]}} % {"add_on_nr", {struct, [Key, ToAdd]}}
+
+                   % {"test_and_set", {struct, [...]}}
+                 | {string(), {struct, [{string(), client_key()} | % {"key", Key}
+                                        {string(), value()} % {"new", New}, {"old", Old}
+                                       ]}}
                  | {string(), any()}. % {"commit", _}
 
 -type read_result() ::
@@ -198,7 +208,7 @@ json_to_reqlist({array, TmpReqList}, AllowCommit) ->
                   [{"old", Old}, {"new", New}, {"key", Key}] -> ok;
                   [{"old", Old}, {"key", Key}, {"new", New}] -> ok
               end,
-              {test_and_set, Key, Old, New};
+              {test_and_set, Key, json_to_value(Old), json_to_value(New)};
           {"commit", _} when AllowCommit ->
               {commit}
       end || {struct, [Elem]} <- TmpReqList ].
