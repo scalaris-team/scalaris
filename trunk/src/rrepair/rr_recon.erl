@@ -136,7 +136,7 @@
 
 -type merkle_sync() ::
           {My::inner, Other::leaf,  MyMaxItemsCount::non_neg_integer(),
-           LeafNodes::[merkle_tree:mt_node()]} |
+           MyKVItems::merkle_tree:mt_bucket(), LeafCount::pos_integer()} |
           {My::leaf,  Other::leaf,  LeafNode::merkle_tree:mt_node()} |
           {My::leaf,  Other::inner, OtherMaxItemsCount::non_neg_integer(),
            LeafNode::merkle_tree:mt_node()}.
@@ -1553,8 +1553,8 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                         MerkleSynAcc, MerkleSyncIN, NewAccMIC,
                         AccCmp + 1, AccSkip);
        (not IsLeafNode) andalso IsLeafHash ->
-           LeafNodes = merkle_tree:get_leaves([Node]),
-           Sync = {inner, leaf, MyMaxItemsCount, LeafNodes},
+           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           Sync = {inner, leaf, MyMaxItemsCount, MyKVItems, LeafCount},
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Stats,
                         <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, AccN,
@@ -1633,8 +1633,8 @@ p_process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN]
                           RestTreeAcc, MerkleSyncAcc, AccMIC, AccCmp, AccSkip) ->
     Sync = case merkle_tree:is_leaf(Node) of
                true  -> {leaf, leaf, Node};
-               false -> LeafNodes = merkle_tree:get_leaves([Node]),
-                        {inner, leaf, MyMaxItemsCount, LeafNodes}
+               false -> {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+                        {inner, leaf, MyMaxItemsCount, MyKVItems, LeafCount}
            end,
     p_process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
                               MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Stats,
@@ -1729,7 +1729,7 @@ merkle_resolve_leaves_noninit(Sync, Stats, Params, P1EOneLeaf) ->
         P1EOneLeaf::float(), LeafNodesAcc::non_neg_integer())
         -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_noninit([{inner, leaf, _MyMaxItemsCount, _LeafNodes} | TL],
+merkle_resolve_leaves_noninit([{inner, leaf, _MyMaxItemsCount, _MyKVItems, _LeafCount} | TL],
                               HashesReply, Stats,
                               BucketSizeBits, MaxBucketSize, P1EOneLeaf, LeafNAcc) ->
     % get KV-List from initiator and resolve in second step
@@ -1747,7 +1747,8 @@ merkle_resolve_leaves_noninit([{leaf, inner, OtherMaxItemsCount, LeafNode} | TL]
                               HashesReply, Stats,
                               BucketSizeBits, MaxBucketSize, P1EOneLeaf, LeafNAcc) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
-    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, P1EOneLeaf, OtherMaxItemsCount, BucketSizeBits, HashesReply),
+    HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, P1EOneLeaf, OtherMaxItemsCount,
+                                                BucketSizeBits, HashesReply),
     merkle_resolve_leaves_noninit(TL, HashesReply1, Stats,
                                   BucketSizeBits, MaxBucketSize, P1EOneLeaf, LeafNAcc + 1);
 merkle_resolve_leaves_noninit([], HashesReply, Stats,
@@ -1758,23 +1759,18 @@ merkle_resolve_leaves_noninit([], HashesReply, Stats,
 %% @doc Helper for resolving an inner-leaf mismatch.
 -spec merkle_resolve_compare_inner_leaf(
         P1EOneLeaf::float(), MyMaxItemsCount::non_neg_integer(),
-        BucketSizeBits::pos_integer(), LeafNodes::[merkle_tree:mt_node()],
+        BucketSizeBits::pos_integer(), MyKVItems::merkle_tree:mt_bucket(),
+        LeafCount::pos_integer(),
         Hashes::bitstring(), ToSend::[?RT:key()], ToReq::[?RT:key()],
         ToResolve::[bitstring()], ResolveNonEmptyAcc::boolean())
         -> {NHashes::bitstring(), ToSend1::[?RT:key()], ToReq1::[?RT:key()],
             ToResolve1::[bitstring()], ResolveNonEmpty1::boolean(),
             LeafCount::non_neg_integer()}.
 merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
-                                  LeafNodes, Hashes, ToSend, ToReq,
+                                  MyBuckets, NLeafNAcc, Hashes, ToSend, ToReq,
                                   ToResolve, ResolveNonEmptyAcc) ->
     {NHashes, OBucketHashes, OBucketTree, SigSize, VSize} =
         merkle_resolve_retrieve_leaf_hashes(Hashes, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
-    {MyBuckets, NLeafNAcc} =
-        lists:foldl(fun(N, {AccBuckets, LeafNAccX}) ->
-                            ?DBG_ASSERT(merkle_tree:is_leaf(N)),
-                            {lists:append(merkle_tree:get_bucket(N), AccBuckets),
-                             LeafNAccX + 1}
-                    end, {[], 0}, LeafNodes),
     {ToSend1, ToReq1, OBucketTree1} =
         get_full_diff(MyBuckets, OBucketTree, ToSend, ToReq, SigSize, VSize),
     ToResolve1 = [compress_k_list(OBucketTree1, OBucketHashes, SigSize, VSize,
@@ -1861,16 +1857,16 @@ merkle_resolve_leaves_init([{leaf, leaf, LeafNode} | TL],
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     % same handling as below inner-leaf -> simply convert:
     merkle_resolve_leaves_init(
-      [{inner, leaf, MaxBucketSize, [LeafNode]} | TL], Hashes,
+      [{inner, leaf, MaxBucketSize, merkle_tree:get_bucket(LeafNode), 1} | TL], Hashes,
       DestRRPid, Stats, OwnerL, BucketSizeBits, MaxBucketSize, P1EOneLeaf,
       ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc, HashesReply);
-merkle_resolve_leaves_init([{inner, leaf, MyMaxItemsCount, LeafNodes} | TL],
+merkle_resolve_leaves_init([{inner, leaf, MyMaxItemsCount, MyKVItems, LeafCount} | TL],
                            Hashes, DestRRPid, Stats, OwnerL, BucketSizeBits,
                            MaxBucketSize, P1EOneLeaf, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
     {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1, LeafCount} =
         merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
-                                          LeafNodes, Hashes, ToSend,
+                                          MyKVItems, LeafCount, Hashes, ToSend,
                                           ToReq, ToResolve, ResolveNonEmpty),
     merkle_resolve_leaves_init(TL, NHashes, DestRRPid, Stats, OwnerL, BucketSizeBits,
                                MaxBucketSize, P1EOneLeaf, ToSend1, ToReq1, ToResolve1,
@@ -1927,13 +1923,13 @@ merkle_resolve_req_keys_noninit([{leaf, inner, _OtherMaxItemsCount, LeafNode} | 
     merkle_resolve_req_keys_noninit(TL, Hashes, BinKeyList, DestRRPid, Stats,
                                     OwnerL, BucketSizeBits, MaxBucketSize, P1EOneLeaf,
                                     ToSend1, ToReq, ToResolve, ResolveNonEmpty, true);
-merkle_resolve_req_keys_noninit([{inner, leaf, MyMaxItemsCount, LeafNodes} | TL],
+merkle_resolve_req_keys_noninit([{inner, leaf, MyMaxItemsCount, MyKVItems, LeafCount} | TL],
                                 Hashes, BinKeyList, DestRRPid,
                                 Stats, OwnerL, BucketSizeBits, MaxBucketSize, P1EOneLeaf,
                                 ToSend, ToReq, ToResolve, ResolveNonEmpty, BKLNonEmpty) ->
     {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1, LeafCount} =
         merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
-                                          LeafNodes, Hashes, ToSend,
+                                          MyKVItems, LeafCount, Hashes, ToSend,
                                           ToReq, ToResolve, ResolveNonEmpty),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats),
     merkle_resolve_req_keys_noninit(TL, NHashes, BinKeyList, DestRRPid, NStats,
