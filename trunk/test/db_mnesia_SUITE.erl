@@ -25,16 +25,17 @@
 
 -define(TEST_DB, db_mnesia).
 -define(CLOSE, close).
--define(EQ, =:=).
+-define(EQ, ==).
 
 -include("db_backend_SUITE.hrl").
 
 all() -> lists:append(tests_avail(), [tester_reopen]).
 
-suite() -> [ {timetrap, {seconds, 30}} ].
+suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
+    ok = db_mnesia:start(),
     tester:register_type_checker({typedef, db_backend_beh, key}, db_backend_beh, tester_is_valid_db_key),
     tester:register_value_creator({typedef, db_backend_beh, key}, db_backend_beh, tester_create_db_key, 1),
 
