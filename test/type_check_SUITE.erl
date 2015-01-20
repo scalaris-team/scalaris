@@ -780,7 +780,7 @@ tester_type_check_util(_Config) ->
              {wait_for, 1}, %% cannot create funs
              {wait_for, 2}, %% cannot create funs
              {wait_for_process_to_die, 1}, %% could wait forever
-             {wait_for_table_to_disappear, 2}, %% cannot create tids
+             {wait_for_ets_table_to_disappear, 2}, %% cannot create tids
              {zipfoldl, 5}, %% cannot create funs
              {rrd_combine_timing_slots, 3}, %% values too big
              {rrd_combine_timing_slots, 4}, %% values too big

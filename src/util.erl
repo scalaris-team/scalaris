@@ -64,7 +64,7 @@
 -export([tc/3, tc/2, tc/1]).
 -export([wait_for/1, wait_for/2,
          wait_for_process_to_die/1,
-         wait_for_table_to_disappear/2,
+         wait_for_ets_table_to_disappear/2,
          ets_tables_of/1]).
 -export([round/2]).
 
@@ -156,8 +156,8 @@ wait_for_process_to_die(Pid) when is_pid(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 
 %% @doc Waits for the given ets table to disappear.
--spec wait_for_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
-wait_for_table_to_disappear(Pid, Table) ->
+-spec wait_for_ets_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
+wait_for_ets_table_to_disappear(Pid, Table) ->
     wait_for(fun() ->
                      case ets:info(Table, owner) of
                          undefined -> true;
@@ -166,7 +166,7 @@ wait_for_table_to_disappear(Pid, Table) ->
                      end
              end).
 
--spec ets_tables_of(pid()) -> list().
+-spec ets_tables_of(pid()) -> [tid() | atom()].
 ets_tables_of(Pid) ->
     Tabs = ets:all(),
     [ Tab || Tab <- Tabs, ets:info(Tab, owner) =:= Pid ].
