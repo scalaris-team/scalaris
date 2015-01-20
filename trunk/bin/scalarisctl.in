@@ -634,7 +634,13 @@ checkinstallation() {
     exit 0
 }
 
+scalarisrecover(){
+    scalarisstart recover
+}
+
 scalarisstart(){
+    START_TYPE=${1-"start"}
+    shift
     $ERL -noinput -name $NODE_NAME -eval 'halt(0).' 2>/dev/null > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -705,6 +711,7 @@ scalarisstart(){
  -pa $BEAMDIR $TOKEFLAGS $BACKGROUND\
  -sasl sasl_error_logger false\
  -yaws embedded true\
+ -scalaris start_type \"$START_TYPE\"\
  -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
  -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
@@ -818,7 +825,7 @@ until [ -z "$1" ]; do
       shift
       NODES_PER_VM=$1
       shift;;
-    checkinstallation | start | stop | gstop | restart | list | debug | status)
+    checkinstallation | start | stop | gstop | restart | recover | list | debug | status)
       cmd="$1"
       shift;;
     "dbg-check-ring")
@@ -874,6 +881,8 @@ case $cmd in
     restart)
         scalarisstop
         scalarisstart;;
+    recover)
+        scalarisrecover;;
     list)
         list_erlang_processes;;
     debug)
