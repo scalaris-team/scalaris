@@ -164,12 +164,6 @@
          }).
 -type state() :: #rr_recon_state{}.
 
-% Optimum for reducing P1E for the two parts: key and version comparison (factor B for the latter)
--define(TRIVIAL_B, 0.5).
--define(SHASH_B, 0.5). % TODO: find optimum!
-% Optimum for reducing P1E for the two parts: bloom and trivial RC (factor B for the latter)
--define(BLOOM_B, 0.5809402158035948). % 2*math:log(2) / (1+2*math:log(2))
-
 % keep in sync with check_node/5
 -define(recon_ok,                       1). % match
 -define(recon_fail_stop_leaf,           2). % mismatch, sending node has leaf node
@@ -446,11 +440,12 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
                   % NOTE: reduce P1E for the two parts here (SHash and trivial RC)
+                  P1E_sub = calc_n_subparts_p1e(2, P1E),
                   {BuildTime, {MyDiff, SigSizeT, VSizeT}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        OtherItemCount, ?SHASH_B * P1E)
+                                        OtherItemCount, P1E_sub)
                               end),
                   KList = [element(1, KV) || KV <- NewKVList],
                   OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
@@ -520,11 +515,12 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
                   % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
+                  P1E_sub = calc_n_subparts_p1e(2, P1E),
                   {BuildTime, {DBChunk, SigSize, VSize}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        BFCount, ?BLOOM_B * P1E)
+                                        BFCount, P1E_sub)
                               end),
                   ?DBG_ASSERT(DBChunk =/= <<>>),
                   
@@ -2228,6 +2224,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %% @doc Splits P1E into N equal independent sub-processes and returns the P1E
 %%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
+%%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
 -spec calc_n_subparts_p1e(N::pos_integer(), P1E::float()) -> P1E_sub::float().
 calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%     _VP = 1 - math:pow(1 - P1E, 1 / N).
@@ -2252,11 +2249,11 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     case get_min_version_bits() of
         variable ->
             % reduce P1E for the two parts here (key and version comparison)
-            B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
+            P1E_sub = calc_n_subparts_p1e(2, P1E),
             % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
+            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
             % note: we have n one-to-one comparisons
-            VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), B * P1E),
+            VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
             VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
             ok;
         VSize0 ->
@@ -2299,9 +2296,9 @@ shash_signature_sizes(_, 0, _P1E) ->
     0; % invalid but since there are 0 items, this is ok!
 shash_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     % reduce P1E for the two parts here (hash and trivial phases)
-    A = 1 - ?SHASH_B,
+    P1E_sub = calc_n_subparts_p1e(2, P1E),
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
     % align if required
     Res = case config:read(rr_align_to_bytes) of
               false -> SigSize0;
@@ -2358,7 +2355,8 @@ align_bitsize(SigSize0, VSize0) ->
 %%      NOTE: reduces P1E for the two parts here (bloom and trivial RC)
 -spec bloom_fp(MaxItems::non_neg_integer(), P1E::float()) -> float().
 bloom_fp(MaxItems, P1E) ->
-    1 - math:pow(1 - (1 - ?BLOOM_B) * P1E, 1 / erlang:max(MaxItems, 1)).
+    P1E_sub = calc_n_subparts_p1e(2, P1E),
+    1 - math:pow(1 - P1E_sub, 1 / erlang:max(MaxItems, 1)).
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
