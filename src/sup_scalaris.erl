@@ -257,19 +257,10 @@ stop_first_services() ->
     _ = inets:stop(),
     ok.
 
+-spec start_mnesia() -> ok.
 -ifdef(PRBR_MNESIA).
--spec start_mnesia() -> ok.
-start_mnesia() ->
-    application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
-    case mnesia:create_schema([node()]) of
-        ok -> ok;
-        Msg -> 
-            io:format("starting mnesia: ~w", [Msg])
-    end,
-    _ = application:start(mnesia),
-    ok.
+start_mnesia() -> db_mnesia:start().
 -else.
--spec start_mnesia() -> ok.
 start_mnesia() -> ok.
 -endif.
 
