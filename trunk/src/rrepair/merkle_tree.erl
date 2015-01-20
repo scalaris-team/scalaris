@@ -32,7 +32,7 @@
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
-         get_item_count/1, get_leaf_count/1, get_leaves/1,
+         get_item_count/1, get_items/1, get_leaf_count/1, get_leaves/1,
          get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
@@ -212,6 +212,29 @@ get_childs({_H, _ICnt, _Bkt, _I}) -> [].
 get_item_count({merkle_tree, _, Root}) -> get_item_count(Root);
 get_item_count({_H, _Cnt, ICnt, _I, _CL}) -> ICnt;
 get_item_count({_H, ICnt, _Bkt, _I}) -> ICnt.
+
+%% @doc Gets all items in the buckets of the given merkle tree or node list
+%%      (in arbitrary order).
+-spec get_items(merkle_tree() | mt_node() | [mt_node()])
+        -> {Items::mt_bucket(), LeafCount::non_neg_integer()}.
+get_items({merkle_tree, _, Root}) -> get_items(Root);
+get_items({_H, _Cnt, _ICnt, _I, _CL} = N) -> get_items_([N], [], 0);
+get_items({_H, _ICnt, _Bkt, _I} = N) -> [N];
+get_items(Nodes) when is_list(Nodes) -> get_items_(Nodes, [], 0).
+
+%% @doc Helper for get_items/1.
+-spec get_items_(Iter::mt_iter(), Items::mt_bucket(), LCnt::non_neg_integer())
+        -> {Items::mt_bucket(), LeafCount::non_neg_integer()}.
+get_items_(Iter, Items, LCnt) ->
+    case next(Iter) of
+        {Node, Next} ->
+            case is_leaf(Node) of
+                true  -> get_items_(Next, get_bucket(Node) ++ Items, LCnt + 1);
+                false -> get_items_(Next, Items, LCnt)
+            end;
+        none ->
+            {Items, LCnt}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
