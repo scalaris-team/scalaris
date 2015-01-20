@@ -326,36 +326,20 @@ sup_pause_childs(SupPid) ->
                   Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
     ok.
 
+-spec get_tables_of(pid()) -> list().
+-ifdef(PRBR_MNESIA).
+get_tables_of(_Pid)->
+  Tables = db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
+  _ = db_mnesia:delete_tables(Tables),
+  Tables.
+-else.
+get_tables_of(Pid)->
+  util:ets_tables_of(Pid).
+-endif.
+
 %% @doc Kills all children of the given supervisor (recursively) after they
 %%      have been paused by sup_pause_childs/1.
 -spec sup_kill_childs(Supervisor::pid() | atom()) -> ok.
--ifdef(PRBR_MNESIA).
-sup_kill_childs(SupPid) ->
-  ChildSpecs = sup_which_children(SupPid),
-  _ = [ try
-          case Type of
-            supervisor -> sup_kill_childs(Pid);
-            worker     -> ok
-          end,
-          %% TODO find out which tables are from that pidgroup and delete
-          Tables = util:mnesia_tables_of(pid_groups:my_groupname()),
-          _ = util:delete_tables(Tables),
-          _ = supervisor:terminate_child(SupPid, Id),
-          _ = supervisor:delete_child(SupPid, Id),
-          util:wait_for_process_to_die(Pid),
-          _ = [ util:wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
-          ok
-        catch
-          % child may not exist any more due to a parallel process terminating it
-          exit:{killed, _} -> ok;
-          exit:{noproc, _} -> ok;
-          % exit reason may encapsulate a previous failure
-          exit:{{killed, _}, _} -> ok;
-          exit:{{noproc, _}, _} -> ok
-        end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
-    Pid =/= undefined, is_process_alive(Pid) ],
-  ok.
--else.
 sup_kill_childs(SupPid) ->
     ChildSpecs = sup_which_children(SupPid),
     _ = [ try
@@ -363,7 +347,7 @@ sup_kill_childs(SupPid) ->
                   supervisor -> sup_kill_childs(Pid);
                   worker     -> ok
               end,
-              Tables = util:ets_tables_of(Pid),
+              Tables = get_tables_of(Pid),
               _ = supervisor:terminate_child(SupPid, Id),
               _ = supervisor:delete_child(SupPid, Id),
               util:wait_for_process_to_die(Pid),
@@ -379,7 +363,7 @@ sup_kill_childs(SupPid) ->
           end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
                   Pid =/= undefined, is_process_alive(Pid) ],
     ok.
--endif.
+
 -spec sup_get_all_children(Supervisor::pid() | atom()) -> [pid()].
 sup_get_all_children(Supervisor) ->
     AllChilds = [X || X = {_, Pid, _, _} <- sup_which_children(Supervisor),
