@@ -346,25 +346,21 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
     ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
                  {non_unique_send_list, ToSend, ToSend1}),
-    ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
-                 {non_unique_req_list, ToReq1}),
 
     %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
     if SyncFinished ->
            SID = rr_recon_stats:get(session_id, Stats),
-           ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
-                  [SID, length(ToSend1), length(ToReq1)]),
+           ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p",
+                  [SID, length(ToSend1)]),
            NewStats =
-               if ToSend1 =/= [] orelse ToReq1 =/= [] ->
+               if ToSend1 =/= [] ->
                       send(DestRR_Pid, {request_resolve, SID,
-                                        {?key_upd, ToSend1, ToReq1},
+                                        {?key_upd, ToSend1, []},
                                         [{from_my_node, 0},
                                          {feedback_request, comm:make_global(OwnerL)}]}),
-                      % we will get one or two replies from a subsequent feedback response
-                      FBCount = if ToReq1 =/= [] -> 2;
-                                   true -> 1
-                                end,
+                      % we will get one reply from a subsequent feedback response
+                      FBCount = 1,
                       rr_recon_stats:inc([{resolve_started, FBCount},
                                           {await_rs_fb, FBCount}], Stats);
                   true ->
@@ -372,8 +368,11 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                end,
 
            % let the non-initiator's rr_recon process identify the remaining keys
-           Req2Count = gb_trees:size(OtherDBChunk1),
-           ToReq2 = compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
+           ReqTree = lists:foldl(fun(KeyBin, Acc) ->
+                                         gb_trees:enter(KeyBin, 0, Acc)
+                                 end, OtherDBChunk1, ToReq1),
+           Req2Count = gb_trees:size(ReqTree),
+           ToReq2 = compress_k_list(ReqTree, OtherDBChunkOrig,
                                     SigSize, VSize, 0, [], 0, 0),
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
@@ -1020,18 +1019,18 @@ decompress_kv_list(Bin, AccList, SigSize, VSize) ->
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
         (MyEntries::[], MyIOtherKvTree::kv_tree(),
-         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         AccFBItems::FBItems, AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+        -> {FBItems::FBItems, ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
         (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()};
         (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+         AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                   util:pow(2, VSize)).
@@ -1039,18 +1038,18 @@ get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
 %% @doc Helper for get_full_diff/6.
 -spec get_full_diff_
         (MyEntries::[], MyIOtherKvTree::kv_tree(),
-         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         AccFBItems::FBItems, AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+        -> {FBItems::FBItems, ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
         (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()};
         (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+         AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
@@ -1080,7 +1079,7 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
                                   ReqItems, SigSize, VMod);
                true -> % VersionShort < OtherVersionShort
                    get_full_diff_(Rest, MyIOtKvTree2, FBItems,
-                                  [Key | ReqItems], SigSize, VMod)
+                                  [KeyBin | ReqItems], SigSize, VMod)
             end
     end.
 
@@ -1089,18 +1088,18 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
-                    AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+                    AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
                     SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
 get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                    util:pow(2, VSize)).
 
 %% @doc Helper for get_part_diff/6.
 -spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
-                     AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+                     AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
                      SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
 get_part_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
@@ -1118,7 +1117,7 @@ get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize,
                    get_part_diff_(Rest, MyIOtKvTree2, FBItems, ReqItems,
                                   SigSize, VMod);
                true ->
-                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [Key | ReqItems],
+                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [KeyBin | ReqItems],
                                   SigSize, VMod)
             end
     end.
@@ -1336,25 +1335,26 @@ shash_bloom_perform_resolve(
     {ToSendKeys1, ToReq1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
-    ?TRACE("Resolve ~S Session=~p ; ToSend=~p ; ToReq=~p",
-           [_RMethod, SID, length(ToSendKeys1), length(ToReq1)]),
+    ?TRACE("Resolve ~S Session=~p ; ToSend=~p",
+           [_RMethod, SID, length(ToSendKeys1)]),
     ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
                  {non_unique_send_list, ToSendKeys1}),
-    ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
-                 {non_unique_req_list, ToReq1}),
 
     % note: the resolve request was counted at the initiator and
     %       thus from_my_node must be 0 on this node!
     send_local(OwnerL, {request_resolve, SID,
-                        {key_upd_send, DestRRPid, ToSendKeys1, ToReq1},
+                        {key_upd_send, DestRRPid, ToSendKeys1, []},
                         [{from_my_node, 0},
                          {feedback_request, comm:make_global(OwnerL)}]}),
     % we will get one reply from a subsequent feedback response
     NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
 
     % let the initiator's rr_recon process identify the remaining keys
-    Req2Count = gb_trees:size(DBChunkTree1),
-    ToReq2 = compress_k_list(DBChunkTree1, DBChunk, SigSize, VSize, 0, [], 0, 0),
+    ReqTree = lists:foldl(fun(KeyBin, Acc) ->
+                                  gb_trees:enter(KeyBin, 0, Acc)
+                          end, DBChunkTree1, ToReq1),
+    Req2Count = gb_trees:size(ReqTree),
+    ToReq2 = compress_k_list(ReqTree, DBChunk, SigSize, VSize, 0, [], 0, 0),
     ?TRACE("resolve_req ~s Session=~p ; ToReq=~p (~p bits)",
            [_RMethod, SID, Req2Count, erlang:bit_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
@@ -1772,12 +1772,15 @@ merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
     {NHashes, OBucketHashes, OBucketTree, SigSize, VSize} =
         merkle_resolve_retrieve_leaf_hashes(Hashes, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
     {ToSend1, ToReq1, OBucketTree1} =
-        get_full_diff(MyBuckets, OBucketTree, ToSend, ToReq, SigSize, VSize),
-    ToResolve1 = [compress_k_list(OBucketTree1, OBucketHashes, SigSize, VSize,
+        get_full_diff(MyBuckets, OBucketTree, ToSend, [], SigSize, VSize),
+    ReqTree = lists:foldl(fun(KeyBin, Acc) ->
+                                  gb_trees:enter(KeyBin, 0, Acc)
+                          end, OBucketTree1, ToReq1),
+    ToResolve1 = [compress_k_list(ReqTree, OBucketHashes, SigSize, VSize,
                                   0, [], 0, 0) | ToResolve],
     ResolveNonEmptyAcc1 =
-        ?IIF(gb_trees:size(OBucketTree1) =/= 0, true, ResolveNonEmptyAcc),
-    {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmptyAcc1, NLeafNAcc}.
+        ?IIF(gb_trees:size(ReqTree) =/= 0, true, ResolveNonEmptyAcc),
+    {NHashes, ToSend1, ToReq, ToResolve1, ResolveNonEmptyAcc1, NLeafNAcc}.
 
 %% @doc Helper for the final resolve step during merkle sync.
 -spec merkle_resolve(
@@ -1799,6 +1802,7 @@ merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
                             {non_unique_send_list, ToSend}),
                ?DBG_ASSERT2(length(ToReq) =:= length(lists:usort(ToReq)),
                             {non_unique_req_list, ToReq}),
+               ?ASSERT2(ToReq =:= [], {req_nonempty, ToReq}),
                send_local(OwnerL, {request_resolve, SID,
                                    {key_upd_send, DestRRPid, ToSend, ToReq},
                                    [{from_my_node, ?IIF(Initiator, 1, 0)},
