@@ -65,9 +65,7 @@
 -export([wait_for/1, wait_for/2,
          wait_for_process_to_die/1,
          wait_for_table_to_disappear/2,
-         ets_tables_of/1,
-         mnesia_tables_of/1,
-         delete_mnesia_tables/1 ]).
+         ets_tables_of/1]).
 -export([round/2]).
 
 -export([repeat/3, repeat/4, parallel_run/5]).
@@ -172,19 +170,6 @@ wait_for_table_to_disappear(Pid, Table) ->
 ets_tables_of(Pid) ->
     Tabs = ets:all(),
     [ Tab || Tab <- Tabs, ets:info(Tab, owner) =:= Pid ].
-
-%% @doc Return all the tables owned by PidGroup
--spec mnesia_tables_of(pid()) -> list().
-mnesia_tables_of(Pid) ->
-  Tabs = mnesia:system_info(tables),
-  [ Tab || Tab <- Tabs, string:sub_word(mnesia:table_info(Tab, name), 2, $:) =:= Pid ].
-
-%% @doc Close recursivly all mnesia tables in List
--spec delete_mnesia_tables(list()) -> ok.
-delete_mnesia_tables([Tab | Tail]) ->
-  db_mnesia:close(Tab),
-  delete_mnesia_tables(Tail);
-delete_mnesia_tables([]) -> ok.
 
 %% @doc Escapes quotes in the given string.
 -spec escape_quotes(String::string()) -> string().
