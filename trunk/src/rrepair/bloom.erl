@@ -303,12 +303,10 @@ set_bits(Filter, []) ->
 
 % V 2 - 12 % faster than V1
 check_Bits(Filter, [Pos | Positions]) ->
-    <<_:Pos/bitstring, C:1, _/bitstring>> = Filter,
-    case C of
-        1 -> check_Bits(Filter, Positions);
-        0 -> false
+    case Filter of
+        <<_:Pos/bitstring, 1:1, _/bitstring>> -> check_Bits(Filter, Positions);
+        <<_:Pos/bitstring, 0:1, _/bitstring>> -> false
     end;
-
 check_Bits(_, []) ->
     true.
 
