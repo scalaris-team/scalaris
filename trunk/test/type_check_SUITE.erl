@@ -470,6 +470,7 @@ tester_type_check_rrepair(_Config) ->
              {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
+             {bloom_fp, 2}, %% needs float > 0, < 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_k_list, 8}, %% needs a special binary to correspond to a number of bits
@@ -791,7 +792,7 @@ tester_type_check_util(_Config) ->
            [ {lists_takewith_iter, 3}, %% cannot create funs; tested via feeder
              {lists_partition3, 5}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 4}, %% indices must exist in list
-             {shuffle_helperA,2}, %% preconds must be fulfilled
+             {shuffle_helperA, 3}, %% preconds must be fulfilled
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
              {'=:<_lists', 2}, %% need equal length lists
              {ssplit_unique_helper, 5}, %% needs fun
