@@ -671,6 +671,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
        RTree =:= [] ->
             ?TRACE("Sync (NI): ~.2p", [MerkleSyncNew]),
             P1EOneLeaf = calc_n_subparts_p1e(length(MerkleSyncNew), P1EAllLeaves),
+%%             log:pal("merkle [ ~p ] LeafSync#: ~p\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p",
+%%                     [self(), length(MerkleSyncNew), P1EAllLeaves, P1EOneLeaf]),
             {Hashes, NStats2} =
                 merkle_resolve_leaves_noninit(MerkleSyncNew, NStats,
                                               Params, P1EOneLeaf),
@@ -743,6 +745,8 @@ on({resolve_req, Hashes} = _Msg,
   when is_bitstring(Hashes) ->
     ?TRACE1(_Msg, State),
     P1EOneLeaf = calc_n_subparts_p1e(length(MerkleSync), P1EAllLeaves),
+%%     log:pal("merkle [ ~p ] LeafSync#: ~p\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p",
+%%             [self(), length(MerkleSync), P1EAllLeaves, P1EOneLeaf]),
     {HashesReply, BinIdxList, NStats} =
         merkle_resolve_leaves_init(MerkleSync, Hashes, DestRRPid, Stats,
                                    OwnerL, Params, P1EOneLeaf),
@@ -888,6 +892,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             #merkle_params{p1e = P1ETotal,
                            ni_item_count = OtherItemsCount} = Params,
             MyItemCount = merkle_tree:get_item_count(MySyncStruct),
+%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+%%                     [self(), merkle_tree:size_detail(MySyncStruct),
+%%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
+%%                                    merkle_tree:get_item_count(L) =:= 0])]),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
 
             {P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL} =
@@ -912,6 +920,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             P1ETotal = get_p1e(),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
             ItemCount = merkle_tree:get_item_count(MySyncStruct),
+%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+%%                     [self(), merkle_tree:size_detail(MySyncStruct),
+%%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
+%%                                    merkle_tree:get_item_count(L) =:= 0])]),
 
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
@@ -1408,10 +1420,10 @@ merkle_next_signature_sizes(
     NextSigSizeL = min_max(util:ceil(util:log2((2 * BucketSize) / P1E_L)),
                            1, 160),
 
-%%     log:pal("P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B~n"
-%%             "Buckets: ~B, \tMyMI: ~B, \tOtMI: ~B",
-%%             [P1E_I, P1E_L, NextSigSizeI, NextSigSizeL,
-%%              BucketSize, MyMaxItemsCount, OtherMaxItemsCount]),
+%%     log:pal("merkle [ ~p ] MyMI: ~B, \tOtMI: ~B~n"
+%%             "P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B",
+%%             [self(), MyMaxItemsCount, OtherMaxItemsCount,
+%%              P1E_I, P1E_L, NextSigSizeI, NextSigSizeL]),
     {P1E_I, P1E_L, NextSigSizeI, NextSigSizeL}.
 
 -compile({nowarn_unused_function, {min_max_feeder, 3}}).
