@@ -232,6 +232,26 @@ get_leaf_count_(Iter, LCnt) ->
         none -> LCnt
     end.
 
+%% @doc Gets all leaves in the given merkle tree or node list
+%%      (in arbitrary order).
+-spec get_leaves(merkle_tree() | mt_node() | [mt_node()]) -> [mt_node()].
+get_leaves({merkle_tree, _, Root}) -> get_leaves(Root);
+get_leaves({_H, _Cnt, _ICnt, _I, _CL} = N) -> get_leaves_([N], []);
+get_leaves({_H, _ICnt, _Bkt, _I} = N) -> [N];
+get_leaves(Nodes) when is_list(Nodes) -> get_leaves_(Nodes, []).
+
+%% @doc Helper for get_leaves/1.
+-spec get_leaves_(Iter::mt_iter(), Acc::[mt_node()]) -> [mt_node()].
+get_leaves_(Iter, Acc) ->
+    case next(Iter) of
+        {Node, Next} ->
+            case is_leaf(Node) of
+                true  -> get_leaves_(Next, [Node | Acc]);
+                false -> get_leaves_(Next, Acc)
+            end;
+        none -> Acc
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether the given merkle_tree or node is a leaf.
@@ -472,22 +492,6 @@ next([[] | R2]) ->
     next(R2);
 next([]) ->
     none.
-
-%% @doc Gets all leaves in the given merkle tree or node list.
--spec get_leaves(Tree::merkle_tree() | [mt_node()]) -> Leaves::[mt_node()].
-get_leaves({merkle_tree, _, Root})    -> get_leaves([Root], []);
-get_leaves(Nodes) when is_list(Nodes) -> get_leaves(Nodes, []).
-
-%% @doc Helper for get_leaves/1.
--spec get_leaves(RestNodes::[mt_node()], LeafAcc::[mt_node()])
-        -> Leaves::[mt_node()].
-get_leaves([], LeafAcc) ->
-    lists:reverse(LeafAcc);
-get_leaves([Node | Rest], LeafAcc) ->
-    case is_leaf(Node) of
-        true  -> get_leaves(Rest, [Node | LeafAcc]);
-        false -> get_leaves(lists:append(get_childs(Node), Rest), LeafAcc)
-    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
