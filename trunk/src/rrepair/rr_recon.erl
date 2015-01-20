@@ -1376,12 +1376,7 @@ merkle_next_p1e(BranchFactor, P1ETotal) ->
     % inner node: current node or any of its BranchFactor children (B=BranchFactor+1)
     % leaf node: current node only (B=1) and thus P1ETotal
     % => current node's probability of 0 errors = P0E(child)^B
-    % however, we cannot use P0E=(1-P1E) since it is near 1 and its floating
-    % point representation is sub-optimal!
-    % => use Taylor expansion of P1E_next = 1 - (1-P1E)^(1/B) at P1E = 0
-    BI = BranchFactor + 1,
-    P1E_I = P1ETotal / BI +
-              (BI - 1) * P1ETotal * P1ETotal / (2 * BI * BI), % +O[p^3]
+    P1E_I = calc_n_subparts_p1e(BranchFactor + 1, P1ETotal),
     P1E_L = P1ETotal,
 %%     log:pal("merkle [ ~p ]~n - P1ETotal: ~p, \tP1E_I: ~p, \tP1E_L: ~p",
 %%             [self(), P1ETotal, P1E_I, P1E_L]),
