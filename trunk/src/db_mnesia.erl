@@ -17,7 +17,7 @@
 %%         Two keys K and L are considered equal if K == L yields true.
 %% @end
 -module(db_mnesia).
--author('fajerski@zib.de').
+-author('tanracinet@gmail.com').
 -vsn('$Id: db_ets.erl 6270 2014-03-28 14:25:52Z fajerski@zib.de $').
 
 -include("scalaris.hrl").
@@ -55,7 +55,8 @@ start() ->
   case mnesia:create_schema([node()]) of
     ok -> ok;
     Msg ->
-      io:format("starting mnesia: ~w", [Msg])
+      io:format("starting mnesia: ~w", [Msg]),
+      erlang:exit(0)
   end,
   _ = application:start(mnesia),
   ok.
