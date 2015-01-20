@@ -29,9 +29,11 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
+-export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
 -export([get_name/1, get_load/1]).
+%% cleanup functions
+-export([mnesia_tables_of/1, delete_mnesia_tables/1, close_and_delete/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -47,9 +49,22 @@
 
 -export([traverse_table_and_show/1]).
 
+-spec start() -> ok.
+start() ->
+  application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
+  case mnesia:create_schema([node()]) of
+    ok -> ok;
+    Msg ->
+      io:format("starting mnesia: ~w", [Msg])
+  end,
+  _ = application:start(mnesia),
+  ok.
+
+%% @doc traverse table and print content
+-spec traverse_table_and_show(Table_name::nonempty_string()) -> ok.
 traverse_table_and_show(Table_name)->
   Iterator =  fun(Rec,_)->
-    io:format("~p~n",[Rec]),
+    log:log(warn, "~p~n",[Rec]),
     []
   end,
   case mnesia:is_transaction() of
@@ -58,6 +73,19 @@ traverse_table_and_show(Table_name)->
       Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
       mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
   end.
+
+%% @doc Return all the tables owned by PidGroup
+-spec mnesia_tables_of(pid()) -> list().
+mnesia_tables_of(Pid) ->
+  Tabs = mnesia:system_info(tables),
+  [ Tab || Tab <- Tabs, string:sub_word(mnesia:table_info(Tab, name), 2, $:) =:= Pid ].
+
+%% @doc Close recursivly all mnesia tables in List
+-spec delete_mnesia_tables(list()) -> ok.
+delete_mnesia_tables([Tab | Tail]) ->
+  close(Tab),
+  delete_mnesia_tables(Tail);
+delete_mnesia_tables([]) -> ok.
 
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
@@ -85,15 +113,21 @@ new(DBName, Options) ->
 %%      A new database is created
 -spec open(DBName::nonempty_string()) -> db().
 open(DBName) ->
-    log:log(warn, "~p: open/1 is not supported by ets, calling new/1 instead",
+    log:log(warn, "~p: open/1 is not supported by mnesia, calling new/1 instead",
             [self()]),
     new(DBName).
 
-%% @doc Closes and deletes the DB named DBName
+%% @doc Closes the DB named DBName
 -spec close(DBName::db()) -> true.
 close(DBName) ->
-    ?TRACE("close:~nDB_name:~p~n",[DBName]),
-    mnesia:transaction(fun()-> mnesia:delete_table(DBName)end).
+  ?TRACE("close:~nDB_name:~p~n",[DBName]),
+  mnesia:transaction(fun()-> mnesia:delete_table(DBName)end).
+
+%% @doc Closes and deletes the DB named DBName
+-spec close_and_delete(DBName::db()) -> true.
+close_and_delete(DBName) ->
+  ?TRACE("close:~nDB_name:~p~n",[DBName]),
+  mnesia:transaction(fun()-> mnesia:delete_table(DBName)end).
 
 %% @doc Saves arbitrary tuple Entry or list of tuples Entries
 %%      in DB DBName and returns the new DB.
@@ -112,7 +146,7 @@ put(DBName, Entry) ->
                     false ->
                         element(1, Entry) =/= '$end_of_table'
                 end),
-    {atomic, _} = mnesia:sync_transaction(fun() -> mnesia:write({DBName, element(1, Entry), Entry}) end),
+    {atomic, _} = mnesia:transaction(fun() -> mnesia:write({DBName, element(1, Entry), Entry}) end),
     DBName.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
@@ -162,21 +196,23 @@ foldl(DB, Fun, Acc, Interval) ->
 %% @doc foldl/5 iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
--spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+-spec foldl(db(), fun((Key::key(), A) -> A), A,
+                               db_backend_beh:interval(), non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {_, '$end_of_table', _End, _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {_, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {_, Start, End, _}, _MaxNum) when Start > End -> Acc;
 foldl(DB, Fun, Acc, {El}, _MaxNum) ->
     case mnesia:transaction(fun() -> mnesia:read(DB, El) end) of
-      {atom, []} ->
+      {atomic, []} ->
             Acc;
-      {atom, [_Entry]} ->
+      {atomic, [_Entry]} ->
             Fun(El, Acc)
     end;
 foldl(DB, Fun, Acc, all, MaxNum) ->
-    foldl(DB, Fun, Acc, MaxNum);
+  {atomic, First} = mnesia:transaction(fun()-> mnesia:first(DB) end),
+  {atomic, Last} = mnesia:transaction(fun()-> mnesia:last(DB) end),
+  foldl(DB, Fun, Acc, {'[', First, Last, ']'}, MaxNum);
 foldl(DB, Fun, Acc, {'(', Start, End, RBr}, MaxNum) ->
     {atomic, Next} = mnesia:transaction(fun()-> mnesia:next(DB, Start) end),
     foldl(DB, Fun, Acc, {'[', Next, End, RBr}, MaxNum);
@@ -211,17 +247,17 @@ foldl_iter(DB, Fun, Acc, {'[', Start, End, ']'}, MaxNum) ->
     {atomic, Next} = mnesia:transaction(fun()-> mnesia:next(DB, Start) end),
     foldl_iter(DB, Fun, Fun(Start, Acc), {'[', Next, End, ']'}, MaxNum - 1).
 
-%% @doc Is equivalent to ets:foldr(Fun, Acc0, DB).
+%% @doc Is equivalent to foldr(Fun, Acc0, DB).
 -spec foldr(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr(DB, Fun, Acc) ->
     {atomic, First} = mnesia:transaction(fun()-> mnesia:first(DB) end),
     {atomic, Last} = mnesia:transaction(fun()-> mnesia:last(DB) end),
-    foldr(DB, Fun, Acc, {'[', First, Last, ']'}, mnesia:info(DB, size)).
+    foldr(DB, Fun, Acc, {'[', First, Last, ']'}, mnesia:table_info(DB, size)).
 
 %% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
 -spec foldr(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval()) -> Acc1::A.
 foldr(DB, Fun, Acc, Interval) ->
-    foldr(DB, Fun, Acc, Interval, mnesia:info(DB, size)).
+    foldr(DB, Fun, Acc, Interval, mnesia:table_info(DB, size)).
 
 %% @doc Behaves like foldl/5 with the difference that it starts at the end of
 %%      Interval and iterates towards the start of Interval.
@@ -232,9 +268,9 @@ foldr(_DB, _Fun, Acc, {_, '$end_of_table', _Start, _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {_, End, Start, _}, _MaxNum) when Start < End -> Acc;
 foldr(DB, Fun, Acc, {El}, _MaxNum) ->
     case mnesia:transaction(fun()-> mnesia:read(DB, El) end) of
-      {atom, []} ->
+      {atomic, []} ->
             Acc;
-      {atom, [_Entry]} ->
+      {atomic, [_Entry]} ->
             Fun(El, Acc)
     end;
 foldr(DB, Fun, Acc, all, MaxNum) ->
@@ -249,10 +285,10 @@ foldr(DB, Fun, Acc, {LBr, End, Start, ')'}, MaxNum) ->
     foldr(DB, Fun, Acc, {LBr, End, Previous, ']'}, MaxNum);
 foldr(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
     case mnesia:transaction(fun()-> mnesia:read(DB, Start) end) of
-      {atom, []} ->
+      {atomic, []} ->
             {atomic, Previous} = mnesia:transaction(fun()-> mnesia:prev(DB, Start) end),
             foldr(DB, Fun, Acc, {'[', End, Previous, ']'}, MaxNum);
-      {atom, [_Entry]} ->
+      {atomic, [_Entry]} ->
             foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum)
     end.
 
