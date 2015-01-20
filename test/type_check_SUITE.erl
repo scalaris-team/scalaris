@@ -462,7 +462,7 @@ tester_type_check_rrepair(_Config) ->
              {build_recon_struct, 6}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
-             {merkle_next_signature_sizes, 6}, %% needs float > 0, < 1
+             {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
              {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
@@ -482,16 +482,15 @@ tester_type_check_rrepair(_Config) ->
              {decompress_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 8}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 14}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 8}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
-             {merkle_get_sync_leaves, 5}, %% needs merkle_tree with hashes
+             {p_process_tree_cmp_result, 13}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 5}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
              {merkle_resolve_compare_inner_leaf, 9}, %% needs special bitstring
              {merkle_resolve, 9}, % tries to send messages
-             {merkle_resolve_leaves_noninit, 6}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_noninit, 10}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_noninit, 4}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_noninit, 7}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_init, 7}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_init, 14}, % needs only leaf nodes in node list
              {merkle_resolve_req_keys_noninit, 14}, % needs only leaf nodes in node list, same-length lists
