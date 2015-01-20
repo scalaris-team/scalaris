@@ -278,8 +278,8 @@ stop_pid_groups() ->
     case whereis(pid_groups) of
         PidGroups when is_pid(PidGroups) ->
             gen_component:kill(PidGroups),
-            util:wait_for_table_to_disappear(PidGroups, pid_groups),
-            util:wait_for_table_to_disappear(PidGroups, pid_groups_hidden),
+            util:wait_for_ets_table_to_disappear(PidGroups, pid_groups),
+            util:wait_for_ets_table_to_disappear(PidGroups, pid_groups_hidden),
             catch unregister(pid_groups),
             ok;
         _ -> ok
@@ -484,7 +484,7 @@ kill_new_processes(OldProcesses, Options) ->
                           _ = [begin
 %%                                    ct:pal("waiting for table ~.0p to disappear~n~p",
 %%                                           [Tab, ets:info(Tab)]),
-                                   util:wait_for_table_to_disappear(X, Tab)
+                                   util:wait_for_ets_table_to_disappear(X, Tab)
                                end || Tab <- Tabs ],
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}

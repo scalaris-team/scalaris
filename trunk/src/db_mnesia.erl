@@ -75,7 +75,7 @@ traverse_table_and_show(Table_name)->
   end.
 
 %% @doc Return all the tables owned by PidGroup
--spec mnesia_tables_of(pid()) -> list().
+-spec mnesia_tables_of(pid()) -> [atom()].
 mnesia_tables_of(Pid) ->
   Tabs = mnesia:system_info(tables),
   [ Tab || Tab <- Tabs, string:sub_word(mnesia:table_info(Tab, name), 2, $:) =:= Pid ].

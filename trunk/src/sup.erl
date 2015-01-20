@@ -23,6 +23,8 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
+-include("types.hrl").
+
 -export([sup_start/3,
          sup_get_all_children/1,
          sup_terminate/1,
@@ -326,15 +328,26 @@ sup_pause_childs(SupPid) ->
                   Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
     ok.
 
--spec get_tables_of(pid()) -> list().
 -ifdef(PRBR_MNESIA).
+-spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[tid() | atom()]}.
 get_tables_of(_Pid)->
-  Tables = db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
-  _ = db_mnesia:delete_tables(Tables),
-  Tables.
+  {db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
+   util:ets_tables_of(Pid)}.
+
+-spec delete_tables(pid(), {MNesia::[atom()], Ets::[tid() | atom()]}) -> ok.
+delete_tables(Pid, {MNesia, Ets}) ->
+    _ = db_mnesia:delete_tables(MNesia),
+    _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
+    ok.
 -else.
+-spec get_tables_of(pid()) -> [tid() | atom()].
 get_tables_of(Pid)->
   util:ets_tables_of(Pid).
+
+-spec delete_tables(pid(), Ets::[tid() | atom()]) -> ok.
+delete_tables(Pid, Ets) ->
+    _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
+    ok.
 -endif.
 
 %% @doc Kills all children of the given supervisor (recursively) after they
@@ -351,7 +364,7 @@ sup_kill_childs(SupPid) ->
               _ = supervisor:terminate_child(SupPid, Id),
               _ = supervisor:delete_child(SupPid, Id),
               util:wait_for_process_to_die(Pid),
-              _ = [ util:wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
+              delete_tables(Pid, Tables),
               ok
           catch
               % child may not exist any more due to a parallel process terminating it
