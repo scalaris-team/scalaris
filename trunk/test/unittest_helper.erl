@@ -421,7 +421,8 @@ stop_minimal_procs(CTConfig)  ->
     end.
 
 -type process_info() ::
-    {pid(), InitCall::mfa(), CurFun::mfa(), Info::term() | failed | no_further_infos}.
+    {pid(), InitCall::mfa(), CurFun::mfa(),
+     {RegName::atom() | not_registered, Info::term() | failed | no_further_infos}}.
 
 -spec get_processes() -> [process_info()].
 get_processes() ->
@@ -489,13 +490,14 @@ kill_new_processes(OldProcesses, Options) ->
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end
-              end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,
+              end || {X, InitCall, CurFun, {RegName, _Info}} = Proc <- OnlyNew,
                      not (InitCall =:= {test_server_sup, timetrap, 3} andalso
                               CurFun =:= {test_server_sup, timetrap, 3}),
                      not (InitCall =:= {test_server_sup, timetrap, 2} andalso
                               CurFun =:= {test_server_sup, timetrap, 2}),
                      not (InitCall =:= {test_server_gl, init, 1}),
                      not (CurFun =:= {prim_file, drv_get_response, 1}), % spawned by R16 for io:put_chars/3
+                     RegName =/= cover_server,
                      X =/= self(),
                      X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
