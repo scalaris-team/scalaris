@@ -28,6 +28,7 @@
          get_value_creator/1]).
 -export([set_last_call/4, get_last_call/1, reset_last_call/1]).
 -export([log_last_calls/0]).
+-export([delete/0]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -119,6 +120,21 @@ delete(Key) ->
               throw({tester_global_state_unknown_table, Key})
     end.
 
+%% @doc Deletes the whole table (and the accompanying test)
+-spec delete() -> ok.
+delete() ->
+    case erlang:whereis(?MODULE) of
+        undefined -> ok;
+        Pid when is_pid(Pid) ->
+            MonitorRef = erlang:monitor(process, Pid),
+            Pid ! {kill, self()},
+            receive
+                ok -> erlang:demonitor(MonitorRef, [flush]), ok;
+                {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
+            end,
+            ok
+end.
+
 -spec create_table() -> true.
 create_table() ->
     P = self(),
@@ -138,17 +154,10 @@ create_table() ->
                           end
                   end,
               P ! go,
-              sleep_for_ever()
+              receive {kill, Pid} -> Pid ! ok
+              end
       end),
     receive go -> true end.
-
-%% @doc Copy from util:sleep_for_ever/0.
-%%      NOTE: We cannot use the util function though because we want to be able
-%%            to test util but the function will not survive code reloads.
--spec sleep_for_ever() -> no_return().
-sleep_for_ever() ->
-    timer:sleep(5000),
-    sleep_for_ever().
 
 -spec log_last_calls() -> ok.
 log_last_calls() ->
