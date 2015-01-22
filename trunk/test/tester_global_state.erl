@@ -140,8 +140,9 @@ create_table() ->
     P = self(),
     spawn(
       fun() ->
-              catch(erlang:register(?MODULE, self())),
-              _ = try ets:new(?MODULE, [set, public, named_table])
+              IsOwner =
+                  try ets:new(?MODULE, [set, public, named_table]),
+                      true
                   catch
                       % is there a race-condition?
                       Error:Reason ->
@@ -149,12 +150,16 @@ create_table() ->
                               undefined ->
                                   ?ct_fail("could not create ets table for tester_global_state: ~p:~p",
                                            [Error, Reason]);
-                              _ ->
-                                  ok
+                              _ -> false
                           end
                   end,
               P ! go,
-              receive {kill, Pid} -> Pid ! ok
+              case IsOwner of
+                  true ->
+                      erlang:register(?MODULE, self()),
+                      receive {kill, Pid} -> Pid ! ok
+                      end;
+                  false -> ok
               end
       end),
     receive go -> true end.
