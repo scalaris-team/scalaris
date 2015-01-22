@@ -1,4 +1,4 @@
-#   Copyright 2007-2012 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2015 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -500,7 +500,8 @@ AS_IF([test "$PYTHON2" != ""],
       [AC_MSG_CHECKING([for python 2.x sitelibdir])
        AC_MSG_RESULT([$PYTHON2SITELIBDIR])
        ENABLEPYTHON2INSTALL="install-python"
-       sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py])
+       #sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py
+       ])
 AC_SUBST(ENABLEPYTHON2INSTALL)
 
 PYTHON3SITELIBDIR=
