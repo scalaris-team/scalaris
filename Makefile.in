@@ -567,25 +567,12 @@ install-doc: doc
 	ln -sf @docdir@/erlang $(DOCROOTDIR)/doc
 
 install-java-doc: java-doc
-	install -d $(DOCDIR)/java-api
-	install -d $(DOCDIR)/java-api/index-files
-	install -d $(DOCDIR)/java-api/resources
-	install -d $(DOCDIR)/java-api/de/zib/scalaris/class-use
-	install -d $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
-	install -m 644 -t $(DOCDIR)/java-api \
-	           java-api/doc/*.html
-	install -m 644 -t $(DOCDIR)/java-api/index-files \
-	           java-api/doc/index-files/*.html
-	install -m 644 -t $(DOCDIR)/java-api/resources \
-	           java-api/doc/resources/*.gif
-	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris \
-	           java-api/doc/de/zib/scalaris/*.html
-	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/class-use \
-	           java-api/doc/de/zib/scalaris/class-use/*.html
-	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples \
-	           java-api/doc/de/zib/scalaris/examples/*.html
-	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use \
-	           java-api/doc/de/zib/scalaris/examples/class-use/*.html
+	for dir in `find java-api/doc -type d`; do \
+	  install -d "$(DOCDIR)/java-api$${dir#java-api/doc}" ; \
+	  for file in `find "$$dir" -maxdepth 1 -type f`; do \
+	    install -m 644 -t "$(DOCDIR)/java-api$${dir#java-api/doc}" "$${file}" ; \
+	  done ; \
+	done
 
 install-python-doc-html: python-doc-html
 	install -d $(DOCDIR)/python-api
