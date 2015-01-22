@@ -51,7 +51,8 @@ has_first_quorum() ->
             Proposal = {leader, MyServicePerVM},
             MaxProposers = length(KnownHosts),
             Majority = quorum:majority_for_accept(MaxProposers),
-            Rank = index_of(MyServicePerVM, KnownHosts),
+            Rank = util:lists_index_of(MyServicePerVM, KnownHosts),
+            ?ASSERT(Rank =/= not_found),
 
             acceptor:start_paxosid(MyAcceptor, PaxosId, Learners),
             learner:start_paxosid(MyLearner, PaxosId, Majority, comm:this(), client_cookie),
@@ -65,8 +66,3 @@ has_first_quorum() ->
                   )
             end
     end.
-
-index_of(P, [P|_Rest]) ->
-    1;
-index_of(P, [_|Rest]) ->
-    1 + index_of(P, Rest).
