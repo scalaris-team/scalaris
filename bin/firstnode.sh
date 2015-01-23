@@ -32,4 +32,4 @@ fi
 # start a dht node (-s)
 # start the first node (declared by -f)
 NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
-$DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -s -f start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -s -t first start

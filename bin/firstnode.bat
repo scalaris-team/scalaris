@@ -56,7 +56,7 @@ pushd %BEAMDIR%
   -scalaris docroot "\"%DOCROOTDIR%\"" ^
   -scalaris config "\"%ETCDIR%\\scalaris.cfg\"" ^
   -scalaris local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
-  -scalaris first true ^
+  -scalaris start_type first ^
   -scalaris start_mgmt_server true ^
   -scalaris start_dht_node dht_node ^
   -connect_all false -hidden -name %NODE_NAME% ^

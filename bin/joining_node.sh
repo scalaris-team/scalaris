@@ -37,4 +37,4 @@ else
 ERLFLAGS=" "
 fi
 
-$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -s start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -t joining -s start

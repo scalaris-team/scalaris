@@ -178,16 +178,16 @@ test-clean:
 bench: compile
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "ebench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -t first start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "ebench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "ebench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "ebench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining -s start ; \
 	( ./bin/scalarisctl -n "ebench_boot" dbg-check-ring 4 30 && \
 	echo "running bench:increment(10, 500)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
@@ -207,7 +207,7 @@ java-test: compile java
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -buildfile java-api/build.xml test ) ; \
 	FAILED=$$? ; \
@@ -226,16 +226,16 @@ java-test: compile java
 java-bench: compile java
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "jbench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -t first start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "jbench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "jbench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "jbench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining -s start ; \
 	( ./bin/scalarisctl -n "jbench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JAPI_NODE="jbench_boot jbench_node1 jbench_node2 jbench_node3" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
 	./bin/scalarisctl -n "jbench_boot" stop ; \
@@ -262,7 +262,7 @@ python-test: compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON2) python-api/scalaris_test.py ) ; \
 	FAILED=$$? ; \
@@ -281,16 +281,16 @@ python-test: compile python
 python-bench: compile python
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "pbench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -t first start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "pbench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "pbench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "pbench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining -s start ; \
 	( ./bin/scalarisctl -n "pbench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON2) python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	./bin/scalarisctl -n "pbench_boot" stop ; \
@@ -339,7 +339,7 @@ python3-test: compile python3
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $PYTHON3 python3-api/scalaris_test.py ) ; \
 	FAILED=$$? ; \
@@ -358,16 +358,16 @@ python3-test: compile python3
 python3-bench: compile python3
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "p3bench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -t first start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "p3bench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "p3bench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining -s start ; \
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "p3bench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining -s start ; \
 	( ./bin/scalarisctl -n "p3bench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $PYTHON3 python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	./bin/scalarisctl -n "p3bench_boot" stop ; \
@@ -381,7 +381,7 @@ ruby-test: compile
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_test.rb ) ; \
 	FAILED=$$? ; \
@@ -402,7 +402,7 @@ interop-test: compile java java-scalaris.test.compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.stderr.log && \
@@ -439,7 +439,7 @@ interop3-test: interop-test python3
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py write interop_test3 > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_write.stderr.log && \
