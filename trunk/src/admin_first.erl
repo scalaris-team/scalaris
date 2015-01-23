@@ -29,9 +29,9 @@
 is_first_vm() ->
     util:is_unittest()
         orelse
-    config:read(first) =:= true
+    config:read(start_type) =:= first
         orelse
-    (util:app_get_env(first_quorum, false) =:= true andalso has_first_quorum()).
+    (config:read(start_type) =:= quorum andalso has_first_quorum()).
 
 has_first_quorum() ->
     % determine own IP

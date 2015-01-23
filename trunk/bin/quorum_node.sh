@@ -33,4 +33,4 @@ else
 ERLFLAGS=" "
 fi
 
-$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -q -m -s start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -t qourum -m -s start

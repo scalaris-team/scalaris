@@ -4608,7 +4608,7 @@ sed -i -e "s|python-api|python3-api|g" \
        -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
        -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl bin/scalarisctl2 java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris"
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5318,7 +5318,6 @@ do
     "Emakefile") CONFIG_FILES="$CONFIG_FILES Emakefile" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "bin/scalarisctl") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl" ;;
-    "bin/scalarisctl2") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl2" ;;
     "java-api/scalaris") CONFIG_FILES="$CONFIG_FILES java-api/scalaris" ;;
     "java-api/scalaris-java.conf") CONFIG_FILES="$CONFIG_FILES java-api/scalaris-java.conf" ;;
     "contrib/init.d/scalaris") CONFIG_FILES="$CONFIG_FILES contrib/init.d/scalaris" ;;
@@ -5777,7 +5776,6 @@ fi
 
 
 chmod u+x bin/scalarisctl
-chmod u+x bin/scalarisctl2
 chmod u+x java-api/scalaris
 chmod u+x python-api/scalaris
 chmod u+x python3-api/scalaris
