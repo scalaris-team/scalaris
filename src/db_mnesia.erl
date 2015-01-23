@@ -233,7 +233,6 @@ foldl(DB, Fun, Acc, {'[', Start, End, ']'}, MaxNum) ->
                        MaxNum)
     end.
 
-%% @doc mnesia_last
 %% @doc foldl_iter(/5) is a recursive function applying Fun only on elements
 %%      inside the Interval. It is called by every foldl operation.
 -spec foldl_iter(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
