@@ -52,11 +52,27 @@
 -spec start() -> ok.
 start() ->
   application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
-  case mnesia:create_schema([node()]) of
-    ok -> ok;
-    Msg ->
-      io:format("starting mnesia: ~w", [Msg]),
-      erlang:exit(0)
+%  case config:read(_type) of
+  case config:read(start_type) of
+    recover ->
+      case mnesia:create_schema([node()]) of
+        ok ->
+          io:format("starting mnesia: no previous Schema to recover from.~n"),
+          mnesia:delete_schema([node()]),
+          erlang:halt();
+        {error, {_, {already_exists, _}}} ->
+          io:format("starting mnesia: recovering.~n");
+        Msg ->
+          io:format("starting mnesia recover : ~w~n", [Msg]),
+          erlang:halt()
+      end;
+    _ ->
+      case mnesia:create_schema([node()]) of
+        ok -> ok;
+        Msg ->
+          io:format("starting mnesia: ~w~n", [Msg]),
+          erlang:halt()
+      end
   end,
   _ = application:start(mnesia),
   ok.
