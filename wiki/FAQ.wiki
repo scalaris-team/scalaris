@@ -75,11 +75,11 @@ Available packages are listed in the following table:
 
 || *Distribution* || *Version* || *Download* ||
 || Arch Linux || || stable: [http://download.opensuse.org/repositories/home:/scalaris/ArchLinux/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/ArchLinux/] ||
-|| Fedora || 19 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_19/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_19/] ||
 || Fedora || 20 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_20/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_20/] ||
+|| Fedora || 21 || unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_21/] ||
 || openSUSE || 11.4 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_11.4/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_11.4/scalaris.ymp 1-Click Install]) ||
-|| openSUSE || 12.3 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.3/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.3/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_12.3/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_12.3/scalaris.ymp 1-Click Install]) ||
 || openSUSE || 13.1 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_13.1/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_13.1/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_13.1/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_13.1/scalaris.ymp 1-Click Install]) ||
+|| openSUSE || 13.2 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_13.2/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_13.2/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_13.2/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_13.2/scalaris.ymp 1-Click Install]) ||
 || openSUSE || Tumbleweed || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Tumbleweed/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install]) ||
 || openSUSE || Factory || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Factory/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Factory/scalaris.ymp 1-Click Install]) ||
 || SLE || 10 || stable: [http://download.opensuse.org/repositories/home:/scalaris/SLE_10/] ([http://download.opensuse.org/repositories/home:/scalaris/SLE_10/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_10/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_10/scalaris.ymp 1-Click Install]) ||
@@ -103,25 +103,24 @@ Available packages are listed in the following table:
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
-Exceptions are made for RHEL-based distributions, SLE, openSUSE 11.4, Debian 5.0 and Arch Linux:
+Exceptions are made for RHEL-based distributions, SLE, openSUSE 11.4 and Arch Linux:
   * For SLE and openSUSE 11.4, we provide Erlang !R14B04.
   * For RHEL-based distributions (CentOS 5 & 6, RHEL 5 & 6) we include the Erlang package from the EPEL repository of RHEL 6.
-  * For Debian 5.0 we include the Erlang package of Ubuntu 11.04.
   * For Arch Linux we include the Erlang package from the [https://www.archlinux.org/packages/community/x86_64/erlang/ community repository].
 
 === How to add our repository to openSUSE-based distributions (openSUSE, SLE)? ===
 
-For e.g. openSUSE 12.1 execute the following command as root:
+For e.g. openSUSE 13.2 execute the following command as root:
 {{{
-zypper addrepo --refresh http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/ scalaris
+zypper addrepo --refresh http://download.opensuse.org/repositories/home:/scalaris/openSUSE_13.2/ scalaris
 }}}
 You can then either install Scalaris through YaST or use the command-line tool zypper: `zypper install scalaris`.
 
 === How to add our repository to Fedora-based distributions (Fedora, RHEL, CentOS)? ===
 
-To add our repository to the list of repositories, yum uses, download its description file and (as root) place it in `/etc/yum.repos.d/`, e.g. for Fedora 16:
+To add our repository to the list of repositories, yum uses, download its description file and (as root) place it in `/etc/yum.repos.d/`, e.g. for Fedora 20:
 {{{
-sudo curl "http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/home:scalaris.repo" -o /etc/yum.repos.d/home\:scalaris.repo
+sudo curl "http://download.opensuse.org/repositories/home:/scalaris/Fedora_20/home:scalaris.repo" -o /etc/yum.repos.d/home\:scalaris.repo
 }}}
 . Afterwards you can install Scalaris using the usual `yum install scalaris` command (similarly for the other packages).
 
@@ -140,7 +139,7 @@ This is currently not possible because the Open Build Service does not export a 
 Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (mostly in `/etc/apt/`). _Adapt the URL to the distribution you use (see above)._
 
 {{{
-deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.04/ ./
+deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_14.04/ ./
 }}}
 
 Then download our package signing key and add it to your system (as root):
