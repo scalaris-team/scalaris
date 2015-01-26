@@ -89,6 +89,47 @@ init(Options) ->
 supspec(_) ->
     {ok, {{one_for_one, 10, 1}, []}}.
 
+-spec get_dht_node_descs([tuple()]) -> [ProcessDescr::supervisor:child_spec()].
+get_dht_node_descs(Options) ->
+
+  case config:read(start_type) of
+    recover ->
+      Tables = lists:delete(schema, mnesia:system_info(tables)),
+      io:format("tables list: ~w~n", [Tables]),
+      %% creating tuples with DB_names different parts : {DB_type, PID_group, Random_id}
+      DB_list = lists:usort(lists:map(fun(Table) -> {list_to_atom(string:sub_word(atom_to_list(Table), 1, $:)),
+                                         list_to_atom(string:sub_word(atom_to_list(Table), 2, $:)),
+                                         list_to_atom(string:sub_word(atom_to_list(Table), 3, $:))}end,
+                          Tables)),
+      %% creating list of all nodes per vm and removing duplicates
+      PID_groups = lists:usort(lists:map(fun({_, Name, _}) -> Name end,DB_list)),
+
+      %%
+      lists:map(fun(PID_group)->
+        Option_new = lists:map(fun({Type, Name, Rdm})->
+           {Type,
+            atom_to_list(Type)++atom_to_list(Name)++atom_to_list(Rdm),
+            atom_to_list(Type)++atom_to_list(Name)++atom_to_list(Rdm)++":subscribers"}
+        end, lists:filter(fun({_, X, _}) -> X == PID_group end, DB_list)),
+
+        DhtNodeId = randoms:getRandomString(),
+        TheOptions = [{my_sup_dht_node_id, DhtNodeId} | lists:append(Options, Option_new)],
+        sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
+          [{PID_group, TheOptions}])
+      end,PID_groups);
+    _ ->
+      DHTNodeJoinAt = case util:app_get_env(join_at, random) of
+                           random -> [];
+                           Id     -> [{{dht_node, id}, Id}, {skip_psv_lb}]
+                      end,
+      DhtNodeId = randoms:getRandomString(),
+      DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
+      DHTNodeGroup = pid_groups:new("dht_node_"),
+      sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
+        [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
+          | DHTNodeOptions]}])
+  end.
+
 -spec childs(list(tuple())) -> [any()].
 childs(Options) ->
     {service_group, ServiceGroup} = lists:keyfind(service_group, 1, Options),
@@ -120,16 +161,8 @@ childs(Options) ->
                              [ServiceGroup]),
     ClientsMonitor =
         sup:worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
-    DHTNodeJoinAt = case util:app_get_env(join_at, random) of
-                         random -> [];
-                         Id     -> [{{dht_node, id}, Id}, {skip_psv_lb}]
-                     end,
-    DhtNodeId = randoms:getRandomString(),
-    DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
-    DHTNodeGroup = pid_groups:new("dht_node_"),
-    DHTNode = sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
-                                       [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
-                                         | DHTNodeOptions]}]),
+    %% Moves several lignes to get_dht_node_specs for recovery mechanims
+    DHTNodes = get_dht_node_descs(Options),
     FailureDetector = sup:worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = case config:read(ganglia_enable) of
                   true -> sup:worker_desc(ganglia_server, ganglia, start_link, [ServiceGroup]);
@@ -191,7 +224,7 @@ childs(Options) ->
     DHTNodeServer =
         case DHTNodeModule of
             false -> []; %% no dht node requested
-            _ -> [DHTNode]
+            _ -> DHTNodes
         end,
     lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
 
