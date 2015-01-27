@@ -121,7 +121,7 @@ REPLICA_KEY_2 = 85070591730234615865843651857942052864
 REPLICA_KEY_3 = 170141183460469231731687303715884105728
 REPLICA_KEY_4 = 255211775190703847597530955573826158592
 
-all: compile tags
+all: Makefile compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
@@ -758,3 +758,14 @@ install-python3: python3
 install: install-erlang
 
 install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHON2INSTALL@ @ENABLEPYTHON3INSTALL@
+
+Makefile: Makefile.in configure
+	@echo "Makefile is outdated. please run ./configure"
+	@echo "call configure with all parameters from your previous configure run"
+	@exit 1 
+
+configure: configure.ac
+	@echo "configure is outdated. please run ./bootstrap.sh and ./configure"
+	@echo "call configure with all parameters from your previous configure run"
+	@exit 1 
+
