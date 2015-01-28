@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2012 Zuse Institute Berlin
+# Copyright 2007-2015 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ ERLFLAGS=" "
 fi
 
 # start a mgmt_server (-m)
-# start a dht node (-s)
-# start the first node (declared by -f)
+# start the first node (-t first)
 NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
 $DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -s -t first start
