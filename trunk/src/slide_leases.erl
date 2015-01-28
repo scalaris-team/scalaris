@@ -43,7 +43,7 @@
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_join_send(State, SlideOp) ->
-    log:log("prepare_join_send", []),
+    %log:log("prepare_join_send", []),
     % can be ignored for leases
     {ok, State, SlideOp}.
 
@@ -98,7 +98,7 @@ update_rcv_data2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
-    log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
+    %log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
     case find_lease(State, OldSlideOp, active) of
         {ok, Lease} ->
             Id = l_on_cseq:id(l_on_cseq:get_range(Lease)),
@@ -153,7 +153,7 @@ prepare_send_delta2(State, SlideOp, Msg) ->
     case Msg of
         {handover, success, _NewLease} ->
             % disable new lease
-            log:log("prepare_send_delta2 ~p~n", [Msg]),
+            %log:log("prepare_send_delta2 ~p~n", [Msg]),
             %State1 = locally_disable_lease(State, NewLease),
             {ok, State, SlideOp};
         {split, fail, _Lease} ->
@@ -189,7 +189,7 @@ finish_delta2(State, SlideOp, {continue}) ->
 finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
     % handover lease to succ
     comm:send_local(ReplyPid, {continue}),
-    log:log("finish_delta_ack1~n", []),
+    %log:log("finish_delta_ack1~n", []),
     {ok, State, OldSlideOp}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,7 +200,7 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
     % notify neighbor on successful handover
-    log:log("finish_delta_ack2 ~p~n", [Msg]),
+    %log:log("finish_delta_ack2 ~p~n", [Msg]),
     % notify succ
     case find_lease(State, SlideOp, passive) of
         {ok, Lease} ->
