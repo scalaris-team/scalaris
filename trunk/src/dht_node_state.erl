@@ -26,7 +26,7 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_MR_SLIDE(X,Y), ?TRACE(X, Y)).
 
--export([new/3,
+-export([new/3, new_on_recover/12,
          get/2,
          dump/1,
          set_rt/2, set_rm/2, set_db/2, set_lease_list/2,
@@ -129,6 +129,38 @@ new(RT, RMState, DB) ->
            lease_db3 = prbr:init(lease_db3),
            lease_db4 = prbr:init(lease_db4),
            lease_list = lease_list:empty(),
+           snapshot_state = snapshot_state:new(),
+           mr_state = orddict:new(),
+           mr_master_state = orddict:new()
+          }.
+
+-spec new_on_recover(?RT:external_rt(), RMState::rm_loop:state(), 
+                     PRBR_KV_DB::prbr:state(), TXID_DB1::prbr:state(), TXID_DB2::prbr:state(), 
+                     TXID_DB3::prbr:state(), TXID_DB4::prbr:state(), Lease_DB1::prbr:state(), 
+                     Lease_DB2::prbr:state(), Lease_DB3::prbr:state(), Lease_DB4::prbr:state(),
+                     LeaseList::lease_list:lease_list()) -> state().
+new_on_recover(RT, RMState, 
+               PRBR_KV_DB,
+               TXID_DB1, TXID_DB2, TXID_DB3, TXID_DB4, 
+               Lease_DB1, Lease_DB2, Lease_DB3, Lease_DB4,
+               LeaseList) ->
+    #state{rt = RT,
+           rm_state = RMState,
+           join_time = now(),
+           db = db_dht:new(), % ?!?
+           tx_tp_db = tx_tp:init(),
+           proposer = pid_groups:get_my(paxos_proposer),
+           monitor_proc = pid_groups:get_my(dht_node_monitor),
+           prbr_kv_db = PRBR_KV_DB,
+           txid_db1 = TXID_DB1,
+           txid_db2 = TXID_DB2,
+           txid_db3 = TXID_DB3,
+           txid_db4 = TXID_DB4,
+           lease_db1 = Lease_DB1,
+           lease_db2 = Lease_DB2,
+           lease_db3 = Lease_DB3,
+           lease_db4 = Lease_DB4,
+           lease_list = LeaseList,
            snapshot_state = snapshot_state:new(),
            mr_state = orddict:new(),
            mr_master_state = orddict:new()
