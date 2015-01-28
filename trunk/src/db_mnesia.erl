@@ -38,6 +38,7 @@
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
+-export([tab2list/1]).
 
 -type db() :: mnesia:tab().
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
@@ -318,3 +319,16 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
            [Start, End, MaxNum]),
   {atomic, Previous} = mnesia:transaction(fun()-> mnesia:prev(DB, Start) end),
     foldr_iter(DB, Fun, Fun(Start, Acc), {'[', End, Previous, ']'}, MaxNum - 1).
+
+-spec tab2list(Table_name::db()) -> [Entries::entry()].
+tab2list(Table_name) ->
+    io:format("db_mnesia:tab2list ~p~n", [is_atom(Table_name)]),
+    Iterator =  fun({_DBName, _Key, Entry}, Acc)->
+                        [Entry | Acc]
+                end,
+    case mnesia:is_transaction() of
+        true -> mnesia:foldl(Iterator,[],Table_name);
+        false ->
+            Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
+            mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
+    end.
