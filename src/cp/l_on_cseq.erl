@@ -267,16 +267,23 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
 % lease renewal
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, renew, Old = #lease{version=OldVersion}, Mode},
+on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion}, Mode},
    State) ->
-    %log:pal("on renew ~w (~w)~n", [Old, Mode]),
+    %log:pal("on renew ~w (~w, ~w)~n", [Old, Mode, self()]),
     Self = comm:this(),
     New = case get_aux(Old) of
               % change owner to self -> remove aux
               {change_owner, Self} ->
                   Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()};
               _ ->
-                  Old#lease{version=OldVersion+1, timeout=new_timeout()}
+                  case comm:this() of
+                      Owner ->
+                          Old#lease{version=OldVersion+1, timeout=new_timeout()};
+                      _ ->
+                          % we are trying to recover
+                          Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0, 
+                                    timeout=new_timeout()}
+                  end
           end,
     ContentCheck = generic_content_check(Old, New, renew),
 %% @todo New passed for debugging only:
@@ -1027,8 +1034,8 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                     {true, null};
                 % special case for renew after crash-recovery
                 #lease{epoch = E0, owner = O0, version = V0} 
-                  when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =/= OldOwner
-                       andalso Writer =:= renew ->
+                  when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =:= OldOwner
+                       andalso NewOwner =/= OldOwner andalso Writer =:= renew ->
                        % after a crash the logical owner should not
                        % have changed. however its pid will have
                        % changed. this special case checks that epoch
