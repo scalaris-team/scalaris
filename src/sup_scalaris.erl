@@ -97,7 +97,9 @@ get_dht_node_descs(Options) ->
       Tables = lists:delete(schema, mnesia:system_info(tables)),
       io:format("tables list: ~w~n", [Tables]),
       %% creating tuples with DB_names different parts : {DB_type, PID_group, Random_id}
-      DB_list = lists:usort(lists:map(fun(Table) -> {list_to_atom(string:sub_word(atom_to_list(Table), 1, $:)),
+          
+      DB_list = lists:usort(lists:map(fun(Table) -> 
+                                              {list_to_atom(string:sub_word(atom_to_list(Table), 1, $:)),
                                          list_to_atom(string:sub_word(atom_to_list(Table), 2, $:)),
                                          list_to_atom(string:sub_word(atom_to_list(Table), 3, $:))}end,
                           Tables)),
@@ -108,8 +110,8 @@ get_dht_node_descs(Options) ->
       lists:map(fun(PID_group)->
         Option_new = lists:map(fun({Type, Name, Rdm})->
            {Type,
-            atom_to_list(Type)++atom_to_list(Name)++atom_to_list(Rdm),
-            atom_to_list(Type)++atom_to_list(Name)++atom_to_list(Rdm)++":subscribers"}
+            list_to_atom(atom_to_list(Type)++":"++atom_to_list(Name)++":"++atom_to_list(Rdm)),
+            list_to_atom(atom_to_list(Type)++":"++atom_to_list(Name)++":"++atom_to_list(Rdm)++":subscribers")}
         end, lists:filter(fun({_, X, _}) -> X == PID_group end, DB_list)),
 
         DhtNodeId = randoms:getRandomString(),
