@@ -140,6 +140,8 @@ tab2list({DB, _Subscr, _Snap}) ->
     case ?DB of
         db_ets ->
             ets:tab2list(DB);
+        db_mnesia ->
+            db_mnesia:tab2list(DB);
         _ ->
             throw({tab2list_not_supported_by_DB_type, ?DB})
     end.
