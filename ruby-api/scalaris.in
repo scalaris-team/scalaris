@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#  Copyright 2007-2012 Zuse Institute Berlin
+#  Copyright 2007-2015 Zuse Institute Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ done
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 # is this a svn checkout or an (rpm/deb/manual) installation?
-if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" ]; then
+if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" -a "${DIRNAME##*/}" = "ruby-api" ]; then
   # local mode, i.e. uninstalled
   SCALARISCLIENT_RUBY="`dirname $DIRNAME`/ruby-api/scalaris_client.rb"
 fi
