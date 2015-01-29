@@ -31,7 +31,7 @@ DIRNAME=`dirname $ABSPATH`
 # is this a svn checkout or an (rpm/deb/manual) installation?
 if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" -a "${DIRNAME##*/}" = "ruby-api" ]; then
   # local mode, i.e. uninstalled
-  SCALARISCLIENT_RUBY="`dirname $DIRNAME`/ruby-api/scalaris_client.rb"
+  SCALARISCLIENT_RUBY="`dirname $0`/scalaris_client.rb"
 fi
 
 eval $SCALARISCLIENT_RUBY $args

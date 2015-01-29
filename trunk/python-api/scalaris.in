@@ -32,7 +32,7 @@ DIRNAME=`dirname $ABSPATH`
 # is this a svn checkout or an (rpm/deb/manual) installation?
 if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" -a "${DIRNAME##*/}" = "python-api" ]; then
   # local mode, i.e. uninstalled
-  SCALARISCLIENT_PYTHON2="`dirname $DIRNAME`/python-api/scalaris_client.py"
+  SCALARISCLIENT_PYTHON2="`dirname $0`/scalaris_client.py"
 fi
 
 eval $PYTHON2 $SCALARISCLIENT_PYTHON2 $args
