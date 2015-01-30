@@ -56,7 +56,7 @@ recover(Leases1, Leases2, Leases3, Leases4) ->
 -spec filter([{?RT:key(), l_on_cseq:lease_t()}]) -> [{?RT:key(), l_on_cseq:lease_t()}].
 filter(Leases) ->
     F = fun({Id, L}) ->
-                log:log("~w ~w~n", [Id, L]),
+                %% log:log("~w ~w~n", [Id, L]),
                 LeaseId = l_on_cseq:get_id(L),
                 Id =:= LeaseId andalso %% is first replica?
                     l_on_cseq:is_live_aux_field(L) andalso

@@ -133,7 +133,7 @@ update_lease_in_dht_node_state(Lease, State, Mode, Reason) ->
     case {Mode, Reason} of
         {_, received_lease} ->
             MyActiveLease = lease_list:get_active_lease(LeaseList),
-            log:log("received lease ~w~n~w", [Lease, MyActiveLease]),
+            %log:log("received lease ~w~n~w", [Lease, MyActiveLease]),
             if
                 MyActiveLease =:= empty ->
                     update_lease_in_dht_node_state(Lease, State, Mode);

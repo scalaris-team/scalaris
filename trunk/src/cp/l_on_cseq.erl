@@ -349,7 +349,7 @@ on({l_on_cseq, renew_reply,
 on({l_on_cseq, send_lease_to_node, Lease, Mode}, State) ->
     % @todo do we need any checks?
     % @todo do i need to notify rm about the new range?
-    log:log("send_lease_to_node ~p ~p~n", [self(), Lease]),
+    ?TRACE("send_lease_to_node ~p ~p~n", [self(), Lease]),
     lease_list:update_lease_in_dht_node_state(Lease, State, Mode, received_lease);
 
 
@@ -426,14 +426,14 @@ on({l_on_cseq, handover, Old = #lease{epoch=OldEpoch},
 on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
     _NewOwner, _New}, State) ->
     % @todo if success update lease in State
-    log:log("successful handover ~p~n", [Value]),
+    ?TRACE("successful handover ~p~n", [Value]),
     comm:send_local(ReplyTo, {handover, success, Value}),
     lease_list:update_lease_in_dht_node_state(Value, State, passive, handover);
 
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                                 {content_check_failed, {Reason, _Current, _Next}}},
-    ReplyTo, NewOwner, New}, State) ->
-    log:log("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
+    ReplyTo, NewOwner, _New}, State) ->
+    ?TRACE("handover denied: ~p ~p ~p~n", [Reason, Value, _New]),
     case Reason of
         lease_does_not_exist ->
             comm:send_local(ReplyTo, {handover, failed, Value}),
@@ -731,9 +731,9 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split, Lease, R1, R2, Keep, ReplyTo, PostAux}, State) ->
     Id = id(R1),
-    log:pal("split first step: creating new lease L1(~w) (~p)~n", [self(), Id]),
-    Active = get_active_lease(State),
-    log:log("going to split(~w):~n~w~n~w~n", [self(), Active, Lease]),
+    ?TRACE("split first step: creating new lease L1(~w) (~p)~n", [self(), Id]),
+    _Active = get_active_lease(State),
+    ?TRACE("going to split(~w):~n~w~n~w~n", [self(), _Active, Lease]),
     New = #lease{id      = id(R1),
                  epoch   = 1,
                  owner   = comm:this(),
@@ -751,7 +751,7 @@ on({l_on_cseq, split, Lease, R1, R2, Keep, ReplyTo, PostAux}, State) ->
 
 on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, _Keep, ReplyTo, _PostAux,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
-    log:pal("split first step failed: ~p~n", [Reason]),
+    ?TRACE("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
             comm:send_local(ReplyTo, {split, fail, Lease}),
@@ -764,11 +764,11 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, _Keep, ReplyTo, _PostAux,
 % lease split (step2)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, split_reply_step1, L2=#lease{id=Id,epoch=OldEpoch}, R1, R2,
+on({l_on_cseq, split_reply_step1, L2=#lease{id=_Id,epoch=OldEpoch}, R1, R2,
     Keep, ReplyTo, PostAux, {qwrite_done, _ReqId, _Round, L1}}, State) ->
-    log:pal("split second step(~w): updating L2 (~p)~n", [self(), Id]),
-    Active = get_active_lease(State),
-    log:log("split second step(~w):~n~w~n~w~n~w~n", [self(), Active, L1, L2]),
+    ?TRACE("split second step(~w): updating L2 (~p)~n", [self(), _Id]),
+    _Active = get_active_lease(State),
+    ?TRACE("split second step(~w):~n~w~n~w~n~w~n", [self(), _Active, L1, L2]),
     New = L2#lease{
             epoch   = OldEpoch + 1,
             range   = R2,
@@ -791,7 +791,7 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=Id,epoch=OldEpoch}, R1, R2,
 on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
-    log:pal("split second step failed: ~p~n", [Reason]),
+    ?TRACE("split second step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L2}),
@@ -830,11 +830,11 @@ on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step2,
-    L1 = #lease{id=Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
+    L1 = #lease{id=_Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    log:pal("split third step(~w): renew L1 ~p~n", [self(), Id]),
-    Active = get_active_lease(State),
-    log:log("split_reply_step2(~w):~n~w~n~w~n~w~n", [self(), Active, L1, L2]),
+    ?TRACE("split third step(~w): renew L1 ~p~n", [self(), _Id]),
+    _Active = get_active_lease(State),
+    ?TRACE("split_reply_step2(~w):~n~w~n~w~n~w~n", [self(), _Active, L1, L2]),
     New = L1#lease{
             epoch   = OldEpoch + 1,
             aux     = PostAux,
@@ -850,7 +850,7 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
-    log:pal("split third step failed: ~p~n", [Reason]),
+    ?TRACE("split third step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L1}), State; %@todo
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L1}),
@@ -889,9 +889,9 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step3,
-    L2 = #lease{id=Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
+    L2 = #lease{id=_Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
-    log:pal("split fourth step: renew L2 ~p ~p ~p ~p~n", [R1, R2, Id, PostAux]),
+    ?TRACE("split fourth step: renew L2 ~p ~p ~p ~p~n", [R1, R2, _Id, PostAux]),
     New = L2#lease{
             epoch   = OldEpoch + 1,
             aux     = empty,
@@ -905,10 +905,10 @@ on({l_on_cseq, split_reply_step3,
 
 on({l_on_cseq, split_reply_step4, L1, _R1, _R2, _Keep, ReplyTo, _PostAux,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    log:pal("successful split~n", []),
-    log:pal("successful split ~p~n", [ReplyTo]),
-    Active = get_active_lease(State),
-    log:log("split_reply_step4(~w):~n~w~n~w~n~w~n", [self(), Active, L1, L2]),
+    ?TRACE("successful split~n", []),
+    ?TRACE("successful split ~p~n", [ReplyTo]),
+    _Active = get_active_lease(State),
+    ?TRACE("split_reply_step4(~w):~n~w~n~w~n~w~n", [self(), _Active, L1, L2]),
     comm:send_local(ReplyTo, {split, success, L1, L2}),
     lease_list:update_lease_in_dht_node_state(L2, State, active, split_reply_step4);
 
@@ -916,7 +916,7 @@ on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
-    log:pal("split fourth step: ~p~n", [Reason]),
+    ?TRACE("split fourth step: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State;
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L2}),
