@@ -52,10 +52,14 @@ start_link(Options) ->
                          [{service_group, ServiceGroup} | Options]),
     case Link of
         {ok, SupRef} when is_pid(SupRef) ->
-            case pid_groups:find_all(dht_node) of
-                [DhtNodePid] ->
-                    comm:send_local(DhtNodePid, {join, start});
-                [] -> ok
+            case config:read(start_type) of
+                recover -> ok;
+                _ ->
+                    case pid_groups:find_all(dht_node) of
+                        [DhtNodePid] ->
+                            comm:send_local(DhtNodePid, {join, start});
+                        [] -> ok
+                    end
             end,
             add_additional_nodes(),
             case util:is_unittest() of
@@ -95,7 +99,7 @@ get_dht_node_descs(Options) ->
   case config:read(start_type) of
     recover ->
       Tables = lists:delete(schema, mnesia:system_info(tables)),
-      io:format("tables list: ~w~n", [Tables]),
+      %% io:format("tables list: ~w~n", [Tables]),
       %% creating tuples with DB_names different parts : {DB_type, PID_group, Random_id}
       DB_list = lists:usort([begin
                                  TableStr = atom_to_list(Table),
