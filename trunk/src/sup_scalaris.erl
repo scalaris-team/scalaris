@@ -97,28 +97,27 @@ get_dht_node_descs(Options) ->
       Tables = lists:delete(schema, mnesia:system_info(tables)),
       io:format("tables list: ~w~n", [Tables]),
       %% creating tuples with DB_names different parts : {DB_type, PID_group, Random_id}
-          
-      DB_list = lists:usort(lists:map(fun(Table) -> 
-                                              {list_to_atom(string:sub_word(atom_to_list(Table), 1, $:)),
-                                         list_to_atom(string:sub_word(atom_to_list(Table), 2, $:)),
-                                         list_to_atom(string:sub_word(atom_to_list(Table), 3, $:))}end,
-                          Tables)),
+      DB_list = lists:usort([begin
+                                 TableStr = atom_to_list(Table),
+                                 {string:sub_word(TableStr, 1, $:),
+                                  string:sub_word(TableStr, 2, $:),
+                                  string:sub_word(TableStr, 3, $:)}
+                             end || Table <- Tables]),
       %% creating list of all nodes per vm and removing duplicates
-      PID_groups = lists:usort(lists:map(fun({_, Name, _}) -> Name end,DB_list)),
+      PID_groups = lists:usort([PidGroup || {_, PidGroup, _} <- DB_list]),
 
-      %%
-      lists:map(fun(PID_group)->
-        Option_new = lists:map(fun({Type, Name, Rdm})->
-           {Type,
-            list_to_atom(atom_to_list(Type)++":"++atom_to_list(Name)++":"++atom_to_list(Rdm)),
-            list_to_atom(atom_to_list(Type)++":"++atom_to_list(Name)++":"++atom_to_list(Rdm)++":subscribers")}
-        end, lists:filter(fun({_, X, _}) -> X == PID_group end, DB_list)),
-
-        DhtNodeId = randoms:getRandomString(),
-        TheOptions = [{my_sup_dht_node_id, DhtNodeId} | lists:append(Options, Option_new)],
-        sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
-          [{PID_group, TheOptions}])
-      end,PID_groups);
+      %% create descriptions for all dht nodes to recover:
+      [begin
+           Option_new =
+               [{list_to_atom(Type),
+                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm])),
+                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm, ":subscribers"]))}
+               || {Type, Name, Rdm} <- DB_list, Name =:= PID_group],
+           DhtNodeId = randoms:getRandomString(),
+           TheOptions = [{my_sup_dht_node_id, DhtNodeId} | lists:append(Options, Option_new)],
+           sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
+                               [{PID_group, TheOptions}])
+       end || PID_group <- PID_groups];
     _ ->
       DHTNodeJoinAt = case util:app_get_env(join_at, random) of
                            random -> [];
