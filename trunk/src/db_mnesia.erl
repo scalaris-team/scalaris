@@ -322,7 +322,6 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
 
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list(Table_name) ->
-    io:format("db_mnesia:tab2list ~p~n", [is_atom(Table_name)]),
     Iterator =  fun({_DBName, _Key, Entry}, Acc)->
                         [Entry | Acc]
                 end,
