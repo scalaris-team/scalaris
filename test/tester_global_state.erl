@@ -141,7 +141,8 @@ create_table() ->
     spawn(
       fun() ->
               IsOwner =
-                  try ets:new(?MODULE, [set, public, named_table]),
+                  try
+                      _ = ets:new(?MODULE, [set, public, named_table]),
                       true
                   catch
                       % is there a race-condition?
