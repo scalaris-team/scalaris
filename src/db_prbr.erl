@@ -120,7 +120,7 @@ open(DB) ->
 close({KVStore, Subscribers, {SnapDB, _LLC, _SLC}} = State) ->
     _ = call_subscribers(State, close_db),
     ?DB:close(KVStore),
-    ?DB:close(Subscribers),
+    db_ets:close(Subscribers),
     case SnapDB of
         false ->
             ok;
@@ -488,12 +488,12 @@ delete_entries({DB, _Subscr, _SnapState} = State, Interval) ->
 %%     existing subscription with that tag).
 -spec set_subscription(State::db(), subscr_t()) -> db().
 set_subscription({DB, Subscr, SnapState}, Subscription) ->
-    {DB, ?DB:put(Subscr, Subscription), SnapState}.
+    {DB, db_ets:put(Subscr, Subscription), SnapState}.
 
 %% @doc Gets a subscription stored under Tag (empty list if there is none).
 -spec get_subscription(State::db(), Tag::any()) -> [subscr_t()].
 get_subscription({_DB, Subscr, _SnapState}, Tag) ->
-    case ?DB:get(Subscr, Tag) of
+    case db_ets:get(Subscr, Tag) of
         {} ->
             [];
         SubsT ->
@@ -503,17 +503,17 @@ get_subscription({_DB, Subscr, _SnapState}, Tag) ->
 %% @doc Removes a subscription stored under Tag (if there is one).
 -spec remove_subscription(State::db(), Tag::any()) -> db().
 remove_subscription({DB, Subscr, SnapState}, Tag) ->
-    case ?DB:get(Subscr, Tag) of
+    case db_ets:get(Subscr, Tag) of
         {} -> ok;
         {Tag, _I, _ChangesFun, RemSubscrFun} -> RemSubscrFun(Tag)
     end,
-    {DB, ?DB:delete(Subscr, Tag), SnapState}.
+    {DB, db_ets:delete(Subscr, Tag), SnapState}.
 
 %% @doc Go through all subscriptions and perform the given operation if
 %%      matching.
 -spec call_subscribers(State::db(), Operation::close_db | subscr_op_t()) -> db().
 call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
-    {NewState, _Op} = ?DB:foldl(Subscr,
+    {NewState, _Op} = db_ets:foldl(Subscr,
               fun call_subscribers_iter/2,
               {State, Operation}),
     NewState.
@@ -524,7 +524,7 @@ call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
         -> {db(), Operation::close_db | subscr_op_t()}.
 call_subscribers_iter(Tag, {{_DB, Subscr, _SnapState} = State, Op}) ->
     % assume the key exists (it should since we are iterating over the table!)
-    {Tag, I, ChangesFun, RemSubscrFun} = ?DB:get(Subscr, Tag),
+    {Tag, I, ChangesFun, RemSubscrFun} = db_ets:get(Subscr, Tag),
     NewState =
         case Op of
             close_db ->
