@@ -495,7 +495,7 @@ init(Options) ->
     dht_node_move:send_trigger(),
 
     Recover = config:read(start_type) =:= recover,
-    FirstState = case {is_first(Options), config:read(leases), Recover} of
+    case {is_first(Options), config:read(leases), Recover} of
         {_   , true, true} ->
             % we are recovering
             dht_node_join_recover:join(Options);
