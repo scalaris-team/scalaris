@@ -763,6 +763,3 @@ Makefile: Makefile.in
 	@echo "Makefile is outdated. please run ./configure"
 	@echo "call configure with all parameters from your previous configure run"
 	@exit 1 
-
-configure: configure.ac
-	./bootstrap.sh
