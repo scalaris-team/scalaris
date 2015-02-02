@@ -95,6 +95,7 @@ lease_checker(TargetSize) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec is_disjoint([intervals:interval()]) -> boolean().
 is_disjoint([]) ->
     true;
 is_disjoint([H | T]) ->
