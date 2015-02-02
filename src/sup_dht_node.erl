@@ -30,7 +30,7 @@
 -export([start_link/1, init/1]).
 -export([supspec/1, childs/1]).
 
--spec start_link(tuple())
+-spec start_link({DHTNodeGroup::pid_groups:groupname(), Options::[tuple()]})
         -> {ok, Pid::pid(), pid_groups:groupname()} | ignore |
                {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link({DHTNodeGroup, Options}) ->
