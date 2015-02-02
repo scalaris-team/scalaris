@@ -63,9 +63,8 @@ lease_checker(TargetSize) ->
     LeaseLists = get_all_leases(),
     ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
     PassiveLeases = lists:flatten([lease_list:get_passive_leases(LL) || LL <- LeaseLists]),
-    ActiveIntervals =   lists:flatten(
-                          [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty]),
-    NormalizedActiveIntervals = intervals:tester_create_interval(ActiveIntervals),
+    ActiveIntervals = [l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty],
+    NormalizedActiveIntervals = intervals:union(ActiveIntervals),
     %log:log("Lease-Checker: ~w ~w ~w", [ActiveLeases, ActiveIntervals, PassiveLeases]),
     %ct:pal("ActiveIntervals: ~p", [ActiveIntervals]),
     %ct:pal("PassiveLeases: ~p", [PassiveLeases]),

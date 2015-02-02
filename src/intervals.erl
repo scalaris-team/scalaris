@@ -45,7 +45,7 @@
          is_left_of/2, is_right_of/2,
          split/2,
          % operations for intervals
-         intersection/2, union/2, minus/2,
+         intersection/2, union/1, union/2, minus/2,
          % getters for certain intervals
          get_bounds/1, get_elements/1, get_simple_intervals/1,
          simple_interval_to_interval/1,
@@ -403,6 +403,10 @@ union([], B)         -> B;
 union(A, [])         -> A;
 union(A, A)          -> A;
 union(A, B)          -> normalize_internal(lists:append(A, B)).
+
+%% @doc Creates the union of a list of intervals.
+-spec union([interval()]) -> interval().
+union(List) -> normalize_internal(lists:append(List)).
 
 %% @doc Creates the union of two simple intervals or empty lists.
 -spec union_simple(A::simple_interval(), B::simple_interval()) -> [simple_interval()].

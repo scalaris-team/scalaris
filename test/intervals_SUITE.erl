@@ -45,7 +45,9 @@ groups() ->
      tester_normalize_well_formed, tester_normalize,
      tester_intersection_well_formed, tester_intersection,
      tester_not_intersection, tester_not_intersection2,
-     tester_union_well_formed, tester_union, tester_not_union, tester_union_continuous,
+     tester_union2_well_formed, tester_union2, tester_not_union2,
+     tester_union1_well_formed, tester_union1, tester_not_union1,
+     tester_union2_same_as_union1, tester_union_continuous,
      tester_is_adjacent, tester_is_adjacent_union,
      tester_is_left_right_of,
      tester_is_subset, tester_is_subset2, tester_is_double_subset_equality,
@@ -423,22 +425,40 @@ tester_not_intersection2(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:union/2 and intervals:is_continuous/1
+% intervals:union/2, intervals:union/1 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_union_well_formed(intervals:interval(), intervals:interval()) -> true.
-prop_union_well_formed(A, B) ->
+-spec prop_union2_well_formed(intervals:interval(), intervals:interval()) -> true.
+prop_union2_well_formed(A, B) ->
     intervals:is_well_formed(intervals:union(A, B)).
 
--spec prop_union(intervals:interval(), intervals:interval(), intervals:key()) -> true.
-prop_union(A, B, X) ->
+-spec prop_union1_well_formed([intervals:interval()]) -> true.
+prop_union1_well_formed(List) ->
+    intervals:is_well_formed(intervals:union(List)).
+
+-spec prop_union2(intervals:interval(), intervals:interval(), intervals:key()) -> true.
+prop_union2(A, B, X) ->
     ?implies(intervals:in(X, A) orelse intervals:in(X, B),
              intervals:in(X, intervals:union(A, B))).
 
--spec prop_not_union(intervals:interval(), intervals:interval(), intervals:key()) -> true.
-prop_not_union(A, B, X) ->
+-spec prop_union1([intervals:interval()], intervals:key()) -> true.
+prop_union1(List, X) ->
+    ?implies(lists:any(fun(I) -> intervals:in(X, I) end, List),
+             intervals:in(X, intervals:union(List))).
+
+-spec prop_not_union2(intervals:interval(), intervals:interval(), intervals:key()) -> true.
+prop_not_union2(A, B, X) ->
     ?implies(not intervals:in(X, A) andalso not intervals:in(X, B),
              not intervals:in(X, intervals:union(A, B))).
+
+-spec prop_not_union1([intervals:interval()], intervals:key()) -> true.
+prop_not_union1(List, X) ->
+    ?implies(lists:all(fun(I) -> not intervals:in(X, I) end, List),
+             not intervals:in(X, intervals:union(List))).
+
+-spec prop_union2_same_as_union1(intervals:interval(), intervals:interval()) -> true.
+prop_union2_same_as_union1(A, B) ->
+    ?equals(intervals:union(A, B), intervals:union([A, B])).
 
 -spec prop_union_continuous(A0Br::intervals:left_bracket(), A0::intervals:key(), A1::intervals:key(), A1Br::intervals:right_bracket(),
                             B0Br::intervals:left_bracket(), B0::intervals:key(), B1::intervals:key(), B1Br::intervals:right_bracket()) -> true.
@@ -478,14 +498,26 @@ prop_union_continuous(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
         true  -> true
     end.
 
-tester_union_well_formed(_Config) ->
-    tester:test(?MODULE, prop_union_well_formed, 2, 5000, [{threads, 2}]).
+tester_union2_well_formed(_Config) ->
+    tester:test(?MODULE, prop_union2_well_formed, 2, 5000, [{threads, 2}]).
 
-tester_union(_Config) ->
-    tester:test(?MODULE, prop_union, 3, 5000, [{threads, 2}]).
+tester_union1_well_formed(_Config) ->
+    tester:test(?MODULE, prop_union1_well_formed, 1, 5000, [{threads, 2}]).
 
-tester_not_union(_Config) ->
-    tester:test(?MODULE, prop_not_union, 3, 5000, [{threads, 2}]).
+tester_union2(_Config) ->
+    tester:test(?MODULE, prop_union2, 3, 5000, [{threads, 2}]).
+
+tester_union1(_Config) ->
+    tester:test(?MODULE, prop_union1, 2, 5000, [{threads, 2}]).
+
+tester_not_union2(_Config) ->
+    tester:test(?MODULE, prop_not_union2, 3, 5000, [{threads, 2}]).
+
+tester_not_union1(_Config) ->
+    tester:test(?MODULE, prop_not_union1, 2, 5000, [{threads, 2}]).
+
+tester_union2_same_as_union1(_Config) ->
+    tester:test(?MODULE, prop_union2_same_as_union1, 2, 5000, [{threads, 2}]).
 
 tester_union_continuous(_Config) ->
     tester:test(?MODULE, prop_union_continuous, 8, 5000, [{threads, 2}]).
@@ -495,6 +527,9 @@ tester_union_continuous(_Config) ->
 % intervals:is_adjacent/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+tester_is_adjacent(_Config) ->
+    tester:test(?MODULE, prop_is_adjacent, 8, 5000, [{threads, 2}]).
 
 -spec(prop_is_adjacent/8 :: (A0Br::intervals:left_bracket(), A0::intervals:key(), A1::intervals:key(), A1Br::intervals:right_bracket(),
                              B0Br::intervals:left_bracket(), B0::intervals:key(), B1::intervals:key(), B1Br::intervals:right_bracket()) -> boolean()).
@@ -534,9 +569,6 @@ prop_is_adjacent_union(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     A = intervals:new(A0Br, A0, A1, A1Br),
     B = intervals:new(B0Br, B0, B1, B1Br),
     ?implies(intervals:is_adjacent(A, B), intervals:is_continuous(intervals:union(A, B))).
-
-tester_is_adjacent(_Config) ->
-    tester:test(?MODULE, prop_is_adjacent, 8, 5000, [{threads, 2}]).
 
 -spec(prop_is_left_right_of/8 :: (A0Br::intervals:left_bracket(), A0::intervals:key(),
                                   A1::intervals:key(), A1Br::intervals:right_bracket(),
