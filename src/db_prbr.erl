@@ -148,15 +148,14 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
             end, 0).
 
 -spec tab2list(db()) -> [entry()].
+-ifdef(PRBR_MNESIA).
 tab2list({DB, _Subscr, _Snap}) ->
-    case ?DB of
-        db_ets ->
-            ets:tab2list(DB);
-        db_mnesia ->
-            db_mnesia:tab2list(DB);
-        _ ->
-            throw({tab2list_not_supported_by_DB_type, ?DB})
-    end.
+    db_mnesia:tab2list(DB).
+-endif.
+-ifdef(PRBR_ETS).
+tab2list({DB, _Subscr, _Snap}) ->
+    ets:tab2list(DB).
+-endif.
 
 %%%%%%
 %%% raw whole db entry operations
