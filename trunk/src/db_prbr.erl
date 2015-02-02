@@ -46,6 +46,9 @@
 
 %% whole DB management
 -export([new/0, new/1]).
+-ifdef(PRBR_MNESIA).
+-export([open/1]).
+-endif.
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
@@ -64,7 +67,7 @@
 -export([delete_entries/2]).
 
 -type db() :: {KeyValueDB  :: ?DB:db(),
-               Subscribers :: ?DB:db(), %% for delta recording
+               Subscribers :: db_ets:db(), %% for delta recording
                SnaphotInfo :: {?DB:db() | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
@@ -93,14 +96,23 @@ new() ->
     RandomName = randoms:getRandomString(),
     DBName = pid_groups:my_groupname() ++ ":" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
-    {?DB:new(DBName), ?DB:new(SubscrName), {false, 0, 0}}.
+    {?DB:new(DBName), db_ets:new(SubscrName), {false, 0, 0}}.
 %% @doc Initializes a new database.
 -spec new(nonempty_string()) -> db().
 new(DBName) ->
   RandomName = randoms:getRandomString(),
   DBNameNew = DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName,
   SubscrName = DBNameNew ++ ":subscribers",
-  {?DB:new(DBNameNew), ?DB:new(SubscrName), {false, 0, 0}}.
+  {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
+
+-ifdef(PRBR_MNESIA).
+%% @doc Re-opens an existing database.
+-spec open(DB::atom()) -> db().
+open(DB) ->
+  DBName = ?DB:get_name(DB),
+  SubscrName = DBName ++ ":subscribers",
+  {DB, db_ets:new(SubscrName), {false, 0, 0}}.
+-endif.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).

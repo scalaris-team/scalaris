@@ -67,7 +67,6 @@ get_db(Options, DBName) ->
     case lists:keyfind(DBName, 1, Options) of
         [] ->
             log:log("error");
-        {DBName, DB, Subscriber} ->
-            % should be a call in db_prbr
-            {DB, Subscriber, {false, 0, 0}}
+        {DBName, DB} ->
+            db_prbr:open(DB)
     end.

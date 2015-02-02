@@ -91,7 +91,7 @@
 
 
 -type db() :: {KeyValueDB  :: ?DB:db(),
-               Subscribers :: ?DB:db(), %% for delta recording
+               Subscribers :: db_ets:db(), %% for delta recording
                SnaphotInfo :: {?DB:db() | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
@@ -119,7 +119,7 @@ new() ->
     RandomName = randoms:getRandomString(),
     DBName = "db_" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
-    {?DB:new(DBName), ?DB:new(SubscrName), {false, 0, 0}}.
+    {?DB:new(DBName), db_ets:new(SubscrName), {false, 0, 0}}.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
@@ -127,7 +127,7 @@ new() ->
 close({KVStore, Subscribers, {SnapDB, _LLC, _SLC}} = State) ->
     _ = call_subscribers(State, close_db),
     ?DB:close(KVStore),
-    ?DB:close(Subscribers),
+    db_ets:close(Subscribers),
     case SnapDB of
         false ->
             ok;
