@@ -110,8 +110,7 @@ get_dht_node_descs(Options) ->
       [begin
            Option_new =
                [{list_to_atom(Type),
-                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm])),
-                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm, ":subscribers"]))}
+                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm]))}
                || {Type, Name, Rdm} <- DB_list, Name =:= PID_group],
            DhtNodeId = randoms:getRandomString(),
            TheOptions = [{my_sup_dht_node_id, DhtNodeId} | lists:append(Options, Option_new)],
