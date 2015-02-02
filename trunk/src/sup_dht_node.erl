@@ -77,6 +77,9 @@ childs([{DHTNodeGroup, Options}]) ->
     Gossip =
         sup:worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
 
+    GossipCyclonFeeder =
+        sup:worker_desc(gossip_cyclon_feeder, gossip_cyclon_feeder, start_link, [DHTNodeGroup]),
+
     LBActive =
         case config:read(lb_active) of
             true -> sup:worker_desc(lb_active, lb_active, start_link, [DHTNodeGroup]);
@@ -125,6 +128,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     RoutingTable,
                     DC_Clustering,
                     Gossip,
+                    GossipCyclonFeeder,
                     SnapshotLeader,
                     SupWPool,
                     WPool,

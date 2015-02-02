@@ -347,6 +347,18 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
             {ok, State}
     end;
 
+%% used by the gossip_cyclon_feeder to add nodes to the cyclon cache
+handle_msg({add_nodes_to_cache, Nodes}, {OldCache, Node}) ->
+    NewCache =
+        lists:foldl(
+          fun(N, CacheX) ->
+                  case node:same_process(N, Node) of
+                      false -> cyclon_cache:add_node(N, 0, CacheX);
+                      true -> CacheX
+                  end
+          end, OldCache, Nodes),
+    {ok, {NewCache, Node}};
+
 %% Response to get_dht_nodes message from service_per_vm. Contains a list of
 %% registered dht nodes from service_per_vm. Initiated in
 %% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
