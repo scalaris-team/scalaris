@@ -271,27 +271,30 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
    State) ->
     %log:pal("on renew ~w (~w, ~w)~n", [Old, Mode, self()]),
     Self = comm:this(),
-    New = case get_aux(Old) of
-              % change owner to self -> remove aux
-              {change_owner, Self} ->
-                  Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()};
-              _ ->
-                  case comm:this() of
-                      Owner ->
-                          Old#lease{version=OldVersion+1, timeout=new_timeout()};
-                      _ ->
-                          % we are trying to recover
-                          Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0, 
-                                    timeout=new_timeout()}
-                  end
+    {New, Renew} = 
+        case get_aux(Old) of
+            % change owner to self -> remove aux
+            {change_owner, Self} ->
+                {Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()}, renew};
+            _ ->
+                case comm:this() of
+                    Owner ->
+                        {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
+                    _ ->
+                        % we are trying to recover
+                        log:log("trying to recover: owner=~p id=~p, self=~p", 
+                                [Owner, get_id(Old), comm:this()]),
+                        {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0, 
+                                  timeout=new_timeout()}, renew_recover}
+                end
           end,
-    ContentCheck = generic_content_check(Old, New, renew),
+    ContentCheck = generic_content_check(Old, New, Renew),
 %% @todo New passed for debugging only:
-    ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
+    ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode, Renew}),
     update_lease(ReplyTo, ContentCheck, Old, New, State),
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Renew}, State) ->
     %% log:pal("successful renew~n~w~n~w~n", [Value, l_on_cseq:get_id(Value)]),
     lease_list:update_lease_in_dht_node_state(Value,
                                               lease_list:update_next_round(l_on_cseq:get_id(Value),
@@ -300,7 +303,7 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, St
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
-    New, Mode}, State) ->
+    New, Mode, Renew}, State) ->
     % @todo retry
     log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
     log:pal("id: ~p~n", [dht_node_state:get(State, node_id)]),
@@ -316,7 +319,14 @@ on({l_on_cseq, renew_reply,
                                                                 Mode)
             end;
         unexpected_owner   ->
-            lease_list:remove_lease_from_dht_node_state(Value, State, Mode);
+            CurrentOwner = get_owner(Value),
+            case {comm:this(), Renew} of
+                {CurrentOwner, renew_recover} ->
+                    % the owner was already changed in a recover
+                    State;
+                _ ->
+                    lease_list:remove_lease_from_dht_node_state(Value, State, Mode)
+            end;
         unexpected_aux     ->
             case get_aux(Value) of
                 empty                  ->
@@ -494,15 +504,21 @@ on({l_on_cseq, takeover_reply, ReplyTo,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
-    New = L1#lease{epoch    = OldEpoch + 1,
-                   version = 0,
-                   aux     = {invalid, merge, get_range(L1), get_range(L2)},
-                   timeout = new_timeout()},
-    ContentCheck = generic_content_check(L1, New, merge_step1),
-    Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1,
-                                     L2, ReplyTo, '_'}),
-    update_lease(Self, ContentCheck, L1, New, State),
-    State;
+    case L2 of
+        empty ->
+            log:log("trying to merge with empty lease ?!?"),
+            State;
+        _ ->
+            New = L1#lease{epoch    = OldEpoch + 1,
+                           version = 0,
+                           aux     = {invalid, merge, get_range(L1), get_range(L2)},
+                           timeout = new_timeout()},
+            ContentCheck = generic_content_check(L1, New, merge_step1),
+            Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1,
+                                             L2, ReplyTo, '_'}),
+            update_lease(Self, ContentCheck, L1, New, State),
+            State
+    end;
 
 on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
@@ -1035,7 +1051,7 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                 % special case for renew after crash-recovery
                 #lease{epoch = E0, owner = O0, version = V0} 
                   when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =:= OldOwner
-                       andalso NewOwner =/= OldOwner andalso Writer =:= renew ->
+                       andalso NewOwner =/= OldOwner andalso Writer =:= renew_recover ->
                        % after a crash the logical owner should not
                        % have changed. however its pid will have
                        % changed. this special case checks that epoch
