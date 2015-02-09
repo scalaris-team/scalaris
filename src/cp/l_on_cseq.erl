@@ -305,10 +305,10 @@ on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
     New, Mode, Renew}, State) ->
     % @todo retry
-    log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
-    log:pal("id: ~p~n", [dht_node_state:get(State, node_id)]),
-    log:pal("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
-    log:pal("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
+    ?TRACE("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
+    ?TRACE("id: ~p~n", [dht_node_state:get(State, node_id)]),
+    ?TRACE("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
+    ?TRACE("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
     case Reason of
         lease_does_not_exist ->
             case Value of %@todo is this necessary?
@@ -494,7 +494,7 @@ on({l_on_cseq, takeover_reply, ReplyTo,
 on({l_on_cseq, takeover_reply, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Value, 
      {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
-    log:log("takeover failed ~p ~p~n", [Value, Reason]),
+    ?TRACE("takeover failed ~p ~p~n", [Value, Reason]),
     comm:send_local(ReplyTo, {takeover, failed, Value, Reason}),
     State;
 
@@ -506,7 +506,7 @@ on({l_on_cseq, takeover_reply, ReplyTo,
 on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
     case L2 of
         empty ->
-            log:log("trying to merge with empty lease ?!?"),
+            ?TRACE("trying to merge with empty lease ?!?", []),
             State;
         _ ->
             New = L1#lease{epoch    = OldEpoch + 1,
@@ -524,7 +524,7 @@ on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    log:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     case Reason of
         %lease_does_not_exist ->
@@ -590,7 +590,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2,
      {content_check_failed, {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
-    log:pal("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
+    ?TRACE("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
     case Reason of
         %lease_does_not_exist ->
         %    % cannot happen
@@ -653,7 +653,7 @@ on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    log:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
         %lease_does_not_exist ->
         %  % cannot happen
@@ -700,7 +700,7 @@ on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
 on({l_on_cseq, merge_reply_step3, L2 = #lease{epoch=OldEpoch}, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     % @todo if success update lease in State
-    log:pal("successful merge step3 ~p~n", [L1]),
+    ?TRACE("successful merge step3 ~p~n", [L1]),
     New = L2#lease{epoch   = OldEpoch + 1,
                    version = 0,
                    aux     = empty,
@@ -713,7 +713,7 @@ on({l_on_cseq, merge_reply_step3, L2 = #lease{epoch=OldEpoch}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
     {qwrite_done, _ReqId, Round, L2}}, State) ->
-    log:pal("successful merge ~p~p~n", [ReplyTo, L2]),
+    ?TRACE("successful merge ~p~p~n", [ReplyTo, L2]),
     comm:send_local(ReplyTo, {merge, success, L2, L1}),
     lease_list:update_lease_in_dht_node_state(L2,
                                               lease_list:update_next_round(l_on_cseq:get_id(L2),
@@ -725,7 +725,7 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    log:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     case Reason of
         unexpected_timeout ->
@@ -1058,7 +1058,7 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                        % and version are correctly guessed, but the
                        % owner is wrong. in addition, we require that
                        % this is a renew.
-                    log:log("loncq: this has to be a renew after a recovery"),
+                    ?TRACE("loncq: this has to be a renew after a recovery", []),
                     {true, null};
                 % check that epoch and version match with Old
                 % we only warn/fail if the remaining fields do not match

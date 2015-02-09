@@ -21,6 +21,10 @@
 -vsn('$Id$').
 
 -behaviour(gen_component).
+
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
+
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
@@ -104,12 +108,12 @@ rm_exec(Pid, _Tag, Old, New, _Reason) ->
 %% @private
 -spec on(comm:message(), state()) -> state().
 on({rm_change, OldRange, NewRange}, State) ->
-    log:log("the range has changed: ~w -> ~w", [OldRange, NewRange]),
-    log:log("state: ~w", [State]),
+    ?TRACE("the range has changed: ~w -> ~w", [OldRange, NewRange]),
+    ?TRACE("state: ~w", [State]),
     compare_and_fix_rm_with_leases(State);
 
 on({read_after_rm_change, MissingRange, Result}, State) ->
-    log:log("read_after_rm_change ~w", [Result]),
+    ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, Lease} ->
             case l_on_cseq:is_live_aux_field(Lease) of
@@ -118,8 +122,8 @@ on({read_after_rm_change, MissingRange, Result}, State) ->
                     l_on_cseq:lease_takeover(Lease, Pid),
                     add_takeover(State, Lease);
                 false ->
-                    log:log("the proposed range is marked as dead %w", [MissingRange]),
-                    log:log("the qread result is %w", [Result]),
+                    ?TRACE("the proposed range is marked as dead ~w", [MissingRange]),
+                    ?TRACE("the qread result is ~w", [Result]),
                     % @todo tell rm to ignore range, because it was merged?
                     State
             end;
@@ -129,7 +133,7 @@ on({read_after_rm_change, MissingRange, Result}, State) ->
     end;
 
 on({takeover_after_rm_change, _Lease, Result}, State) ->
-    log:log("takeover_after_rm_change ~w", [Result]),
+    ?TRACE("takeover_after_rm_change ~w", [Result]),
     case Result of
         {takeover, failed, L, Error} ->
             case Error of
@@ -138,17 +142,17 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                         {value, L2} ->
                             case l_on_cseq:get_timeout(L) =:= l_on_cseq:get_timeout(L2) of
                                 true ->
-                                    log:log("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
+                                    ?TRACE("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
                                     LeaseTimeout = l_on_cseq:get_timeout(L),
                                     Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, L, '_'}),
                                     WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
-                                    log:log("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
+                                    ?TRACE("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
                                     case WaitTime < 500*1000 of
                                         true ->
                                             l_on_cseq:lease_takeover(L, Pid);
                                         false ->
                                             PostponeBy = trunc(0.5 + WaitTime / (1000*1000)),
-                                            log:log("delaying takeover by ~ws", [PostponeBy]),
+                                            ?TRACE("delaying takeover by ~ws", [PostponeBy]),
                                             l_on_cseq:lease_takeover_after(PostponeBy, L, Pid)
                                     end,
                                     State;
@@ -166,7 +170,7 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                     remove_takeover(State, L)
             end;
         {takeover, success, L2} ->
-            log:log("takeover_after_rm_change success"),
+            ?TRACE("takeover_after_rm_change success", []),
             % @todo we call receive in an on-handler ?!?
             comm:send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), lease_list}),
             LeaseList = receive
@@ -180,7 +184,7 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
     end;
 
 on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
-    log:log("merge after rm_change: ~w", [Result]),
+    ?TRACE("merge after rm_change: ~w", [Result]),
     case Result of
         % will always succeed (eventually)
         {merge, success, __L2, _L1} ->
@@ -188,7 +192,7 @@ on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     end;
 
 on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
-    log:log("merge after finish done: ~w", [Result]),
+    ?TRACE("merge after finish done: ~w", [Result]),
     State;
 
 on({get_node_for_new_neighbor, {get_state_response, Node}}, State) ->
@@ -207,7 +211,7 @@ compare_and_fix_rm_with_leases(State) ->
             {get_state_response, [{lease_list, L}, {my_range, Range}]} ->
                 {L, Range}
              end,
-    log:log("lease list ~w", [LeaseList]),
+    ?TRACE("lease list ~w", [LeaseList]),
     ActiveRange = lease_list:get_active_range(LeaseList),
     case intervals:is_empty(ActiveRange) of
         true ->
@@ -281,7 +285,7 @@ is_current_takeover(#state{takeovers=Takeovers}, L) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec propose_new_neighbors(comm:mypid() | nil) -> ok.
 propose_new_neighbors(PidOrNil) ->
-    log:log("somebody else updated this lease"),
+    ?TRACE("somebody else updated this lease", []),
     case PidOrNil of
         nil ->
             ok;
