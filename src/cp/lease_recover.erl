@@ -37,8 +37,9 @@ recover(Leases1, Leases2, Leases3, Leases4) ->
                                        lists:append(prbr:tab2list(Leases3), 
                                                     lists:append(prbr:tab2list(Leases2), 
                                                                  prbr:tab2list(Leases1)))))),
-    io:format("candidates ~p~n", [Candidates]),
+    %% io:format("candidates ~p~n", [Candidates]),
     case length(Candidates) of
+        0 -> lease_list:empty();
         1 -> % one potentially active lease: set active lease
             [Lease] = Candidates,
             lease_list:make_lease_list(Lease, [], []);
