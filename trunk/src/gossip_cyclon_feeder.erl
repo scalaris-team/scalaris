@@ -68,15 +68,17 @@ on({trigger_round}, #state{local_nodes=LocalNodes, remote_nodes=RemoteNodes,
     [comm:send_local(Pid, {get_node_details, 
                            comm:reply_as(comm:this(), 3, 
                                          {local_node_response, Pid, '_'}), [neighbors]})
-     || Pid <- LocalNodes],
+     || Pid <- LocalNodes, is_process_alive(Pid)],
     % call remote nodes
     [comm:send(Pid, {get_node_details, 
                            comm:reply_as(comm:this(), 3, 
-                                         {remote_node_response, Pid, '_'}), [neighbors]})
+                                         {remote_node_response, Pid, '_'}), [neighbors]},
+              [{?quiet}])
      || Pid <- RemoteNodes],
     % call known hosts
     [comm:send(Pid, {get_dht_nodes, 
-                           comm:reply_as(comm:this(), 3, {known_hosts_response, Pid, '_'})})
+                           comm:reply_as(comm:this(), 3, {known_hosts_response, Pid, '_'})},
+              [{?quiet}])
      || Pid <- KnownHosts],
     msg_delay:send_trigger(10, {trigger_round}),
     State;
