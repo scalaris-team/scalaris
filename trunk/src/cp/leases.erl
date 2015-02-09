@@ -55,7 +55,7 @@ is_responsible_(LeaseList, Key) ->
                 IsAlive andalso RangeMatches ->
                     true;
                 RangeMatches ->
-                    log:log("returned maybe"),
+                    %log:log("returned maybe"),
                     maybe;
                 true ->
                     %log:log("returned false"),
