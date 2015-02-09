@@ -48,14 +48,14 @@ check_local_leases(DHTNode) ->
     LeaseList = get_dht_node_state(DHTNode, lease_list),
     ActiveLease = lease_list:get_active_lease(LeaseList),
     PassiveLeases = lease_list:get_passive_leases(LeaseList),
-    %log:log("active lease: ~w", [ActiveLease]),
+    MyRange = get_dht_node_state(DHTNode, my_range),
+    log:log("active lease=~p; my_range=~p", [ActiveLease, MyRange]),
     ActiveInterval = case ActiveLease of
                          empty ->
                              intervals:empty();
                          _ ->
                              l_on_cseq:get_range(ActiveLease)
                      end,
-    MyRange = get_dht_node_state(DHTNode, my_range),
     LocalCorrect = MyRange =:= ActiveInterval,
     length(PassiveLeases) == 0 andalso LocalCorrect.
 
@@ -75,7 +75,7 @@ lease_checker(TargetSize) ->
     HaveAllAuxEmpty = lists:all(fun(L) ->
                                         L =/= empty andalso l_on_cseq:get_aux(L) =:= empty
                                 end, ActiveLeases),
-    ct:pal("lease checker: ~w ~w ~w ~w~n~w~n~w~n", [IsAll, IsDisjoint, HaveAllActiveLeases, HaveNoPassiveLeases,PassiveLeases, NormalizedActiveIntervals]),
+    % ct:pal("lease checker: ~w ~w ~w ~w~n~w~n~w~n", [IsAll, IsDisjoint, HaveAllActiveLeases, HaveNoPassiveLeases,PassiveLeases, NormalizedActiveIntervals]),
     case IsAll of
         false ->
             %print_all_active_leases(),
@@ -105,7 +105,7 @@ is_disjoint([H | T]) ->
 is_disjoint(_I, []) ->
     true;
 is_disjoint(I, [H|T]) ->
-    intervals:is_empty(intervals:intersection([I],[H]))
+    intervals:is_empty(intervals:intersection(I,H))
         andalso is_disjoint(I, T).
 
 get_dht_node_state(Pid, What) ->
