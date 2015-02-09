@@ -224,7 +224,7 @@ remove_lease_from_dht_node_state(Lease, State, Mode) ->
         active ->
             log:log("you are trying to remove an active lease"),
             % delete_mnesia_dbs(State) ?
-            admin:del_nodes_by_name([pid_groups:my_groupname()], false),
+            _ = admin:del_nodes_by_name([pid_groups:my_groupname()], false),
             remove_active_lease_from_dht_node_state(Lease, State);
         any ->
             remove_passive_lease_from_dht_node_state(Lease,
