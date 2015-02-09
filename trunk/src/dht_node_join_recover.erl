@@ -26,7 +26,6 @@
 
 -spec join(Options::[tuple()]) -> dht_node_state:state().
 join(Options) ->
-    io:format("dht_node_join:join ~p~n", [Options]),
     % 1. get old lease databases
     Lease_DB1 = get_db(Options, lease_db1),
     Lease_DB2 = get_db(Options, lease_db2),
@@ -37,7 +36,7 @@ join(Options) ->
     % 3. create state with old mnesias
     MyId = l_on_cseq:get_id(lease_list:get_active_lease(LeaseList)),
     Me = node:new(comm:this(), MyId, 0), 
-    Neighbors = nodelist:new_neighborhood(Me), % needed for ?RT:empty/1
+    Neighbors = nodelist:new_neighborhood(Me), % needed for ?RT:empty_ext/1
     EmptyRT = ?RT:empty_ext(Neighbors), % only for rt_chord
     RMState = rm_loop:init(Me, Me, Me, null),
     PRBR_KV_DB = get_db(Options, prbr_kv_db),
