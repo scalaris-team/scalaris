@@ -209,17 +209,26 @@ compare_and_fix_rm_with_leases(State) ->
              end,
     log:log("lease list ~w", [LeaseList]),
     ActiveRange = lease_list:get_active_range(LeaseList),
-    MissingRange = intervals:minus(MyRange, ActiveRange),
-    case intervals:is_empty(MissingRange) of
+    case intervals:is_empty(ActiveRange) of
         true ->
+            % we lost our active lease; we do not participate in the ring anymore
             State;
         false ->
-            log:log("missing range: ~w", [MissingRange]),
-            LeaseId = l_on_cseq:id(MissingRange),
-            Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
-            l_on_cseq:read(LeaseId, Pid),
-            %#op{missing_range = MissingRange, found_leases = []};
-            State
+            MissingRange = intervals:minus(MyRange, ActiveRange),
+            case intervals:is_non_empty(MissingRange) 
+                 andalso
+                intervals:is_left_of(MissingRange, ActiveRange) of
+                false ->
+                    State;
+                true ->
+                    %% log:log("missing range:~n missing=~p~n active=~p~n my_range=~p", 
+                    %%         [MissingRange, ActiveRange, MyRange]),
+                    %% log:log("missing range: ~w", [MissingRange]),
+                    LeaseId = l_on_cseq:id(MissingRange),
+                    Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
+                    l_on_cseq:read(LeaseId, Pid),
+                    State
+            end
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
