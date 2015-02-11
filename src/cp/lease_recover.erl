@@ -31,37 +31,18 @@ recover(Leases1, Leases2, Leases3, Leases4) ->
     %% Leases2 = filter(get_leases(leases_db2)),
     %% Leases3 = filter(get_leases(leases_db3)),
     %% Leases4 = filter(get_leases(leases_db4)),
-    ExtractLease = fun({_Id, Lease}) -> Lease end,
-    Candidates = lists:map(ExtractLease,
-                   filter(lists:append(prbr:tab2list(Leases4), 
-                                       lists:append(prbr:tab2list(Leases3), 
-                                                    lists:append(prbr:tab2list(Leases2), 
-                                                                 prbr:tab2list(Leases1)))))),
+    AllLeases = lists:append([prbr:tab2list(Leases4), prbr:tab2list(Leases3),
+                              prbr:tab2list(Leases2), prbr:tab2list(Leases1)]),
+    Candidates = [L || {Id, L} <- AllLeases,
+                       Id =:= l_on_cseq:get_id(L), %% is first replica?
+                       l_on_cseq:is_live_aux_field(L),
+                       l_on_cseq:has_timed_out(L)],
     %% io:format("candidates ~p~n", [Candidates]),
-    case length(Candidates) of
-        0 -> lease_list:empty();
-        1 -> % one potentially active lease: set active lease
-            [Lease] = Candidates,
+    case Candidates of
+        [] -> lease_list:empty();
+        [Lease] -> % one potentially active lease: set active lease
             lease_list:make_lease_list(Lease, [], []);
-        2 -> % could be an ongoing split or an ongoing merge: finish operation
+        [_, _] -> % could be an ongoing split or an ongoing merge: finish operation
             ts = nyi, % ts: not yet implemented
             lease_list:empty()
     end.
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% helper
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec filter([{?RT:key(), l_on_cseq:lease_t()}]) -> [{?RT:key(), l_on_cseq:lease_t()}].
-filter(Leases) ->
-    F = fun({Id, L}) ->
-                %% log:log("~w ~w~n", [Id, L]),
-                LeaseId = l_on_cseq:get_id(L),
-                Id =:= LeaseId andalso %% is first replica?
-                    l_on_cseq:is_live_aux_field(L) andalso
-                    l_on_cseq:has_timed_out(L)
-        end,
-    lists:filter(F, Leases).
-

@@ -663,14 +663,13 @@ shutdown(_FullState) ->
 -spec request_node_details(State::state()) -> ok.
 request_node_details(State) ->
     % get state of dht node
-    DHT_Node = pid_groups:get_my(dht_node),
-    case DHT_Node of
+    case pid_groups:get_my(dht_node) of
         failed ->
             % our dht_node died and was removed from pid_groups
             %% log:log("request_node_details failed: ~p ~p", 
             %%        [pid_groups:my_groupname(), DHT_Node]);
             ok;
-        _ ->
+        DHT_Node ->
             EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, state_get(instance, State), '_'}),
             comm:send_local(DHT_Node, 
                             {get_node_details, EnvPid, [load, load2, load3, db, my_range]})
