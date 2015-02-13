@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin,
+% @copyright 2013-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -72,6 +72,11 @@ start() ->
         ok -> ok;
         Msg ->
           io:format("starting mnesia: ~w~n", [Msg]),
+          io:format("starting mnesia: maybe you tried to start a new node "
+                    "while we still found persisted data of a node with the "
+                   "same name. If you want to get rid of the old persisted "
+                    "data, delete them using ~p.~n",
+                    ["rm -rf data/" ++ atom_to_list(node())]),
           erlang:halt()
       end
   end,
