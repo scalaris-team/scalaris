@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -550,34 +550,49 @@ on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
                                   ReadFilterResultValue}, State);
 
 on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
-    Entry = setelement(2, get_entry(ReqId, tablename(State)), do_qwrite_fast),
-    ContentCheck = element(2, entry_filters(Entry)),
-    WriteFilter = element(3, entry_filters(Entry)),
-    WriteValue = entry_val(Entry),
+    %% What if ReqId does no longer exist? Can that happen? How?
+    %% a) Lets analyse the paths to do_qwrite_fast:
+    %% b) Lets analyse when entries are removed from the database:
+    Entry = get_entry(ReqId, tablename(State)),
+    _ = case Entry of
+        undefined ->
+          %% drop actions for unknown requests, as they must be
+          %% outdated. The retrigger mechanism may delete entries at
+          %% any time, so we have to be prepared for that.
+          State;
+        _ ->
+          NewEntry = setelement(2, Entry, do_qwrite_fast),
+          ContentCheck = element(2, entry_filters(NewEntry)),
+          WriteFilter = element(3, entry_filters(NewEntry)),
+          WriteValue = entry_val(NewEntry),
 
-    _ = case ContentCheck(OldRFResultValue, WriteFilter, WriteValue) of
-        {true, PassedToUpdate} ->
-            %% own proposal possible as next instance in the consens sequence
-            This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
-            DB = db_selector(State),
+          _ = case ContentCheck(OldRFResultValue,
+                                WriteFilter,
+                                WriteValue) of
+              {true, PassedToUpdate} ->
+                %% own proposal possible as next instance in the
+                %% consens sequence
+                This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
+                DB = db_selector(State),
                 [ begin
-                      %% let fill in whether lookup was consistent
-                      LookupEnvelope =
-                          dht_node_lookup:envelope(
-                            4,
-                            {prbr, write, DB, '_', This, X, Round,
-                             WriteValue, PassedToUpdate, WriteFilter}),
-                      api_dht_raw:unreliable_lookup(X, LookupEnvelope)
+                    %% let fill in whether lookup was consistent
+                    LookupEnvelope =
+                      dht_node_lookup:envelope(
+                        4,
+                        {prbr, write, DB, '_', This, X, Round,
+                        WriteValue, PassedToUpdate, WriteFilter}),
+                    api_dht_raw:unreliable_lookup(X, LookupEnvelope)
                   end
-                  || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
-        {false, Reason} = _Err ->
-            %% own proposal not possible as of content check
-            comm:send_local(entry_client(Entry),
+                  || X <- ?RT:get_replica_keys(entry_key(NewEntry)) ];
+                {false, Reason} = _Err ->
+                  %% own proposal not possible as of content check
+                  comm:send_local(entry_client(NewEntry),
                             {qwrite_deny, ReqId, Round, OldRFResultValue,
-                             {content_check_failed, Reason}}),
-            ?PDB:delete(ReqId, tablename(State))
-    end,
-    State;
+                            {content_check_failed, Reason}}),
+                  ?PDB:delete(ReqId, tablename(State))
+                end,
+            State
+        end;
 
 %% qwrite step 3: a replica replied to write from step 2
 %%                when      majority reached, -> finish.
@@ -738,7 +753,7 @@ req_for_retrigger(Entry, IncDelay) ->
 -spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
 retrigger(Entry, TableName, IncDelay) ->
     Request = req_for_retrigger(Entry, IncDelay),
-    log:log("Retrigger caused by timeout or concurrency for ~.0p~n", [Request]),
+    ?TRACE("Retrigger caused by timeout or concurrency for ~.0p~n", [Request]),
     comm:send_local(self(), Request),
     ?PDB:delete(element(1, Entry), TableName).
 
