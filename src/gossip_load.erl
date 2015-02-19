@@ -566,7 +566,7 @@ notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState} = Full
     CurRound = state_get(round, CurState),
     PrevRound = state_get(round, PrevState),
     FullState1 =
-        case {Data, Round} of
+        case {Round, Data} of
             {CurRound, undefined} ->
                 FullState;
             {CurRound, _} ->
