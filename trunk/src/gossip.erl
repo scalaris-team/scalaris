@@ -537,7 +537,8 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
                 [element(1, ErrorMsg), element(2, MsgUnpacked), Reason, element(1, Msg)]),
             State;
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
-            log:log(warn(), "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
+            log:log(warn(), "[ Gossip ] p2p_exch from ~w (gossip) to ~w (dht_node)" ++
+                    " failed because of ~w", [_SourcePid, _Pid, Reason]),
             NewState1 = cb_notify_change(exch_failure, {p2p_exch, PData, Round}, CBModule, State),
             NewState1;
         {p2p_exch_reply, CBModule, _SourcePid, QData, Round} ->
@@ -565,6 +566,12 @@ on_active({remove_all_tombstones}, State) ->
 %% for debugging
 on_active(print_state, State) ->
     log:log(warn, "~s", [to_string(State)]),
+    State;
+
+%% for debugging
+on_active({get_state, SourcePid}, State) ->
+    comm:send(SourcePid, State),
+    %% log:log(warn, "~s", [to_string(State)]),
     State;
 
 %% Only messages for callback modules are expected to reach this on_active clause.
@@ -601,6 +608,7 @@ handle_msg({selected_peer, CBModule, _Msg={cy_cache, []}}, State) ->
 
 
 handle_msg({selected_peer, CBModule, _Msg={cy_cache, Nodes}}, State) ->
+    log:log(info, "selected_peer: ~w, ~w", [CBModule, _Msg]),
     {_Node, PData} = state_get({exch_data, CBModule}, State),
     case PData of
         undefined -> state_set({exch_data, CBModule}, {Nodes, undefined}, State);
@@ -802,7 +810,7 @@ start_p2p_exchange(Peers, PData, CBModule, State)  ->
     SendToPeer = fun(Peer, StateIn) ->
         case node:is_me(Peer) of
             false ->
-                %% io:format("starting p2p exchange. Peer: ~w, Ref: ~w~n",[Peer, Ref]),
+                %% log:log(warn, "starting p2p exchange. Peer: ~w~n",[Peer]),
                 ?SEND_TO_GROUP_MEMBER(
                         node:pidX(Peer), gossip,
                         {p2p_exch, CBModule, comm:this(), PData, state_get({round, CBModule}, StateIn)}),
@@ -1174,7 +1182,7 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors, _Reason) ->
 %%          <li>`{exch_data, CBModule}', a tuple of the data to exchange and the peer to
 %%                  exchange the data with. </li>
 %%          <li>`{round, CBModule}', the round of the given callback module, </li>
-%%          <li>`{reply_peer, Ref}', the peer to send the p2p_exch_reply to, </li>
+%%          <li>`{reply_peer, Ref}', the peer to send the g2p_exch_reply to, </li>
 %%          <li>`{trigger_group, TriggerInterval}', the trigger group (i.e. a list
 %%              of callback modules) to the given TriggerInterval, </li>
 %%          <li>`{trigger_lock, CBModule}', locks triggering while within prepare-request

@@ -542,7 +542,8 @@ round_has_converged({_PrevState, CurState}=FullState) ->
     (Keyword::exch_failure, {_MsgTag::atom(), Data::data(), _Round::round()},
              FullState::full_state()) -> {ok, full_state()}.
 notify_change(new_round, NewRound, {PrevState, CurState}) ->
-    log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [state_get(instance, CurState), NewRound]),
+    log:log(debug, "[ ~w ~w ] new_round notification. NewRound: ~w. Leader: ~w",
+            [state_get(instance, CurState), comm:this(), NewRound, state_get(leader, CurState)]),
     case state_get(request, CurState) of
         true ->
           {ok, {PrevState, finish_request(CurState)}};
@@ -551,12 +552,12 @@ notify_change(new_round, NewRound, {PrevState, CurState}) ->
     end;
 
 notify_change(leader, {MsgTag, NewRange}, {PrevState, CurState}) when MsgTag =:= is_leader ->
-    log:log(?SHOW, "[ ~w ] I'm the leader", [?MODULE]),
+    log:log(?SHOW, "[ ~w ] ~w is the leader", [state_get(instance, CurState), comm:this()]),
     CurState1 = state_set([{leader, true}, {range, NewRange}], CurState),
     {ok, {PrevState, CurState1}};
 
 notify_change(leader, {MsgTag, NewRange}, {PrevState, CurState}) when MsgTag =:= no_leader ->
-    log:log(?SHOW, "[ ~w ] I'm no leader", [?MODULE]),
+    log:log(?SHOW, "[ ~w ] ~w is no leader", [state_get(instance, CurState), comm:this()]),
     CurState1 = state_set([{leader, false}, {range, NewRange}], CurState),
     {ok, {PrevState, CurState1}};
 
@@ -666,12 +667,12 @@ request_node_details(State) ->
     case pid_groups:get_my(dht_node) of
         failed ->
             % our dht_node died and was removed from pid_groups
-            %% log:log("request_node_details failed: ~p ~p", 
-            %%        [pid_groups:my_groupname(), DHT_Node]);
+            log:log(warn, "[ ~w ~w ] request_node_details from ~p failed",
+                   [state_get(instance, State), comm:this(), pid_groups:my_groupname()]),
             ok;
         DHT_Node ->
             EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, state_get(instance, State), '_'}),
-            comm:send_local(DHT_Node, 
+            comm:send_local(DHT_Node,
                             {get_node_details, EnvPid, [load, load2, load3, db, my_range]})
     end.
 
