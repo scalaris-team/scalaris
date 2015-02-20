@@ -460,14 +460,18 @@ check_state({Cache, _Node} = _State) ->
 %%      gossip module.
 -spec request_node_details([node_details:node_details_name()]) -> ok.
 request_node_details(Details) ->
-    DHT_Node = pid_groups:get_my(dht_node),
-    This = comm:this(),
-    EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
-    case comm:is_valid(This) of
-        true ->
-            comm:send_local(DHT_Node, {get_node_details, EnvPid, Details}),
+    case pid_groups:get_my(dht_node) of
+        undefined ->
             ok;
-        false -> ok
+        DHT_Node ->
+            This = comm:this(),
+            EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
+            case comm:is_valid(This) of
+                true ->
+                    comm:send_local(DHT_Node, {get_node_details, EnvPid, Details}),
+                    ok;
+                false -> ok
+            end
     end.
 
 
