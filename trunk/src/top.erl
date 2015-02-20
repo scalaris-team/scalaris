@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -310,8 +310,13 @@ prettyprint_msg({?send_to_group_member, ProcessName, Msg}) ->
 prettyprint_msg({?send_to_registered_proc, ProcessName, Msg}) ->
     {util:extint2atom(?send_to_registered_proc), ProcessName, prettyprint_msg(Msg)};
 prettyprint_msg(Msg) ->
-    setelement(1, Msg, util:extint2atom(element(1, Msg))).
-    
+    case Msg of
+        {X, f, Y} when is_integer(X) andalso is_tuple(Y) ->
+            %% handle lookup envelope separately
+            {X, f, prettyprint_msg(Y)};
+        _ ->
+            setelement(1, Msg, util:extint2atom(element(1, Msg)))
+    end.
 
 -spec on(comm:message(), state()) -> state().
 
