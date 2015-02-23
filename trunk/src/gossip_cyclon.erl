@@ -465,9 +465,9 @@ request_node_details(Details) ->
             ok;
         DHT_Node ->
             This = comm:this(),
-            EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
             case comm:is_valid(This) of
                 true ->
+                    EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
                     comm:send_local(DHT_Node, {get_node_details, EnvPid, Details}),
                     ok;
                 false -> ok
