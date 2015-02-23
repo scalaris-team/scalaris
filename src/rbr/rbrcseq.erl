@@ -272,13 +272,12 @@ on({qread_collect,
     %% collect a majority of answers and select that one with the highest
     %% round number.
     {_Round, ReqId} = pr:get_id(MyRwithId),
-    Entry = get_entry(ReqId, tablename(State)),
-    _ = case Entry of
+    case get_entry(ReqId, tablename(State)) of
         undefined ->
             %% drop replies for unknown requests, as they must be
             %% outdated as all replies run through the same process.
             State;
-        _ ->
+        Entry ->
             case add_read_reply(Entry, db_selector(State), MyRwithId,
                                Val, SeenWriteRound, Cons) of
                 {false, NewEntry} ->

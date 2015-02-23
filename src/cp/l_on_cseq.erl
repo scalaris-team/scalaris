@@ -503,22 +503,20 @@ on({l_on_cseq, takeover_reply, ReplyTo,
 % lease merge (step1)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, merge, _L1 = #lease{}, _L2 = empty, _ReplyTo}, State) ->
+    ?TRACE("trying to merge with empty lease ?!?", []),
+    State;
+
 on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
-    case L2 of
-        empty ->
-            ?TRACE("trying to merge with empty lease ?!?", []),
-            State;
-        _ ->
-            New = L1#lease{epoch    = OldEpoch + 1,
-                           version = 0,
-                           aux     = {invalid, merge, get_range(L1), get_range(L2)},
-                           timeout = new_timeout()},
-            ContentCheck = generic_content_check(L1, New, merge_step1),
-            Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1,
-                                             L2, ReplyTo, '_'}),
-            update_lease(Self, ContentCheck, L1, New, State),
-            State
-    end;
+    New = L1#lease{epoch    = OldEpoch + 1,
+                   version = 0,
+                   aux     = {invalid, merge, get_range(L1), get_range(L2)},
+                   timeout = new_timeout()},
+    ContentCheck = generic_content_check(L1, New, merge_step1),
+    Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1,
+                                     L2, ReplyTo, '_'}),
+    update_lease(Self, ContentCheck, L1, New, State),
+    State;
 
 on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
