@@ -22,7 +22,8 @@
 
 -behaviour(gen_component).
 
--export([dump_node_states/0, kill_nodes/1, register_dht_node/1, deregister_dht_node/1]).
+-export([dump_node_states/0, kill_nodes/1, kill_nodes_by_name/1, register_dht_node/1, 
+         deregister_dht_node/1]).
 
 -export([start_link/1, init/1, on/2]).
 
@@ -59,6 +60,12 @@ kill_nodes(No) ->
              _ = supervisor:terminate_child(main_sup, Id),
              supervisor:delete_child(main_sup, Id)
          end || Child <- Childs],
+    ok.
+
+% @doc kills Scalaris nodes from the current VM 
+-spec kill_nodes_by_name(Names::list(pid_groups:groupname())) -> ok.
+kill_nodes_by_name(Names) ->
+    comm:send_local(service_per_vm, {kill_nodes_by_name, Names}),
     ok.
 
 %% @doc Sends a register message to a running service_per_vm to register a
@@ -130,9 +137,11 @@ on({get_dht_nodes, Pid}, State) ->
     State;
 
 on({delete_node, SupPid, SupId}, State) ->
-    sup:sup_terminate_childs(SupPid),
-    _ = supervisor:terminate_child(main_sup, SupId),
-    _ = supervisor:delete_child(main_sup, SupId),
+    _ = admin:del_node({SupId, SupPid, supervisor, []}, false),
+    State;
+
+on({kill_nodes_by_name, Names}, State) ->
+    _ = admin:del_nodes_by_name(Names, false),
     State;
 
 on({add_node, Options}, State) ->
