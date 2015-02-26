@@ -461,7 +461,7 @@ check_state({Cache, _Node} = _State) ->
 -spec request_node_details([node_details:node_details_name()]) -> ok.
 request_node_details(Details) ->
     case pid_groups:get_my(dht_node) of
-        undefined ->
+        failed ->
             ok;
         DHT_Node ->
             This = comm:this(),
