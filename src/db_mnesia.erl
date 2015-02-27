@@ -59,7 +59,7 @@ start() ->
       case mnesia:create_schema([node()]) of
         ok ->
           io:format("starting mnesia: no previous Schema to recover from.~n"),
-          mnesia:delete_schema([node()]),
+          ok = mnesia:delete_schema([node()]),
           erlang:halt();
         {error, {_, {already_exists, _}}} ->
           io:format("starting mnesia: recovering.~n");
@@ -74,7 +74,7 @@ start() ->
           io:format("starting mnesia: ~w~n", [Msg]),
           io:format("starting mnesia: maybe you tried to start a new node "
                     "while we still found persisted data of a node with the "
-                   "same name. If you want to get rid of the old persisted "
+                    "same name. If you want to get rid of the old persisted "
                     "data, delete them using ~p.~n",
                     ["rm -rf data/" ++ atom_to_list(node())]),
           erlang:halt()
@@ -144,13 +144,15 @@ open(DBName) ->
 -spec close(DBName::db()) -> true.
 close(DBName) ->
   ?TRACE("close:~nDB_name:~p~n",[DBName]),
-  mnesia:transaction(fun()-> mnesia:delete_table(DBName)end).
+  {'atomic',_} = mnesia:transaction(fun()-> mnesia:delete_table(DBName)end),
+  true.
 
 %% @doc Closes and deletes the DB named DBName
 -spec close_and_delete(DBName::db()) -> true.
 close_and_delete(DBName) ->
   ?TRACE("close:~nDB_name:~p~n",[DBName]),
-  mnesia:transaction(fun()-> mnesia:delete_table(DBName)end).
+  {'atomic',_} = mnesia:transaction(fun()-> mnesia:delete_table(DBName)end),
+  true.
 
 %% @doc Saves arbitrary tuple Entry or list of tuples Entries
 %%      in DB DBName and returns the new DB.
@@ -186,7 +188,7 @@ get(DBName, Key) ->
 %%      If such a tuple does not exists nothing is changed.
 -spec delete(DBName::db(), Key::key()) -> db().
 delete(DBName, Key) ->
-    mnesia:transaction(fun()-> mnesia:delete({DBName, Key}) end),
+    {atomic, _} = mnesia:transaction(fun()-> mnesia:delete({DBName, Key}) end),
     DBName.
 
 %% @doc Returns the name of the DB specified in new/1.
