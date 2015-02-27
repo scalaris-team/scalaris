@@ -29,7 +29,7 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2, open/1]).
+-export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
 -export([get_name/1, get_load/1]).
 %% cleanup functions
