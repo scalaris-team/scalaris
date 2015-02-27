@@ -110,9 +110,9 @@ new(DBName) ->
 %% NOTE: we cannot tag this as DOC as in case of undefined PRBR_MNESIA there is
 %%       a multiple doc tag error
 -spec open(DB::atom()) -> db().
-open(DB) ->
-  DBName = ?DB:open(DB),
-  SubscrName = DBName ++ ":subscribers",
+open(DBName) ->
+  DB = ?DB:open(DBName),
+  SubscrName = ?DB:get_name(DB) ++ ":subscribers",
   {DB, db_ets:new(SubscrName), {false, 0, 0}}.
 -endif.
 
