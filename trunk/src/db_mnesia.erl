@@ -29,7 +29,7 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
+-export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2, open/1]).
 %% db info
 -export([get_name/1, get_load/1]).
 %% cleanup functions
@@ -134,11 +134,9 @@ new(DBName, Options) ->
 
 %% @doc Open a previously existing database. Not supported by ets.
 %%      A new database is created
--spec open(DBName::nonempty_string()) -> db().
+-spec open(DBName::atom()) -> db().
 open(DBName) ->
-    log:log(warn, "~p: open/1 is not supported by mnesia, calling new/1 instead",
-            [self()]),
-    new(DBName).
+    DBName.
 
 %% @doc Closes the DB named DBName
 -spec close(DBName::db()) -> true.

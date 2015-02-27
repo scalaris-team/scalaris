@@ -111,7 +111,7 @@ new(DBName) ->
 %%       a multiple doc tag error
 -spec open(DB::atom()) -> db().
 open(DB) ->
-  DBName = ?DB:get_name(DB),
+  DBName = ?DB:open(DB),
   SubscrName = DBName ++ ":subscribers",
   {DB, db_ets:new(SubscrName), {false, 0, 0}}.
 -endif.
