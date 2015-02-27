@@ -132,11 +132,13 @@ new(DBName, Options) ->
     mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set} | Options]),
     DbAtom.
 
-%% @doc Open a previously existing database. Not supported by ets.
-%%      A new database is created
--spec open(DBName::atom()) -> db().
+%% @doc Open a previously existing database assuming the database has been
+%%      restored by the start of the mnesia application.
+-spec open(DBName::atom() | nonempty_string()) -> db().
+open(DBName) when is_atom(DBName) ->
+    DBName;
 open(DBName) ->
-    DBName.
+    erlang:list_to_atom(DBName).
 
 %% @doc Closes the DB named DBName
 -spec close(DBName::db()) -> true.
