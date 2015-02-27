@@ -106,7 +106,9 @@ new(DBName) ->
   {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
 
 -ifdef(PRBR_MNESIA).
-%% @doc Re-opens an existing database.
+%% Re-opens an existing database.
+%% NOTE: we cannot tag this as DOC as in case of undefined PRBR_MNESIA there is
+%%       a multiple doc tag error
 -spec open(DB::atom()) -> db().
 open(DB) ->
   DBName = ?DB:get_name(DB),
