@@ -13,12 +13,14 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
+%% @author Tanguy Racinet <tanracinet@gmail.com>
 %% @doc    Unit tests for the mnesia backend.
 %% @end
 %% @version $Id$
 -module(db_mnesia_SUITE).
 
 -author('kruber@zib.de').
+-author('tanracinet@gmail.com').
 -vsn('$Id$').
 
 -compile(export_all).
@@ -31,7 +33,7 @@
 
 all() -> lists:append(tests_avail(), [tester_reopen]).
 
-suite() -> [ {timetrap, {seconds, 40}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
