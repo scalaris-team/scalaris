@@ -144,15 +144,13 @@ open(DBName) ->
 -spec close(DBName::db()) -> true.
 close(DBName) ->
   ?TRACE("close:~nDB_name:~p~n",[DBName]),
-  {'atomic',_} = mnesia:transaction(fun()-> mnesia:delete_table(DBName)end),
+  {atomic, ok} = mnesia:delete_table(DBName),
   true.
 
 %% @doc Closes and deletes the DB named DBName
 -spec close_and_delete(DBName::db()) -> true.
 close_and_delete(DBName) ->
-  ?TRACE("close:~nDB_name:~p~n",[DBName]),
-  {'atomic',_} = mnesia:transaction(fun()-> mnesia:delete_table(DBName)end),
-  true.
+  close(DBName).
 
 %% @doc Saves arbitrary tuple Entry or list of tuples Entries
 %%      in DB DBName and returns the new DB.
