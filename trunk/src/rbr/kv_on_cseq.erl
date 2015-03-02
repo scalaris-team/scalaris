@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -50,10 +50,29 @@
 %% consistency
 %% -export([is_valid_next_req/3]).
 %% read filters
--export([rf_val/1]).
+-export([rf_rl_vers/1]).
 -export([rf_rl_wl_vers/1]).
+-export([rf_val/1]).
+-export([rf_val_vers/1]).
+-export([rf_wl_vers/1]).
+
+%% content checks
+-export([cc_abort_read/3]).
+-export([cc_abort_write/3]).
+-export([cc_commit_read/3]).
+-export([cc_commit_write/3]).
+-export([cc_set_rl/3]).
+-export([cc_set_wl/3]).
+-export([cc_single_write/3]).
+-export([cc_return_val/4]).
+
 %% write filters
+-export([wf_set_rl/3]).
 -export([wf_set_vers_val/3]).
+-export([wf_set_wl/3]).
+-export([wf_unset_rl/3]).
+-export([wf_unset_wl/3]).
+-export([wf_val_unset_wl/3]).
 
 -type txid() :: ?RT:key().
 
@@ -75,7 +94,7 @@ work_phase_async(ClientPid, ReqId, HashedKey, _Op) ->
     ReplyTo = comm:reply_as(ClientPid, 3,
                             {work_phase_async_done, ReqId, '_'}),
     rbrcseq:qread(kv_rbrcseq, ReplyTo, HashedKey,
-                  fun rf_val_vers/1),
+                  fun ?MODULE:rf_val_vers/1),
     ok.
 
 -spec rf_val_vers(db_entry() | prbr_bottom) -> {client_value(), version()}.
@@ -90,7 +109,7 @@ rf_val_vers(X)          -> {val(X), vers(X)}.
 -spec read(client_key()) -> api_tx:read_result().
 read(Key) ->
     rbrcseq:qread(kv_rbrcseq, self(), ?RT:hash_key(Key),
-                  fun rf_val/1),
+                  fun ?MODULE:rf_val/1),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, Value},
@@ -125,9 +144,9 @@ rf_val(X)          -> val(X).
 -spec write(client_key(), client_value()) -> api_tx:write_result().
 write(Key, Value) ->
     rbrcseq:qwrite(kv_rbrcseq, self(), ?RT:hash_key(Key),
-                   fun rf_rl_wl_vers/1,
-                   fun cc_single_write/3,
-                   fun wf_set_vers_val/3, Value),
+                   fun ?MODULE:rf_rl_wl_vers/1,
+                   fun ?MODULE:cc_single_write/3,
+                   fun ?MODULE:wf_set_vers_val/3, Value),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value}, {ok}); %%;
@@ -186,9 +205,9 @@ set_lock(TLogEntry, TxId, ReplyTo) ->
                 end,
     case tx_tlog:get_entry_operation(TLogEntry) of
         ?read ->
-            ReadFilter = fun rf_wl_vers/1, %% read lock is irrelevant for reads
-            ContentCheck = fun cc_set_rl/3,
-            WriteFilter = fun wf_set_rl/3,
+            ReadFilter = fun ?MODULE:rf_wl_vers/1, %% read lock is irrelevant for reads
+            ContentCheck = fun ?MODULE:cc_set_rl/3,
+            WriteFilter = fun ?MODULE:wf_set_rl/3,
             rbrcseq:qwrite(kv_rbrcseq, ReplyTo, HashedKey,
                            ReadFilter,
                            ContentCheck,
@@ -196,9 +215,9 @@ set_lock(TLogEntry, TxId, ReplyTo) ->
                            _Value = {TxId,
                                      tx_tlog:get_entry_version(TLogEntry)});
         ?write ->
-            ReadFilter = fun rf_rl_wl_vers/1,
-            ContentCheck = fun cc_set_wl/3,
-            WriteFilter = fun wf_set_wl/3,
+            ReadFilter = fun ?MODULE:rf_rl_wl_vers/1,
+            ContentCheck = fun ?MODULE:cc_set_wl/3,
+            WriteFilter = fun ?MODULE:wf_set_wl/3,
             rbrcseq:qwrite(kv_rbrcseq, ReplyTo, HashedKey,
                            ReadFilter,
                            ContentCheck,
@@ -242,11 +261,14 @@ cc_set_wl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
     Checks =
-        [ { TLogVers =:= Vers,  {cc_set_wl_version_mismatch, TLogVers, Vers} },
+        [ { TLogVers =:= Vers,
+            {cc_set_wl_version_mismatch, TLogVers, Vers} },
           { no_write_lock =:= WL
-            %%orelse TxId =:= WL %% do not rewrite TxId
+            %% accept already existing WL from write through
+            orelse TxId =:= WL %% old comment (do not rewrite TxId)?
           , {cc_set_wl_txid_mismatch, WL, TxId} },
-          { [] =:= RL,          {cc_set_wl_readlock_not_empty, RL} } ],
+          { [] =:= RL,
+            {cc_set_wl_readlock_not_empty, RL} } ],
     cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_wl
@@ -257,12 +279,8 @@ wf_set_wl(prbr_bottom, _UI = none, {TxId, -1}) ->
 wf_set_wl(prbr_bottom, _UI = none, {TxId, _}) ->
 %%    ct:pal("should only happen in tester unittests~n"),
     set_writelock(new_entry(), TxId);
-wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
+wf_set_wl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
     set_writelock(DBEntry, TxId).
-
-
-
-
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_read
@@ -286,9 +304,9 @@ commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
                    true         -> Key
                 end,
-    ReadFilter = fun rf_rl_vers/1,
-    ContentCheck = fun cc_commit_read/3,
-    WriteFilter = fun wf_unset_rl/3,
+    ReadFilter = fun ?MODULE:rf_rl_vers/1,
+    ContentCheck = fun ?MODULE:cc_commit_read/3,
+    WriteFilter = fun ?MODULE:wf_unset_rl/3,
     rbrcseq:qwrite_fast(kv_rbrcseq, ReplyTo, HashedKey,
                         ReadFilter,
                         ContentCheck,
@@ -353,9 +371,9 @@ commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
                    true         -> Key
                 end,
-    ReadFilter = fun rf_wl_vers/1,
-    ContentCheck = fun cc_commit_write/3,
-    WriteFilter = fun wf_val_unset_wl/3,
+    ReadFilter = fun ?MODULE:rf_wl_vers/1,
+    ContentCheck = fun ?MODULE:cc_commit_write/3,
+    WriteFilter = fun ?MODULE:wf_val_unset_wl/3,
     {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     %% {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     rbrcseq:qwrite_fast(kv_rbrcseq, ReplyTo, HashedKey,
@@ -435,10 +453,16 @@ cc_commit_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
        (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
 wf_val_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
 wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
-    T1 = set_writelock(DBEntry, no_write_lock),
-    T2 = set_val(T1, Val),
-    %% increment version counter on write
-    set_vers(T2, 1 + TLogVers).
+    case vers(DBEntry) =< TLogVers of
+        true ->
+            T1 = set_writelock(DBEntry, no_write_lock),
+            T2 = set_val(T1, Val),
+            T3 = reset_readlock(T2),
+            %% increment version counter on write
+            set_vers(T3, 1 + TLogVers);
+        _ ->
+            DBEntry
+    end.
 
 
 
@@ -466,9 +490,9 @@ abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
                    true         -> Key
                 end,
-    ReadFilter = fun rf_rl_vers/1,
-    ContentCheck = fun cc_abort_read/3,
-    WriteFilter = fun wf_unset_rl/3,
+    ReadFilter = fun ?MODULE:rf_rl_vers/1,
+    ContentCheck = fun ?MODULE:cc_abort_read/3,
+    WriteFilter = fun ?MODULE:wf_unset_rl/3,
     rbrcseq:qwrite_fast(kv_rbrcseq, ReplyTo, HashedKey,
                         ReadFilter,
                         ContentCheck,
@@ -540,9 +564,9 @@ abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
                    true         -> Key
                 end,
-    ReadFilter = fun rf_wl_vers/1,
-    ContentCheck = fun cc_abort_write/3,
-    WriteFilter = fun wf_unset_wl/3,
+    ReadFilter = fun ?MODULE:rf_wl_vers/1,
+    ContentCheck = fun ?MODULE:cc_abort_write/3,
+    WriteFilter = fun ?MODULE:wf_unset_wl/3,
     {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     %% {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     rbrcseq:qwrite_fast(kv_rbrcseq, ReplyTo, HashedKey,
@@ -653,6 +677,8 @@ unset_readlock(Entry, TxId) ->
     %% delete all occurrences of TxId
     NewRL = [ X || X <- element(1, Entry), X =/= TxId ],
     setelement(1, Entry, NewRL).
+reset_readlock(Entry) ->
+    setelement(1, Entry, []).
 
 
 -spec writelock(db_entry()) -> writelock().
