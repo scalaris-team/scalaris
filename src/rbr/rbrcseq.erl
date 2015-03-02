@@ -342,14 +342,25 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% we only try to re-write a consensus in exactly this
             %% round without retrying, so having no content check is
             %% fine here
+            {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
+                case pr:get_wf(entry_latest_seen(ReadEntry)) of
+                    none ->
+                        {fun prbr:noop_write_filter/3, null,
+                         entry_val(ReadEntry)};
+                    WTInfos ->
+                        %% WTInfo = write through infos
+                        log:log("Setting write through write filter ~p",
+                                [WTInfos]),
+                        WTInfos
+                 end,
             Filters = {fun prbr:noop_read_filter/1,
                        fun(_,_,_) -> {true, null} end,
-                       fun prbr:noop_write_filter/3},
+                       WTWF},
 
             Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
                                     This,
                                     period(State),
-                                    Filters, entry_val(ReadEntry),
+                                    Filters, WTVal,
                                     entry_retrigger(ReadEntry)
                                     - entry_period(ReadEntry)),
 
@@ -366,9 +377,9 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                             4,
                             {prbr, write, DB, '_', Collector, X,
                              entry_my_round(ReadEntry),
-                             entry_val(ReadEntry),
-                             null,
-                             fun prbr:noop_write_filter/3}),
+                             WTVal,
+                             WTUI,
+                             WTWF}),
                       comm:send_local(Dest,
                                       {?lookup_aux, X, 0,
                                        LookupEnvelope})
@@ -481,19 +492,33 @@ on({qread_write_through_collect, ReqId,
             end
     end;
 
-on({qread_write_through_done, ReadEntry, Filtering,
-    {qwrite_done, _ReqId, Round, Val}}, State) ->
+on({qread_write_through_done, ReadEntry, _Filtering,
+    {qwrite_done, _ReqId, _Round, _Val}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_done qwrite_done ~p ~p~n", [_ReqId, ReadEntry]),
-    ClientVal =
-        case Filtering of
-            apply_filter -> F = entry_filters(ReadEntry), F(Val);
-            _ -> Val
-        end,
-    TReplyEntry = entry_set_val(ReadEntry, ClientVal),
-    ReplyEntry = entry_set_my_round(TReplyEntry, Round),
-    %% log:pal("Write through of write request done informing ~p~n", [ReplyEntry]),
-    inform_client(qread_done, ReplyEntry),
-    State;
+    %% as we applied a write filter, the actual distributed consensus
+    %% result may be different from the highest paxos version, that we
+    %% collected in the beginning. So we have to initiate the qread
+    %% again to get the latest value.
+
+%%    Old:
+%%    ClientVal =
+%%        case Filtering of
+%%            apply_filter -> F = entry_filters(ReadEntry), F(Val);
+%%            _ -> Val
+%%        end,
+%%    TReplyEntry = entry_set_val(ReadEntry, ClientVal),
+%%    ReplyEntry = entry_set_my_round(TReplyEntry, Round),
+%%    %% log:pal("Write through of write request done informing ~p~n", [ReplyEntry]),
+%%    inform_client(qread_done, ReplyEntry),
+
+    Client = entry_client(ReadEntry),
+    Key = entry_key(ReadEntry),
+    ReadFilter = entry_filters(ReadEntry),
+    RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
+
+    gen_component:post_op(
+      {qread, Client, Key, ReadFilter, RetriggerAfter},
+      State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
     {qread_done, _ReqId, Round, Val}}, State) ->
@@ -507,6 +532,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
     %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
+
     State;
 
 %% normal qwrite step 1: preparation and starting read-phase
@@ -845,7 +871,7 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
            SeenWriteRound =:= RLatestSeen ->
                 %% if this happens, consistency is probably broken by
                 %% too weak (wrong) content checks...?
-                
+
                 %% unfortunately the following statement is not always
                 %% true: As we also update parts of the value (set
                 %% write lock) it can happen that the write lock is
@@ -871,7 +897,7 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
                 %% might be the case, that a writelock which was set
                 %% on an outdated replica had to be rolled back. Then
                 %% replicas with newest paxos time stamp may exist
-                %% with differing value and we habe to chose that one
+                %% with differing value and we have to chose that one
                 %% with the highest version number for a quorum read.
 
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),

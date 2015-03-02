@@ -149,7 +149,17 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
 on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
-    _ = case writable(KeyEntry, InRound) of
+    %% we store the writefilter to be able to reproduce the request in
+    %% write_throughs. We modify the InRound here to avoid duplicate
+    %% transfer of the Value etc.
+    RoundForWrite =
+        case fun prbr:noop_write_filter/3 =:= WriteFilter of
+            true ->
+                pr:set_wf(InRound, none);
+            _ ->
+                pr:set_wf(InRound, {WriteFilter, PassedToUpdate, Value})
+        end,
+    _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
                 NewVal = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),

@@ -56,6 +56,12 @@
          none | prbr:write_filter() %% ...
         }.
 
+-type write_through_info() ::
+       { prbr:write_filter(),
+         UpdateInfo :: term(),
+         WriteValue :: term()
+       }.
+
 -spec new(non_neg_integer(), any()) -> pr().
 new(Counter, ProposerUID) -> {Counter, ProposerUID, none}.
 
@@ -65,10 +71,10 @@ get_r(RwId) -> element(1, RwId).
 -spec get_id(pr()) -> any().
 get_id(RwId) -> element(2, RwId).
 
--spec get_wf(pr()) -> none | prbr:write_filter().
+-spec get_wf(pr()) -> none | write_through_info().
 get_wf(RwId) -> element(3, RwId).
 
--spec set_wf(pr(), none | prbr:write_filter()) -> pr().
+-spec set_wf(pr(), none | write_through_info()) -> pr().
 set_wf(R, WF) -> setelement(3, R, WF).
 
 %% As the round number contains the client's pid, they are still
