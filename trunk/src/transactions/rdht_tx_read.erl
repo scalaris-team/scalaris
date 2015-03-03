@@ -1,4 +1,4 @@
-%% @copyright 2009-2014 Zuse Institute Berlin
+%% @copyright 2009-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ work_phase(ClientPid, ReqId, Request) ->
     HashedKey = ?RT:hash_key(Key),
     work_phase_key(ClientPid, ReqId, Key, HashedKey, Op).
 
--spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
+-spec work_phase_key(comm:erl_local_pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                      client_key(), ?RT:key(),
                      Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
         -> ok.

@@ -89,7 +89,8 @@
                 value()
                }.
 
--spec work_phase_async(pid(), any(), ?RT:key(), read | write) -> ok.
+%% @TODO add support for ?random_from_list | {{?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
+-spec work_phase_async(comm:erl_local_pid(), any(), ?RT:key(), read | write) -> ok.
 work_phase_async(ClientPid, ReqId, HashedKey, _Op) ->
     ReplyTo = comm:reply_as(ClientPid, 3,
                             {work_phase_async_done, ReqId, '_'}),
