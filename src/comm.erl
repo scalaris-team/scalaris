@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -89,9 +89,12 @@
                         erl_local_pid_plain()}.
 
 -type erl_local_pid_with_reply_as() ::
-        {erl_local_pid_plain(), e, pos_integer(), envelope()}.
+        {erl_local_pid_plain(),         e, pos_integer(), envelope()}
+      | {erl_local_pid_with_reply_as(), e, pos_integer(), envelope()}.
 -type mypid_with_reply_as() ::
-        {mypid_plain(),         e, pos_integer(), envelope()}.
+        {mypid_plain(),         e, pos_integer(), envelope()}
+      | {mypid_with_reply_as(), e, pos_integer(), envelope()}.
+
 
 -type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_reply_as().
 -type mypid()         :: mypid_plain() | mypid_with_reply_as().
@@ -263,7 +266,7 @@ make_global(GlobalPid) -> GlobalPid.
 make_local({Pid, e, Nth, Cookie}) when is_pid(Pid) orelse is_atom(Pid) ->
     {Pid, e, Nth, Cookie};
 make_local({Pid, e, Nth, Cookie}) ->
-    {comm_server:make_local(Pid), e, Nth, Cookie};
+    {make_local(Pid), e, Nth, Cookie};
 make_local(Pid) when is_pid(Pid) orelse is_atom(Pid) -> Pid;
 make_local(Pid) -> comm_server:make_local(Pid).
 
@@ -281,7 +284,7 @@ get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 %% @doc Encapsulates the given pid (local or global) with the reply_as
 %%      request, so a send/2 to the generated target will put a reply
 %%      message at the Nth position of the given envelope.
--spec reply_as(plain_pid(), 2..16, envelope()) ->
+-spec reply_as(erl_local_pid() | mypid(), 2..16, envelope()) ->
                mypid_with_reply_as() | erl_local_pid_with_reply_as().
 reply_as(Target, Nth, Envelope) ->
     ?DBG_ASSERT('_' =:= element(Nth, Envelope)),
