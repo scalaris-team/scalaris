@@ -471,6 +471,7 @@ tester_type_check_rrepair(_Config) ->
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
+             {merkle_next_p1e, 2}, %% needs float > 0, < 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_k_list, 8}, %% needs a special binary to correspond to a number of bits
