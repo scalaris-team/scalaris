@@ -89,11 +89,24 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             comm:send_local(DHTNode,
                             {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg});
         false ->
-            WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
-            %log:log("lookup_aux_leases route ~p~n", [self()]),
-            P = element(2, ?RT:next_hop(State, Key)),
-            %log:log("lookup_aux_leases route ~p -> ~p~n", [self(), P]),
-            comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
+            MyRange = dht_node_state:get(State, my_range),
+            case intervals:in(Key, MyRange) of
+                true ->
+                    % @doc we are here because leases and rm disagree
+                    % over responsibility. One cause for this case can
+                    % be join/sliding. Our successor still has the
+                    % lease for our range. But rm already believes
+                    % that we are responsible for our range. The
+                    % solution is to forward the lookup to our
+                    % successor instead of asking rt.
+                    Succ = node:pidX(dht_node_state:get(State, succ)),
+                    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
+                    comm:send(Succ, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
+                false ->
+                    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
+                    P = element(2, ?RT:next_hop(State, Key)),
+                    comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
+            end
     end.
 
 %% @doc Find the node responsible for Key and send him the message Msg.
