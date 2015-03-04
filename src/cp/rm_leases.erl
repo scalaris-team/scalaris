@@ -73,13 +73,6 @@ init([]) ->
 rm_filter(Old, New, Reason) ->
     OldRange = nodelist:node_range(Old),
     NewRange = nodelist:node_range(New),
-    %case OldRange =/= NewRange of
-    %    true ->
-    %        log:log("the range has changed: ~w -> ~w (~w)",
-    %                [OldRange, NewRange, Reason]);
-    %    false ->
-    %        ok
-    %end,
     case Reason of
         {slide_finished, _} ->
             false;
@@ -110,9 +103,9 @@ rm_exec(Pid, _Tag, Old, New, _Reason) ->
 on({rm_change, OldRange, NewRange}, State) ->
     ?TRACE("the range has changed: ~w -> ~w", [OldRange, NewRange]),
     ?TRACE("state: ~w", [State]),
-    compare_and_fix_rm_with_leases(State);
+    compare_and_fix_rm_with_leases(State, OldRange, NewRange);
 
-on({read_after_rm_change, MissingRange, Result}, State) ->
+on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, Lease} ->
@@ -122,7 +115,7 @@ on({read_after_rm_change, MissingRange, Result}, State) ->
                     l_on_cseq:lease_takeover(Lease, Pid),
                     add_takeover(State, Lease);
                 false ->
-                    ?TRACE("the proposed range is marked as dead ~w", [MissingRange]),
+                    ?TRACE("the proposed range is marked as dead ~w", [_MissingRange]),
                     ?TRACE("the qread result is ~w", [Result]),
                     % @todo tell rm to ignore range, because it was merged?
                     State
@@ -191,8 +184,8 @@ on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
             State
     end;
 
-on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
-    ?TRACE("merge after finish done: ~w", [Result]),
+on({merge_after_leave, _NewLease, _OldLease, _Result}, State) ->
+    ?TRACE("merge after finish done: ~w", [_Result]),
     State;
 
 on({get_node_for_new_neighbor, {get_state_response, Node}}, State) ->
@@ -203,8 +196,9 @@ on({get_takeovers, Pid}, #state{takeovers=Takeovers} = State) ->
     comm:send(Pid, {get_takeovers_response, Takeovers}),
     State.
 
--spec compare_and_fix_rm_with_leases(state()) -> state().
-compare_and_fix_rm_with_leases(State) ->
+-spec compare_and_fix_rm_with_leases(state(), intervals:interval(), intervals:interval()) 
+                                     -> state().
+compare_and_fix_rm_with_leases(State, OldRange, NewRange) ->
     % @todo we call receive in an on-handler ?!?
     comm:send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), [lease_list, my_range]}),
     {LeaseList, MyRange} = receive
@@ -218,22 +212,40 @@ compare_and_fix_rm_with_leases(State) ->
             % we lost our active lease; we do not participate in the ring anymore
             State;
         false ->
-            MissingRange = intervals:minus(MyRange, ActiveRange),
-            case intervals:is_non_empty(MissingRange) 
-                 andalso
-                intervals:is_left_of(MissingRange, ActiveRange) of
+            case intervals:is_subset(OldRange, NewRange) of
+                true -> 
+                    % NewRange > OldRange
+                    % my range became larger -> do takeover
+                    prepare_takeover(State, MyRange, ActiveRange);
                 false ->
-                    State;
-                true ->
-                    %% log:log("missing range:~n missing=~p~n active=~p~n my_range=~p", 
-                    %%         [MissingRange, ActiveRange, MyRange]),
-                    %% log:log("missing range: ~w", [MissingRange]),
-                    LeaseId = l_on_cseq:id(MissingRange),
-                    Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
-                    l_on_cseq:read(LeaseId, Pid),
-                    State
+                    case intervals:is_subset(NewRange, OldRange) of
+                        true -> 
+                            % OldRange > NewRange
+                            % my range became smaller -> ignore
+                            State;
+                        false ->
+                            State
+                    end
             end
     end.
+
+prepare_takeover(State, MyRange, ActiveRange) ->
+    MissingRange = intervals:minus(MyRange, ActiveRange),
+    case intervals:is_non_empty(MissingRange) 
+        andalso
+        intervals:is_left_of(MissingRange, ActiveRange) of
+        false ->
+            State;
+        true ->
+            %% log:log("missing range:~n missing=~p~n active=~p~n my_range=~p", 
+            %%         [MissingRange, ActiveRange, MyRange]),
+            %% log:log("missing range: ~w", [MissingRange]),
+            LeaseId = l_on_cseq:id(MissingRange),
+            Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
+            l_on_cseq:read(LeaseId, Pid),
+            State
+    end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
