@@ -303,9 +303,9 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Re
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
-    New, Mode, Renew}, State) ->
+    _New, Mode, Renew}, State) ->
     % @todo retry
-    ?TRACE("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
+    ?TRACE("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
     ?TRACE("id: ~p~n", [dht_node_state:get(State, node_id)]),
     ?TRACE("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
     ?TRACE("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
@@ -586,9 +586,9 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{epoch=OldEpoch}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2,
-     {content_check_failed, {Reason, Current, Next}}}}, State) ->
+     {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
+    ?TRACE("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, _Current, _Next]),
     case Reason of
         %lease_does_not_exist ->
         %    % cannot happen

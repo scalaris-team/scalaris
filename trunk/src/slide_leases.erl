@@ -198,9 +198,9 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
                         NextOpMsg, EmbeddedMsg::{continue})
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
-finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
+finish_delta_ack2(State, SlideOp, NextOpMsg, _Msg) ->
     % notify neighbor on successful handover
-    %log:log("finish_delta_ack2 ~p~n", [Msg]),
+    %log:log("finish_delta_ack2 ~p~n", [_Msg]),
     % notify succ
     case find_lease(State, SlideOp, passive) of
         {ok, Lease} ->
