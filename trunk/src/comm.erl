@@ -128,7 +128,7 @@
 -type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_reply_as().
 -type mypid()         :: mypid_plain() | mypid_with_reply_as().
 
--type plain_pid() :: mypid_plain() | erl_local_pid_plain().
+%-type plain_pid() :: mypid_plain() | erl_local_pid_plain().
 
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
                          {group_member, Process::atom()} |
