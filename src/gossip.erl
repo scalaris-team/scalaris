@@ -588,10 +588,10 @@ on_active(Msg, State) ->
         started ->
             handle_msg(Msg, State);
         false ->
-            log:log(warn(), "[ Gossip ] Unknown Callback Module: ~w", [element(2, Msg)]),
+            log:log(warn, "[ Gossip ] Unknown Callback Module: ~w", [element(2, Msg)]),
             State
     catch
-        _:_ -> log:log(warn(), "[ Gossip ] Unknown msg: ~w", [Msg]),
+        _:_ -> log:log(warn, "[ Gossip ] Unknown msg: ~w", [Msg]),
                State
     end,
     State1.
@@ -657,7 +657,7 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
 handle_msg({selected_reply_data, CBModule, QData, Ref, Round}, State)->
     case take_reply_peer(Ref, State) of
         {none, State1} ->
-            log:log(warn(), "[ Gossip ] Got 'selected_reply_data', but no matching reply peer stored in State.");
+            log:log(warn, "[ Gossip ] Got 'selected_reply_data', but no matching reply peer stored in State.");
         {Peer, State1} ->
             comm:send(Peer, {p2p_exch_reply, CBModule, comm:this(), QData, Round}, [{shepherd, self()}])
     end,
@@ -1487,7 +1487,7 @@ stop_gossip_task(CBModule) ->
 -spec warn() -> log:log_level().
 warn() ->
     case config:read(gossip_log_level_warn) of
-        failed -> warn;
+        failed -> info;
         Level -> Level
     end.
 
