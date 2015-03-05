@@ -33,10 +33,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec check_leases_for_all_nodes() -> boolean().
 check_leases_for_all_nodes() ->
-    lists:all(fun (B) -> B end, [ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
+    io:format("======= node local test ==========~n"),
+    lists:all(fun (B) -> B end, [ check_local_leases(DHTNode) || DHTNode <- all_dht_nodes() ]).
 
 -spec check_leases_for_the_ring() -> boolean().
 check_leases_for_the_ring() ->
+    io:format("======= global test ==========~n"),
     lease_checker(admin:number_of_nodes()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -45,19 +47,24 @@ check_leases_for_the_ring() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 check_local_leases(DHTNode) ->
-    LeaseList = get_dht_node_state(DHTNode, lease_list),
-    ActiveLease = lease_list:get_active_lease(LeaseList),
-    PassiveLeases = lease_list:get_passive_leases(LeaseList),
-    MyRange = get_dht_node_state(DHTNode, my_range),
-    log:log("active lease=~p; my_range=~p", [ActiveLease, MyRange]),
-    ActiveInterval = case ActiveLease of
-                         empty ->
-                             intervals:empty();
-                         _ ->
-                             l_on_cseq:get_range(ActiveLease)
-                     end,
-    LocalCorrect = MyRange =:= ActiveInterval,
-    length(PassiveLeases) == 0 andalso LocalCorrect.
+    case get_dht_node_state(DHTNode, [lease_list, my_range]) of
+        false ->
+            false;
+        {true, [{lease_list, LeaseList}, {my_range, MyRange}]} ->
+            ActiveLease = lease_list:get_active_lease(LeaseList),
+            PassiveLeases = lease_list:get_passive_leases(LeaseList),
+            ActiveInterval = case ActiveLease of
+                                 empty ->
+                                     intervals:empty();
+                                 _ ->
+                                     l_on_cseq:get_range(ActiveLease)
+                             end,
+            LocalCorrect = MyRange =:= ActiveInterval,
+            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n", 
+                      [LocalCorrect, 
+                       l_on_cseq:get_range(ActiveLease), MyRange]),
+            length(PassiveLeases) == 0 andalso LocalCorrect
+    end.
 
 lease_checker(TargetSize) ->
     LeaseLists = get_all_leases(),
@@ -83,6 +90,11 @@ lease_checker(TargetSize) ->
         true ->
             ok
     end,
+    io:format("complete ring covered by leases: ~w~n", [IsAll]),
+    io:format("all aux-fields are empty       : ~w~n", [HaveAllAuxEmpty]),
+    io:format("no leases overlap              : ~w~n", [IsDisjoint]),
+    io:format("each node has one active lease : ~w~n", [HaveAllActiveLeases]),
+    io:format("no passive leases              : ~w~n", [HaveNoPassiveLeases]),
     IsAll andalso
         HaveAllAuxEmpty andalso
         IsDisjoint andalso
@@ -109,14 +121,23 @@ is_disjoint(I, [H|T]) ->
         andalso is_disjoint(I, T).
 
 get_dht_node_state(Pid, What) ->
-    comm:send_local(Pid, {get_state, comm:this(), What}),
+    comm:send(Pid, {get_state, comm:this(), What}),
     receive
         {get_state_response, Data} ->
-            Data
+            {true, Data}
+    after 50 ->
+            false
     end.
 
 get_all_leases() ->
-    [ get_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ].
+    GetLeases = fun(Pid) ->
+                        get_dht_node_state(Pid, lease_list)
+                end,
+    lists:filtermap(GetLeases, all_dht_nodes()).
 
-get_leases(Pid) ->
-    get_dht_node_state(Pid, lease_list).
+all_dht_nodes() ->
+    mgmt_server:node_list(),
+    receive
+        {get_list_response, Nodes} ->
+            Nodes
+    end.
