@@ -175,7 +175,12 @@ receive_state_if_alive(Pid, MsgTag) ->
                 after 100 ->
                     receive_state_if_alive(Pid, MsgTag)
             end;
-        _ -> failed
+        _ ->
+            receive
+                {'$gen_component', MsgTag, State} -> State
+                after 0 ->
+                    failed
+            end
     end.
 
 -spec receive_state_if_alive(Pid::pid(),
@@ -189,7 +194,12 @@ receive_state_if_alive(Pid, MsgTag, Timeout) when Timeout >= 0->
                 after 100 ->
                     receive_state_if_alive(Pid, MsgTag, Timeout - 100)
             end;
-        _ -> failed
+        _ ->
+            receive
+                {'$gen_component', MsgTag, State} -> State
+                after 0 ->
+                    failed
+            end
     end;
 receive_state_if_alive(_Pid, _MsgTag, _Timeout) -> failed.
 
