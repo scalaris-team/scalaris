@@ -168,7 +168,7 @@ on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, Snap
     tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, SnapNumber, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Lookup (see api_dht_raw.erl and dht_node_look up.erl)
+% Lookup (see api_dht_raw.erl and dht_node_lookup.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({?lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
