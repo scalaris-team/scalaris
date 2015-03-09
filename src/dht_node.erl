@@ -495,18 +495,18 @@ init(Options) ->
     dht_node_move:send_trigger(),
 
     Recover = config:read(start_type) =:= recover,
-    case {is_first(Options), config:read(leases), Recover} of
-        {_   , true, true} ->
+    case {is_first(Options), config:read(leases), Recover, is_add_nodes(Options)} of
+        {_   , true, true, false} ->
             % we are recovering
             dht_node_join_recover:join(Options);
-        {true, true, false} ->
+        {true, true, false, _} ->
             msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
             Id = l_on_cseq:id(intervals:all()),
             TmpState = dht_node_join:join_as_first(Id, 0, Options),
             %% we have to inject the first lease by hand, as otherwise
             %% no routing will work.
             l_on_cseq:add_first_lease_to_db(Id, TmpState);
-        {false, true, false} ->
+        {false, true, _, true} ->
             msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
             % get my ID (if set, otherwise chose a random ID):
             Id = case lists:keyfind({dht_node, id}, 1, Options) of
@@ -514,7 +514,7 @@ init(Options) ->
                      _ -> ?RT:get_random_node_id()
                  end,
             dht_node_join:join_as_other(Id, 0, Options);
-        {IsFirst, _, _} ->
+        {IsFirst, _, _, _} ->
             % get my ID (if set, otherwise chose a random ID):
             Id = case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;
@@ -542,6 +542,10 @@ start_link(DHTNodeGroup, Options) ->
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
     lists:member({first}, Options) andalso admin_first:is_first_vm().
+
+-spec is_add_nodes([tuple()]) -> boolean().
+is_add_nodes(Options) ->
+    lists:member({add_node}, Options).
 
 -spec is_alive(State::dht_node_join:join_state() | dht_node_state:state() | term()) -> boolean().
 is_alive(State) ->
