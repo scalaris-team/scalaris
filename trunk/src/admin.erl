@@ -46,7 +46,7 @@
 % @doc add new Scalaris nodes on the local node
 -spec add_node_at_id(?RT:key()) -> pid_groups:groupname() | {error, term()}.
 add_node_at_id(Id) ->
-    add_node([{{dht_node, id}, Id}, {skip_psv_lb}]).
+    add_node([{{dht_node, id}, Id}, {skip_psv_lb}, {add_node}]).
 
 -spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
@@ -55,7 +55,7 @@ add_node(Options) ->
     Desc = sup:supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [{Group,
-               [{my_sup_dht_node_id, DhtNodeId} | Options]}]),
+               [{my_sup_dht_node_id, DhtNodeId}, {add_node} | Options]}]),
     Sup = erlang:whereis(main_sup),
     case sup:start_sup_as_child([" +"], Sup, Desc) of
         {ok, _Child, Group}           ->
