@@ -103,7 +103,8 @@ add_my_config(KVList) ->
     KVList1 = [{known_hosts, [{{127,0,0,1}, ScalarisPort, service_per_vm}]},
                {mgmt_server, {{127,0,0,1}, ScalarisPort, mgmt_server}},
                {port, ScalarisPort},
-               {yaws_port, YawsPort} | KVList],
+               {yaws_port, YawsPort},
+               {start_type, first} | KVList],
     lists:append(KVList1, [{start_mgmt_server, true}]).
 
 %% @doc Adds unittest specific ports from the environment to the list of
