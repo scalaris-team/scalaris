@@ -91,9 +91,6 @@ childs([{DHTNodeGroup, Options}]) ->
     RMLeases =
         sup:worker_desc(rm_leases, rm_leases,
                              start_link, [DHTNodeGroup]),
-    LeaseWatcher =
-        sup:worker_desc(lease_watcher, lease_watcher,
-                             start_link, [DHTNodeGroup]),
     RoutingTable =
         sup:worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
@@ -136,6 +133,5 @@ childs([{DHTNodeGroup, Options}]) ->
                     RepUpdate,
                     Autoscale,
                     RMLeases,
-                    LeaseWatcher,
                     LBActive
            ]).
