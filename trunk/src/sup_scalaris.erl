@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -141,10 +141,6 @@ childs(Options) ->
                           failed -> false;
                           X -> X
                       end,
-    DHTNodeModule = case config:read(start_dht_node) of
-                          failed -> false;
-                          Y -> Y
-                      end,
 
     AdminServer = sup:worker_desc(admin_server, admin, start_link),
     BenchServer = sup:worker_desc(bench_server, bench_server, start_link, [ServiceGroup]),
@@ -165,7 +161,7 @@ childs(Options) ->
                              [ServiceGroup]),
     ClientsMonitor =
         sup:worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
-    %% Moves several lignes to get_dht_node_specs for recovery mechanims
+    %% Moves several lines to get_dht_node_descs() for recovery mechanims
     DHTNodes = get_dht_node_descs(Options),
     FailureDetector = sup:worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = case config:read(ganglia_enable) of
@@ -225,11 +221,11 @@ childs(Options) ->
             true -> [MgmtServerDNCache, MgmtServer];
             false -> []
         end,
-    DHTNodeServer =
-        case DHTNodeModule of
-            false -> []; %% no dht node requested
-            _ -> DHTNodes
-        end,
+    DHTNodeServer = case config:read(start_type) of
+                        nostart -> []; %% no dht node requested
+                        failed -> [];
+                        _ -> DHTNodes
+                    end,
     lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
 
 -spec add_additional_nodes() -> ok.

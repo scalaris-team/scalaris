@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2012 Zuse Institute Berlin
+# Copyright 2007-2012, 2015 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -37,4 +37,4 @@ else
 ERLFLAGS=" "
 fi
 
-$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -t joining -s start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -t joining start

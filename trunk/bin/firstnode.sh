@@ -31,4 +31,4 @@ fi
 # start a mgmt_server (-m)
 # start the first node (-t first)
 NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
-$DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -s -t first start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -t first start
