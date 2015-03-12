@@ -60,7 +60,7 @@
 % for unit tests
 -export([unittest_lease_update/3]).
 -export([unittest_create_lease/1]).
--export([unittest_create_lease_with_range/2]).
+-export([unittest_create_lease_with_range/3]).
 -export([unittest_clear_lease_list/1]).
 -export([unittest_get_delta/0]).
 
@@ -1230,14 +1230,14 @@ unittest_create_lease(Id) ->
            timeout = new_timeout()
           }.
 
--spec unittest_create_lease_with_range(?RT:key(), ?RT:key()) -> lease_t().
-unittest_create_lease_with_range(From, To) ->
+-spec unittest_create_lease_with_range(?RT:key(), ?RT:key(), comm:mypid_plain()) -> lease_t().
+unittest_create_lease_with_range(From, To, Owner) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     Range = node:mk_interval_between_ids(From, To),
     Id = id(Range),
     #lease{id      = Id,
            epoch   = 1,
-           owner   = comm:this(),
+           owner   = Owner,
            range   = Range,
            aux     = empty,
            version = 1,
