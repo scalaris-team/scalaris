@@ -49,7 +49,7 @@
 -export([unpack_cookie/2, get_plain_pid/1]).
 
 %% initialization
--export([init_and_wait_for_valid_pid/0]).
+-export([init_and_wait_for_valid_IP/0]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0, group_message/0, msg_tag/0,
@@ -398,11 +398,12 @@ forward_to_registered_proc(Processname, Msg) ->
         Pid when is_pid(Pid) -> comm:send_local(Pid, Msg)
     end.
 
-%% @doc Initializes the comm layer by sending a message to known_hosts. A
-%%      valid PID for comm:this/0 will be available afterwards.
-%%      (ugly hack to get a valid ip-address into the comm-layer)
--spec init_and_wait_for_valid_pid() -> ok.
-init_and_wait_for_valid_pid() ->
+%% @doc Initializes the comm layer by sending a message to
+%%      known_hosts. A valid IP (and comm:mypid()) for comm:this/0
+%%      will be available afterwards.  (ugly hack to get a valid
+%%      ip-address into the comm-layer)
+-spec init_and_wait_for_valid_IP() -> ok.
+init_and_wait_for_valid_IP() ->
     case is_valid(this()) of
         true -> ok;
         false ->
@@ -417,5 +418,5 @@ init_and_wait_for_valid_pid() ->
             _ = [send(KnownHost, {hi}, [{group_member, service_per_vm}, {?quiet}])
                    || KnownHost <- KnownHosts],
             timer:sleep(100),
-            init_and_wait_for_valid_pid()
+            init_and_wait_for_valid_IP()
     end.
