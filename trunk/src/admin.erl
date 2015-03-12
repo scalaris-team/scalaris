@@ -1,4 +1,4 @@
-% @copyright 2008-2014 Zuse Institute Berlin
+% @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ add_node(Options) ->
     DhtNodeId = randoms:getRandomString(),
     Group = pid_groups:new("dht_node_"),
     Desc = sup:supervisor_desc(
-             DhtNodeId, config:read(dht_node_sup), start_link,
+             DhtNodeId, sup_dht_node, start_link,
              [{Group,
                [{my_sup_dht_node_id, DhtNodeId}, {add_node} | Options]}]),
     Sup = erlang:whereis(main_sup),
