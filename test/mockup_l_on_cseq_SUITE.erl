@@ -91,10 +91,11 @@ end_per_testcase(_TestCase, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_merge(_Config) ->
-    {L1, L2} = mockup_l_on_cseq:create_two_adjacent_leases(),
     % join group
     Pid = pid_groups:find_a(mockup_l_on_cseq),
     pid_groups:join(pid_groups:group_of(Pid)),
+    % create leases
+    {L1, L2} = mockup_l_on_cseq:create_two_adjacent_leases(comm:make_global(Pid)),
     % do merge
     % evil, but l_on_cseq:lease_merge sends to a real dht_node
     comm:send_local(Pid, {l_on_cseq, merge, L1, L2, self()}),
@@ -137,11 +138,12 @@ test_merge_with_renewal_after_step3(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_split(_Config) ->
-    L = mockup_l_on_cseq:create_lease(rt_SUITE:number_to_key(0),
-                                      rt_SUITE:number_to_key(16)),
     % join group
     Pid = pid_groups:find_a(mockup_l_on_cseq),
     pid_groups:join(pid_groups:group_of(Pid)),
+    % create lease
+    L = mockup_l_on_cseq:create_lease(rt_SUITE:number_to_key(0),
+                                      rt_SUITE:number_to_key(16), comm:make_global(Pid)),
     % do split
     Keep = second,
     Range = l_on_cseq:get_range(L),
@@ -184,10 +186,11 @@ test_split(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_merge_with_renewal_at(_Config, Step, FirstOrSecond) ->
-    {L1, L2} = mockup_l_on_cseq:create_two_adjacent_leases(),
     % join group
     Pid = pid_groups:find_a(mockup_l_on_cseq),
     pid_groups:join(pid_groups:group_of(Pid)),
+    % create lease
+    {L1, L2} = mockup_l_on_cseq:create_two_adjacent_leases(comm:make_global(Pid)),
     % prepare message filter
     mockup_l_on_cseq:set_message_filter(fun (Msg) ->
                                             element(2, Msg) =:= Step
