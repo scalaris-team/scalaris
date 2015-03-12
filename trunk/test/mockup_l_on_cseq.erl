@@ -28,8 +28,8 @@
 -export([on/2, init/1, start_link/0]).
 
 % lease mgmt.
--export([create_two_adjacent_leases/0]).
--export([create_lease/2]).
+-export([create_two_adjacent_leases/1]).
+-export([create_lease/3]).
 
 % public api
 -export([get_renewal_counter/0, get_lease_list/0,
@@ -39,21 +39,21 @@
 % public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec create_two_adjacent_leases() -> {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
-create_two_adjacent_leases() ->
+-spec create_two_adjacent_leases(comm:mypid_plain()) -> {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
+create_two_adjacent_leases(Owner) ->
     % we have a symmetric ring with four nodes, so we are going to use
     % the ranges: 0-1 and 1-2.
     Key1 = rt_SUITE:number_to_key(0),
     Key2 = rt_SUITE:number_to_key(2),
     SplitKey = ?RT:get_split_key(Key1, Key2, {1, 2}),
-    L1 = create_lease(Key1, SplitKey),
-    L2 = create_lease(SplitKey, Key2),
+    L1 = create_lease(Key1, SplitKey, Owner),
+    L2 = create_lease(SplitKey, Key2, Owner),
     ct:pal("mock leases~n~w~n~w~n", [L1, L2]),
     {L1, L2}.
 
--spec create_lease(?RT:key(), ?RT:key()) -> l_on_cseq:lease_t().
-create_lease(From, To) ->
-    L = l_on_cseq:unittest_create_lease_with_range(From, To),
+-spec create_lease(?RT:key(), ?RT:key(), comm:mypid_plain()) -> l_on_cseq:lease_t().
+create_lease(From, To, Owner) ->
+    L = l_on_cseq:unittest_create_lease_with_range(From, To, Owner),
     Range = node:mk_interval_between_ids(From, To),
     Id = l_on_cseq:id(Range),
     DB = l_on_cseq:get_db_for_id(Id),
