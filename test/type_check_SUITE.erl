@@ -1,4 +1,4 @@
-%% @copyright 2012-2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -678,7 +678,7 @@ tester_type_check_util(_Config) ->
         [ {comm,
            [ {get_ip, 1}, %% cannot create correct envelopes
              {get_port, 1}, %% cannot create correct envelopes
-             {init_and_wait_for_valid_pid, 0}, %% cannot start
+             {init_and_wait_for_valid_IP, 0}, %% cannot start
              {is_local, 1}, %% cannot create correct envelopes
              {send, 2}, {send, 3}, %% cannot send msgs
              {send_local, 2}, {send_local_after, 3}, %% cannot send msgs

@@ -131,7 +131,7 @@ on({web_debug_info, Requestor}, Nodes) ->
 init(_Options) ->
     %% find the vaild own IP adress
     case config:read(start_type) of
-        nostart -> comm:init_and_wait_for_valid_pid();
+        nostart -> comm:init_and_wait_for_valid_IP();
         _ -> ok
     end,
     dn_cache:subscribe(),

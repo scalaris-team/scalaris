@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -162,7 +162,7 @@ on({trigger_gc}, State) ->
     _ = [garbage_collect(X) || X <- processes()],
     State;
 
-%% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
+%% message from comm:init_and_wait_for_valid_IP/0 (no reply needed)
 on({hi}, State) ->
     State.
 
