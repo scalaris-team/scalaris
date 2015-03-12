@@ -1,4 +1,4 @@
-% @copyright 2008-2013 Zuse Institute Berlin
+% @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -70,9 +70,8 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(
-              fun() ->
-                      ?RT:get_replica_keys(?RT:hash_key("0"))
-              end, [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
+              ?RT:get_replica_keys(?RT:hash_key("0")),
+              [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
             Config
 %%             {skip, "temporarily"}
