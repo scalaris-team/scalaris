@@ -1,5 +1,5 @@
 @echo off
-:: Copyright 2010-2012 Zuse Institute Berlin
+:: Copyright 2010-2015 Zuse Institute Berlin
 ::
 ::    Licensed under the Apache License, Version 2.0 (the "License");
 ::    you may not use this file except in compliance with the License.
@@ -58,7 +58,6 @@ pushd %BEAMDIR%
   -scalaris local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
   -scalaris start_type first ^
   -scalaris start_mgmt_server true ^
-  -scalaris start_dht_node dht_node ^
   -connect_all false -hidden -name %NODE_NAME% ^
   %SCALARIS_ADDITIONAL_PARAMETERS% ^
   -s scalaris %ERL_SCHED_FLAGS% %params%
