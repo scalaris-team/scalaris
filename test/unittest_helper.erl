@@ -1,4 +1,4 @@
-%  @copyright 2008-2014 Zuse Institute Berlin
+%  @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ add_my_config(KVList) ->
                {mgmt_server, {{127,0,0,1}, ScalarisPort, mgmt_server}},
                {port, ScalarisPort},
                {yaws_port, YawsPort},
-               {start_type, first} | KVList],
+               {start_type, nostart} | KVList],
     lists:append(KVList1, [{start_mgmt_server, true}]).
 
 %% @doc Adds unittest specific ports from the environment to the list of

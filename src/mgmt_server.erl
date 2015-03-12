@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -129,10 +129,9 @@ on({web_debug_info, Requestor}, Nodes) ->
 
 -spec init(Options::[tuple()]) -> state().
 init(_Options) ->
-    case config:read(start_dht_node) of
-        failed ->
-            % if a dht_node is started, it will do this job:
-            comm:init_and_wait_for_valid_pid();
+    %% find the vaild own IP adress
+    case config:read(start_type) of
+        nostart -> comm:init_and_wait_for_valid_pid();
         _ -> ok
     end,
     dn_cache:subscribe(),

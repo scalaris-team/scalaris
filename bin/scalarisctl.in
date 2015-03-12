@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2014 Zuse Institute Berlin
+# Copyright 2007-2015 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -58,14 +58,13 @@ port=""
 yaws_port=""
 join_at=""
 start_mgmt_server=0
-start_dht_node="" # "dht_node"
 DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
 cmd=""
 NODES_PER_VM=""
 
 usage(){
-    echo "usage: scalarisctl [options] [services] <cmd>"
+    echo "usage: scalarisctl [options] <cmd>"
     echo " options:"
     echo "    -h          - print this help message"
     echo "    -d          - daemonize"
@@ -85,13 +84,11 @@ usage(){
     echo "    --nodes-per-vm <number>"
     echo "                - number of Scalaris nodes to start inside the VM"
     echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart"
-    echo " services:"
-    echo "    -m          - global Scalaris management server"
-    echo "    -s          - Scalaris node (see also -f)"
-    echo " commands:"
+    echo "    -m          - start global Scalaris management server"
+    echo " <cmd>:"
     echo "    checkinstallation"
     echo "                - test installation"
-    echo "    start       - start services (see -m and -s)"
+    echo "    start       - start services (see -m and -t)"
     echo "    stop        - stop a scalaris process defined by its name (see -n)"
     echo "    restart     - restart a scalaris process by its name (see -n)"
     echo ""
@@ -412,13 +409,13 @@ checkinstallation() {
         export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]"
     fi
     export SCALARIS_JAPI_NODE="$NODE_NAME"
-    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
-        echo "  we were trying to run: $0 -t nostart -s -m -d start"
+        echo "  we were trying to run: $0 -t nostart -m -d start"
         # try to stop anyway (it could have been a false alarm):
-        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
     fi
 
@@ -441,9 +438,9 @@ checkinstallation() {
       if [ $try -eq $max_tries ] ; then
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
         echo "  (result: ${scalaris_nodes_count_actual})."
-        echo "  we were trying to run: $0 -t first -s -m -d start"
+        echo "  we were trying to run: $0 -t first -m -d start"
         # try to stop anyway (it could have been a false alarm):
-        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
       fi
     done
@@ -621,7 +618,7 @@ checkinstallation() {
         echo "$RUBY_OUTPUT"
     fi
 
-    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
 
     if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
          -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
@@ -678,9 +675,6 @@ scalarisstart(){
     fi
     if [ $start_mgmt_server -eq 1 ]; then
         tmp="$tmp -scalaris start_mgmt_server true"
-    fi
-    if [ "$start_dht_node" != "" ]; then
-        tmp="$tmp -scalaris start_dht_node $start_dht_node"
     fi
     if [ "$verbose" -eq 1 ]; then
         tmp="$tmp -scalaris verbose true"
@@ -839,7 +833,6 @@ until [ -z "$1" ]; do
             p) port=$OPTARG;;
             y) yaws_port=$OPTARG;;
             m) start_mgmt_server=1;;
-            s) start_dht_node="dht_node";;
             t) start_type=$OPTARG;;
             v) echo setting verbose from cli
                verbose=1;;
