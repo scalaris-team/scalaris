@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ init_per_testcase(_TestCase, Config) ->
     GroupConfig = proplists:get_value(tc_group_properties, Config, []),
     {move_config, MoveConf} = lists:keyfind(move_config, 1, GroupConfig),
     unittest_helper:make_ring_with_ids(
-      fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end,
+      ?RT:get_replica_keys(?RT:hash_key("0")),
       [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0},
                  {join_lb_psv, lb_psv_simple}, {lb_psv_samples, 1}]
             ++ MoveConf}]),

@@ -1,4 +1,4 @@
-% @copyright 2008-2012, 2014 Zuse Institute Berlin
+% @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -60,8 +60,7 @@ init_per_testcase(TestCase, Config) ->
         false ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(
-              fun() ->
-                      ?RT:get_replica_keys(?RT:hash_key("0")) end,
+              ?RT:get_replica_keys(?RT:hash_key("0")),
               [{config,
                 [{monitor_perf_interval, 0},  % deactivate monitor_perf
                  {log_path, PrivDir}]}]),

@@ -134,21 +134,42 @@ get_evenly_spaced_keys(N) ->
     [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, N)].
 
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
--spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
+-spec make_ring_with_ids([?RT:key()]) -> pid().
 make_ring_with_ids(Ids) ->
     make_ring_with_ids(Ids, []).
 
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
 %%      a {config, [{Key, Value},...]} option.
--spec make_ring_with_ids([?RT:key(),...] | fun(() -> [?RT:key(),...]), Options::kv_opts()) -> pid().
+-spec make_ring_with_ids([?RT:key(),...], Options::kv_opts()) -> pid().
 make_ring_with_ids(Ids, Options) when is_list(Ids) ->
-    make_ring_with_ids(fun () -> Ids end, Options);
-make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
-    % note: do not call IdsFun before the initial setup
-    %       (it might use config or another process)
-    % allow at most 10s for the whole ring to come up
-    TimeTrap = test_server:timetrap(10000),
+    NodeAddFun =
+        fun() ->
+                [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}])
+                 | [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
+        end,
+    make_ring_generic(erlang:length(Ids), Options, NodeAddFun).
+
+%% @doc Creates a ring with Size random IDs.
+-spec make_ring(Size::pos_integer()) -> pid().
+make_ring(Size) ->
+    make_ring(Size, []).
+
+%% @doc Creates a ring with Size rangom IDs.
+%%      Passes Options to the supervisor, e.g. to set config variables, specify
+%%      a {config, [{Key, Value},...]} option.
+-spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
+make_ring(Size, Options) ->
+    NodeAddFun =
+        fun() ->
+                First = admin:add_node([{first}]),
+                {RestSuc, RestFailed} = admin:add_nodes(Size - 1),
+                [First | RestSuc ++ RestFailed]
+        end,
+    make_ring_generic(Size, Options, NodeAddFun).
+
+make_ring_generic(Size, Options, NodeAddFun) ->
+    TimeTrap = test_server:timetrap(3000 + Size * 1000),
     set_config_file_paths(),
     error_logger:tty(true),
     case ets:info(config_ets) of
@@ -167,62 +188,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                   tester:start_pseudo_proc(),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
                   mgmt_server:connect(),
-                  Ids = IdsFun(), % config may be needed
-                  [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]) |
-                       [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
-          end),
-    FailedNodes = [X || X = {error, _ } <- StartRes],
-    case FailedNodes of
-        [] -> ok;
-        [_|_] -> stop_ring(Pid),
-                 ?ct_fail("adding nodes failed: ~.0p", [FailedNodes])
-    end,
-%%     timer:sleep(1000),
-    % need to call IdsFun again (may require config process or others
-    % -> can not call it before starting the scalaris process)
-    Ids = IdsFun(),
-    Size = length(Ids),
-    check_ring_size(Size),
-    wait_for_stable_ring(),
-    check_ring_size(Size),
-    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
-    ?TRACE_RING_DATA(),
-    test_server:timetrap_cancel(TimeTrap),
-    Pid.
-
-%% @doc Creates a ring with Size random IDs.
--spec make_ring(Size::pos_integer()) -> pid().
-make_ring(Size) ->
-    make_ring(Size, []).
-
-%% @doc Creates a ring with Size rangom IDs.
-%%      Passes Options to the supervisor, e.g. to set config variables, specify
-%%      a {config, [{Key, Value},...]} option.
--spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
-make_ring(Size, Options) ->
-    % allow at most 1s for each node to come up (+3s for init)
-    TimeTrap = test_server:timetrap(3000 + Size * 1000),
-    set_config_file_paths(),
-    error_logger:tty(true),
-    case ets:info(config_ets) of
-        undefined -> ok;
-        _         -> ct:fail("Trying to create a new ring although there is already one.")
-    end,
-    {Pid, StartRes} =
-        start_process(
-          fun() ->
-                  ct:pal("unittest_helper:make_ring size ~p", [Size]),
-                  erlang:register(ct_test_ring, self()),
-                  randoms:start(),
-                  {ok, _GroupsPid} = pid_groups:start_link(),
-                  NewOptions = prepare_config(Options),
-                  config:init(NewOptions),
-                  tester:start_pseudo_proc(),
-                  {ok, _} = sup_scalaris:start_link(NewOptions),
-                  mgmt_server:connect(),
-                  First = admin:add_node([{first}]),
-                  {RestSuc, RestFailed} = admin:add_nodes(Size - 1),
-                  [First | RestSuc ++ RestFailed]
+                  NodeAddFun()
           end),
     FailedNodes = [X || X = {error, _ } <- StartRes],
     case FailedNodes of
@@ -232,10 +198,12 @@ make_ring(Size, Options) ->
     end,
     true = erlang:is_process_alive(Pid),
 %%     timer:sleep(1000),
+    % need to call IdsFun again (may require config process or others
+    % -> can not call it before starting the scalaris process)
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
-    ct:pal("unittest_helper:make_ring size ~p done.", [Size]),
+    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
     ?TRACE_RING_DATA(),
     test_server:timetrap_cancel(TimeTrap),
     Pid.

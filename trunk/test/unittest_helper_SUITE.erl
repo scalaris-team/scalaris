@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ suite() ->
 init_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
- 
+
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
@@ -50,11 +50,13 @@ end_per_suite(Config) ->
 -spec prop_make_ring_with_ids(IDs::[?RT:key(),...]) -> true.
 prop_make_ring_with_ids(IDs) ->
     UniqueIDs = lists:usort(IDs),
-    unittest_helper:make_ring_with_ids(UniqueIDs, [{config, [pdb:get(log_path, ?MODULE)]}]),
-    
+    unittest_helper:make_ring_with_ids(
+      UniqueIDs,
+      [{config, [pdb:get(log_path, ?MODULE)]}]),
+
     DHTNodes = pid_groups:find_all(dht_node),
     ?equals(length(DHTNodes), length(UniqueIDs)),
-    
+
     ActualIds = [begin
            comm:send_local(DhtNode,
                            {get_node_details, comm:this(), [node]}),
@@ -65,9 +67,9 @@ prop_make_ring_with_ids(IDs) ->
 %%            after 500 -> timeout
            end
        end || DhtNode <- DHTNodes],
-    
+
     ?equals(lists:sort(ActualIds), lists:sort(UniqueIDs)),
-    
+
     unittest_helper:stop_ring(),
     % wait a bit for all processes to stop
     timer:sleep(100),
