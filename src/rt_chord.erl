@@ -102,7 +102,7 @@ init_stabilize(Neighbors, RT) ->
 %% @doc Removes dead nodes from the routing table.
 -spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 filter_dead_node(RT, DeadPid, _Reason) ->
-    DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
+    DeadIndices = [Index || {Index, {Node, _RTLoop}}  <- gb_trees:to_list(RT),
                             node:same_process(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
@@ -111,7 +111,7 @@ filter_dead_node(RT, DeadPid, _Reason) ->
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(RT) ->
-    [node:pidX(Node) || Node <- gb_trees:values(RT)].
+    [node:pidX(Node) || {Node, _RTLoop} <- gb_trees:values(RT)].
 
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
@@ -238,15 +238,15 @@ get_key_segment(Key) ->
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 dump(RT) ->
     [{webhelpers:safe_html_string("~p", [Index]),
-      webhelpers:safe_html_string("~p", [Node])} || {Index, Node} <- gb_trees:to_list(RT)].
+      webhelpers:safe_html_string("~p", [Node])} || {Index, {Node, _RTLoop}} <- gb_trees:to_list(RT)].
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
 %%      Changed indicates whether a new node was inserted (the RT structure may
 %%      change independently from this indicator!).
 -spec stabilize(Neighbors::nodelist:neighborhood(), OldRT::rt(), Index::index(),
-                Node::node:node_type()) -> {NewRT::rt(), Changed::boolean()}.
-stabilize(Neighbors, RT, Index, Node) ->
+                Node::node:node_type(), RTLoop::comm:mypid()) -> {NewRT::rt(), Changed::boolean()}.
+stabilize(Neighbors, RT, Index, Node, RTLoop) ->
     MyId = nodelist:nodeid(Neighbors),
     Succ = nodelist:succ(Neighbors),
     case (node:id(Succ) =/= node:id(Node))   % reached succ?
@@ -266,7 +266,7 @@ stabilize(Neighbors, RT, Index, Node) ->
             end,
             Changed = (Index =:= first_index() orelse
                           (gb_trees:lookup(prev_index(Index), RT) =/= {value, Node})),
-            {gb_trees:enter(Index, Node, RT), Changed};
+            {gb_trees:enter(Index, {Node, RTLoop}, RT), Changed};
         _ ->
             {RT, false}
     end.
@@ -290,14 +290,14 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
              intervals:in(NewNodeId, node:mk_interval_between_nodes(NewPred, NewSucc)) of
         true ->
             NewRT = gb_trees:map(
-                      fun(_K, N) ->
-                              case node:same_process(N, NewPred) of
+                      fun(_K, {Node, RTLoop}) ->
+                              case node:same_process(Node, NewPred) of
                                   true  ->
-                                      node:newer(N, NewPred);
+                                      {node:newer(Node, NewPred), RTLoop};
                                   false ->
-                                      case node:same_process(N, NewSucc) of
-                                          true  -> node:newer(N, NewSucc);
-                                          false -> N
+                                      case node:same_process(Node, NewSucc) of
+                                          true  -> {node:newer(Node, NewSucc), RTLoop};
+                                          false -> {Node, RTLoop}
                                       end
                               end
                       end, OldRT),
@@ -391,12 +391,12 @@ check_config() ->
                                    rt_loop:state_active() | unknown_event.
 handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(Source_PID, {rt_get_node_response, Index, MyNode}, ?SEND_OPTIONS),
+    comm:send(Source_PID, {rt_get_node_response, Index, MyNode, comm:this()}, ?SEND_OPTIONS),
     State;
-handle_custom_message({rt_get_node_response, Index, Node}, State) ->
+handle_custom_message({rt_get_node_response, Index, Node, RTLoop}, State) ->
     OldRT = rt_loop:get_rt(State),
     Neighbors = rt_loop:get_neighb(State),
-    case stabilize(Neighbors, OldRT, Index, Node) of
+    case stabilize(Neighbors, OldRT, Index, Node, RTLoop) of
         {NewRT, true} ->
             check_do_update(OldRT, NewRT, rt_loop:get_neighb(State), true);
         {NewRT, false} -> ok
@@ -479,11 +479,11 @@ next_hop(State, Id) ->
 next_hop(Neighbors, RT, Id) ->
     % check routing table:
     RTSize = get_size(RT),
-    NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
+    {NodeRT, _RTLoop} = case util:gb_trees_largest_smaller_than(Id, RT) of
                  {value, _Key, N} ->
                      N;
                  nil when RTSize =:= 0 ->
-                     nodelist:succ(Neighbors);
+                     {nodelist:succ(Neighbors), undefined};
                  nil -> % forward to largest finger
                      {_Key, N} = gb_trees:largest(RT),
                      N
@@ -506,13 +506,14 @@ export_rt_to_dht_node(RT, Neighbors) ->
     Succ = nodelist:succ(Neighbors),
     % always include the pred and succ in the external representation
     % note: we are subscribed at the RM for changes to these nodes
-    Tree = gb_trees:enter(node:id(Succ), Succ,
-                          gb_trees:enter(node:id(Pred), Pred, gb_trees:empty())),
+    Tree = gb_trees:enter(node:id(Succ), {Succ, undefined},
+                          gb_trees:enter(node:id(Pred), {Pred, undefined}, gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->
                                  % only store the ring id and the according node structure
-                                 case node:id(V) =:= Id of
+                                {Node, _RTLoop} = V,
+                                 case node:id(Node) =:= Id of
                                      true  -> Acc;
-                                     false -> gb_trees:enter(node:id(V), V, Acc)
+                                     false -> gb_trees:enter(node:id(Node), V, Acc)
                                  end
                         end, Tree, RT).
 %% userdevguide-end rt_chord:export_rt_to_dht_node
@@ -524,7 +525,8 @@ export_rt_to_dht_node(RT, Neighbors) ->
 to_list(State) ->
     RT = dht_node_state:get(State, rt),
     Neighbors = dht_node_state:get(State, neighbors),
-    nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
+    Nodes = lists:map(fun ({Node, _RTLoop}) -> Node end, gb_trees:values(RT)),
+    nodelist:mk_nodelist([nodelist:succ(Neighbors) | Nodes ],
                          nodelist:node(Neighbors)).
 
 %% userdevguide-begin rt_chord:wrap_message

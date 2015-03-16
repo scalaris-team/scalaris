@@ -31,7 +31,7 @@ create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes) ->
     gb_trees:from_orddict(
       [begin
            Key = number_to_key(N),
-           {Key, node:new(lists:nth(Idx, Nodes), Key, 0)}
+           {Key, {node:new(lists:nth(Idx, Nodes), Key, 0), undefined}}
        end || {N, Idx} <- RT_Keys]).
 
 check_next_hop(State, _Succ, N, NodeExp) ->
