@@ -55,6 +55,7 @@ comment(AA,AA_COMPRESS_HASHES,0.0 left 0.1, wid 2.01 ht 0.45 \
         "CH(cur) := compressed"\
         "hashes of current level");
 message(AA,BB,"check_nodes(HashSize, CH(cur))");
+inactive(AA);
 active(BB);
 comment(BB,BB_MISMATCHES,0.00 right 0.175, wid 1.6 ht 0.45 \
         "compare hashes,"\
@@ -68,6 +69,7 @@ rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
 comment(BB,MISMATCHES,0.39 left 0.25, wid 3.2 ht 0.45 \
         "\bu leaf\sbB\eb (\*y)                                               "\
         "\bu leaf\sbA\eb-inner\sbB\eb: leaf\sbA\eb\moi\sbB\eb (\*x\sb1\eb), leaf\sbA\eb\nmi\sbB\eb (\*x\sb2\eb)");
+active(AA);
 step();
 comment(AA,AA_MISMATCHES,0.00 left 0.175, wid 1.8 ht 0.625 \
         "calc. new HashSize,"\
