@@ -26,7 +26,6 @@
 
 -compile(export_all).
 
--define(TEST_DB, db_mnesia).
 -define(CLOSE, close).
 -define(EQ, ==).
 
@@ -41,15 +40,16 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
-init_per_testcase(TestCase, Config) ->
-  case TestCase of
-    _ ->
+-ifdef(PRBR_MNESIA).
+init_per_testcase(_TestCase, Config) ->
       {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
       unittest_helper:make_ring(8, [{config, [{log_path, PrivDir},
                                     {leases, true}]}]),
       unittest_helper:check_ring_size_fully_joined(8),
-      Config
-  end.
+      Config.
+-else.
+init_per_testcase(_TestCase, _Config) -> skip("db_mnesia not set -> skipping test SUITE").
+-endif.
 
 end_per_testcase(_TestCase, Config) ->
   unittest_helper:stop_ring(),
