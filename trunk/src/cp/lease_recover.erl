@@ -27,17 +27,14 @@
 
 -spec recover(prbr:state(), prbr:state(), prbr:state(), prbr:state()) -> lease_list:lease_list().
 recover(Leases1, Leases2, Leases3, Leases4) ->
-    %% Leases1 = filter(get_leases(leases_db1)),
-    %% Leases2 = filter(get_leases(leases_db2)),
-    %% Leases3 = filter(get_leases(leases_db3)),
-    %% Leases4 = filter(get_leases(leases_db4)),
     AllLeases = lists:append([prbr:tab2list(Leases4), prbr:tab2list(Leases3),
                               prbr:tab2list(Leases2), prbr:tab2list(Leases1)]),
     Candidates = [L || {Id, L} <- AllLeases,
+                       L =/= prbr_bottom, %% ??
                        Id =:= l_on_cseq:get_id(L), %% is first replica?
                        l_on_cseq:is_live_aux_field(L),
                        l_on_cseq:has_timed_out(L)],
-    %% io:format("candidates ~p~n", [Candidates]),
+    %% log:log("candidates ~p~n", [Candidates]),
     case Candidates of
         [] -> lease_list:empty();
         [Lease] -> % one potentially active lease: set active lease
