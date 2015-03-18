@@ -330,7 +330,7 @@ sup_pause_childs(SupPid) ->
 
 -ifdef(PRBR_MNESIA).
 -spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[tid() | atom()]}.
-get_tables_of(_Pid)->
+get_tables_of(Pid)->
   {db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
    util:ets_tables_of(Pid)}.
 
