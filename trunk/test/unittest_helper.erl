@@ -25,7 +25,7 @@
 
 -export([get_scalaris_port/0, get_yaws_port/0,
          get_evenly_spaced_keys/1,
-         make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
+         make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2, make_ring_recover/1,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
          check_ring_size/1, check_ring_size_fully_joined/1,
@@ -143,12 +143,25 @@ make_ring_with_ids(Ids) ->
 %%      a {config, [{Key, Value},...]} option.
 -spec make_ring_with_ids([?RT:key(),...], Options::kv_opts()) -> pid().
 make_ring_with_ids(Ids, Options) when is_list(Ids) ->
-    NodeAddFun =
+  ct:pal("Trying to make ring with Ids, containing ~p nodes.",[erlang:length(Ids)]),
+  NodeAddFun =
         fun() ->
                 [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}])
                  | [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
         end,
-    make_ring_generic(erlang:length(Ids), Options, NodeAddFun).
+  TimeTrap = test_server:timetrap(3000 + erlang:length(Ids) * 1000),
+  Pid = make_ring_generic(Options, NodeAddFun),
+  test_server:timetrap_cancel(TimeTrap),
+  Pid.
+
+-spec make_ring_recover([Options::kv_opts()]) -> pid().
+make_ring_recover(Options) ->
+  ct:pal("Trying to recover ring."),
+  TimeTrap = test_server:timetrap(60000),
+  Pid = make_ring_generic(Options, fun() ->[] end),
+  ct:pal("ring restored"),
+  test_server:timetrap_cancel(TimeTrap),
+  Pid.
 
 %% @doc Creates a ring with Size random IDs.
 -spec make_ring(Size::pos_integer()) -> pid().
@@ -160,16 +173,24 @@ make_ring(Size) ->
 %%      a {config, [{Key, Value},...]} option.
 -spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
 make_ring(Size, Options) ->
+  ct:pal("Trying to make ring with ~p nodes.",[Size]),
     NodeAddFun =
         fun() ->
                 First = admin:add_node([{first}]),
                 {RestSuc, RestFailed} = admin:add_nodes(Size - 1),
                 [First | RestSuc ++ RestFailed]
         end,
-    make_ring_generic(Size, Options, NodeAddFun).
-
-make_ring_generic(Size, Options, NodeAddFun) ->
     TimeTrap = test_server:timetrap(3000 + Size * 1000),
+    Pid = make_ring_generic(Options, NodeAddFun),
+    check_ring_size(Size),
+    wait_for_stable_ring(),
+    check_ring_size(Size),
+    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
+    test_server:timetrap_cancel(TimeTrap),
+    Pid.
+
+-spec make_ring_generic(Options::kv_opts(), []) -> pid().
+make_ring_generic(Options, NodeAddFun) ->
     set_config_file_paths(),
     error_logger:tty(true),
     case ets:info(config_ets) of
@@ -179,7 +200,6 @@ make_ring_generic(Size, Options, NodeAddFun) ->
     {Pid, StartRes} =
         start_process(
           fun() ->
-                  ct:pal("Trying to build Scalaris with ids~n"),
                   erlang:register(ct_test_ring, self()),
                   randoms:start(),
                   {ok, _GroupsPid} = pid_groups:start_link(),
@@ -200,12 +220,7 @@ make_ring_generic(Size, Options, NodeAddFun) ->
 %%     timer:sleep(1000),
     % need to call IdsFun again (may require config process or others
     % -> can not call it before starting the scalaris process)
-    check_ring_size(Size),
-    wait_for_stable_ring(),
-    check_ring_size(Size),
-    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
     ?TRACE_RING_DATA(),
-    test_server:timetrap_cancel(TimeTrap),
     Pid.
 
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.
