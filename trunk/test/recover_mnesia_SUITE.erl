@@ -48,7 +48,7 @@ init_per_testcase(_TestCase, Config) ->
       unittest_helper:check_ring_size_fully_joined(8),
       Config.
 -else.
-init_per_testcase(_TestCase, _Config) -> skip("db_mnesia not set -> skipping test SUITE").
+init_per_testcase(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test SUITE"}.
 -endif.
 
 end_per_testcase(_TestCase, Config) ->
