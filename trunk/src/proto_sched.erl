@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin
+% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -302,14 +302,17 @@ get_infos() -> get_infos(default).
 
 -spec get_infos(trace_id()) -> [tuple()].
 get_infos(TraceId) ->
-    LoggerPid = pid_groups:find_a(proto_sched),
-    clear_infection(),
-    comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
-    receive
-        ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
-    end,
-    restore_infection(),
-    Infos.
+    case pid_groups:find_a(proto_sched) of
+        undefined -> [];
+        LoggerPid ->
+            clear_infection(),
+            comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
+            receive
+                ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
+                end,
+            restore_infection(),
+            Infos
+    end.
 
 -spec infected() -> boolean().
 infected() ->
