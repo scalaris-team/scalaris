@@ -303,7 +303,7 @@ get_infos() -> get_infos(default).
 -spec get_infos(trace_id()) -> [tuple()].
 get_infos(TraceId) ->
     case pid_groups:find_a(proto_sched) of
-        undefined -> [];
+        failed -> [];
         LoggerPid ->
             clear_infection(),
             comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
