@@ -65,7 +65,7 @@ join(Options) ->
 get_db(Options, DBName) ->
     case lists:keyfind(DBName, 1, Options) of
         false ->
-            log:log("error");
+            log:log("error: Options:~w ~nDBName:~w", [Options, DBName]);
         {DBName, DB} ->
             db_prbr:open(DB)
     end.
