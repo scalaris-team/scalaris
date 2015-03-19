@@ -30,7 +30,7 @@
          activate/1, deactivate/0,
          check_config/0,
          get_neighb/1, get_rt/1, set_rt/2,
-         rm_send_update/5]).
+         rm_neighbor_change/3, rm_send_update/5]).
 
 -export_type([state_active/0]).
 
@@ -109,7 +109,7 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     comm:send_local(self(), {periodic_rt_rebuild}),
     rm_loop:subscribe(self(), ?MODULE,
-                      fun rm_loop:subscribe_dneighbor_change_filter/3,
+                      fun ?MODULE:rm_neighbor_change/3,
                       fun ?MODULE:rm_send_update/5, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
@@ -154,7 +154,7 @@ on_active({deactivate_rt}, {Neighbors, _OldRT})  ->
                                  fun ?MODULE:on_inactive/2);
 
 %% userdevguide-begin rt_loop:update_rt
-% update routing table with changed ID, pred and/or succ
+% Update routing table with changed neighborhood from the rm
 on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
@@ -204,7 +204,6 @@ on_active({dump, Pid}, {_Neighbors, RTState} = State) ->
     comm:send_local(Pid, {dump_response, RTState}),
     State;
 
-%% on_active({lookup_aux, Pid}, {_Neighbors, RTState} = State) ->
 on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, RT} = State) ->
     case config:read(leases) of
         true ->
@@ -214,7 +213,6 @@ on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, RT} = State) ->
             lookup_aux_chord(Neighbors, RT, Key, Hops, Msg)
     end,
     State;
-
 
 on_active({send_error, _Target, {?send_to_group_member, routing_table, {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
     log:log(warn, "[routing_table] lookup_aux failed 1. Target: ~p. Msg: ~p.", [_Target, _Message]),
@@ -233,7 +231,6 @@ on_active({send_error, Target, {?lookup_fin, Key, Data, Msg} = _Message, _Reason
 % unknown message
 on_active(Message, State) ->
     ?RT:handle_custom_message(Message, State).
-
 
 -spec lookup_aux_chord(Neighbors::nodelist:neighborhood(), RT::?RT:rt(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
@@ -291,8 +288,16 @@ set_rt({Neighbors, _OldRT}, NewRT) ->
 % Misc.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Notifies the node's routing table of a changed node ID, predecessor
-%%      and/or successor. Used to subscribe to the ring maintenance.
+%% @doc Filter function for subscriptions that returns true if a
+%%      any neighbor changes.
+-spec rm_neighbor_change(
+        OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
+        Reason::rm_loop:reason()) -> boolean().
+rm_neighbor_change(OldNeighbors, NewNeighbors, _Reason) ->
+    OldNeighbors =/= NewNeighbors.
+
+%% @doc Notifies the node's routing table of a changed neighborhood.
+%%      Used to subscribe to the ring maintenance.
 -spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
                      OldNeighbors::nodelist:neighborhood(),
                      NewNeighbors::nodelist:neighborhood(),
