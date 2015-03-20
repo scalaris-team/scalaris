@@ -26,44 +26,59 @@
 
 -compile(export_all).
 
+-define(NUM_EXECUTIONS, 5).
 -define(CLOSE, close).
--define(EQ, ==).
 
 all() -> [
-  tester_ring_8,
-  tester_with_data].
+  {group, make_ring_group},
+  {group, recover_data_group}].
+groups() ->
+  [
+    {make_ring_group, [sequence], [tester_ring_8]},
+    {recover_data_group, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_write, tester_read]}
+  ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
+-ifdef(PRBR_MNESIA).
 init_per_suite(Config) ->
   unittest_helper:init_per_suite(Config).
+-else.
+init_per_suite(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test SUITE"}.
+-endif.
 
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
--ifdef(PRBR_MNESIA).
-init_per_testcase(_TestCase, Config) ->
-  % make sure ring is stopped, previous test may have run into timeout
+init_per_group(Group, Config) ->
+  % stop ring from previous test case (it may have run into a timeout)
   unittest_helper:stop_ring(),
   application:stop(mnesia),
-  file:delete("/home/tanguy/scalaris-dev/data/recover_mnesia_SUITE_ct@127.0.0.1/schema.DAT"),
+  WorkingDir = string:sub_string(os:cmd(pwd), 1, string:len(os:cmd(pwd))-1)++
+    "/../data/recover_mnesia_SUITE_ct@127.0.0.1/",
+  file:delete(WorkingDir ++ "schema.DAT"),
 
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:make_ring(8, [{config, [{log_path, PrivDir},
-                                {leases, true}]}]),
+    {leases, true}]}]),
   unittest_helper:check_ring_size_fully_joined(8),
-  Config.
--else.
-init_per_testcase(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test SUITE"}.
--endif.
+  unittest_helper:init_per_group(Group, Config).
 
-end_per_testcase(_TestCase, Config) ->
+end_per_group(Group, Config) ->
+  WorkingDir = string:sub_string(os:cmd(pwd), 1, string:len(os:cmd(pwd))-1)++
+    "/../data/recover_mnesia_SUITE_ct@127.0.0.1/",
   Tabs = lists:delete(schema, mnesia:system_info(tables)),
   unittest_helper:stop_ring(),
   application:stop(mnesia),
-  [ok = file:delete("/home/tanguy/scalaris-dev/data/recover_mnesia_SUITE_ct@127.0.0.1/"++atom_to_list(X)++".DCD")||X<-Tabs],
-  ok = file:delete("/home/tanguy/scalaris-dev/data/recover_mnesia_SUITE_ct@127.0.0.1/schema.DAT"),
+  [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
+  ok = file:delete(WorkingDir ++ "schema.DAT"),
+  unittest_helper:end_per_group(Group, Config).
+
+init_per_testcase(_TestCase, Config) ->
   Config.
+
+end_per_testcase(_TestCase, _Config) ->
+  ok.
 
 rw_suite_runs(N) ->
   erlang:min(N, 200).
@@ -77,18 +92,20 @@ tester_ring_8(Config) ->
   unittest_helper:stop_ring(),
   ct:pal("ring stopped -> sleeping. Waiting for leases to expire"),
   timer:sleep(11000),
-  unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
-                                      {leases, true},
-                                      {start_type, recover}]}]),
+  unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
+                                     {leases, true},
+                                     {start_type, recover}]}]),
   util:wait_for(fun admin:check_leases/0, 10000),
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test with_data/1 write data to KV DBs and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tester_with_data(Config) ->
+tester_write(_Config) ->
   % writting data to KV
-  [kv_on_cseq:write(integer_to_list(X),X)||X<-lists:seq(1,100)],
+  [kv_on_cseq:write(integer_to_list(X),X)||X<-lists:seq(1,100)].
+
+tester_read(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
   ct:pal("ring stopped -> sleeping. Waiting for leases to expire"),
