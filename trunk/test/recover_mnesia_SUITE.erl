@@ -50,6 +50,7 @@ init_per_suite(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
+-ifdef(PRBR_MNESIA).
 init_per_group(Group, Config) ->
   % stop ring from previous test case (it may have run into a timeout)
   unittest_helper:stop_ring(),
@@ -63,6 +64,9 @@ init_per_group(Group, Config) ->
     {leases, true}]}]),
   unittest_helper:check_ring_size_fully_joined(8),
   unittest_helper:init_per_group(Group, Config).
+-else.
+init_per_group(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test group"}.
+-endif.
 
 end_per_group(Group, Config) ->
   WorkingDir = string:sub_string(os:cmd(pwd), 1, string:len(os:cmd(pwd))-1)++
