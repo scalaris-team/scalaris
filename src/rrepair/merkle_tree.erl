@@ -153,7 +153,7 @@ new(I, ConfParams) ->
 -spec new(intervals:interval(), EntryList::mt_bucket(), mt_config_params())
         -> merkle_tree().
 new(I, EntryList, ConfParams) ->
-    gen_hash(bulk_build(I, EntryList, ConfParams)).
+    bulk_build(I, EntryList, ConfParams).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -376,7 +376,9 @@ p_bulk_build({_H, ItemCount, _Bkt, Interval}, Config, KeyList) ->
     NCount = lists:foldl(fun(N, AccN) ->
                                  AccN + node_size(N)
                          end, 0, ChildNodes),
-    {nil, 1 + NCount, ItemCount + length(KeyList), Interval, ChildNodes}.
+    % hash the bucket now:
+    Hash = run_inner_hf(ChildNodes, Config#mt_config.inner_hf),
+    {Hash, 1 + NCount, ItemCount + length(KeyList), Interval, ChildNodes}.
 
 -spec build_childs([{I::intervals:continuous_interval(), Count::non_neg_integer(),
                      mt_bucket()}], mt_config(), Acc::[mt_node()]) -> [mt_node()].
@@ -385,14 +387,10 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     KeepBucket = Config#mt_config.keep_bucket,
     Node = if Count > BucketSize ->
                   p_bulk_build({nil, 0, [], Interval}, Config, Bucket);
-              KeepBucket ->
-                  % let gen_hash/1 hash the leaves
-                  {nil, Count, Bucket, Interval};
-              true -> % not KeepBucket
-                  % need to hash here since we won't keep the bucket!
-                  Bucket1 = lists:keysort(1, Bucket),
-                  Hash = run_leaf_hf(Bucket1, Interval, Config#mt_config.leaf_hf),
-                  {Hash, Count, [], Interval}
+              true ->
+                  % hash the bucket now:
+                  {Bucket1, Hash} = run_leaf_hf(Bucket, Interval, Config#mt_config.leaf_hf),
+                  {Hash, Count, ?IIF(KeepBucket, Bucket1, []), Interval}
            end,
     build_childs(T, Config, [Node | Acc]);
 build_childs([], _, Acc) ->
@@ -435,8 +433,7 @@ gen_hash_node({Hash, _ICnt, _Bkt = [], _I} = N, _InnerHf,
 gen_hash_node({_OldHash, ICnt, Bucket, Interval},
               _InnerHf, LeafHf, true, CleanBuckets) ->
     % leaf node, keep_bucket true
-    Bucket1 = lists:keysort(1, Bucket),
-    Hash = run_leaf_hf(Bucket1, Interval, LeafHf),
+    {Bucket1, Hash} = run_leaf_hf(Bucket, Interval, LeafHf),
     {Hash, ICnt, ?IIF(CleanBuckets, [], Bucket1), Interval}.
 
 %% @doc Hashes an inner node based on its childrens' hashes.
@@ -446,13 +443,14 @@ run_inner_hf(Childs, InnerHf) ->
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::leaf_hash_fun())
-        -> mt_node_key().
-run_leaf_hf(Bucket, I, LeafHf) ->
+        -> {mt_bucket(), mt_node_key()}.
+run_leaf_hf(Bucket0, I, LeafHf) ->
+    Bucket = lists:keysort(1, Bucket0),
     ?DBG_ASSERT(lists:ukeysort(1, Bucket) =:= Bucket),
     Hash = LeafHf(Bucket, I),
     Size = erlang:bit_size(Hash),
     <<SmallHash:Size/integer-unit:1>> = Hash,
-    SmallHash.
+    {Bucket, SmallHash}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
