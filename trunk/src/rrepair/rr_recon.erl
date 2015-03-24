@@ -74,7 +74,7 @@
 -type 'db_chunk_kvv+'():: [{?RT:key(), db_dht:version(), db_dht:value()},...].
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
--type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
+-type kvi_tree()       :: gb_trees:tree(KeyBin::bitstring(), {VersionShort::non_neg_integer(), Idx::non_neg_integer()}).
 -type shash_kv_set()   :: gb_sets:set(KVBin::bitstring()).
 
 -record(trivial_recon_struct,
@@ -159,7 +159,7 @@
          kv_list            = []                                     :: db_chunk_kv(),
          k_list             = []                                     :: [?RT:key()],
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
-         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReq::[bitstring()]}
+         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReqIdx::[non_neg_integer()]}
          }).
 -type state() :: #rr_recon_state{}.
 
@@ -263,14 +263,14 @@ on({start_recon, RMethod, Params} = _Msg,
             #trivial_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                   db_chunk = DBChunk,
                                   sig_size = SigSize, ver_size = VSize} = Params,
-            Params1 = Params,
+            Params1 = Params#trivial_recon_struct{db_chunk = <<>>},
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
-                decompress_kv_list(DBChunk, [], SigSize, VSize),
+                decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, DBChunkTree}],
+            Misc1 = [{db_chunk, {DBChunkTree, gb_trees:size(DBChunkTree)}}],
             Reconcile = resolve,
             Stage = resolve;
         shash ->
@@ -332,18 +332,17 @@ on({start_recon, RMethod, Params} = _Msg,
 on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = resolve,            initiator = true,
                            method = trivial,           dhtNodePid = DhtNodePid,
-                           params = #trivial_recon_struct{db_chunk = OtherDBChunkOrig,
-                                                          sig_size = SigSize,
+                           params = #trivial_recon_struct{sig_size = SigSize,
                                                           ver_size = VSize},
                            dest_rr_pid = DestRR_Pid,   stats = Stats,
-                           ownerPid = OwnerL, to_resolve = {ToSend, ToReq},
-                           misc = [{db_chunk, OtherDBChunk}],
+                           ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
+                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen}}],
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
 
     % identify items to send, request and the remaining (non-matched) DBChunk:
-    {ToSend1, ToReq1, OtherDBChunk1} =
-        get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
+    {ToSend1, ToReqIdx1, OtherDBChunk1} =
+        get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize, VSize),
     ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
                  {non_unique_send_list, ToSend, ToSend1}),
 
@@ -368,22 +367,18 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                end,
 
            % let the non-initiator's rr_recon process identify the remaining keys
-           ReqTree = lists:foldl(fun(KeyBin, Acc) ->
-                                         gb_trees:enter(KeyBin, 0, Acc)
-                                 end, OtherDBChunk1, ToReq1),
-           Req2Count = gb_trees:size(ReqTree),
-           ToReq2 = compress_k_list(ReqTree, OtherDBChunkOrig,
-                                    SigSize, VSize, 0, [], 0, 0),
+           ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OtherDBChunk1)] ++ ToReqIdx1),
+           ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats2 =
-               if Req2Count > 0 ->
+               if ReqIdx =/= [] ->
                       rr_recon_stats:inc([{resolve_started, 1}], NewStats);
                   true -> NewStats
                end,
 
            ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
-                  [SID, Req2Count, erlang:bit_size(ToReq2)]),
+                  [SID, length(ReqIdx), erlang:bit_size(ToReq2)]),
            comm:send(DestReconPid, {resolve_req, ToReq2}),
            
            shutdown(sync_finished,
@@ -392,8 +387,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                          misc = []});
        true ->
            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve),
-           State#rr_recon_state{to_resolve = {ToSend1, ToReq1},
-                                misc = [{db_chunk, OtherDBChunk1}]}
+           State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
+                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen}}]}
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -611,13 +606,13 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
     ?TRACE1(_Msg, State),
 
     DBChunkTree =
-        decompress_kv_list(OtherDBChunk, [], SigSize, VSize),
+        decompress_kv_list(OtherDBChunk, [], SigSize, VSize, 0),
     MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList),
                                 not gb_trees:is_defined(compress_key(Key, SigSize),
                                                         DBChunkTree)],
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, OtherDBChunk, DBChunkTree, SigSize, VSize, DestReconPid, MyDiffKeys,
+                  State, DBChunkTree, SigSize, VSize, DestReconPid, MyDiffKeys,
                   % nothing to do if the chunk is empty and no items to send
                   gb_trees:is_empty(DBChunkTree) andalso MyDiffIdx =:= <<>>),
 
@@ -628,10 +623,10 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                            method = bloom}) ->
     ?TRACE1(_Msg, State),
     
-    DBChunkTree = decompress_kv_list(DBChunk, [], SigSize, VSize),
+    DBChunkTree = decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunk, DBChunkTree, SigSize, VSize, DestReconPid, [],
+                  State, DBChunkTree, SigSize, VSize, DestReconPid, [],
                   % nothing to do if the chunk is empty
                   gb_trees:is_empty(DBChunkTree)),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
@@ -1023,55 +1018,56 @@ compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
 
 %% @doc De-compresses the binary from compress_kv_list/4 into a gb_tree with a
 %%      binary key representation and the integer of the (shortened) version.
--spec decompress_kv_list(CompressedBin::bitstring(), AccList::[{KeyBin::bitstring(), VersionShort::non_neg_integer()}],
-                         SigSize::signature_size(), VSize::signature_size())
-        -> ResTree::kv_tree().
-decompress_kv_list(<<>>, AccList, _SigSize, _VSize) ->
+-spec decompress_kv_list(CompressedBin::bitstring(),
+                         AccList::[{KeyBin::bitstring(), {VersionShort::non_neg_integer(), Idx::non_neg_integer()}}],
+                         SigSize::signature_size(), VSize::signature_size(), CurPos::non_neg_integer())
+        -> ResTree::kvi_tree().
+decompress_kv_list(<<>>, AccList, _SigSize, _VSize, _CurPos) ->
     gb_trees:from_orddict(orddict:from_list(AccList));
-decompress_kv_list(Bin, AccList, SigSize, VSize) ->
+decompress_kv_list(Bin, AccList, SigSize, VSize, CurPos) ->
     <<KeyBin:SigSize/bitstring, Version:VSize, T/bitstring>> = Bin,
-    decompress_kv_list(T, [{KeyBin, Version} | AccList], SigSize, VSize).
+    decompress_kv_list(T, [{KeyBin, {Version, CurPos}} | AccList], SigSize, VSize, CurPos + 1).
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
-        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+        (MyEntries::[], MyIOtherKvTree::kvi_tree(),
          AccFBItems::FBItems, AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::FBItems, ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}
+        -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
-        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
          AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()};
-        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
+        -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
          AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
-get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
+    get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
                   util:pow(2, VSize)).
 
 %% @doc Helper for get_full_diff/6.
 -spec get_full_diff_
-        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+        (MyEntries::[], MyIOtherKvTree::kvi_tree(),
          AccFBItems::FBItems, AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::FBItems, ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}
+        -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
-        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
          AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()};
-        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
+        -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
          AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
          SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
-get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
-    {FBItems, ReqItems, MyIOtKvTree};
-get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+get_full_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+    {FBItems, ReqItemsIdx, MyIOtKvTree};
+get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
     Key = element(1, Tpl),
     Version = element(2, Tpl),
     TplSize = tuple_size(Tpl),
@@ -1080,25 +1076,25 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
         none when TplSize =:= 3 ->
             Value = element(3, Tpl),
             get_full_diff_(Rest, MyIOtKvTree, [{Key, Value, Version} | FBItems],
-                           ReqItems, SigSize, VMod);
+                           ReqItemsIdx, SigSize, VMod);
         none when TplSize =:= 2 ->
             get_full_diff_(Rest, MyIOtKvTree, [Key | FBItems],
-                           ReqItems, SigSize, VMod);
-        {value, OtherVersionShort} ->
+                           ReqItemsIdx, SigSize, VMod);
+        {value, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = gb_trees:delete(KeyBin, MyIOtKvTree),
             if VersionShort > OtherVersionShort andalso TplSize =:= 3 ->
                    Value = element(3, Tpl),
                    get_full_diff_(Rest, MyIOtKvTree2, [{Key, Value, Version} | FBItems],
-                                  ReqItems, SigSize, VMod);
+                                  ReqItemsIdx, SigSize, VMod);
                VersionShort > OtherVersionShort andalso TplSize =:= 2 ->
                    get_full_diff_(Rest, MyIOtKvTree2, [Key | FBItems],
-                                  ReqItems, SigSize, VMod);
+                                  ReqItemsIdx, SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
                    get_full_diff_(Rest, MyIOtKvTree2, FBItems,
-                                  ReqItems, SigSize, VMod);
+                                  ReqItemsIdx, SigSize, VMod);
                true -> % VersionShort < OtherVersionShort
                    get_full_diff_(Rest, MyIOtKvTree2, FBItems,
-                                  [KeyBin | ReqItems], SigSize, VMod)
+                                  [Idx | ReqItemsIdx], SigSize, VMod)
             end
     end.
 
@@ -1106,37 +1102,37 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
 %%      and the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
--spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
+-spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                     AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
                     SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
-get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
+    get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
                    util:pow(2, VSize)).
 
 %% @doc Helper for get_part_diff/6.
--spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
+-spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                      AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
                      SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItems::[bitstring()], MyIOtherKvTree::kv_tree()}.
-get_part_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
-    {FBItems, ReqItems, MyIOtKvTree};
-get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+get_part_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+    {FBItems, ReqItemsIdx, MyIOtKvTree};
+get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case gb_trees:lookup(KeyBin, MyIOtKvTree) of
         none ->
-            get_part_diff_(Rest, MyIOtKvTree, FBItems, ReqItems,
+            get_part_diff_(Rest, MyIOtKvTree, FBItems, ReqItemsIdx,
                            SigSize, VMod);
-        {value, OtherVersionShort} ->
+        {value, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = gb_trees:delete(KeyBin, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtKvTree2, [Key | FBItems], ReqItems,
+                   get_part_diff_(Rest, MyIOtKvTree2, [Key | FBItems], ReqItemsIdx,
                                   SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, ReqItems,
+                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, ReqItemsIdx,
                                   SigSize, VMod);
                true ->
-                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [KeyBin | ReqItems],
+                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [Idx | ReqItemsIdx],
                                   SigSize, VMod)
             end
     end.
@@ -1167,15 +1163,13 @@ compress_key(Key, SigSize) ->
            <<0:FillSize, KBin/binary>>
     end.
 
-%% @doc Creates a compressed version of the (unmatched) binary keys in the given
-%%      set using the indices in the original KV list.
+%% @doc Creates a compressed version of a (key-)position list.
 %% @see shash_compress_k_list/7
--spec compress_k_list(KVTree::kv_tree(), OtherDBChunkOrig::bitstring(),
-                      SigSize::signature_size(), VSize::signature_size(),
-                      AccPos::non_neg_integer(), ResultIdx::[?RT:key()],
-                      LastPos::non_neg_integer(), Max::non_neg_integer())
+-spec compress_idx_list(SortedIdxList::[non_neg_integer()],
+                        DBChunkLen::non_neg_integer(), ResultIdx::[?RT:key()],
+                        LastPos::non_neg_integer(), Max::non_neg_integer())
         -> CompressedIndices::bitstring().
-compress_k_list(_, <<>>, _SigSize, _VSize, DBChunkLen, AccResult, _LastPos, Max) ->
+compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
     IdxSize = if Max =:= 0 -> 1;
                  true      -> bits_for_number(Max)
               end,
@@ -1189,18 +1183,10 @@ compress_k_list(_, <<>>, _SigSize, _VSize, DBChunkLen, AccResult, _LastPos, Max)
             IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
             <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>
     end;
-compress_k_list(KVTree, Bin, SigSize, VSize, AccPos, AccResult, LastPos, Max) ->
-    <<KeyBin:SigSize/bitstring, _Version:VSize, T/bitstring>> = Bin,
-    NextPos = AccPos + 1,
-    case gb_trees:is_defined(KeyBin, KVTree) of
-        false ->
-            compress_k_list(KVTree, T, SigSize, VSize, NextPos,
-                            AccResult, LastPos, Max);
-        true ->
-            CurIdx = AccPos - LastPos,
-            compress_k_list(KVTree, T, SigSize, VSize, NextPos,
-                            [CurIdx | AccResult], NextPos, erlang:max(CurIdx, Max))
-    end.
+compress_idx_list([Pos | Rest], DBChunkLen, AccResult, LastPos, Max) ->
+    CurIdx = Pos - LastPos,
+    compress_idx_list(Rest, DBChunkLen, [CurIdx | AccResult], Pos + 1,
+                      erlang:max(CurIdx, Max)).
 
 %% @doc De-compresses a bitstring with indices from compress_k_list/8 or
 %%      shash_compress_k_list/7 into a list of keys from the original key list.
@@ -1338,20 +1324,21 @@ shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos, Max) ->
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
 %%      processes in phase 2 (trivial RC).
 -spec shash_bloom_perform_resolve(
-        State::state(), DBChunk::bitstring(), DBChunkTree::kv_tree(),
+        State::state(), DBChunkTree::kvi_tree(),
         SigSize::signature_size(), VSize::signature_size(),
         DestReconPid::comm:mypid(), FBItems::[?RT:key()],
         SkipResolve::boolean()) -> rr_recon_stats:stats().
-shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunk, _DBChunkTree,
+shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunkTree,
                             _SigSize, _VSize, _DestReconPid, [], true) ->
     Stats;
 shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod},
-  DBChunk, DBChunkTree, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
+  DBChunkTree, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    {ToSendKeys1, ToReq1, DBChunkTree1} =
+    OrigDBChunkLen = gb_trees:size(DBChunkTree),
+    {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
     ?TRACE("Resolve ~S Session=~p ; ToSend=~p",
@@ -1369,15 +1356,12 @@ shash_bloom_perform_resolve(
     NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
 
     % let the initiator's rr_recon process identify the remaining keys
-    ReqTree = lists:foldl(fun(KeyBin, Acc) ->
-                                  gb_trees:enter(KeyBin, 0, Acc)
-                          end, DBChunkTree1, ToReq1),
-    Req2Count = gb_trees:size(ReqTree),
-    ToReq2 = compress_k_list(ReqTree, DBChunk, SigSize, VSize, 0, [], 0, 0),
+    ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(DBChunkTree1)] ++ ToReqIdx1),
+    ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
     ?TRACE("resolve_req ~s Session=~p ; ToReq=~p (~p bits)",
-           [_RMethod, SID, Req2Count, erlang:bit_size(ToReq2)]),
+           [_RMethod, SID, length(ToReq2), erlang:bit_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
-    if Req2Count > 0 ->
+    if ReqIdx =/= [] ->
            rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
        true -> NewStats1
     end.
@@ -1713,15 +1697,15 @@ merkle_resolve_add_leaf_hash(LeafNode, P1E, OtherMaxItemsCount, BucketSizeBits,
 -spec merkle_resolve_retrieve_leaf_hashes(
         Hashes::bitstring(), P1E::float(), MyMaxItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer())
-        -> {NHashes::bitstring(), OtherBucketBin::bitstring(), OtherBucketTree::kv_tree(),
+        -> {NHashes::bitstring(), OtherBucketTree::kvi_tree(),
             SigSize::signature_size(), VSize::signature_size()}.
 merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits) ->
     <<BSize:BucketSizeBits/integer-unit:1, HashesT/bitstring>> = Hashes,
     {SigSize, VSize} = trivial_signature_sizes(BSize, MyMaxItemsCount, P1E),
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
-    OBucketTree = decompress_kv_list(OBucketBin, [], SigSize, VSize),
-    {NHashes, OBucketBin, OBucketTree, SigSize, VSize}.
+    OBucketTree = decompress_kv_list(OBucketBin, [], SigSize, VSize, 0),
+    {NHashes, OBucketTree, SigSize, VSize}.
 
 %% @doc Gets a compact binary merkle hash list from all leaf-inner node
 %%      comparisons so that the other node can filter its leaf nodes and
@@ -1783,17 +1767,14 @@ merkle_resolve_leaves_noninit([], HashesReply, Stats,
 merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
                                   MyBuckets, NLeafNAcc, Hashes, ToSend, ToReq,
                                   ToResolve, ResolveNonEmptyAcc) ->
-    {NHashes, OBucketHashes, OBucketTree, SigSize, VSize} =
+    {NHashes, OBucketTree, SigSize, VSize} =
         merkle_resolve_retrieve_leaf_hashes(Hashes, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
-    {ToSend1, ToReq1, OBucketTree1} =
+    OrigDBChunkLen = gb_trees:size(OBucketTree),
+    {ToSend1, ToReqIdx1, OBucketTree1} =
         get_full_diff(MyBuckets, OBucketTree, ToSend, [], SigSize, VSize),
-    ReqTree = lists:foldl(fun(KeyBin, Acc) ->
-                                  gb_trees:enter(KeyBin, 0, Acc)
-                          end, OBucketTree1, ToReq1),
-    ToResolve1 = [compress_k_list(ReqTree, OBucketHashes, SigSize, VSize,
-                                  0, [], 0, 0) | ToResolve],
-    ResolveNonEmptyAcc1 =
-        ?IIF(gb_trees:size(ReqTree) =/= 0, true, ResolveNonEmptyAcc),
+    ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)] ++ ToReqIdx1),
+    ToResolve1 = [compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0) | ToResolve],
+    ResolveNonEmptyAcc1 = ?IIF(ReqIdx =/= [], true, ResolveNonEmptyAcc),
     {NHashes, ToSend1, ToReq, ToResolve1, ResolveNonEmptyAcc1, NLeafNAcc}.
 
 %% @doc Helper for the final resolve step during merkle sync.
