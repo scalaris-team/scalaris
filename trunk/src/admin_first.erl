@@ -34,8 +34,6 @@ is_first_vm() ->
     (config:read(start_type) =:= quorum andalso has_first_quorum()).
 
 has_first_quorum() ->
-    % determine own IP
-    comm:init_and_wait_for_valid_IP(),
     KnownHosts = config:read(known_hosts),
     MyServicePerVM = comm:get(service_per_vm, comm:this()),
     case lists:member(MyServicePerVM, KnownHosts) of

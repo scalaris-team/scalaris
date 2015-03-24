@@ -99,6 +99,8 @@ start_link(ServiceGroup) ->
 
 -spec init(any()) -> state().
 init(_Arg) ->
+    %% find my IP address
+    comm:init_and_wait_for_valid_IP(),
     msg_delay:send_trigger(10, {trigger_gc}),
     [].
 

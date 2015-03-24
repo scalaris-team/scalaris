@@ -129,11 +129,6 @@ on({web_debug_info, Requestor}, Nodes) ->
 
 -spec init(Options::[tuple()]) -> state().
 init(_Options) ->
-    %% find the vaild own IP adress
-    case config:read(start_type) of
-        nostart -> comm:init_and_wait_for_valid_IP();
-        _ -> ok
-    end,
     dn_cache:subscribe(),
     gb_trees:empty().
 

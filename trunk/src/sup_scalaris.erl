@@ -208,7 +208,6 @@ childs(Options) ->
                     ClientsMonitor,
                     Top,
                     Monitor,
-                    Service,
                     CommStats,
                     CommLayer,
                     FailureDetector,
@@ -226,7 +225,7 @@ childs(Options) ->
                         failed -> [];
                         _ -> DHTNodes
                     end,
-    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
+    lists:flatten([BasicServers, MgmtServers, Service, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
 
 -spec add_additional_nodes() -> ok.
 add_additional_nodes() ->
