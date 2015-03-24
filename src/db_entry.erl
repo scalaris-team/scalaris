@@ -29,7 +29,8 @@
          get_writelock/1, set_writelock/2, unset_writelock/1,
          get_version/1,
          reset_locks/1, is_locked/1,
-         is_empty/1, is_null/1, lockcount_delta/2]).
+         is_empty/1, is_null/1,
+         lockcount/1]).
 
 % only for unit tests:
 -export([inc_version/1, dec_version/1]).
@@ -128,16 +129,10 @@ is_empty(_) -> false.
 is_null({_Key, empty_val, false, 0, -1}) -> true;
 is_null(_) -> false.
 
-%% @doc Helper for lock bookkeeping. Compares two db_entries and returns delta
-%%      accordingly. It assumes that only related entries are compared, i.e. it
-%%      is assumed that no locks are released that are not held in the first
-%%      place. 
--spec lockcount_delta(db_entry:entry(), db_entry:entry()) -> integer().
-lockcount_delta(OldEntry, NewEntry) ->
-    TmpLC = get_readlock(NewEntry) - get_readlock(OldEntry),
-    WL_old = get_writelock(OldEntry),
-    WL_new = get_writelock(NewEntry),
-    if WL_new =:= false andalso WL_old =/= false -> TmpLC - 1;
-       WL_new =/= false andalso WL_old =:= false -> TmpLC + 1;
-       true                                      -> TmpLC
+%% @doc Returns how many read and write locks are currently set.
+-spec lockcount(db_entry:entry()) -> integer().
+lockcount(Entry) ->
+    WL = get_writelock(Entry),
+    if WL =:= false -> get_readlock(Entry);
+       true         -> get_readlock(Entry) + 1
     end.

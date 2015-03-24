@@ -191,8 +191,7 @@ set_entry(State, Entry, TLogSnapNo, OwnSnapNo) ->
             delete_entry(State, Entry);
         _ ->
             %% do lockcounting and copy-on-write logic
-            OldEntry = get_entry(State, db_entry:get_key(Entry)),
-            {KVStore, Subscr, Snap} = snaps(State, OldEntry, Entry, TLogSnapNo, OwnSnapNo),
+            {KVStore, Subscr, Snap} = snaps(State, Entry, TLogSnapNo, OwnSnapNo),
             %% set actual entry in DB
             call_subscribers({?DB:put(KVStore, Entry), Subscr, Snap},
                              {write, Entry})
@@ -212,7 +211,7 @@ delete_entry_at_key(State, Key) ->
 delete_entry_at_key({DB, Subscr, {Snap, LiveLC, SnapLC}} = State,  Key, Reason) ->
     %% TODO count locks
     OldEntry = get_entry(State, Key),
-    Delta = db_entry:lockcount_delta(OldEntry,db_entry:new(Key)),
+    Delta = -db_entry:lockcount(OldEntry),
     NewLiveLC = LiveLC + Delta,
     NewSnapLC = case Snap of
         false -> SnapLC;
@@ -830,18 +829,27 @@ get_snap_lc({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
 
 %% do all the necessary things to maintain possibly running
 %% snapshots. called in set_entry()
-snaps({DB, Subscr, {false, LiveLC, SnapLC}}, OldEntry, Entry, _OpSnapNum,
+snaps({DB, Subscr, {false, LiveLC, SnapLC}} = State, Entry, _OpSnapNum,
       _OwnSnapNo) ->
     %% no snapshot running, just update the live lockcount
-    {DB, Subscr, {false, LiveLC + db_entry:lockcount_delta(OldEntry, Entry), SnapLC}};
-snaps({DB, Subscr, {SnapDB, LiveLC, SnapLC}} = State, OldEntry, Entry, OpSnapNum,
+    LC_new = db_entry:lockcount(Entry),
+    % NOTE: only retrieve OldEntry if needed
+    LC_old =
+        if LC_new =:= 0 andalso LiveLC =:= 0 andalso SnapLC =:= 0 ->
+               0; % must be 0, otherwise DB is in erroneous state!
+           true ->
+               db_entry:lockcount(get_entry(State, db_entry:get_key(Entry)))
+        end,
+    {DB, Subscr, {false, LiveLC + LC_new - LC_old, SnapLC}};
+snaps({DB, Subscr, {SnapDB, LiveLC, SnapLC}} = State, Entry, OpSnapNum,
       OwnSnapNo) when OpSnapNum >= OwnSnapNo ->
+    OldEntry = get_entry(State, db_entry:get_key(Entry)),
     %% This case hints at the validate phase of a
     %% transaction. Lockcounts should only increase and in this case
     %% we should do copy-on-write. There is a special case to handle:
     %% when a write transaction is aborted but we voted prepare we
     %% need to correct the lockcounts.
-    case db_entry:lockcount_delta(OldEntry, Entry) of
+    case db_entry:lockcount(Entry) - db_entry:lockcount(OldEntry) of
         Delta when Delta < 0 ->
             %% check if LiveLC and SnapLC are > 1 in old db in this
             %% case a transaction got through validation just before a
@@ -880,13 +888,14 @@ snaps({DB, Subscr, {SnapDB, LiveLC, SnapLC}} = State, OldEntry, Entry, OpSnapNum
                                                         SnapLC}}, db_entry:get_key(Entry))
 
     end;
-snaps({DB, Subscr, {SnapDB, LiveLC, SnapLC}} = State, OldEntry, Entry, OpSnapNum,
+snaps({DB, Subscr, {SnapDB, LiveLC, SnapLC}} = State, Entry, OpSnapNum,
       OwnSnapNo) when OpSnapNum < OwnSnapNo ->
+    OldEntry = get_entry(State, db_entry:get_key(Entry)),
     %% this case hints at commit or abort of a transaction that belongs into the
     %% snapshot. Since this is the finishing phase of the transaction locks
     %% should decrease. If locks increase log a warning since thsi should not
     %% happen,
-    case db_entry:lockcount_delta(OldEntry, Entry) of
+    case db_entry:lockcount(Entry) - db_entry:lockcount(OldEntry) of
         Delta when Delta < 0 ->
             SnapEntry = get_snapshot_entry(State, db_entry:get_key(Entry)),
             case db_entry:is_null(SnapEntry) of
@@ -934,10 +943,10 @@ set_snapshot_entry(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, Entry) ->
             OldEntry = get_snapshot_entry(State, db_entry:get_key(Entry)),
             NewSnapLC = case db_entry:is_null(OldEntry) of
                 false ->
-                    SnapLC + db_entry:lockcount_delta(OldEntry, Entry);
+                    SnapLC + db_entry:lockcount(Entry) - db_entry:lockcount(OldEntry);
                 _ ->
                     LiveEntry = get_entry(State, db_entry:get_key(Entry)),
-                    SnapLC + db_entry:lockcount_delta(LiveEntry, Entry)
+                    SnapLC + db_entry:lockcount(Entry) - db_entry:lockcount(LiveEntry)
             end,
             ?TRACE_SNAP("set_snapshot_entry: ~p~n~p~n~p",
                         [self(), NewSnapLC, Entry]),
@@ -964,10 +973,10 @@ delete_snapshot_entry_at_key(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, 
     OldEntry = get_snapshot_entry(State, Key),
     NewSnapLC = case db_entry:is_null(OldEntry) of
         false ->
-            SnapLC + db_entry:lockcount_delta(OldEntry, db_entry:new(Key));
+            SnapLC - db_entry:lockcount(OldEntry);
         _ ->
             LiveEntry = get_entry(State, Key),
-            SnapLC + db_entry:lockcount_delta(LiveEntry, db_entry:new(Key))
+            SnapLC - db_entry:lockcount(LiveEntry)
     end,
     ?TRACE("deleting key ~p", [Key]),
     {DB, Subscr, {?DB:delete(SnapTable, Key), LiveLC, NewSnapLC}}.
@@ -1008,7 +1017,7 @@ copy_value_to_snapshot_table(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, 
             ?TRACE_SNAP("copy_value_to_snapshot_table: ~p~nfrom ~p to ~p~n~p",
                         [self(), SnapLC, TmpLC, Entry]),
             {?DB:put(SnapTable, Entry), LiveLC, SnapLC +
-             db_entry:lockcount_delta(OldSnapEntry, Entry)};
+             db_entry:lockcount(Entry) - db_entry:lockcount(OldSnapEntry)};
         _ ->
             {SnapTable, LiveLC, SnapLC}
     end,
