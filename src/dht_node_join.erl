@@ -109,7 +109,6 @@
 -spec join_as_first(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
         -> dht_node_state:state().
 join_as_first(Id, IdVersion, _Options) ->
-    comm:init_and_wait_for_valid_IP(),
     log:log(info, "[ Node ~w ] joining as first: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
@@ -122,7 +121,6 @@ join_as_first(Id, IdVersion, _Options) ->
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],
             State::{join, phase2(), msg_queue:msg_queue()}}.
 join_as_other(Id, IdVersion, Options) ->
-    comm:init_and_wait_for_valid_IP(),
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     JoinUUID = uid:get_pids_uid(),
