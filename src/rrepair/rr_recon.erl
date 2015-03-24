@@ -802,7 +802,7 @@ on({resolve_req, BinKeyList} = _Msg,
                    RestI::intervals:interval(), state()) -> state() | kill.
 build_struct(DBList, SyncI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
-                                     struct = OldSyncStruct,
+                                     struct = {},
                                      initiator = Initiator, stats = Stats,
                                      dhtNodePid = DhtNodePid, stage = Stage,
                                      kv_list = KVList}) ->
@@ -826,8 +826,8 @@ build_struct(DBList, SyncI, RestI,
                         true -> RMethod
                      end,
            {BuildTime, SyncStruct} =
-               util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, SyncI,
-                                                   NewKVList, Params, BeginSync)
+               util:tc(fun() -> build_recon_struct(ToBuild, SyncI,
+                                                   NewKVList, Params)
                        end),
            Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
            NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1,
@@ -2247,11 +2247,10 @@ bloom_fp(MaxItems, P1E) ->
     P1E_sub = calc_n_subparts_p1e(2, P1E),
     1 - math:pow(1 - P1E_sub, 1 / erlang:max(MaxItems, 1)).
 
--spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         DestI::intervals:non_empty_interval(), db_chunk_kv(),
-                         Params::parameters() | {}, BeginSync::boolean())
+-spec build_recon_struct(method(), DestI::intervals:non_empty_interval(),
+                         db_chunk_kv(), Params::parameters() | {})
         -> sync_struct().
-build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+build_recon_struct(trivial, I, DBItems, _Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
     {DBChunkBin, SigSize, VSize} =
@@ -2259,7 +2258,7 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     #trivial_recon_struct{interval = I, reconPid = comm:this(),
                           db_chunk = DBChunkBin,
                           sig_size = SigSize, ver_size = VSize};
-build_recon_struct(shash, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+build_recon_struct(shash, I, DBItems, _Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
     P1E = get_p1e(),
@@ -2268,7 +2267,7 @@ build_recon_struct(shash, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     #shash_recon_struct{interval = I, reconPid = comm:this(),
                         db_chunk = DBChunkBin, sig_size = SigSize,
                         p1e = P1E};
-build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+build_recon_struct(bloom, I, DBItems, _Params) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
@@ -2280,7 +2279,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     #bloom_recon_struct{interval = I, reconPid = comm:this(),
                         bf_bin = bloom:get_property(BF, filter),
                         item_count = MaxItems, p1e = P1E};
-build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
+build_recon_struct(merkle_tree, I, DBItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     MOpts = case Params of
                 {} -> % merkle_tree only!
@@ -2297,18 +2296,7 @@ build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginS
                      {leaf_hf, fun art:merkle_leaf_hf/2}]
             end,
     merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]);
-build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, BeginSync) ->
-    ?DBG_ASSERT(not intervals:is_empty(_I)),
-    ?DBG_ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
-    NTree = merkle_tree:insert_list(DBItems, OldSyncStruct),
-    if BeginSync ->
-           % no more DB items -> finish tree
-           merkle_tree:gen_hash(NTree, true);
-       true ->
-           % don't hash now - there will be new items
-           NTree
-    end;
-build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync) ->
+build_recon_struct(art, I, DBItems, _Params = {}) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     BranchFactor = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
@@ -2316,30 +2304,10 @@ build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync
                                         {bucket_size, BucketSize},
                                         {leaf_hf, fun art:merkle_leaf_hf/2},
                                         {keep_bucket, true}]),
-    if BeginSync ->
-           % no more DB items -> create art struct:
-           #art_recon_struct{art = art:new(Tree, get_art_config()),
-                             branch_factor = BranchFactor,
-                             bucket_size = BucketSize};
-       true ->
-           % more DB items to come... stay with merkle tree
-           Tree
-    end;
-build_recon_struct(art, OldSyncStruct, _I, DBItems, _Params = {}, BeginSync) ->
-    % similar to continued merkle build
-    ?DBG_ASSERT(not intervals:is_empty(_I)),
-    ?DBG_ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
-    Tree1 = merkle_tree:insert_list(DBItems, OldSyncStruct),
-    if BeginSync ->
-           % no more DB items -> finish tree, remove buckets, create art struct:
-           NTree = merkle_tree:gen_hash(Tree1, true),
-           #art_recon_struct{art = art:new(NTree, get_art_config()),
-                             branch_factor = merkle_tree:get_branch_factor(NTree),
-                             bucket_size = merkle_tree:get_bucket_size(NTree)};
-       true ->
-           % don't hash now - there will be new items
-           Tree1
-    end.
+    % create art struct:
+    #art_recon_struct{art = art:new(Tree, get_art_config()),
+                      branch_factor = BranchFactor,
+                      bucket_size = BucketSize}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER

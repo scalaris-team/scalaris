@@ -459,7 +459,7 @@ tester_type_check_rrepair(_Config) ->
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
              {build_struct, 4}, %% tries to send messages, needs valid state with pid
-             {build_recon_struct, 6}, %% DB items must be in interval
+             {build_recon_struct, 4}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
