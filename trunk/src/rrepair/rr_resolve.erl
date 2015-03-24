@@ -512,12 +512,10 @@ make_unique_kvv([_|_] = KVV) ->
 -spec make_other_kv_tree([{?RT:key(), Val::term(), db_dht:version()}])
         -> gb_trees:tree(?RT:key(), db_dht:version()).
 make_other_kv_tree(KVV) ->
-    lists:foldl(
-      fun({KeyX, _ValX, VersionX}, TreeX) ->
-              lists:foldl(fun(RKeyX, TreeY) ->
-                                  gb_trees:enter(RKeyX, VersionX, TreeY)
-                          end, TreeX, ?RT:get_replica_keys(KeyX))
-      end, gb_trees:empty(), KVV).
+    gb_trees:from_orddict(
+          orddict:from_list(
+            [{RKeyX, VersionX} || {KeyX, _ValX, VersionX} <- KVV,
+                                  RKeyX <- ?RT:get_replica_keys(KeyX)])).
 
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,
