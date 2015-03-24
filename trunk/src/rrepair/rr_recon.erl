@@ -1001,7 +1001,14 @@ calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
 calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
     0;
 calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
-    min_max(util:ceil(util:log2((M+N)*(M+N-1) / P1E) - 1), 1, MaxSize).
+    NT = M + N,
+%%     P = math:log(1 / (1-P1E)),
+    % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
+    %         point representation is sub-optimal!
+    % => use Taylor expansion of math:log(1 / (1-P1E))  at P1E = 0
+    %    (small terms first)
+    P = lists:sum([math:pow(P1E, X) / X || X <- lists:seq(5, 1, -1)]), % +O[p^6]
+    min_max(util:ceil(util:log2(NT * (2 * NT - 1) / P)), 1, MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
