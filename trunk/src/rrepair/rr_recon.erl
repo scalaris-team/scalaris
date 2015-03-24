@@ -159,7 +159,7 @@
          kv_list            = []                                     :: db_chunk_kv(),
          k_list             = []                                     :: [?RT:key()],
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
-         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReq::[?RT:key()]}
+         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReq::[bitstring()]}
          }).
 -type state() :: #rr_recon_state{}.
 
