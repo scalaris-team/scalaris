@@ -167,7 +167,7 @@ get_random_in_interval(I) ->
 -spec get_random_in_interval(intervals:simple_interval2(), Count::pos_integer()) -> [key(),...].
 get_random_in_interval({LBr, L, R, RBr}, Count) ->
     case intervals:wraps_around(LBr, L, R, RBr) of
-        false -> [normalize(Key) || Key <- get_random_in_interval2(LBr, L, R, RBr, Count)];
+        false -> get_random_in_interval2(LBr, L, R, RBr, Count);
         true  -> [normalize(Key) || Key <- get_random_in_interval2(LBr, L, ?PLUS_INFINITY + R, RBr, Count)]
     end.
 
