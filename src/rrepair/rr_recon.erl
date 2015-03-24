@@ -2107,9 +2107,13 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%     _VP = 1 - math:pow(1 - P1E, 1 / N).
     % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
-    % point representation is sub-optimal!
+    %         point representation is sub-optimal!
     % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
-    _VP = P1E / N + (N - 1) * P1E * P1E / (2 * N * N). % +O[p^3]
+    N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
+    _VP = P1E / N + (N - 1) * math:pow(P1E, 2) / (2 * N2)
+              + (2*N2 - 3*N + 1) * math:pow(P1E, 3) / (6 * N3)
+              + (6*N3 - 11*N2 + 6*N - 1) * math:pow(P1E, 4) / (24 * N4)
+              + (24*N4 - 50*N3 + 35*N2 - 10*N + 1) * math:pow(P1E, 5) / (120 * N5). % +O[p^6]
 
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
