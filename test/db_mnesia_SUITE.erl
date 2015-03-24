@@ -31,7 +31,7 @@
 
 -include("db_backend_SUITE.hrl").
 
-all() -> lists:append(tests_avail(), [tester_reopen]).
+all() -> tests_avail().
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
@@ -56,25 +56,3 @@ end_per_suite(Config) ->
 
 rw_suite_runs(N) ->
     erlang:min(N, 200).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% db_mnesia:open/1, db_mnesia getters
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_reopen(Key::?RT:key()) -> true.
-prop_reopen(Key) ->
-    DB = db_mnesia:new(randoms:getRandomString()),
-    FileName = db_mnesia:get_name(DB),
-    check_db(DB, [], "check_db_reopen_1"),
-    ?equals(db_mnesia:get(DB, Key), {}),
-    DB1 = db_mnesia:put(DB, {Key}),
-    db_mnesia:close(DB1),
-    DB2 = db_mnesia:open(FileName),
-    check_db(DB2, [{Key}], "check_db_reopen_2"),
-    ?equals(db_mnesia:get(DB2, Key), {Key}),
-    db_mnesia:close_and_delete(DB2),
-    true.
-
-tester_reopen(_Config) ->
-    tester:test(?MODULE, prop_reopen, 1, rw_suite_runs(10)).
