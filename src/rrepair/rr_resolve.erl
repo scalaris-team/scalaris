@@ -419,7 +419,7 @@ integrate_update_key_entries_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
                                RegenOk, RegenFail, FBItems, OtherKvTree, FBOn) ->
     NewFBItems =
         if not Done andalso Exists andalso FBOn ->
-               case gb_trees:lookup(db_entry:get_key(Entry), OtherKvTree) of
+               case any_replica_in_tree(?RT:get_replica_keys(db_entry:get_key(Entry)), OtherKvTree) of
                    none -> [entry_to_kvv(Entry) | FBItems];
                    {value, OtherVersion} ->
                        MyVersion = db_entry:get_version(Entry),
@@ -443,6 +443,17 @@ integrate_update_key_entries_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
        not Done and not Exists ->
            integrate_update_key_entries_ack(
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
+    end.
+
+%% @doc Tries to find any key from a list in the tree.
+-spec any_replica_in_tree(RKeys::[Key], Tree::gb_trees:tree(Key, Val))
+        -> none | {value, Val}.
+any_replica_in_tree([], _Tree) ->
+    none;
+any_replica_in_tree([Key | Rest], Tree) ->
+    case gb_trees:lookup(Key, Tree) of
+        none -> any_replica_in_tree(Rest, Tree);
+        X -> X
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
@@ -514,8 +525,7 @@ make_unique_kvv([_|_] = KVV) ->
 make_other_kv_tree(KVV) ->
     gb_trees:from_orddict(
           orddict:from_list(
-            [{RKeyX, VersionX} || {KeyX, _ValX, VersionX} <- KVV,
-                                  RKeyX <- ?RT:get_replica_keys(KeyX)])).
+            [{KeyX, VersionX} || {KeyX, _ValX, VersionX} <- KVV])).
 
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,
