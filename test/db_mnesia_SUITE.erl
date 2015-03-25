@@ -37,6 +37,13 @@ suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
+
+    %% cleanup schema generated possibly in earlier run
+    PWD = os:cmd(pwd),
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD)-1)++
+        "/../data/db_mnesia_SUITE_ct@127.0.0.1/",
+    file:delete(WorkingDir ++ "schema.DAT"),
+
     ok = db_mnesia:start(),
     tester:register_type_checker({typedef, db_backend_beh, key}, db_backend_beh, tester_is_valid_db_key),
     tester:register_value_creator({typedef, db_backend_beh, key}, db_backend_beh, tester_create_db_key, 1),
