@@ -56,8 +56,8 @@ init_per_group(Group, Config) ->
   unittest_helper:stop_ring(),
   application:stop(mnesia),
   PWD = os:cmd(pwd),
-  WorkingDir = string:sub_string(PWD, 1, string:len(PWD)-1)++
-    "/../data/recover_mnesia_SUITE_ct@127.0.0.1/",
+  WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+    "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
   file:delete(WorkingDir ++ "schema.DAT"),
 
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -70,8 +70,9 @@ init_per_group(_Group, _Config) -> {skip, "db_mnesia not set -> skipping test gr
 -endif.
 
 end_per_group(Group, Config) ->
-  WorkingDir = string:sub_string(os:cmd(pwd), 1, string:len(os:cmd(pwd))-1)++
-    "/../data/recover_mnesia_SUITE_ct@127.0.0.1/",
+  PWD = os:cmd(pwd),
+  WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+    "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
   Tabs = lists:delete(schema, mnesia:system_info(tables)),
   unittest_helper:stop_ring(),
   application:stop(mnesia),
