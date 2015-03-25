@@ -229,6 +229,8 @@ compare_and_fix_rm_with_leases(State, OldRange, NewRange) ->
             end
     end.
 
+-spec prepare_takeover(state(), intervals:interval(), intervals:interval()) 
+                                     -> state().
 prepare_takeover(State, MyRange, ActiveRange) ->
     MissingRange = intervals:minus(MyRange, ActiveRange),
     case intervals:is_non_empty(MissingRange) 
