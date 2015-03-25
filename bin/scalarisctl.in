@@ -582,32 +582,41 @@ checkinstallation() {
     # testing Ruby:
     echo -n "  Ruby-API ... "
     if [ -f "$SCALARISCLIENT_RUBY" ]; then
-        # simple read/write
-        KEY="checkinstallation-ruby-$RANDOM"
-        RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
-        RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
-        echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" > /dev/null 2>&1
-        RUBYREAD1_FAILED=$?
-        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD1_OUTPUT"`
-
-        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -w ${KEY},1"`
-        RUBYWRITE1_OUTPUT=`$SCALARISCLIENT_RUBY -w ${KEY},1 2>&1`
-        RUBYWRITE1_FAILED=$?
-        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYWRITE1_OUTPUT"`
-
-        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -r ${KEY}"`
-        RUBYREAD2_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
-        RUBYREAD2_FAILED=$?
-        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD2_OUTPUT"`
-
-        # note: we don't have a minibench for ruby...
-
-        if [ $RUBYREAD1_FAILED -ne 0 -o $RUBYWRITE1_FAILED -ne 0 -o $RUBYREAD2_FAILED -ne 0 ]; then
+        RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -h"`
+        RUBYHELP_OUTPUT=`$SCALARISCLIENT_RUBY -h 2>&1`
+        RUBYHELP_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYHELP_OUTPUT"`
+        if [ $RUBYHELP_FAILED -eq 0 ]; then
+            # simple read/write
+            KEY="checkinstallation-ruby-$RANDOM"
+            RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
+            RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+            echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" > /dev/null 2>&1
+            RUBYREAD1_FAILED=$?
+            RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD1_OUTPUT"`
+    
+            RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -w ${KEY},1"`
+            RUBYWRITE1_OUTPUT=`$SCALARISCLIENT_RUBY -w ${KEY},1 2>&1`
+            RUBYWRITE1_FAILED=$?
+            RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYWRITE1_OUTPUT"`
+    
+            RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -r ${KEY}"`
+            RUBYREAD2_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+            RUBYREAD2_FAILED=$?
+            RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD2_OUTPUT"`
+    
+            # note: we don't have a minibench for ruby...
+    
+            if [ $RUBYREAD1_FAILED -ne 0 -o $RUBYWRITE1_FAILED -ne 0 -o $RUBYREAD2_FAILED -ne 0 ]; then
+                RUBY_FAILED=1
+                RUBY_RESULT="$MSG_FAILED"
+            else
+                RUBY_FAILED=0
+                RUBY_RESULT="$MSG_SUCCESS"
+            fi
+        else
             RUBY_FAILED=1
             RUBY_RESULT="$MSG_FAILED"
-        else
-            RUBY_FAILED=0
-            RUBY_RESULT="$MSG_SUCCESS"
         fi
     else
         RUBY_FAILED=0
