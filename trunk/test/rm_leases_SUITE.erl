@@ -112,8 +112,9 @@ tester_type_check_rm_leases(_Config) ->
             {get_takeovers, 1} %% sends messages
            ],
            [
-            {compare_and_fix_rm_with_leases, 1}, %% cannot create dht_node_state (reference for bulkowner)
-            {propose_new_neighbors, 1} %% sends messages
+            {compare_and_fix_rm_with_leases, 3}, %% cannot create dht_node_state (reference for bulkowner)
+            {propose_new_neighbors, 1}, %% sends messages
+            {prepare_takeover, 3} %% cannot create dht_node_state (reference for bulkowner)
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
