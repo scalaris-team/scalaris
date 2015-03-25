@@ -207,7 +207,6 @@ make_ring_generic(Options, NodeAddFun) ->
                   config:init(NewOptions),
                   tester:start_pseudo_proc(),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
-                  mgmt_server:connect(),
                   NodeAddFun()
           end),
     FailedNodes = [X || X = {error, _ } <- StartRes],

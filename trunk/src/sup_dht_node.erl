@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,7 +45,6 @@ start_link({DHTNodeGroup, Options}) ->
                   PeriodInSeconds::pos_integer()}, []}}.
 init([{DHTNodeGroup, _Options}] = X) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
-    mgmt_server:connect(),
     supspec(X).
 %% userdevguide-end sup_dht_node:init
 

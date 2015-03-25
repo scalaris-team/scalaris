@@ -25,8 +25,7 @@
 
 -export([start_link/2,
          number_of_nodes/0,
-         node_list/0, node_list/1,
-         connect/0]).
+         node_list/0, node_list/1]).
 
 -behaviour(gen_component).
 -include("scalaris.hrl").
@@ -38,8 +37,7 @@
     {crash, PID::comm:mypid(), Reason::fd:reason()} |
     {get_list, SourcePid::comm:mypid()} |
     {get_list_length, SourcePid::comm:mypid()} |
-    {register, Node::node:node_type()} |
-    {connect}).
+    {register, Node::node:node_type()}).
 
 % internal state (known nodes)
 -type(state()::Nodes::gb_trees:tree(comm:mypid(), node:node_type())).
@@ -52,15 +50,6 @@ number_of_nodes() ->
     case comm:is_valid(Pid) andalso comm:is_valid(This) of
         true -> comm:send(Pid, {get_list_length, This});
         _    -> comm:send_local(self(), {get_list_length_response, 0})
-    end.
-
--spec connect() -> ok.
-connect() ->
-    % @todo we have to improve the startup process!
-    Pid = mgmtPid(),
-    case comm:is_valid(Pid) of
-        true -> comm:send(Pid, {connect});
-        _    -> ok
     end.
 
 %% @doc trigger a message with all nodes known to the mgmt server
@@ -107,10 +96,6 @@ on({register, Node}, Nodes) ->
     NodePid = node:pidX(Node),
     fd:subscribe(NodePid),
     gb_trees:enter(NodePid, Node, Nodes);
-
-on({connect}, State) ->
-    % ugly work around for finding the local ip by setting up a socket first
-    State;
 
 % dead-node-cache reported dead node to be alive again
 on({zombie, Node}, Nodes) ->

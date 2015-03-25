@@ -95,7 +95,8 @@ deregister_dht_node(Pid) ->
 start_link(ServiceGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                              [{erlang_register, service_per_vm},
-                              {pid_groups_join_as, ServiceGroup, ?MODULE}]).
+                              {pid_groups_join_as, ServiceGroup, ?MODULE},
+                              {wait_for_init}]).
 
 -spec init(any()) -> state().
 init(_Arg) ->
