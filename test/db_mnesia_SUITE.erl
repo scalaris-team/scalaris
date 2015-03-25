@@ -38,10 +38,10 @@ suite() -> [ {timetrap, {seconds, 60}} ].
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
 
-    %% cleanup schema generated possibly in earlier run
+    %% cleanup schema generated possibly in earlier failed run
     PWD = os:cmd(pwd),
-    WorkingDir = string:sub_string(PWD, 1, string:len(PWD)-1)++
-        "/../data/db_mnesia_SUITE_ct@127.0.0.1/",
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+        "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
     file:delete(WorkingDir ++ "schema.DAT"),
 
     ok = db_mnesia:start(),
@@ -58,6 +58,14 @@ end_per_suite(Config) ->
 
     tester:unregister_type_checker({typedef, db_backend_beh, entry}),
     tester:unregister_value_creator({typedef, db_backend_beh, entry}),
+
+    application:stop(mnesia),
+    %% cleanup schema generated in this run
+    PWD = os:cmd(pwd),
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+        "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
+    file:delete(WorkingDir ++ "schema.DAT"),
+
     unittest_helper:stop_minimal_procs(Config),
     unittest_helper:end_per_suite(Config).
 
