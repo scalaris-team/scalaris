@@ -52,10 +52,11 @@ end_per_suite(Config) ->
 
 -ifdef(PRBR_MNESIA).
 init_per_group(Group, Config) ->
-  % stop ring from previous test case (it may have run into a timeout)
+  %% stop ring from previous test case (it may have run into a timeout)
   unittest_helper:stop_ring(),
   application:stop(mnesia),
-  WorkingDir = string:sub_string(os:cmd(pwd), 1, string:len(os:cmd(pwd))-1)++
+  PWD = os:cmd(pwd),
+  WorkingDir = string:sub_string(PWD, 1, string:len(PWD)-1)++
     "/../data/recover_mnesia_SUITE_ct@127.0.0.1/",
   file:delete(WorkingDir ++ "schema.DAT"),
 
@@ -65,7 +66,7 @@ init_per_group(Group, Config) ->
   unittest_helper:check_ring_size_fully_joined(8),
   unittest_helper:init_per_group(Group, Config).
 -else.
-init_per_group(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test group"}.
+init_per_group(_Group, _Config) -> {skip, "db_mnesia not set -> skipping test group"}.
 -endif.
 
 end_per_group(Group, Config) ->
