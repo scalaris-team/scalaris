@@ -120,6 +120,7 @@ is_disjoint(I, [H|T]) ->
     intervals:is_empty(intervals:intersection(I,H))
         andalso is_disjoint(I, T).
 
+-spec get_dht_node_state(comm:mypid(), atom() | list(atom())) -> term() | list(term()).
 get_dht_node_state(Pid, What) ->
     comm:send(Pid, {get_state, comm:this(), What}),
     receive
@@ -129,12 +130,14 @@ get_dht_node_state(Pid, What) ->
             false
     end.
 
+-spec get_all_leases() -> list(lease_list:lease_list()).
 get_all_leases() ->
     GetLeases = fun(Pid) ->
                         get_dht_node_state(Pid, lease_list)
                 end,
     lists:filtermap(GetLeases, all_dht_nodes()).
 
+-spec all_dht_nodes() -> list(comm:mypid()).
 all_dht_nodes() ->
     mgmt_server:node_list(),
     receive
