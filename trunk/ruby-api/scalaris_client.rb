@@ -107,7 +107,13 @@ rescue OptionParser::ParseError
   exit
 end
 
-sc = Scalaris::TransactionSingleOp.new
+sc = nil
+communicating_options = [options[:read], options[:write], options[:test_and_set], 
+                         options[:add_on_nr], options[:add_del_on_list]]
+
+if communicating_options.compact != []
+  sc = Scalaris::TransactionSingleOp.new
+end
 
 pp sc.read(options[:read]) unless options[:read] == nil
 pp write(sc, options[:write]) unless options[:write] == nil
