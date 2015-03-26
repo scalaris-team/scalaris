@@ -305,7 +305,7 @@ set_bits(Filter, []) ->
 check_Bits(Filter, [Pos | Positions]) ->
     case Filter of
         <<_:Pos/bitstring, 1:1, _/bitstring>> -> check_Bits(Filter, Positions);
-        <<_:Pos/bitstring, 0:1, _/bitstring>> -> false
+        _ -> false
     end;
 check_Bits(_, []) ->
     true.
