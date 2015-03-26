@@ -147,7 +147,8 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
 
 -spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           EmbeddedMsg::any())
-        -> {ok, dht_node_state:state(), slide_op:slide_op()} | error.
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} | 
+           {abort, Reason::term(), State::dht_node_state:state(), SlideOp1::slide_op:slide_op()}.
 prepare_send_delta2(State, SlideOp, Msg) ->
     % check that split has been done
     case Msg of
@@ -157,9 +158,8 @@ prepare_send_delta2(State, SlideOp, Msg) ->
             %State1 = locally_disable_lease(State, NewLease),
             {ok, State, SlideOp};
         {split, fail, _Lease} ->
-            log:log("prepare_send_delta2: split failed~n", []),
-            % @todo
-            error
+            %% log:log("prepare_send_delta2: split failed~n", []),
+            {abort, Msg, State, SlideOp}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
