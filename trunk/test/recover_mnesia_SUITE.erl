@@ -61,7 +61,7 @@ init_per_group(Group, Config) ->
     remove_node ->
       unittest_helper:init_per_group(Group, Config);
     _ ->
-      %% stop ring from previous test case (it may have run into a timeout)
+      %% stop ring and clean repository from previous test case (it may have run into a timeout)
       unittest_helper:stop_ring(),
       application:stop(mnesia),
       PWD = os:cmd(pwd),
@@ -86,6 +86,7 @@ end_per_group(Group, Config) ->
     remove_node ->
       unittest_helper:end_per_group(Group, Config);
     _ ->
+      % stop ring, stop mnesia and clean repository
       PWD = os:cmd(pwd),
       WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
           "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
@@ -113,7 +114,7 @@ rw_suite_runs(N) ->
 tester_ring(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
-  ct:pal("ring stopped -> sleeping. Waiting for leases to expire"),
+  % wait for leases to expire
   timer:sleep(11000),
   unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
                                      {leases, true},
@@ -125,7 +126,7 @@ tester_ring(Config) ->
 % test write/1 write data to KV DBs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_write(_Config) ->
-  % writting data to KV
+  % write data to KV
   [kv_on_cseq:write(integer_to_list(X),X)||X<-lists:seq(1,100)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -134,7 +135,7 @@ tester_write(_Config) ->
 tester_read(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
-  ct:pal("ring stopped -> sleeping. Waiting for leases to expire"),
+  % wait for leases to expire
   timer:sleep(11000),
   unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
     {leases, true},
@@ -149,21 +150,18 @@ tester_read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_remove_node(_Config) ->
   Tabs = lists:delete(schema, mnesia:system_info(tables)),
+  % delete random node from ring
   Node_name = string:sub_word(atom_to_list(lists:last(Tabs)), 2, $:),
   Node_tabs = [ Tab || Tab <- Tabs, string:sub_word(atom_to_list(Tab), 2, $:) =:= Node_name ],
-  {Ok, _Not_found} = admin:del_nodes_by_name([Node_name], false),
-  ct:pal("node removed: ~p ~nDb to be removed: ~p", [Ok, Node_tabs]),
+  {[Node_name], _Not_found} = admin:del_nodes_by_name([Node_name], false),
+  % wait for leases to expire
   timer:sleep(11000),
-  ct:pal("wake up -> delete DBs"),
-  %[ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Node_tabs],
   [{atomic, ok} = mnesia:delete_table(X)||X<-Node_tabs],
-  ct:pal("DBs removed -> wait for leases"),
   util:wait_for(fun admin:check_leases/0, 10000),
+  % check data integrity
   [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
+  % add node to reform 4 node ring
   admin:add_nodes(1),
-  ct:pal("add node to replace deleted one. Sleep for new node to join"),
   timer:sleep(3000),
-  ct:pal("wake up -> check ring size == 4"),
   unittest_helper:check_ring_size_fully_joined(4),
-  4 = admin:number_of_nodes(),
   true.
