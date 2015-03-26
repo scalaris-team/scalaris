@@ -62,7 +62,7 @@ check_local_leases(DHTNode) ->
             LocalCorrect = MyRange =:= ActiveInterval,
             io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n", 
                       [LocalCorrect, 
-                       l_on_cseq:get_range(ActiveLease), MyRange]),
+                       ActiveInterval, MyRange]),
             length(PassiveLeases) == 0 andalso LocalCorrect
     end.
 
