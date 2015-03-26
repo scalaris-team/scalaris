@@ -149,8 +149,13 @@ make_ring_with_ids(Ids, Options) when is_list(Ids) ->
                 [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}])
                  | [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
         end,
-  TimeTrap = test_server:timetrap(3000 + erlang:length(Ids) * 1000),
+  Size = erlang:length(Ids),
+  TimeTrap = test_server:timetrap(3000 + Size * 1000),
   Pid = make_ring_generic(Options, NodeAddFun),
+  check_ring_size(Size),
+  wait_for_stable_ring(),
+  check_ring_size(Size),
+  ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
   test_server:timetrap_cancel(TimeTrap),
   Pid.
 
