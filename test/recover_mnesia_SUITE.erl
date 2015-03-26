@@ -30,12 +30,15 @@
 -define(CLOSE, close).
 
 all() -> [
-  {group, make_ring_group},
-  {group, recover_data_group}].
+    {group, make_ring_group},
+    {group, remove_node_group}
+  ].
 groups() ->
   [
-    {make_ring_group, [sequence], [tester_ring_8]},
-    {recover_data_group, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_write, tester_read]}
+    {make_ring_group, [sequence], [tester_ring, tester_write, {group, recover_data_group}]},
+    {recover_data_group, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_read]},
+    {remove_node_group, [sequence], [tester_write, {group, remove_node}]},
+    {remove_node, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_remove_node]}
   ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
@@ -52,33 +55,47 @@ end_per_suite(Config) ->
 
 -ifdef(PRBR_MNESIA).
 init_per_group(Group, Config) ->
-  %% stop ring from previous test case (it may have run into a timeout)
-  unittest_helper:stop_ring(),
-  application:stop(mnesia),
-  PWD = os:cmd(pwd),
-  WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-    "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
-  file:delete(WorkingDir ++ "schema.DAT"),
+  case Group of
+    recover_data_group ->
+      unittest_helper:init_per_group(Group, Config);
+    remove_node ->
+      unittest_helper:init_per_group(Group, Config);
+    _ ->
+      %% stop ring from previous test case (it may have run into a timeout)
+      unittest_helper:stop_ring(),
+      application:stop(mnesia),
+      PWD = os:cmd(pwd),
+      WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+         "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
+      file:delete(WorkingDir ++ "schema.DAT"),
 
-  {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-  unittest_helper:make_ring(8, [{config, [{log_path, PrivDir},
-    {leases, true}]}]),
-  unittest_helper:check_ring_size_fully_joined(8),
-  unittest_helper:init_per_group(Group, Config).
+      {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+      unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+        {leases, true}]}]),
+      unittest_helper:check_ring_size_fully_joined(4),
+      unittest_helper:init_per_group(Group, Config)
+  end.
 -else.
 init_per_group(_Group, _Config) -> {skip, "db_mnesia not set -> skipping test group"}.
 -endif.
 
 end_per_group(Group, Config) ->
-  PWD = os:cmd(pwd),
-  WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-    "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
-  Tabs = lists:delete(schema, mnesia:system_info(tables)),
-  unittest_helper:stop_ring(),
-  application:stop(mnesia),
-  [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
-  ok = file:delete(WorkingDir ++ "schema.DAT"),
-  unittest_helper:end_per_group(Group, Config).
+  case Group of
+    recover_data_group ->
+      unittest_helper:end_per_group(Group, Config);
+    remove_node ->
+      unittest_helper:end_per_group(Group, Config);
+    _ ->
+      PWD = os:cmd(pwd),
+      WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+          "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
+      Tabs = lists:delete(schema, mnesia:system_info(tables)),
+      unittest_helper:stop_ring(),
+      application:stop(mnesia),
+      [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
+      ok = file:delete(WorkingDir ++ "schema.DAT"),
+      unittest_helper:end_per_group(Group, Config)
+   end.
 
 init_per_testcase(_TestCase, Config) ->
   Config.
@@ -90,10 +107,10 @@ rw_suite_runs(N) ->
   erlang:min(N, 200).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% test create_ring_8/1 of mnesia recovery
+% test create_ring/1 of mnesia recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec tester_ring_8([db_backend_beh:entry()]) -> true.
-tester_ring_8(Config) ->
+-spec tester_ring([db_backend_beh:entry()]) -> true.
+tester_ring(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
   ct:pal("ring stopped -> sleeping. Waiting for leases to expire"),
@@ -105,12 +122,15 @@ tester_ring_8(Config) ->
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% test with_data/1 write data to KV DBs and ensure data integrity after recovery
+% test write/1 write data to KV DBs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_write(_Config) ->
   % writting data to KV
   [kv_on_cseq:write(integer_to_list(X),X)||X<-lists:seq(1,100)].
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% test read/1 ensure data integrity after recovery
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_read(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
@@ -124,3 +144,26 @@ tester_read(Config) ->
   [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
   true.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% test remove_node/1 remove a node and ensure data integrity after recovery
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tester_remove_node(_Config) ->
+  Tabs = lists:delete(schema, mnesia:system_info(tables)),
+  Node_name = string:sub_word(atom_to_list(lists:last(Tabs)), 2, $:),
+  Node_tabs = [ Tab || Tab <- Tabs, string:sub_word(atom_to_list(Tab), 2, $:) =:= Node_name ],
+  {Ok, _Not_found} = admin:del_nodes_by_name([Node_name], false),
+  ct:pal("node removed: ~p ~nDb to be removed: ~p", [Ok, Node_tabs]),
+  timer:sleep(11000),
+  ct:pal("wake up -> delete DBs"),
+  %[ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Node_tabs],
+  [{atomic, ok} = mnesia:delete_table(X)||X<-Node_tabs],
+  ct:pal("DBs removed -> wait for leases"),
+  util:wait_for(fun admin:check_leases/0, 10000),
+  [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
+  admin:add_nodes(1),
+  ct:pal("add node to replace deleted one. Sleep for new node to join"),
+  timer:sleep(3000),
+  ct:pal("wake up -> check ring size == 4"),
+  unittest_helper:check_ring_size_fully_joined(4),
+  4 = admin:number_of_nodes(),
+  true.
