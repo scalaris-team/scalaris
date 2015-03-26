@@ -273,7 +273,7 @@ stabilize(Neighbors, RT, Index, Node, RTLoop) ->
 %% userdevguide-end rt_chord:stabilize
 
 %% userdevguide-begin rt_chord:update
-%% @doc Updates the routing table due to a changed node ID, pred and/or succ.
+%% @doc Updates the routing table due to a changed neighborhood.
 -spec update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
              NewNeighbors::nodelist:neighborhood())
         -> {ok | trigger_rebuild, rt()}.
@@ -484,30 +484,31 @@ next_hop(State, Id) ->
     RT = dht_node_state:get(State, rt),
     next_hop(Neighbors, RT, Id).
 
-%% userdevguide-end rt_chord:next_hop
-
-
 -spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> {succ | other, comm:mypid()}.
 next_hop(Neighbors, RT, Id) ->
     % check routing table:
     RTSize = get_size(RT),
-    {NodeRT, RTLoop} = case util:gb_trees_largest_smaller_than(Id, RT) of
-                 {value, _Key, N} ->
-                     N;
-                 nil when RTSize =:= 0 ->
-                     {nodelist:succ(Neighbors), undefined};
-                 nil -> % forward to largest finger
-                     {_Key, N} = gb_trees:largest(RT),
-                     N
-             end,
-    FinalNode =
-    case RTSize < config:read(rt_size_use_neighbors) of
-        false -> NodeRT;
-        _     ->
-            % check neighborhood:
-            nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
+    {NextHopId, NextHop1} =
+    case util:gb_trees_largest_smaller_than(Id, RT) of
+        {value, Key, Node} ->
+            {Key, Node};
+        nil when RTSize =:= 0 ->
+            Succ = nodelist:succ(Neighbors),
+            {node:id(Succ), node:pidX(Succ)};
+        nil -> % forward to largest finger
+            gb_trees:largest(RT)
     end,
-    {node:pidX(FinalNode), RTLoop}.
+    case RTSize < config:read(rt_size_use_neighbors) of
+        false ->
+            NextHop1;
+        _     -> % check neighborhood:
+            % create a fake LastFound node:node_type() for largest_smaller_than
+            % (only Id is used in largest_smaller_than)
+            BestSoFar = node:new(NextHop1, NextHopId, 0),
+            NextHop2 = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
+            node:pidX(NextHop2)
+    end.
+%% userdevguide-end rt_chord:next_hop
 
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node
@@ -517,17 +518,19 @@ export_rt_to_dht_node(RT, Neighbors) ->
     Pred = nodelist:pred(Neighbors),
     Succ = nodelist:succ(Neighbors),
     % always include the pred and succ in the external representation
-    % note: we are subscribed at the RM for changes to these nodes
-    Tree = gb_trees:enter(node:id(Succ), {Succ, undefined},
-                          gb_trees:enter(node:id(Pred), {Pred, undefined}, gb_trees:empty())),
-    util:gb_trees_foldl(fun (_K, V, Acc) ->
+    % note: we are subscribed at the RM for changes to whole neighborhood
+    Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
+                          gb_trees:enter(node:id(Pred), node:pidX(Pred), gb_trees:empty())),
+    ERT = util:gb_trees_foldl(fun (_Key, {Node, RTLoop}, Acc) ->
                                  % only store the ring id and the according node structure
-                                {Node, _RTLoop} = V,
                                  case node:id(Node) =:= Id of
                                      true  -> Acc;
-                                     false -> gb_trees:enter(node:id(Node), V, Acc)
+                                     false -> gb_trees:enter(node:id(Node), RTLoop, Acc)
                                  end
-                        end, Tree, RT).
+                        end, Tree, RT),
+    log:log(debug, "MyId: ~p.~nPred: ~p.~nSucc: ~p.~nRT: ~.2p.~nERT: ~.2p",
+            [Id, Pred, Succ, gb_trees:to_list(RT), gb_trees:to_list(ERT)]),
+    ERT.
 %% userdevguide-end rt_chord:export_rt_to_dht_node
 
 %% @doc Converts the (external) representation of the routing table to a list

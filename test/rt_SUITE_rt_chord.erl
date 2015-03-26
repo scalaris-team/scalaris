@@ -31,11 +31,11 @@ create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes) ->
     gb_trees:from_orddict(
       [begin
            Key = number_to_key(N),
-           {Key, {node:new(lists:nth(Idx, Nodes), Key, 0), undefined}}
+           {Key, lists:nth(Idx, Nodes)}
        end || {N, Idx} <- RT_Keys]).
 
 check_next_hop(State, _Succ, N, NodeExp) ->
-    {Node, _} = ?RT:next_hop(State, number_to_key(N)),
+    Node = ?RT:next_hop(State, number_to_key(N)),
     ?equals_w_note(Node, NodeExp, io_lib:format("~B", [N])).
 
 -spec check_split_key_half(Begin::?RT:key(), End::?RT:key() | ?PLUS_INFINITY_TYPE, SplitKey::?RT:key()) -> true.

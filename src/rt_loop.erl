@@ -248,19 +248,12 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
     WrappedMsg = Msg,
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true ->
-            %% log:log(warn, "[routing_table] lookup_aux succ in interval"),
             %% TODO: do I need a WrappedMsg here ??!
             comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
         _ ->
-            case rt_chord:next_hop(Neighbors, ERT, Key) of
-                {Node, undefined} ->
-                    %% log:log(warn, "[routing_table] lookup_aux next_hop undefined"),
-                    NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
-                    comm:send(Node, NewMsg, [{shepherd, self()}, {group_member, routing_table}]);
-                {_Node, RTLoop} ->
-                    NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
-                    comm:send(RTLoop, NewMsg, [{shepherd, self()}])
-            end
+            NextHop = rt_chord:next_hop(Neighbors, ERT, Key), % TODO change rt_chord
+            NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+            comm:send(NextHop, NewMsg, [{shepherd, self()}])
     end.
 
 -spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
