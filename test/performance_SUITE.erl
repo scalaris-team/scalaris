@@ -28,6 +28,7 @@
 
 all() ->
     [empty,
+     intervals_in,
      get_keys_for_replica_string,
      md5,
      {group, with_config},
@@ -106,6 +107,13 @@ empty(_Config) ->
     iter(count(), fun () ->
                        ok
                   end, "empty"),
+    ok.
+
+intervals_in(_Config) ->
+    I = intervals:new('(', ?RT:hash_key("0"), ?RT:hash_key("1"), ']'),
+    iter2(count()*10, fun (X) ->
+                       intervals:in(X, I)
+                  end, "intervals:in/2"),
     ok.
 
 ets_ordset_lookup1(_Config) ->
