@@ -143,7 +143,7 @@ merkle_tree(_) ->
     {Inner, Leafs, _Items} = merkle_tree:size_detail(TestTree),
     
     BuildT = measure_util:time_avg(
-           fun() -> merkle_tree:bulk_build(I, DB, []) end,
+           fun() -> merkle_tree:new(I, DB, []) end,
            ExecTimes, []),
         
     IterateT = measure_util:time_avg(
@@ -167,7 +167,7 @@ merkle_tree(_) ->
             ------------------------
             PARAMETER: AddedItems=~p ; ExecTimes=~p
             TreeSize: InnerNodes=~p ; Leafs=~p,
-            BuildTime:      ~p (without inner hashing)
+            BuildTime:      ~p
             IterationTime : ~p
             GenHashTime:    ~p
             SimpleSizeTime: ~p
