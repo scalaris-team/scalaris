@@ -618,9 +618,10 @@ p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
 -spec keys_to_intervals(mt_bucket(), [I,...])
         -> Buckets::[{I, Count::non_neg_integer(), mt_bucket()}] when
      is_subtype(I, intervals:continuous_interval()).
- keys_to_intervals(KList, IList) ->
+keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    lists:foldr(fun(Key, Acc) ->
+    % note: no need to preserve the keys' order -> use the 10% faster foldl:
+    lists:foldl(fun(Key, Acc) ->
                         p_key_in_I(Key, decode_key(Key), [], Acc)
                 end, IBucket, KList).
 
