@@ -229,8 +229,15 @@ is_subset(A, B) -> A =:= intersection(A, B).
 
 %% @doc X \in I. Precondition: is_well_formed_simple(I).
 -spec in_simple(X::key(), I::simple_interval()) -> boolean().
-in_simple(X, {FirstBr, First, Last, LastBr}) ->
-    is_between(FirstBr, First, X, Last, LastBr);
+% inline is_between/5 for performance (+15-20%):
+in_simple(X, {'(', Begin, End, ']'}) ->
+    X > Begin andalso End >= X;
+in_simple(X, {'[', Begin, End, ')'}) ->
+    X >= Begin andalso End > X;
+in_simple(X, {'[', Begin, End, ']'}) ->
+    X >= Begin andalso End >= X;
+in_simple(X, {'(', Begin, End, ')'}) ->
+    X > Begin andalso End > X;
 in_simple(_, all)          -> true;
 in_simple(X, {X}) -> true;
 in_simple(_, {_}) -> false.
