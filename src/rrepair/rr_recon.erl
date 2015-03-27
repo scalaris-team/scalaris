@@ -1034,16 +1034,16 @@ decompress_kv_list(Bin, AccList, SigSize, VSize, CurPos) ->
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
         (MyEntries::[], MyIOtherKvTree::kvi_tree(),
-         AccFBItems::FBItems, AccReqItems::[bitstring()],
+         AccFBItems::FBItems, AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
         (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
         (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
+         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
@@ -1053,16 +1053,16 @@ get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
 %% @doc Helper for get_full_diff/6.
 -spec get_full_diff_
         (MyEntries::[], MyIOtherKvTree::kvi_tree(),
-         AccFBItems::FBItems, AccReqItems::[bitstring()],
+         AccFBItems::FBItems, AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
             when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
         (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[bitstring()],
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
         (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
+         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
          SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
@@ -1103,7 +1103,7 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) -
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                    AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
+                    AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
                     SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
 get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
@@ -1112,7 +1112,7 @@ get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
 
 %% @doc Helper for get_part_diff/6.
 -spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                     AccFBItems::[?RT:key()], AccReqItems::[bitstring()],
+                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
                      SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
 get_part_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
