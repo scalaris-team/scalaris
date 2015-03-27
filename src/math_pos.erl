@@ -113,18 +113,18 @@ multiply_rev1([], _Factor, _Carry, Prod, _Base, cutoff, 0) ->
 %%      result in the last component). Divisor must be a positive integer.
 -spec divide(A::position_var(), Divisor::pos_integer(), Base::pos_integer()) -> position_var().
 divide(A = [_|_], Divisor, Base) when is_integer(Divisor) andalso Divisor > 1 ->
-    lists:reverse(divide_torev(A, Divisor, 0, [], Base));
+    divide_helper(A, Divisor, 0, Base);
 divide(A = [_|_], 1, _Base) -> A;
 divide([], _Divisor, _Base) -> [].
 
--spec divide_torev(Diff::position_var(), Divisor::pos_integer(), Carry::non_neg_integer(),
-        Product_rev::position_var(), _Base) -> position_var().
-divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
+-spec divide_helper(Diff::position_var(), Divisor::pos_integer(), Carry::non_neg_integer(),
+                   _Base) -> position_var().
+divide_helper([D1 | DR], Divisor, Carry, Base) ->
     Diff0 = Carry * Base + D1,
     Diff2 = Diff0 div Divisor,
     NewCarry = Diff0 rem Divisor,
-    divide_torev(DR, Divisor, NewCarry, [Diff2 | Product_rev], Base);
-divide_torev([], _Divisor, _Carry, Product_rev, _Base) -> Product_rev.
+    [Diff2 | divide_helper(DR, Divisor, NewCarry, Base)];
+divide_helper([], _Divisor, _Carry, _Base) -> [].
 
 %% @doc Bring two lists to the same length by appending or prepending zeros.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back)
@@ -169,12 +169,12 @@ remove_zeros_front([], _) -> [].
 %%      given Base.
 -spec from_decimal(X::non_neg_integer(), Base::pos_integer()) -> position_var().
 from_decimal(X, Base) ->
-    from_decimal_(X, Base, []).
+    from_decimal_(X, Base).
 
-from_decimal_(X, Base, Acc) when X < Base ->
-    lists:reverse(Acc, [X]);
-from_decimal_(X, Base, Acc) ->
-    from_decimal_(X div Base, Base, [X rem Base | Acc]).
+from_decimal_(X, Base) when X < Base ->
+    [X];
+from_decimal_(X, Base) ->
+    [X rem Base | from_decimal_(X div Base, Base)].
 
 %% @doc Converts a position var with the given Base to a (decimal, non-negative)
 %%      integer.

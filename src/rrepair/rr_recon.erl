@@ -33,7 +33,7 @@
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
--export([merkle_compress_hashlist/4, merkle_decompress_hashlist/4]).
+-export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -652,7 +652,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
     {P1E_I, _P1E_L, SigSizeI, SigSizeL} =
         merkle_next_signature_sizes(Params, LastP1ETotal, OtherMaxItemsCount,
                                     MyLastMaxItemsCount),
-    ToCheck = merkle_decompress_hashlist(ToCheck0, [], SigSizeI, SigSizeL),
+    ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
     {FlagsBin, RTree, MerkleSyncNew, NStats, MyMaxItemsCount} =
         check_node(ToCheck, Tree, SigSizeI, SigSizeL,
                    MyLastMaxItemsCount, OtherMaxItemsCount, MerkleSync, Stats),
@@ -1459,13 +1459,12 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSizeI, SigSizeL) ->
 
 %% @doc Transforms the compact binary representation of merkle hash lists from
 %%      merkle_compress_hashlist/2 back into the original form.
--spec merkle_decompress_hashlist(bitstring(), Hashes,
-                                 SigSizeI::signature_size(),
-                                 SigSizeL::signature_size()) -> Hashes
-    when is_subtype(Hashes, [merkle_cmp_request()]).
-merkle_decompress_hashlist(<<>>, HashListR, _SigSizeI, _SigSizeL) ->
-    lists:reverse(HashListR);
-merkle_decompress_hashlist(Bin, HashListR, SigSizeI, SigSizeL) ->
+-spec merkle_decompress_hashlist(bitstring(), SigSizeI::signature_size(),
+                                 SigSizeL::signature_size())
+        -> Hashes::[merkle_cmp_request()].
+merkle_decompress_hashlist(<<>>, _SigSizeI, _SigSizeL) ->
+    [];
+merkle_decompress_hashlist(Bin, SigSizeI, SigSizeL) ->
     IsLeaf = case Bin of
                  <<1:1, 1:1, Hash:SigSizeL/integer-unit:1, Bin2/bitstring>> ->
                      true;
@@ -1475,7 +1474,7 @@ merkle_decompress_hashlist(Bin, HashListR, SigSizeI, SigSizeL) ->
                  <<0:1, Hash:SigSizeI/integer-unit:1, Bin2/bitstring>> ->
                      false
              end,
-    merkle_decompress_hashlist(Bin2, [{Hash, IsLeaf} | HashListR], SigSizeI, SigSizeL).
+    [{Hash, IsLeaf} | merkle_decompress_hashlist(Bin2, SigSizeI, SigSizeL)].
 
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes
 %%      (executed on non-initiator).

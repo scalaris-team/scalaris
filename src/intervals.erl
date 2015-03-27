@@ -34,7 +34,7 @@
 -compile({inline, [intersection_simple/2, intersection_simple_element/2]}).
 -compile({inline, [union_simple/2, union/2]}).
 -compile({inline, [minus_simple/2, minus_simple2/2]}).
--compile({inline, [split2/8]}).
+-compile({inline, [split2/7]}).
 
 -include("scalaris.hrl").
 
@@ -714,33 +714,33 @@ split(I, Parts) ->
         RKey -> [I];
         _ ->
             SplitKeys = ?RT:get_split_keys(LKey, RKey, Parts),
-            lists:reverse(split2(LBr, LKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr, []))
+            split2(LBr, LKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr)
     end.
 
--compile({nowarn_unused_function, {split2_feeder, 8}}).
+-compile({nowarn_unused_function, {split2_feeder, 7}}).
 -spec split2_feeder
         (left_bracket(), key(), key(), right_bracket(), SplitKeys::[?RT:key()],
-         InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
+         InnerLBr::left_bracket(), InnerRBr::right_bracket())
         -> {left_bracket(), key(), key(), right_bracket(), SplitKeys::[?RT:key()],
-            InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]};
+            InnerLBr::left_bracket(), InnerRBr::right_bracket()};
         (left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')', SplitKeys::[?RT:key()],
-         InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
+         InnerLBr::left_bracket(), InnerRBr::right_bracket())
         -> {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')', SplitKeys::[?RT:key()],
-            InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]}.
-split2_feeder(LBr, LKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr, Acc) ->
+            InnerLBr::left_bracket(), InnerRBr::right_bracket()}.
+split2_feeder(LBr, LKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr) ->
     {LBr, LKey, RKey, RBr,
      util:shuffle(lists:usort([X || X <- SplitKeys, X =/= LKey])),
-     InnerLBr, InnerRBr, Acc}.
+     InnerLBr, InnerRBr}.
 
 -spec split2(left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE,  %% then right_bracket is ')'
              right_bracket(), SplitKeys::[?RT:key()], InnerLBr::left_bracket(),
-             InnerRBr::right_bracket(), Acc::[interval()]) -> [interval()].
-split2(LBr, LKey, RKey, RBr, [], _InnerLBr, _InnerRBr, Acc) ->
-    [new(LBr, LKey, RKey, RBr) | Acc];
-split2(LBr, LKey, RKey, RBr, [SplitKey | SplitKeys], InnerLBr, InnerRBr, Acc) ->
+             InnerRBr::right_bracket()) -> [interval()].
+split2(LBr, LKey, RKey, RBr, [], _InnerLBr, _InnerRBr) ->
+    [new(LBr, LKey, RKey, RBr)];
+split2(LBr, LKey, RKey, RBr, [SplitKey | SplitKeys], InnerLBr, InnerRBr) ->
     ?DBG_ASSERT(LKey =/= SplitKey),
-    split2(InnerLBr, SplitKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr,
-           [new(LBr, LKey, SplitKey, InnerRBr) | Acc]).
+    [new(LBr, LKey, SplitKey, InnerRBr) |
+         split2(InnerLBr, SplitKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr)].
 
 %% @doc returns a list of simple intervals that make up Interval
 -spec get_simple_intervals(Interval::interval()) -> [simple_interval()].

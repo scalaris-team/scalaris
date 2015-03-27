@@ -450,7 +450,7 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     ?DBG_ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
-    FProbList = get_non_uniform_probs(RanGen, []),
+    FProbList = get_non_uniform_probs(RanGen),
     % note: don't use RanGen any more - we don't get the new state in the last call!
     CellLength = case length(FProbList) of
                    0 -> KeyCount + 1;
@@ -521,11 +521,11 @@ build_failure_cells([P | T], List, CellLength, Acc) ->
     {Cell, LT} = util:safe_split(CellLength, List),
     build_failure_cells(T, LT, CellLength, [{P, Cell}|Acc]).
 
--spec get_non_uniform_probs(random_bias:generator(), [float()]) -> [float()].
-get_non_uniform_probs(RanGen, Acc) ->
+-spec get_non_uniform_probs(random_bias:generator()) -> [float()].
+get_non_uniform_probs(RanGen) ->
     case random_bias:next(RanGen) of
-        {ok, V, RanGen1} -> get_non_uniform_probs(RanGen1, [V | Acc]);
-        {last, V, exit}  -> lists:reverse([V | Acc])
+        {ok, V, RanGen1} -> [V | get_non_uniform_probs(RanGen1)];
+        {last, V, exit}  -> [V]
     end.
 
 %% TODO: we need to create random values (prefixed them with old/new for better

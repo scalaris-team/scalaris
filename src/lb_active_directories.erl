@@ -220,13 +220,13 @@ directory_routine(DirKey, _Type, Schedule) ->
         true -> Schedule;
         false ->
             Pool = Directory#directory.pool,
-            ScheduleNew = find_matches(Pool, []),
+            ScheduleNew = find_matches(Pool),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
             ScheduleNew
     end.
 
--spec find_matches(gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
-find_matches(Nodes, Result) ->
+-spec find_matches(gb_sets:set(lb_info:lb_info())) -> schedule().
+find_matches(Nodes) ->
     case gb_sets:size(Nodes) >= 2 of
         true ->
             {LightNode, NodesNew} = gb_sets:take_smallest(Nodes),
@@ -234,13 +234,13 @@ find_matches(Nodes, Result) ->
             Epsilon = 0.24,
             case lb_info:get_load(LightNode) =< Epsilon * lb_info:get_load(HeavyNode) of
                 true ->
-                    find_matches(NodesNew2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
+                    [#reassign{light = LightNode, heavy = HeavyNode} | find_matches(NodesNew2)];
                 _ ->
-                    find_matches(NodesNew2, Result)
+                    find_matches(NodesNew2)
             end;
         false ->
             %% return the result with the best match first
-            lists:reverse(Result)
+            []
     end.
 
 -spec get_all_directory_keys() -> [?RT:key()].

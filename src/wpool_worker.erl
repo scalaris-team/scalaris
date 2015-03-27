@@ -148,19 +148,19 @@ apply_js(FunBin, Data, VM) ->
 %%      function as a binary string.
 -spec define_auto_js(Fun::binary(), [term()]) -> binary().
 define_auto_js(FunBin, Args) ->
-    EncodedArgs = encode_args(Args, []),
+    EncodedArgs = encode_args(Args),
     iolist_to_binary([FunBin, "(", EncodedArgs, ")"]).
 
 %% @doc build argument list for JS function.
 %%      takes a list of terms and returns an iolist of the encoded (mochijson2)
 %%      terms with commas in between.
--spec encode_args([term()], [term()]) -> term().
-encode_args([], Acc) ->
-    lists:reverse(Acc);
-encode_args([H | []], Acc) ->
-    encode_args([], [js_mochijson2:encode(encode(H)) | Acc]);
-encode_args([H | T], Acc) ->
-    encode_args(T, [[js_mochijson2:encode(encode(H)), ","] | Acc]).
+-spec encode_args([term()]) -> iolist().
+encode_args([]) ->
+    [];
+encode_args([H]) ->
+    js_mochijson2:encode(encode(H));
+encode_args([H | T]) ->
+    [js_mochijson2:encode(encode(H)), "," | encode_args(T)].
 
 -spec encode(term()) -> term().
 encode({K, V}) ->

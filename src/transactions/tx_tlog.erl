@@ -167,18 +167,17 @@ get_insane_keys(TLog) ->
 %%      SortedRTlog is TLog received from newer RDHT operations
 -spec merge(tlog(), tlog()) -> tlog().
 merge(TLog1, TLog2) ->
-    merge_tlogs_iter(TLog1, TLog2, []).
+    merge_tlogs_iter(TLog1, TLog2).
 
--spec merge_tlogs_iter([tlog_entry()], [tlog_entry()], [tlog_entry()]) -> [tlog_entry()].
+-spec merge_tlogs_iter([tlog_entry()], [tlog_entry()]) -> [tlog_entry()].
 merge_tlogs_iter([TEntry | TTail] = SortedTLog,
-                 [RTEntry | RTTail] = SortedRTLog,
-                 Acc) ->
+                 [RTEntry | RTTail] = SortedRTLog) ->
     TKey = get_entry_key(TEntry),
     RTKey = get_entry_key(RTEntry),
     if TKey < RTKey ->
-           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
+           [TEntry | merge_tlogs_iter(TTail, SortedRTLog)];
        TKey > RTKey ->
-           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc]);
+           [RTEntry | merge_tlogs_iter(SortedTLog, RTTail)];
        true -> % TKey =:= RTKey ->
            %% key was in TLog, new entry is newer and contains value
            %% for read?
@@ -200,18 +199,16 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                           true ->
                               set_entry_status(RTEntry, ?fail)
                        end,
-                   merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
+                   [NewTLogEntry | merge_tlogs_iter(TTail, RTTail)];
                _ ->
                    log:log(warn,
                            "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
-                   merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
+                   [RTEntry | merge_tlogs_iter(TTail, RTTail)]
            end
     end;
-merge_tlogs_iter([], [], Acc)                 -> lists:reverse(Acc);
-merge_tlogs_iter([], [_|_] = SortedRTLog, []) -> SortedRTLog;
-merge_tlogs_iter([], [_|_] = SortedRTLog, [_|_] = Acc) -> lists:reverse(Acc) ++ SortedRTLog;
-merge_tlogs_iter([_|_] = SortedTLog, [], [])  -> SortedTLog;
-merge_tlogs_iter([_|_] = SortedTLog, [], [_|_] = Acc)  -> lists:reverse(Acc) ++ SortedTLog.
+merge_tlogs_iter([], [])                  -> [];
+merge_tlogs_iter([], [_|_] = SortedRTLog) -> SortedRTLog;
+merge_tlogs_iter([_|_] = SortedTLog, [])  -> SortedTLog.
 
 %% @doc Filters a request list with unique keys so that only operations reside
 %%      that need data from the DHT which is not yet present in the TLog.

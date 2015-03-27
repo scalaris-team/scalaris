@@ -477,22 +477,22 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX0) ->
     file:close(File).
 
 term_to_latex_string(Term) ->
-    quote_latex(lists:flatten(io_lib:format("~p", [Term])), []).
+    quote_latex(lists:flatten(io_lib:format("~p", [Term]))).
 
-quote_latex([], Acc) -> lists:reverse(Acc);
-quote_latex([Char | Tail], Acc) ->
-    NewAcc =
+quote_latex([]) -> [];
+quote_latex([Char | Tail]) ->
+    NewChars =
         case Char of
-            $_ ->  "_" ++ "\\" ++ Acc;
-             ${ ->  "{" ++ "\\" ++ Acc;
-             $} ->  "}" ++ "\\" ++ Acc;
-             $[ ->  "[" ++ "\\" ++ Acc;
-             $] ->  "]" ++ "\\" ++ Acc;
-             %% $< ->  lists:reverse("$\lt$") ++ Acc;
-             %% $> ->  lists:reverse("$\gt$") ++ Acc;
-            _ -> [Char | Acc]
+            $_ ->  "\\_";
+            ${ ->  "\\{";
+            $} ->  "\\}";
+            $[ ->  "\\[";
+            $] ->  "\\]";
+            %% $< ->  lists:reverse("$\lt$");
+            %% $> ->  lists:reverse("$\gt$");
+            _ -> [Char]
         end,
-    quote_latex(Tail, NewAcc).
+    NewChars ++ quote_latex(Tail).
 
 %% @doc Gets the message tag of the given message. Special dht_node messages of
 %%      embedded processes get translated into a tuple of two message tags.
