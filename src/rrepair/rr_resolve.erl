@@ -447,7 +447,7 @@ integrate_update_key_entries_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
 
 %% @doc Tries to find any key from a list in the tree.
 -spec any_replica_in_tree(RKeys::[Key], Tree::gb_trees:tree(Key, Val))
-        -> none | {value, Val}.
+        -> none | {value, Val} when is_subtype(Key, any()), is_subtype(Val, any()).
 any_replica_in_tree([], _Tree) ->
     none;
 any_replica_in_tree([Key | Rest], Tree) ->
