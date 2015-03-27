@@ -184,13 +184,13 @@ prop_tree_hash(L, R, ToAdd) ->
     
     DB1Tree1 = merkle_tree:new(I, DB1, []),
     DB1Tree2 = merkle_tree:new(I, DB1, []),
-    DB1Tree2a = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB1, [])),
+    DB1Tree2a = merkle_tree:gen_hash(merkle_tree:new(I, DB1, [])),
     DB1Tree2b = merkle_tree:gen_hash(merkle_tree:insert_list(DB1, merkle_tree:new(I, [{keep_bucket, true}]))),
     DB1Tree2c = merkle_tree:gen_hash(merkle_tree:insert_list(DB1, merkle_tree:new(I, [{keep_bucket, true}])), true),
     
     DB1aTree1 = merkle_tree:new(I, DB1a, []),
     DB1aTree2 = merkle_tree:new(I, DB1a, []),
-    DB1aTree2a = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB1a, [])),
+    DB1aTree2a = merkle_tree:gen_hash(merkle_tree:new(I, DB1a, [])),
     DB1aTree2b = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}]))),
     DB1aTree2c = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}])), true),
     

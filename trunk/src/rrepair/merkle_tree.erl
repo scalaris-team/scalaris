@@ -39,7 +39,6 @@
 -export([leaf_hash_sha/2]).
 
 % exports for tests
--export([bulk_build/3]).
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
 -compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1,
@@ -78,7 +77,7 @@
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
          leaf_hf        = fun leaf_hash_sha/2  :: leaf_hash_fun(), %hash function for leaf signature creation
          inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation
-         keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
+         keep_bucket    = false             :: boolean()        %false=bucket will be empty after p_bulk_build; true=bucket will be filled
          }).
 -type mt_config() :: #mt_config{}.
 %only key value pairs of mt_config allowed:
@@ -134,26 +133,30 @@ is_empty(_) -> false.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Creates a new empty merkle tree with default params for the given
-%%      interval.
+%%      interval. Also creates the hash values.
 -spec new(intervals:interval()) -> merkle_tree().
 new(I) ->
     new(I, []).
 
 %% @doc Creates a new empty merkle tree with the given params and interval.
+%%      Also creates the hash values.
 %%      ConfParams = list of tuples defined by {config field name, value}
 %%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(intervals:interval(), mt_config_params()) -> merkle_tree().
 new(I, ConfParams) ->
     new(I, [], ConfParams).
 
-%% @doc Creates a new empty merkle tree with the given params and interval and
-%%      inserts entries from EntryList.
+%% @doc Creates a new merkle tree with the given params, interval and
+%%      entries from EntryList. Also creates the hash values.
 %%      ConfParams = list of tuples defined by {config field name, value}
 %%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(intervals:interval(), EntryList::mt_bucket(), mt_config_params())
         -> merkle_tree().
 new(I, EntryList, ConfParams) ->
-    bulk_build(I, EntryList, ConfParams).
+    KeyList = lists:ukeysort(1, EntryList),
+    Config = build_config(ConfParams),
+    [Root] = build_childs([{I, length(KeyList), KeyList}], Config, []),
+    {merkle_tree, Config, Root}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -354,16 +357,6 @@ insert_to_node(Key, CheckKey, {Hash, Count, ItemCount, Interval,
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Builds a merkle tree with all given keys but does not create the hash
-%%      values yet (use gen_hash/1 for that).
--spec bulk_build(Interval::intervals:interval(), KeyList::mt_bucket(),
-                 Params::mt_config_params()) -> MerkleTree::merkle_tree().
-bulk_build(I, KeyList0, Params) ->
-    KeyList = lists:ukeysort(1, KeyList0),
-    Config = build_config(Params),
-    [Root] = build_childs([{I, length(KeyList), KeyList}], Config, []),
-    {merkle_tree, Config, Root}.
-
 %% @doc Builds a merkle node from the given KeyList assuming that the current
 %%      node needs to be split because the KeyList is larger than
 %%      Config#mt_config.bucket_size.
@@ -427,7 +420,7 @@ gen_hash_node({_H, Count, ItemCount, Interval, ChildList = [_|_]},
 gen_hash_node({Hash, _ICnt, _Bkt = [], _I} = N, _InnerHf,
               _LeafHf, false, _CleanBuckets) when Hash =/= nil ->
     % leaf node, no bucket contents, keep_bucket false
-    % -> we already hashed the value in bulk_build and cannot insert any more
+    % -> we already hashed the value in p_bulk_build and cannot insert any more
     %    values
     N;
 gen_hash_node({_OldHash, ICnt, Bucket, Interval},
