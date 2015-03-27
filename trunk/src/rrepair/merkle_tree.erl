@@ -605,13 +605,16 @@ decode_key(Key) -> element(1, Key).
 %% @doc Inserts Key into its matching interval
 %%      PreCond: Key fits into one of the given intervals,
 %%               CheckKey is the decoded Key (see decode_key/1)
--spec p_key_in_I(Key::mt_bucket_entry(), CheckKey::?RT:key(), ReverseLeft::[Bucket],
+-spec p_key_in_I(Key::mt_bucket_entry(), CheckKey::?RT:key(),
                  Right::[Bucket,...]) -> [Bucket,...] when
     is_subtype(Bucket, {I::intervals:continuous_interval(), Count::non_neg_integer(), mt_bucket()}).
-p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
-     case intervals:in(CheckKey, Interval) of
-        true  -> lists:reverse(ReverseLeft, [{Interval, C + 1, [Key | L]} | Right]);
-        false -> p_key_in_I(Key, CheckKey, [P | ReverseLeft], Right)
+p_key_in_I(Key, _CheckKey, [{I1, C1, L1}]) ->
+    ?DBG_ASSERT(intervals:in(_CheckKey, I1)),
+    [{I1, C1 + 1, [Key | L1]}];
+p_key_in_I(Key, CheckKey, [{I1, C1, L1} = B1 | L]) ->
+     case intervals:in(CheckKey, I1) of
+        true  -> [{I1, C1 + 1, [Key | L1]} | L];
+        false -> [B1 | p_key_in_I(Key, CheckKey, L)]
     end.
 
 %% @doc Inserts the given keys into the given intervals.
@@ -622,7 +625,7 @@ keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
     % note: no need to preserve the keys' order -> use the 10% faster foldl:
     lists:foldl(fun(Key, Acc) ->
-                        p_key_in_I(Key, decode_key(Key), [], Acc)
+                        p_key_in_I(Key, decode_key(Key), Acc)
                 end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
