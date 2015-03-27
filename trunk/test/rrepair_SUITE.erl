@@ -238,7 +238,7 @@ prop_merkle_compress_hashlist(Nodes0, SigSizeI, SigSizeL) ->
                      end,
                      {H, merkle_tree:is_leaf(N)}
                  end || N <- Nodes],
-    ?equals(rr_recon:merkle_decompress_hashlist(Bin, [], SigSizeI, SigSizeL), HashesRed).
+    ?equals(rr_recon:merkle_decompress_hashlist(Bin, SigSizeI, SigSizeL), HashesRed).
 
 tester_merkle_compress_hashlist(_) ->
     tester:test(?MODULE, prop_merkle_compress_hashlist, 3, 1000, [{threads, 4}]).

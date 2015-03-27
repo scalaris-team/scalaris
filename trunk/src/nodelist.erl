@@ -342,18 +342,14 @@ filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun) ->
 %% @doc Keeps any node for which FilterFun returns true in a node list and
 %%      executes EvalFun for any other node.
 -spec lfilter(snodelist(), FilterFun::filter_fun(), EvalFun::eval_fun()) -> snodelist().
-lfilter(NodeList, FilterFun, EvalFun) ->
-    lfilter(NodeList, FilterFun, EvalFun, []).
-
--spec lfilter(snodelist(), FilterFun::filter_fun(), EvalFun::eval_fun(), snodelist()) -> snodelist().
-lfilter([N | Rest], FilterFun, EvalFun, Res) ->
+lfilter([N | Rest], FilterFun, EvalFun) ->
     case FilterFun(N) of
-        true -> lfilter(Rest, FilterFun, EvalFun, [N | Res]);
+        true -> [N | lfilter(Rest, FilterFun, EvalFun)];
         _    -> EvalFun(N),
-                lfilter(Rest, FilterFun, EvalFun, Res)
+                lfilter(Rest, FilterFun, EvalFun)
     end;
-lfilter([], _FilterFun, _EvalFun, Res) ->
-    lists:reverse(Res).
+lfilter([], _FilterFun, _EvalFun) ->
+    [].
 
 %% @doc Keeps any node for which FilterFun returns true in a neighborhood
 %%      and executes EvalFun for any other node.

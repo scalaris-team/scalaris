@@ -261,7 +261,7 @@ tester_type_check_math(_Config) ->
              {split, 2} %% integers too large; tested via feeder
            ],
            [ {minus_simple2, 2}, %% second is subset of first param
-             {split2, 8} %% special list of split keys; tested via feeder
+             {split2, 7} %% special list of split keys; tested via feeder
            ]},
           {mathlib,
            [ {vecWeightedAvg,4}, %% needs same length lists
@@ -349,8 +349,7 @@ tester_type_check_node(_Config) ->
             {throw_if_newer, 2}, %% throws
             {lsplit_nodelist, 2}, %% base node must not be in node list
             {lusplit_nodelist, 2}, %% base node must not be in node list
-            {lmerge_helper, 5}, %% base node must not be in node list
-            {lfilter, 4} %% cannot create funs
+            {lmerge_helper, 5} %% base node must not be in node list
           ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
@@ -438,7 +437,7 @@ tester_type_check_rrepair(_Config) ->
              {uniform_key_list_no_split, 3}, %% needs feeder
              {non_uniform_key_list, 5}, %% needs feeder
              {non_uniform_key_list_, 7}, %% needs feeder
-             {get_non_uniform_probs, 2} %% needs feeder
+             {get_non_uniform_probs, 1} %% needs feeder
            ]},
           {hfs_lhsp,
            [ {new, 2}, %% tested via feeder
@@ -454,7 +453,7 @@ tester_type_check_rrepair(_Config) ->
              {map_interval, 2}, %% second interval must be in a single quadrant
 
              {merkle_compress_hashlist, 4}, %% needs merkle nodes with hashes
-             {merkle_decompress_hashlist, 4} %% needs a special binary to correspond to a number of bits
+             {merkle_decompress_hashlist, 3} %% needs a special binary to correspond to a number of bits
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -791,12 +790,12 @@ tester_type_check_util(_Config) ->
            ],
            [ {lists_takewith_iter, 3}, %% cannot create funs; tested via feeder
              {lists_partition3, 5}, %% cannot create funs; tested via feeder
-             {lists_remove_at_indices, 4}, %% indices must exist in list
+             {lists_remove_at_indices, 3}, %% indices must exist in list
              {shuffle_helperA, 3}, %% preconds must be fulfilled
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
              {'=:<_lists', 2}, %% need equal length lists
              {ssplit_unique_helper, 5}, %% needs fun
-             {smerge2_helper, 7}, %% needs fun
+             {smerge2_helper, 6}, %% needs fun
              {i_repeat,5}, %% needs fun
              {parallel_collect,3}, %% needs fun
              {par_map_recv, 2}, %% receives messages

@@ -152,18 +152,18 @@ get_split_key(Begin, End, {Num, Denom}) ->
 -spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
                      Parts::pos_integer()) -> [key()].
 get_split_keys(Begin, End, Parts) ->
-    lists:reverse(get_split_keys_helper(Begin, End, Parts, [])).
+    get_split_keys_helper(Begin, End, Parts).
 
 -spec get_split_keys_helper(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
-                            Parts::pos_integer(), Acc::[key()]) -> [key()].
-get_split_keys_helper(_Begin, _End, 1, Acc) ->
-    Acc;
-get_split_keys_helper(Begin, End, Parts, Acc) ->
+                            Parts::pos_integer()) -> [key()].
+get_split_keys_helper(_Begin, _End, 1) ->
+    [];
+get_split_keys_helper(Begin, End, Parts) ->
     SplitKey = get_split_key(Begin, End, {1, Parts}),
     if SplitKey =:= Begin ->
-           get_split_keys_helper(Begin, End, Parts - 1, Acc);
+           get_split_keys_helper(Begin, End, Parts - 1);
        true ->
-           get_split_keys_helper(SplitKey, End, Parts - 1, [SplitKey | Acc])
+           [SplitKey | get_split_keys_helper(SplitKey, End, Parts - 1)]
     end.
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and

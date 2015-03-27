@@ -111,20 +111,20 @@ add_my_config(KVList) ->
 %%      options for the config process.
 -spec prepare_config(Options::[{atom(), term()}]) -> NewOptions::[{atom(), term()}].
 prepare_config(Options) ->
-    prepare_config_helper(Options, false, []).
+    prepare_config_helper(Options, false).
 
--spec prepare_config_helper(Options, ConfigFound::boolean(), Options) -> Options when is_subtype(Options, [{atom(), term()}]).
-prepare_config_helper([], false, OldOptions) ->
-    lists:reverse(OldOptions, [{config, add_my_config([])}]);
-prepare_config_helper([], true, OldOptions) ->
-    lists:reverse(OldOptions);
-prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
+-spec prepare_config_helper(Options, ConfigFound::boolean()) -> Options when is_subtype(Options, [{atom(), term()}]).
+prepare_config_helper([], false) ->
+    [{config, add_my_config([])}];
+prepare_config_helper([], true) ->
+    [];
+prepare_config_helper([Option | Rest], OldConfigFound) ->
     {NewOption, ConfigFound} =
         case Option of
             {config, KVList} -> {{config, add_my_config(KVList)}, true};
             X                -> {X, OldConfigFound}
         end,
-    prepare_config_helper(Rest, ConfigFound, [NewOption | OldOptions]).
+    [NewOption | prepare_config_helper(Rest, ConfigFound)].
 
 %% @doc Create N evenly spaced keys.
 -spec get_evenly_spaced_keys(N::pos_integer()) -> list(?RT:key()).

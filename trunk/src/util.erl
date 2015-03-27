@@ -331,22 +331,22 @@ minus_all([], _ExcludeList) ->
 minus_first([_|_] = L, [Excluded]) ->
     lists:delete(Excluded, L);
 minus_first([_|_] = L, ExcludeList) ->
-    minus_first2(L, ExcludeList, []);
+    minus_first2(L, ExcludeList);
 minus_first([], _ExcludeList) ->
     [].
 
 %% @doc Removes every item in Excluded only once from List.
--spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T]
+-spec minus_first2(List::[T], Excluded::[T]) -> [T]
     when is_subtype(T, any()).
-minus_first2([H | T], [_|_] = Excluded, Result) ->
+minus_first2([H | T], [_|_] = Excluded) ->
     case lists_take(H, Excluded) of
-        false     -> minus_first2(T, Excluded, [H | Result]);
-        Excluded2 -> minus_first2(T, Excluded2, Result)
+        false     -> [H | minus_first2(T, Excluded)];
+        Excluded2 -> minus_first2(T, Excluded2)
     end;
-minus_first2([], _Excluded, Result) ->
-    lists:reverse(Result);
-minus_first2(L, [], Result) ->
-    lists:reverse(Result, L).
+minus_first2([], _Excluded) ->
+    [];
+minus_first2(L, []) ->
+    L.
 
 -spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->
@@ -704,28 +704,28 @@ smerge2(L1, L2, Lte, EqSelect) ->
               FirstExist::fun((X) -> [X]), SecondExist::fun((X) -> [X])) -> MergedList::[X]
     when is_subtype(X, any()).
 smerge2(L1, L2, Lte, EqSelect, FirstExist, SecondExist) ->
-    smerge2_helper(L1, L2, Lte, EqSelect, FirstExist, SecondExist, []).
+    smerge2_helper(L1, L2, Lte, EqSelect, FirstExist, SecondExist).
 
 %% @doc Helper function for merge2/4.
 -spec smerge2_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()),
         EqSelect::fun((X, X) -> [X]), FirstExist::fun((X) -> [X]),
-        SecondExist::fun((X) -> [X]), OldMergedList::[X]) -> MergedList::[X]
+        SecondExist::fun((X) -> [X])) -> MergedList::[X]
     when is_subtype(X, any()).
-smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
+smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist) ->
     LteH1H2 = Lte(H1, H2),
     LteH2H1 = Lte(H2, H1),
     % note: need to reverse the results of EqSelect, FirstExist, SecondExist since ML is reversed
     if LteH1H2 andalso LteH2H1 ->
-           smerge2_helper(T1, T2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(EqSelect(H1, H2)) ++ ML);
+           EqSelect(H1, H2) ++ smerge2_helper(T1, T2, Lte, EqSelect, FirstExist, SecondExist);
        LteH1H2 ->
-           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(FirstExist(H1)) ++ ML);
+           FirstExist(H1) ++ smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist);
        LteH2H1 ->
-           smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(SecondExist(H2)) ++ ML)
+           SecondExist(H2) ++ smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist)
     end;
-smerge2_helper(L1, [], _Lte, _EqSelect, FirstExist, _SecondExist, ML) ->
-    lists:reverse(ML, lists:flatmap(FirstExist, L1));
-smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist, ML) ->
-    lists:reverse(ML, lists:flatmap(SecondExist, L2)).
+smerge2_helper(L1, [], _Lte, _EqSelect, FirstExist, _SecondExist) ->
+    lists:flatmap(FirstExist, L1);
+smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist) ->
+    lists:flatmap(SecondExist, L2).
 
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
@@ -1068,20 +1068,18 @@ lists_partition3(Pred, [], As, Bs, Cs) when is_function(Pred, 1) ->
     {lists:reverse(As), lists:reverse(Bs), lists:reverse(Cs)}.
 
 -spec lists_remove_at_indices([any(),...], [non_neg_integer(),...]) -> [any()].
-lists_remove_at_indices([_|_] = List, [_|_] = Indices) -> lists_remove_at_indices(List, [], Indices, 0).
+lists_remove_at_indices([_|_] = List, [_|_] = Indices) ->
+    lists_remove_at_indices(List, Indices, 0).
 
 % PRED: Indices list should be non-empty
--spec lists_remove_at_indices([any()], [any()], [non_neg_integer()], non_neg_integer()) -> [any()].
-lists_remove_at_indices(List, AccList, [], _CurrentIndex) ->
-    lists:reverse(lists_prepend_reversed(List, AccList));
-lists_remove_at_indices([_|ListTail], AccList, [CurrentIndex|IndexTail], CurrentIndex) ->
-    lists_remove_at_indices(ListTail, AccList, IndexTail, CurrentIndex + 1);
-lists_remove_at_indices([X|L], AccList, Indices, CurrentIndex) ->
-    lists_remove_at_indices(L, [X | AccList], Indices, CurrentIndex + 1).
-
-% prepend a list in reversed order to another list
--spec lists_prepend_reversed([any()], [any()]) -> [any()].
-lists_prepend_reversed(L, To) -> lists:foldl(fun(El, Acc) -> [El | Acc] end, To, L).
+-spec lists_remove_at_indices([T], Indices::[non_neg_integer()], non_neg_integer())
+        -> [T] when is_subtype(T, any()).
+lists_remove_at_indices(List, [], _CurrentIndex) ->
+    List;
+lists_remove_at_indices([_|ListTail], [CurrentIndex|IndexTail], CurrentIndex) ->
+    lists_remove_at_indices(ListTail, IndexTail, CurrentIndex + 1);
+lists_remove_at_indices([X|L], Indices, CurrentIndex) ->
+    [X | lists_remove_at_indices(L, Indices, CurrentIndex + 1)].
 
 %% @doc A more flexible sublist function than lists:sublist/3.
 %%      Extracts a sublist of length Length starting at Start.
