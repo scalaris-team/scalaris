@@ -144,17 +144,17 @@ bulk_owner(State, Id, I, Msg, Parents) ->
 %%      I \cap (id(Nl), id(Starting_node)].
 %%      Note that the range (id(Starting_node), id(Succ_of_starting_node)]
 %%      has already been covered by bulk_owner/3.
--spec bulk_owner_iter(ReverseRTList::nodelist:snodelist(),
+-spec bulk_owner_iter(ReverseRTList::[{Id::?RT:key(), Pid::comm:mypid()}],
                       Id::uid:global_uid(),
                       I::intervals:interval(), Msg::comm:message(),
                       Limit::?RT:key(), Parents::[comm:mypid(),...]) -> ok.
 bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->
     ok;
-bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
+bulk_owner_iter([{HeadId, HeadPid} | Tail], Id, I, Msg, Limit, Parents) ->
     case intervals:is_empty(I) of
         false ->
             Interval_Head_Limit =
-                node:mk_interval_between_ids(node:id(Head), Limit),
+                node:mk_interval_between_ids(HeadId, Limit),
             Range = intervals:intersection(I, Interval_Head_Limit),
             %%     log:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
             NewLimit =
@@ -163,14 +163,16 @@ bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
                         case Msg of
                             {bulk_distribute, Proc, N, Env, Data} ->
                                 RangeData = get_range_data(Data, Range),
-                                comm:send(node:pidX(Head),
+                                comm:send(HeadPid,
                                           {bulkowner, Id, Range,
-                                           {bulk_distribute, Proc, N, Env, RangeData}, Parents});
+                                           {bulk_distribute, Proc, N, Env, RangeData}, Parents},
+                                         [{group_member, dht_node}]);
                             _ ->
-                                comm:send(node:pidX(Head),
-                                          {bulkowner, Id, Range, Msg, Parents})
+                                comm:send(HeadPid,
+                                          {bulkowner, Id, Range, Msg, Parents},
+                                          [{group_member, dht_node}])
                         end,
-                        node:id(Head);
+                        HeadId;
                     true  -> Limit
                 end,
             RemainingInterval = intervals:minus(I, Range),
