@@ -77,7 +77,8 @@
                          MRMasterDelta::orddict:orddict()}}.
 
 %% userdevguide-begin dht_node_state:state
--record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
+-record(state, {% external_rt stored here for bulkowner
+                rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 rm_state   = ?required(state, rm_state)  :: rm_loop:state(),
                 join_time  = ?required(state, join_time) :: erlang:timestamp(),
                 db         = ?required(state, db)        :: db_dht:db(),

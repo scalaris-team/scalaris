@@ -533,16 +533,17 @@ export_rt_to_dht_node(RT, Neighbors) ->
     ERT.
 %% userdevguide-end rt_chord:export_rt_to_dht_node
 
-%% @doc Converts the (external) representation of the routing table to a list
-%%      in the order of the fingers, i.e. first=succ, second=shortest finger,
-%%      third=next longer finger,...
+%% @doc Converts the (external) representation of the routing table to a list of
+%%      {Id, Pid} tuples, in the order of the fingers, i.e. first=succ,
+%%      second=shortest finger, third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) ->
-    RT = dht_node_state:get(State, rt),
+    ERT = dht_node_state:get(State, rt),
     Neighbors = dht_node_state:get(State, neighbors),
-    Nodes = lists:map(fun ({Node, _RTLoop}) -> Node end, gb_trees:values(RT)),
-    nodelist:mk_nodelist([nodelist:succ(Neighbors) | Nodes ],
-                         nodelist:node(Neighbors)).
+    KVList = gb_trees:to_list(ERT),
+    FakeNodes = lists:map(fun ({Id, Pid}) -> node:new(Pid, Id, 0) end, KVList),
+    NodeList = nodelist:mk_nodelist(FakeNodes, nodelist:node(Neighbors)),
+    lists:map(fun (Node) -> {node:id(Node), node:pidX(Node)} end, NodeList).
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
