@@ -187,6 +187,7 @@ update_lease_in_dht_node_state(Lease, State, Mode) ->
                                               dht_node_state:state()) ->
                                                      dht_node_state:state().
 remove_active_lease_from_dht_node_state(Lease, State) ->
+    log:log("you are trying to remove an active lease via any?!? ~w", [Lease]),
     LeaseList = dht_node_state:get(State, lease_list),
     Active = LeaseList#lease_list_t.active,
     Id = l_on_cseq:get_id(Lease),
@@ -253,6 +254,13 @@ update_passive_lease(Lease, LeaseList = #lease_list_t{passive=Passive}) ->
 
 -spec update_active_lease(Lease::l_on_cseq:lease_t(), LeaseList::lease_list()) -> lease_list().
 update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
+    case Lease of 
+        empty ->
+            log:log("you are trying to remove an active lease in update"),
+            ok;
+        _ ->
+            ok
+    end,
     case Active of
         empty ->
             LeaseList#lease_list_t{active=Lease};
