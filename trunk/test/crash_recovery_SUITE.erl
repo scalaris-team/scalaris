@@ -30,7 +30,10 @@ groups() ->
     [{crash_recovery_tests,[sequence], [
                                         test_crash_recovery,
                                         test_crash_recovery_one_new_node,
-                                        test_crash_recovery_one_outdated_node]}
+                                        test_crash_recovery_one_outdated_node,
+                                        test_crash_recovery_bad_owner_pids,
+                                        test_crash_recovery_two_outdated_nodes
+                                       ]}
     ].
 
 all() ->
@@ -113,6 +116,35 @@ test_crash_recovery_one_outdated_node(_Config) ->
 
     generic_crash_recovery_test(F, 4).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% crash recovery test with *two* nodes having outdated data
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_crash_recovery_two_outdated_nodes(_Config) ->
+    % delete the manipulate dbs on *two* nodes
+    F = fun(DHTNodes) ->
+                % manipulate rounds on the first node
+                [N1, N2, _N3, _N4] = DHTNodes,
+                change_lease_replicas(N1),
+                change_lease_replicas(N2)
+        end,
+
+    generic_crash_recovery_test(F, 4).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% crash recovery test with change all owner pids
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_crash_recovery_bad_owner_pids(_Config) ->
+    % XXXX
+    F = fun(DHTNodes) ->
+                change_owner_pids(DHTNodes)
+        end,
+
+    generic_crash_recovery_test(F, 4).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -174,6 +206,23 @@ change_node_state(Node, F) ->
             ok
     end.
 
+change_owner_pids(DHTNodes) ->
+    Self = comm:this(),
+    F = fun(State) ->
+                change_owner_pid(Self, State, leases_1, lease_db1),
+                change_owner_pid(Self, State, leases_2, lease_db2),
+                change_owner_pid(Self, State, leases_3, lease_db3),
+                change_owner_pid(Self, State, leases_4, lease_db4),
+                State
+        end,
+    lists:foreach(fun (Node) ->
+                          comm:send_local(Node, {set_state, comm:this(), F}),
+                          receive
+                              {set_state_response, _NewState} ->
+                                  ok
+                          end
+                  end, DHTNodes).
+    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -181,7 +230,24 @@ change_node_state(Node, F) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-reset_read_and_write_rounds(State, DBName, PRBRName) ->
+change_owner_pid(Pid, State, DBName, _PRBRName) ->
+    LeaseDB = dht_node_state:get_prbr_state(State, DBName),
+    ct:pal("LeaseDB ~p", [LeaseDB]),
+    [ 
+      prbr:set_entry({Key, 
+                      {ReadRound, ReadClientId, ReadWriteFilter}, 
+                      {WriteRound, WriteClientId, WriteWriteFilter}, 
+                      l_on_cseq:set_owner(Lease, Pid)}, LeaseDB)
+
+      || {Key, 
+          {ReadRound, ReadClientId, ReadWriteFilter}, 
+          {WriteRound, WriteClientId, WriteWriteFilter},
+          Lease} 
+             <- prbr:tab2list_raw_unittest(LeaseDB)],
+    ok.
+
+
+reset_read_and_write_rounds(State, DBName, _PRBRName) ->
     LeaseDB = dht_node_state:get_prbr_state(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
     [ 
@@ -193,6 +259,6 @@ reset_read_and_write_rounds(State, DBName, PRBRName) ->
       || {Key, 
           {ReadRound, ReadClientId, ReadWriteFilter}, 
           {WriteRound, WriteClientId, WriteWriteFilter},
-          Value} 
+          _Value} 
              <- prbr:tab2list_raw_unittest(LeaseDB)],
     ok.
