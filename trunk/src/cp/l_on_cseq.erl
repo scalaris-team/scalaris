@@ -94,7 +94,7 @@
       | {invalid, split, intervals:interval(), intervals:interval()}
       | {valid,   split, intervals:interval(), intervals:interval()}
       | {invalid, merge, intervals:interval(), intervals:interval()}
-      | {invalid, merge, stopped}
+      | {invalid, merge, no_renew}
       | {valid,   merge, intervals:interval(), intervals:interval()}.
 
 -record(lease, {
@@ -335,7 +335,7 @@ on({l_on_cseq, renew_reply,
                     renew_and_update_round(Value, Round, Mode, State);
                 {invalid, merge, _, _} ->
                     renew_and_update_round(Value, Round, Mode, State);
-                {invalid, merge, stopped} ->
+                {invalid, merge, no_renew} ->
                     lease_list:remove_lease_from_dht_node_state(Value, State, Mode);
                 {valid, split, _, _}   ->
                     renew_and_update_round(Value, Round, Mode, State);
@@ -638,7 +638,7 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=OldEpoch}, ReplyTo,
     %log:pal("merge step3~n~w~n~w", [L1, L2]),
     New = L1#lease{epoch   = OldEpoch + 1,
                    version = 0,
-                   aux     = {invalid, merge, stopped},
+                   aux     = {invalid, merge, no_renew},
                    timeout = new_timeout()},
     ContentCheck = generic_content_check(L1, New, merge_step3),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step3,
@@ -988,7 +988,7 @@ on({l_on_cseq, renew_leases}, State) ->
             lease_renew(self(), ActiveLease, active)
     end,
     _ = [lease_renew(self(), L, passive) ||
-            L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, stopped}],
+            L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, no_renew}],
     msg_delay:send_trigger(delta() div 2, {l_on_cseq, renew_leases}),
     State.
 
@@ -1314,7 +1314,7 @@ has_timed_out(L) ->
 
 -spec is_live_aux_field(lease_t()) -> boolean().
 is_live_aux_field(L) ->
-    {invalid, merge, stopped} =/= get_aux(L).
+    {invalid, merge, no_renew} =/= get_aux(L).
 
 -spec invalid_lease() -> lease_t().
 invalid_lease() ->
@@ -1324,7 +1324,7 @@ invalid_lease() ->
        epoch   = 0,
        owner   = nil,
        range   = intervals:empty(),
-       aux     = {invalid, merge, stopped},
+       aux     = {invalid, merge, no_renew},
        version = 0,
        timeout = {A+1, B, C}}.
 

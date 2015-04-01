@@ -37,7 +37,7 @@ groups() ->
                              test_renew_with_concurrent_aux_change_invalid_split,
                              test_renew_with_concurrent_aux_change_valid_split,
                              test_renew_with_concurrent_aux_change_invalid_merge,
-                             test_renew_with_concurrent_aux_change_invalid_merge_stopped,
+                             test_renew_with_concurrent_aux_change_invalid_merge_no_renew,
                              test_renew_with_concurrent_aux_change_valid_merge
                              ]},
      {split_tests, [sequence], [
@@ -273,10 +273,10 @@ test_renew_with_concurrent_aux_change_invalid_merge(_Config) ->
     test_renew_helper(_Config, ModifyF, WaitF),
     true.
 
-test_renew_with_concurrent_aux_change_invalid_merge_stopped(_Config) ->
+test_renew_with_concurrent_aux_change_invalid_merge_no_renew(_Config) ->
     ModifyF =
         fun(Old) ->
-                Aux = {invalid, merge, stopped},
+                Aux = {invalid, merge, no_renew},
                 l_on_cseq:set_aux(
                   l_on_cseq:set_timeout(
                     l_on_cseq:set_version(
@@ -485,7 +485,7 @@ test_split_with_aux_change_in_step1(_Config) ->
                           l_on_cseq:set_version(
                             l_on_cseq:set_epoch(Lease, l_on_cseq:get_epoch(Lease)+1),
                             0)),
-                        {invalid, merge, stopped}),
+                        {invalid, merge, no_renew}),
                 l_on_cseq:unittest_lease_update(Lease, New, passive)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
