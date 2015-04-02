@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -122,10 +122,10 @@
 
 -type split_step1_failed_reason() :: lease_already_exists.
 
--type content_check_t() :: fun ((Current::lease_t() | pbr_bottom, 
+-type content_check_t() :: fun ((Current::lease_t() | prbr_bottom, 
                                  WriteFilter::prbr:write_filter(), 
                                  Next::lease_t()) ->
-          {Result::boolean(), {Reason::generic_failed_reason(), Current::lease_t() | pbr_bottom, 
+          {Result::boolean(), {Reason::generic_failed_reason(), Current::lease_t() | prbr_bottom, 
                                Next::lease_t()} | null}).
 
 -spec delta() -> pos_integer().
@@ -1005,7 +1005,7 @@ on({l_on_cseq, renew_leases}, State) ->
 %%                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
 %%                      New, Writer) ->
 %%     fun(prbr_bottom, _WriteFilter, Next) ->
-%%             {false, {lease_does_not_exist, pbr_bottom, Next}};
+%%             {false, {lease_does_not_exist, prbr_bottom, Next}};
 %%         (Current, _WriteFilter, Next) when Current =:= New ->
 %%             log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, Next, Old, New, Writer]),
 %%             {true, null};
@@ -1039,8 +1039,9 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
     fun(Current, _WriteFilter, Next) ->
             case Current of
                 % check for prbr_bottom 
-                {prbr_bottom, _WriteFilter, _Next} ->
-                    {false, {lease_does_not_exist, pbr_bottom, Next}};
+%                {prbr_bottom, _WriteFilter, _Next} ->
+                prbr_bottom ->
+                    {false, {lease_does_not_exist, prbr_bottom, Next}};
                 % check for re-write
                 New -> % Current =:= New
                     log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", 
