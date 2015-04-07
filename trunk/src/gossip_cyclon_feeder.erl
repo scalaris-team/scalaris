@@ -85,38 +85,38 @@ on({trigger_round}, #state{local_nodes=LocalNodes, remote_nodes=RemoteNodes,
 
 on({local_node_response, Pid, {get_node_details_response, [{neighbors, Neighborhood}]}},
    #state{local_nodes = LocalNodes} = State) ->
-    case lists:member(Pid, LocalNodes) of
-        true ->
-            %% @todo: notify cyclon
-            notify_cyclon(Neighborhood),
-            State#state{local_nodes=lists:delete(Pid, LocalNodes)};
+    case util:lists_take(Pid, LocalNodes) of
         false ->
             %% is duplicate response
-            State
+            State;
+        NewLocalNodes ->
+            %% @todo: notify cyclon
+            notify_cyclon(Neighborhood),
+            State#state{local_nodes = NewLocalNodes}
     end;
 
 on({remote_node_response, Pid, {get_node_details_response, [{neighbors, Neighborhood}]}},
    #state{remote_nodes = RemoteNodes} = State) ->
-    case lists:member(Pid, RemoteNodes) of
-        true ->
-            %% @todo: notify cyclon
-            notify_cyclon(Neighborhood),
-            State#state{remote_nodes=lists:delete(Pid, RemoteNodes)};
+    case util:lists_take(Pid, RemoteNodes) of
         false ->
             %% is duplicate response
-            State
+            State;
+        NewRemoteNodes ->
+            %% @todo: notify cyclon
+            notify_cyclon(Neighborhood),
+            State#state{remote_nodes = NewRemoteNodes}
     end;
 
 on({known_hosts_response, Pid, {get_dht_nodes_response, Nodes}}, 
    #state{known_hosts=KnownHosts, remote_nodes=RemoteNodes} = State) ->
-    case lists:member(Pid, KnownHosts) of
-        true ->
-            %% add to remote_nodes
-            State#state{known_hosts=lists:delete(Pid, KnownHosts),
-                        remote_nodes=lists:append(Nodes, RemoteNodes)};
+    case util:lists_take(Pid, KnownHosts) of
         false ->
             %% is duplicate response
-            State
+            State;
+        NewKnownHosts ->
+            %% add to remote_nodes
+            State#state{known_hosts = NewKnownHosts,
+                        remote_nodes = lists:append(Nodes, RemoteNodes)}
 end.
 
 notify_cyclon(Neighborhood) ->
