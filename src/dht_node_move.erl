@@ -73,7 +73,7 @@
     scheduled_leave | % tried to continue a slide but a leave was already scheduled
     leave_no_partner_found | % tried to do a graceful leave but no successor to move the data to
     next_op_mismatch |
-    {protocol_error, string()}.
+    {protocol_error, term()}.
 
 -type result_message() :: {move, result, Tag::any(), Reason::abort_reason() | ok}.
 
