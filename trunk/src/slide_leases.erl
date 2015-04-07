@@ -159,7 +159,7 @@ prepare_send_delta2(State, SlideOp, Msg) ->
             {ok, State, SlideOp};
         {split, fail, _Lease} ->
             %% log:log("prepare_send_delta2: split failed~n", []),
-            {abort, Msg, State, SlideOp}
+            {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

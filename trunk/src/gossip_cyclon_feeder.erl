@@ -35,9 +35,9 @@
 -export([start_link/1, on/2, init/1]).
 
 -record(state, {
-          local_nodes = ?required(state, local_nodes) :: list(pid()),
-          remote_nodes = ?required(state, remote_nodes) :: list(comm:my_pid_plain()),
-          known_hosts = ?required(state, known_hosts) :: list(comm:my_pid_plain())}).
+          local_nodes = ?required(state, local_nodes) :: [pid()],
+          remote_nodes = ?required(state, remote_nodes) :: [comm:mypid_plain()],
+          known_hosts = ?required(state, known_hosts) :: [comm:mypid_plain()]}).
 
 -type state_t() :: #state{}.
 

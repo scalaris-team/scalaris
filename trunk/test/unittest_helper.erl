@@ -163,7 +163,7 @@ make_ring_with_ids(Ids, Options) when is_list(Ids) ->
 make_ring_recover(Options) ->
   ct:pal("Trying to recover ring."),
   TimeTrap = test_server:timetrap(60000),
-  Pid = make_ring_generic(Options, fun() ->[] end),
+  Pid = make_ring_generic(Options, fun() -> [] end),
   ct:pal("ring restored"),
   test_server:timetrap_cancel(TimeTrap),
   Pid.
@@ -194,7 +194,9 @@ make_ring(Size, Options) ->
     test_server:timetrap_cancel(TimeTrap),
     Pid.
 
--spec make_ring_generic(Options::kv_opts(), []) -> pid().
+-spec make_ring_generic(Options::kv_opts(),
+                        NodeAddFun::fun(() -> [pid_groups:groupname() | {error, term()}]))
+        -> pid().
 make_ring_generic(Options, NodeAddFun) ->
     set_config_file_paths(),
     error_logger:tty(true),
