@@ -1,0 +1,7 @@
+language: erlang
+otp_release:
+   - 17.4
+
+script:
+  - ./configure
+  - make
