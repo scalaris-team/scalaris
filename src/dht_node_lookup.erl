@@ -22,7 +22,7 @@
 
 -include("scalaris.hrl").
 
--export([lookup_decision/4, lookup_aux/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
+-export([lookup_decision/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
 
 -export([envelope/2]).
 
@@ -47,13 +47,6 @@ envelope(Nth, Msg) ->
 -endif.
 
 %% userdevguide-begin dht_node_lookup:routing
-%% @doc Adapter for deprecated lookup_aux.
-%% TODO: remove
--spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
-                 Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux(State, Key, Hops, Msg) ->
-    lookup_decision(State, Key, Hops, Msg).
-
 %% @doc Decide, whether a lookup_aux message should be translated into a lookup_fin
 %%      message
 -spec lookup_decision(State::dht_node_state:state(), Key::intervals:key(),
@@ -189,7 +182,8 @@ lookup_fin_chord(State, Key, Data, Msg) ->
                                      DBRange2, MsgFwd, Key, nodelist:pred(Neighbors),
                                      nodelist:node(Neighbors), nodelist:succ(Neighbors)])
                     end,
-                    lookup_aux(State, Key, Hops, Msg),
+                    %% TODO: replace with lookup_aux msg?
+                    lookup_decision(State, Key, Hops, Msg),
                     State
             end;
         [Pid] -> comm:send(Pid, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg}),
@@ -207,10 +201,10 @@ lookup_fin_leases(State, Key, Data, Msg) ->
             deliver(State, Msg, false, Hops);
         false ->
             log:log("lookup_fin fail: ~p", [self()]),
-            lookup_aux(State, Key, Hops, Msg),
+            %% TODO: replace with lookup_aux msg?
+            lookup_decision(State, Key, Hops, Msg),
             State
     end.
-
 %% userdevguide-end dht_node_lookup:routing
 
 -spec lookup_aux_failed(dht_node_state:state(), Target::comm:mypid(),

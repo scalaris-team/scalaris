@@ -130,9 +130,8 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, TMSnapNo, D
                     comm:send(TM, {?tp_committed, TMItemId});
                 false ->
                     % we don't have an own proposal yet (no validate seen), so we forward msg as is.
-                    dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                               {?tp_do_commit_abort, Id,
-                                                Result, TMSnapNo})
+                    api_dht_raw:unreliable_lookup(Key, {?tp_do_commit_abort, Id,
+                                                        Result, TMSnapNo})
             end,
             DHT_Node_State
     end.
@@ -191,9 +190,8 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
             Res;
         false ->
             %% forward commit to now responsible node
-            dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                       {?tp_do_commit_abort_fwd,
-                                        TM, TMItemId, RTLogEntry,
-                                        Result, OwnProposal, TMSnapNo}),
-            DB
+            api_dht_raw:unreliable_lookup(Key, {?tp_do_commit_abort_fwd,
+                                                TM, TMItemId, RTLogEntry,
+                                                Result, OwnProposal, TMSnapNo}),
+           DB
     end.
