@@ -122,13 +122,24 @@ is_disjoint(I, [H|T]) ->
 
 -spec get_dht_node_state(comm:mypid(), atom() | list(atom())) -> term() | list(term()).
 get_dht_node_state(Pid, What) ->
-    comm:send(Pid, {get_state, comm:this(), What}),
+    Cookie = {os:timestamp(), randoms:getRandomInt()},
+    This = comm:reply_as(comm:this(), 2, {get_dht_node_state_response, '_', Cookie}),
+    comm:send(Pid, {get_state, This, What}),
+    Result = 
+        receive
+            {get_dht_state_response, Data, Cookie} ->
+                {true, Data}
+        after 50 ->
+                false
+        end,
+    % drain message queue
     receive
-        {get_state_response, Data} ->
-            {true, Data}
-    after 50 ->
-            false
-    end.
+        {get_dht_state_response, _Data, _Cookie} ->
+            ok
+    after 0 ->
+            ok
+    end,
+    Result.
 
 -spec get_all_leases() -> list(lease_list:lease_list()).
 get_all_leases() ->
