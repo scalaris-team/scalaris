@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris-examples-wiki
-Version: 0.7.2+svn-1
+Version: 0.7.2+git-1
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all
 Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, scalaris-java (>= 0.7.2+svn7257)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.2+svn"
+SCALARIS_VERSION="0.7.2+git"
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
 url="http://scalaris.googlecode.com/svn/trunk/"
