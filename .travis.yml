@@ -10,6 +10,7 @@ addons:
 
 script:
   - ./configure
+  - touch TAGS.root
   - make
   - make python
   - make python3
