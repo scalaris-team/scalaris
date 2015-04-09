@@ -21,8 +21,8 @@
 %% Version of Scalaris
 -define(SCALARIS_VERSION, "0.7.2+git").
 
--define(PRBR_MNESIA, ok).
-%-define(PRBR_ETS, ok).
+%-define(PRBR_MNESIA, ok).
+-define(PRBR_ETS, ok).
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
