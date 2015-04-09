@@ -177,24 +177,23 @@ If any additional packages are required in order to build an RPM,
 Your source and binary RPMs will be generated in
 \code{/usr/src/packages/SRPMS} and \code{RPMS}.
 
-We build RPM and DEB packages for all tagged Scalaris versions as well as
-snapshots of svn trunk and provide them using the Open Build Service.
+We build RPM and DEB packages for the newest stable Scalaris version as well as
+snapshots of the git master branch and provide them using the Open Build Service.
 The latest stable version is available at
 \url{http://download.opensuse.org/repositories/home:/scalaris/}.
-The latest svn snapshot as well as archives of previous versions are available
-in their respective folders below
-\url{http://download.opensuse.org/repositories/home:/scalaris:/}. Packages
+The latest git snapshot is available at
+\url{http://download.opensuse.org/repositories/home:/scalaris:/svn}. Packages
 are available for
 
 \begin{itemize}
-\item Fedora 16, 17,
-\item Mandriva 2010, 2010.1, 2011,
-\item openSUSE 11.4, 12.1, Factory, Tumbleweed
-\item SLE 10, 11, 11SP1, 11SP2,
-\item CentOS 5.5, 6.2,
-\item RHEL 5.5, 6,
-\item Debian 5.0, 6.0 and
-\item Ubuntu 10.04, 10.10, 11.04, 11.10, 12.04.
+\item Fedora 20, 21,
+\item openSUSE 11.4, 13.1, 13.2, Factory, Tumbleweed,
+\item SLE 10, 11, 11\,SP1, 11\,SP2, 12,
+\item CentOS 5, 6, 7,
+\item RHEL 5, 6, 7,
+\item Debian 6.0, 7.0,
+\item Ubuntu 10.04, 12.04, 14.04, 14.10 and
+\item Arch Linux.
 \end{itemize}
 
 An up-to-date list of available repositories can be found at
@@ -205,14 +204,11 @@ the packages using their Erlang package and recommend using the same version
 that came with the distribution. In this case we do not provide Erlang packages
 in our repository.
 
-Exceptions are made for openSUSE-based and RHEL-based distributions as well as
-Debian~5.0:
+Exceptions are made for (old) openSUSE-based and RHEL-based distributions:
 \begin{itemize}
-  \item For openSUSE, we provide the package from the \code{devel:languages:erlang}
-repository.
-  \item For RHEL-based distributions (CentOS~5, RHEL~5, RHEL~6) we included the Erlang
-package from the EPEL repository of RHEL~6.
-  \item For Debian~5.0 we included the Erlang package of Ubuntu 11.04.
+  \item For older openSUSE or SLE distributions, we provide Erlang R14B04.
+  \item For RHEL-based distributions (CentOS~5,6,7, RHEL~5,6,7) we included the Erlang
+package from the EPEL repository of RHEL~6 and RHEL~7, respectively.
 \end{itemize}
 
 \section{Testing the Installation}
