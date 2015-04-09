@@ -1,6 +1,12 @@
 language: erlang
+
 otp_release:
    - 17.4
+
+addons:
+  apt:
+    packages:
+    - python3
 
 script:
   - ./configure
