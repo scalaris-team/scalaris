@@ -5,3 +5,6 @@ otp_release:
 script:
   - ./configure
   - make
+  - make python
+  - make python3
+  - make java
