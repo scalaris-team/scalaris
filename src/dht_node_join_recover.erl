@@ -65,7 +65,9 @@ join(Options) ->
 get_db(Options, DBName) ->
     case lists:keyfind(DBName, 1, Options) of
         false ->
-            log:log("error: Options:~w ~nDBName:~w", [Options, DBName]);
+            log:log("error: Options:~w ~nDBName:~w", [Options, DBName]),
+            log:log("error in dht_node_join_recover:get_db/2. The mnesia database ~w was not found in the dht_node options (~w)", [DBName, Options]),
+            ok; % will fail in tab2list
         {DBName, DB} ->
             db_prbr:open(DB)
     end.
