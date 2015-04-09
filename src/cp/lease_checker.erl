@@ -127,7 +127,7 @@ get_dht_node_state(Pid, What) ->
     comm:send(Pid, {get_state, This, What}),
     Result = 
         receive
-            {get_dht_state_response, Data, Cookie} ->
+            {get_dht_node_state_response, {get_state_response, Data}, Cookie} ->
                 {true, Data}
         after 50 ->
                 false
