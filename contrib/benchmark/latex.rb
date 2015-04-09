@@ -138,8 +138,8 @@ servers.each {|server_count|
 }
 
 fn =~ %r{sum-test.run-(\d+)-\d+}
-#svninfo = `svn info . --xml | grep revision | cut -d '"' -f 2 | head -n 1`
-svninfo = $1
+#gitinfo = `git log --pretty=format:'%h' -n 1`
+gitinfo = $1
 template = File.read('main.tex.erb')
 eruby = ERB.new(template)
 f = File.new("main.tex", "w+")

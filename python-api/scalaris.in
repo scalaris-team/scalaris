@@ -29,7 +29,7 @@ done
 # activate no_config if called in the source tree:
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
-# is this a svn checkout or an (rpm/deb/manual) installation?
+# is this a source checkout or an (rpm/deb/manual) installation?
 if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" -a "${DIRNAME##*/}" = "python-api" ]; then
   # local mode, i.e. uninstalled
   SCALARISCLIENT_PYTHON2="`dirname $0`/scalaris_client.py"

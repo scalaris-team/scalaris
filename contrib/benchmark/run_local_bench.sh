@@ -9,7 +9,7 @@ cd ../../bin/
 SERVER=1
 
 START_TIME=`date +%m%d%y%H%m%S`
-REV=`svn info | grep Revision | awk '{print $2}'`
+REV=`git log --pretty=format:'%h' -n 1`
 LOG_FILE="../contrib/benchmark/log-$RUN-$REV-$START_TIME"
 LOG_FILE_CLEAN="../contrib/benchmark/sum-$RUN-$REV-$START_TIME"
 HOSTS="localhost"

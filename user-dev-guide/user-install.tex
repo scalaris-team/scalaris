@@ -47,10 +47,9 @@ various Linux distributions.
 
 \subsection{Development Branch}
 
-You find the latest development version in the svn repository:
+You find the latest development version in the git repository:
 \begin{lstlisting}[language={}]
-# Non-members may check out a read-only working copy anonymously over HTTP.
-svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
+git clone https://github.com/scalaris-team/scalaris.git scalaris
 \end{lstlisting}
 
 \subsection{Releases}
@@ -159,11 +158,11 @@ and install it.
 On openSUSE, for example, do the following:
 
 \begin{lstlisting}[language=sh]
-export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
+export SCALARIS_GIT=https://raw.githubusercontent.com/scalaris-team/scalaris/master
 for package in main bindings; do
   mkdir -p ${package}
   cd ${package}
-  svn export ${SCALARIS_SVN}/contrib/packages/${package}/checkout.sh
+  wget ${SCALARIS_GIT}/contrib/packages/${package}/checkout.sh
   ./checkout.sh
   cp * /usr/src/packages/SOURCES/
   rpmbuild -ba scalaris*.spec

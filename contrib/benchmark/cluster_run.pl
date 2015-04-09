@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 if(@ARGV < 3) {
-  print "usage: $0 [revision|HEAD] [de|tcp] Projectname \n";
+  print "usage: $0 [revision|HEAD] [tcp] Projectname \n";
   exit;
 }
 $rev = $ARGV[0];
@@ -13,14 +13,8 @@ my $resdir = `pwd`;
 chomp($resdir);
 $resdir.="/$name";
 system "mkdir $resdir";
-system "svn checkout -r $rev http://scalaris.googlecode.com/svn/trunk/ $resdir/scalaris-read-only";
+system "git clone https://github.com/scalaris-team/scalaris.git $resdir/scalaris-read-only && cd $resdir/scalaris-read-only/ && git checkout $rev";
 #build scalairs
-if($cl eq 'de') {
-  # check out distributet erlang Patch
- #	system "svn copy -r $rev http://scalaris.googlecode.com/svn/trunk/contrib/using_distributed_erlang.patch $resdir/scalaris-read-only/contrib";
-  # Patch 
-	system "patch -p1  $resdir/scalaris-read-only/include/scalaris.hrl <  $resdir/scalaris-read-only/contrib/using_distributed_erlang.patch";
-}
 system "cd  $resdir/scalaris-read-only/ ; ./configure";
 system "cd  $resdir/scalaris-read-only/ ; make";
 system "cd  $resdir/scalaris-read-only/bin ; chmod u+x bench_master.sh ; chmod u+x bench_slave.sh " ;
