@@ -3,7 +3,7 @@
 # This should be called by the command "maven deploy".
 
 # scalaris maven repo
-url="https://scalaris.googlecode.com/svn/maven/"
+url="git@github.com:scalaris-team/scalaris.git"
 # maven repo checkout folder
 folder=".maven"
 
@@ -12,12 +12,14 @@ checkout () {
     # otherwise update
     if [ ! -d ${folder} ]; then
         echo "checkout ${url} -> ${folder} ..."
-        svn checkout ${url} ${folder}
+        git clone --branch gh-pages --single-branch "${url}" "${folder}"
         result=$?
     else
         echo "update ${url} -> ${folder} ..."
-        svn update ${folder}
+        cd "${folder}"
+        git pull
         result=$?
+        cd - >/dev/null
     fi
 
     if [ ${result} -eq 0 ]; then
@@ -29,20 +31,21 @@ checkout () {
 }
 
 commit () {
-
     # put latest erlang jinterface jar into the repository
     file=$(ls lib/OtpErlang-*)
     version=$(basename $file .jar | cut -d "-" -f2,3)
     mvn deploy:deploy-file  -Dfile="$file" \
         -Dversion="$version" -DgroupId="org.erlang.otp" -DartifactId="jinterface" \
-        -Dpackaging="jar" -DrepositoryId="scalaris" -Durl="file:$folder"
+        -Dpackaging="jar" -DrepositoryId="scalaris" -Durl="file:$folder/maven"
 
     # update the remote maven repository
     echo -n "Do you want to update the remote maven repository? [y/N] "
     read -e answer
     if [[ ${answer} == "y" ]]; then
-        svn add --force ${folder}/*
-        svn commit ${folder}
+        cd "${folder}"
+        git add maven
+        git push
+        cd - >/dev/null
     fi
 }
 

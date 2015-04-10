@@ -26,14 +26,14 @@
     <repositories>
         <repository>
             <id>scalaris-repo</id>
-            <url>https://scalaris.googlecode.com/svn/maven/</url>
+            <url>https://scalaris.zib.de/maven/</url>
         </repository>
     </repositories>
 
     <distributionManagement>
         <repository>
             <id>scalaris</id>
-            <url>file:.maven</url>
+            <url>file:.maven/maven</url>
         </repository>
     </distributionManagement>
 
@@ -54,7 +54,7 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <executions>
                     <execution>
-                        <id>Check out maven repository from svn</id>
+                        <id>Check out maven repository from git</id>
                         <!-- Execute before deploy phase -->
                         <!-- http://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html -->
                         <phase>install</phase>
@@ -62,7 +62,7 @@
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>maven_svn_hook.sh</executable>
+                            <executable>maven_git_hook.sh</executable>
                             <arguments>
                                 <argument>checkout</argument>
                             </arguments>
@@ -75,7 +75,7 @@
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>maven_svn_hook.sh</executable>
+                            <executable>maven_git_hook.sh</executable>
                             <arguments>
                                 <argument>commit</argument>
                             </arguments>
