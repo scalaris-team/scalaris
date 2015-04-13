@@ -60,9 +60,9 @@ check_local_leases(DHTNode) ->
                                      l_on_cseq:get_range(ActiveLease)
                              end,
             LocalCorrect = MyRange =:= ActiveInterval,
-            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n", 
-                      [LocalCorrect, 
-                       ActiveInterval, MyRange]),
+            RelRange = get_relative_range(ActiveInterval),
+            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n rel_range     =~p",
+                      [LocalCorrect, ActiveInterval, MyRange, RelRange]),
             length(PassiveLeases) == 0 andalso LocalCorrect
     end.
 
@@ -119,6 +119,11 @@ is_disjoint(_I, []) ->
 is_disjoint(I, [H|T]) ->
     intervals:is_empty(intervals:intersection(I,H))
         andalso is_disjoint(I, T).
+
+-spec get_relative_range(intervals:interval()) -> float().
+get_relative_range(ActiveInterval) ->
+    {_, Begin, End, _} = intervals:get_bounds(ActiveInterval),
+    ?RT:get_range(Begin, End) / ?RT:n().
 
 -spec get_dht_node_state(comm:mypid(), atom() | list(atom())) -> term() | list(term()).
 get_dht_node_state(Pid, What) ->
