@@ -340,7 +340,7 @@ python3-test: compile python3
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $PYTHON3 python3-api/scalaris_test.py ) ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON3) python3-api/scalaris_test.py ) ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
@@ -368,7 +368,7 @@ python3-bench: compile python3
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "p3bench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
 	( ./bin/scalarisctl -n "p3bench_boot" dbg-check-ring 4 30 && \
-	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $PYTHON3 python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
+	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON3) python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	./bin/scalarisctl -n "p3bench_boot" stop ; \
 	./bin/scalarisctl -n "p3bench_node1" stop ; \
 	./bin/scalarisctl -n "p3bench_node2" stop ; \
