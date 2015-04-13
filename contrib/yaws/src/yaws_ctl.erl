@@ -18,7 +18,8 @@
 
 -export([start/2, actl_trace/1]).
 -export([ls/1,hup/1,stop/1,status/1,load/1,
-         check/1,trace/1, debug_dump/1, stats/1, running_config/1]).
+         check/1,trace/1, debug_dump/1, stats/1, running_config/1,
+         configtest/1]).
 %% internal
 -export([run/1, aloop/3, handle_a/3]).
 
@@ -271,19 +272,20 @@ vsn(IP) when size(IP) =:= 8 ->
     "(ipv6)".
 
 -define(IPV4_FMT, "~p.~p.~p.~p").
--define(IPV6_FMT, "~2.16.0b~2.16.0b:~2.16.0b~2.16.0b:~2.16.0b~2.16.0b:~2.16.0b~2.16.0b").
+-define(IPV6_FMT,
+        "~2.16.0b~2.16.0b:~2.16.0b~2.16.0b:~2.16.0b~2.16.0b:~2.16.0b~2.16.0b").
 
 format_ip(IP) ->
     case size(IP) of
-	4 ->
-	    {A, B, C, D} = IP,
-	    io_lib:format(?IPV4_FMT,
-			  [A, B, C, D]);
+        4 ->
+            {A, B, C, D} = IP,
+            io_lib:format(?IPV4_FMT,
+                          [A, B, C, D]);
 
-	8 ->
-	    {A, B, C, D, E, F, G, H} = IP,
-	    io_lib:format(?IPV6_FMT,
-			  [A, B, C, D, E, F, G, H])
+        8 ->
+            {A, B, C, D, E, F, G, H} = IP,
+            io_lib:format(?IPV6_FMT,
+                          [A, B, C, D, E, F, G, H])
     end.
 
 
@@ -312,22 +314,22 @@ a_stats() ->
     Servers2 = parse(Servers1),
 
     case Servers2 of
-	[] ->
-	    f("No statistics available~n", []);
+        [] ->
+            f("No statistics available~n", []);
 
-	Servers2 ->
-	    Stats = fstats(Servers2),
-	    Header = f("Host IP Port Hits Sent~n", []),
+        Servers2 ->
+            Stats = fstats(Servers2),
+            Header = f("Host IP Port Hits Sent~n", []),
 
-	    Lines = lists:map(fun({Host, IP0, Port, {Hits, Sent}}) ->
-				      %% we don't use inet_parse:ntoa/1
-				      %% since it's not documented
-				      IP = format_ip(IP0),
-				      IPVsn = vsn(IP0),
-				      f("~s~s ~s ~p ~p ~p~n",
-					[Host, IPVsn, IP, Port, Hits, Sent])
-			      end, Stats),
-	    [Header, Lines]
+            Lines = lists:map(fun({Host, IP0, Port, {Hits, Sent}}) ->
+                                      %% we don't use inet_parse:ntoa/1
+                                      %% since it's not documented
+                                      IP = format_ip(IP0),
+                                      IPVsn = vsn(IP0),
+                                      f("~s~s ~s ~p ~p ~p~n",
+                                        [Host, IPVsn, IP, Port, Hits, Sent])
+                              end, Stats),
+            [Header, Lines]
     end.
 
 parse(V) ->
@@ -336,7 +338,8 @@ parse([], Acc) ->
     Acc;
 parse([#sconf{stats=undefined}|Tail], Acc) ->
     parse(Tail, Acc);
-parse([#sconf{listen=IP, port=Port, servername=Servername, stats=Stats}|Tail], Acc) ->
+parse([#sconf{listen=IP, port=Port, servername=Servername,
+              stats=Stats}|Tail], Acc) ->
     Host = {Servername, IP, Port, Stats},
     parse(Tail, [Host|Acc]).
 
@@ -572,3 +575,17 @@ stats([SID]) ->
 running_config([SID]) ->
     actl(SID, running_config).
 
+configtest([File]) ->
+
+    Env = #env{debug = false, conf  = {file, File}},
+    case catch yaws_config:load(Env) of
+        {ok, _GC, _SCs} ->
+            io:format("Syntax OK~n"),
+            timer:sleep(100),erlang:halt(0);
+        {error, Error} ->
+            io:format("Syntax error in file ~p:~n~s~n", [File, Error]),
+            timer:sleep(100),erlang:halt(1);
+        Other ->
+            io:format("Syntax error in file ~p:~n~p~n", [File, Other]),
+            timer:sleep(100),erlang:halt(1)
+    end.

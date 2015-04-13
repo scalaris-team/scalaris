@@ -12,15 +12,12 @@
 
 -export([version/0,
          vardir/0,
-         etcdir/0,
-         is_local_install/0]).
+         etcdir/0]).
 
-version() -> "1.96".
+version() -> "1.99".
 
 vardir() ->  "/usr/local/var".
 
 etcdir() -> "/usr/local/etc".
-
-is_local_install() -> true.
 
 

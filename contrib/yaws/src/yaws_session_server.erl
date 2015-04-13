@@ -24,7 +24,7 @@
 -export([new_session/1,new_session/2,new_session/3,new_session/4,
          cookieval_to_opaque/1,
          print_sessions/0,
-         replace_session/2,
+         replace_session/2, replace_session/3,
          delete_session/1]).
 
 %% Default ETS backend callbacks
@@ -71,24 +71,24 @@ stop() ->
 get_yaws_session_server_backend() ->
     #gconf{ysession_mod = DefaultBackend} = #gconf{},
     case yaws_server:getconf() of
-	{ok, #gconf{ysession_mod = Backend}, _} -> Backend;
-	_ ->
-	    case application:get_env(yaws, embedded) of
-		{ok, true} ->
-		    case application:get_env(yaws, embedded_conf) of
-			{ok, L} when is_list(L) ->
-			    case lists:keysearch(gc, 1, L) of
-				{value, {_, #gconf{ysession_mod = Backend}}} ->
-				    Backend;
-				_ ->
-				    DefaultBackend
-			    end;
-			_ ->
-			    DefaultBackend
-		    end;
-		_ ->
-		    DefaultBackend
-	    end
+        {ok, #gconf{ysession_mod = Backend}, _} -> Backend;
+        _ ->
+            case application:get_env(yaws, embedded) of
+                {ok, true} ->
+                    case application:get_env(yaws, embedded_conf) of
+                        {ok, L} when is_list(L) ->
+                            case lists:keysearch(gc, 1, L) of
+                                {value, {_, #gconf{ysession_mod = Backend}}} ->
+                                    Backend;
+                                _ ->
+                                    DefaultBackend
+                            end;
+                        _ ->
+                            DefaultBackend
+                    end;
+                _ ->
+                    DefaultBackend
+            end
     end.
 
 
@@ -116,7 +116,11 @@ print_sessions() ->
     gen_server:cast(?MODULE, print_sessions).
 
 replace_session(Cookie, NewOpaque) ->
-    gen_server:call(?MODULE, {replace_session, Cookie, NewOpaque}, infinity).
+    gen_server:call(?MODULE, {replace_session, Cookie, NewOpaque, undefined},
+                    infinity).
+replace_session(Cookie, NewOpaque, Cleanup) ->
+    gen_server:call(?MODULE, {replace_session, Cookie, NewOpaque, Cleanup},
+                    infinity).
 
 delete_session(CookieVal) ->
     gen_server:call(?MODULE, {delete_session, CookieVal}, infinity).
@@ -182,12 +186,20 @@ handle_call({cookieval_to_opaque, Cookie}, _From, State) ->
     {reply, Result, State, to()};
 
 handle_call({replace_session, Cookie, NewOpaque}, _From, State) ->
+    handle_call({replace_session, Cookie, NewOpaque, undefined}, _From, State);
+handle_call({replace_session, Cookie, NewOpaque, Cleanup}, _From, State) ->
     Backend = State#state.backend,
     Result =
         case Backend:lookup(Cookie) of
             [Y] ->
                 Y2 = Y#ysession{to = gnow() + Y#ysession.ttl,
-                                opaque = NewOpaque},
+                                opaque = NewOpaque,
+                                cleanup = case Cleanup of
+                                              undefined ->
+                                                  Y#ysession.cleanup;
+                                              _ ->
+                                                  Cleanup
+                                          end},
                 Backend:insert(Y2);
             [] ->
                 error
@@ -216,8 +228,8 @@ handle_call(stop, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%----------------------------------------------------------------------
-handle_cast(print_session, #state{backend = Backend} = State) ->
-    Ss = Backend:list(Backend),
+handle_cast(print_sessions, #state{backend = Backend} = State) ->
+    Ss = Backend:list(),
     io:format("** ~p sessions active ~n~n", [length(Ss)]),
     N = gnow(),
     lists:foreach(fun(S) ->
@@ -281,7 +293,7 @@ long_to() ->
 
 %% timeout if the server is idle for more than 2 minutes.
 to() ->
-    2 * 60 * 1000.                              
+    2 * 60 * 1000.
 gnow() ->
     calendar:datetime_to_gregorian_seconds(
       calendar:local_time()).

@@ -23,7 +23,7 @@
   {i, "contrib/yaws/include"},
   {i, "contrib/log4erl/include"}
   @EMAKEFILEDEFINES@
-  @HAVE_YAWS_SENDFILE@
+  @YAWS_OPTIONS@
  ]}.
 % now the source and all of its sub-directories:
 {["src/*",
@@ -49,7 +49,7 @@
   {i, "contrib/yaws/include"},
   {i, "contrib/log4erl/include"}
   @EMAKEFILEDEFINES@
-  @HAVE_YAWS_SENDFILE@
+  @YAWS_OPTIONS@
  ]}.
 % unit tests:
 {"test/*",
@@ -81,6 +81,6 @@
   nowarn_unused_vars,
   {outdir, "contrib/yaws/ebin/"},
   {i, "contrib/yaws/include"}
-  @HAVE_YAWS_SENDFILE@
+  @YAWS_OPTIONS@
  ]}.
 @EMAKEFILECOMPILECOMPAT@

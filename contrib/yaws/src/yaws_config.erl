@@ -15,14 +15,23 @@
 
 -include_lib("kernel/include/file.hrl").
 
+-ifndef(HAVE_BAD_WILDCARD).
+-define(WILDCARD_SUPPORTED, true).
+-else.
+-define(WILDCARD_SUPPORTED, false).
+-endif.
+
+-define(NEXTLINE, io_get_line(FD, '', [])).
+
 -export([load/1,
          make_default_gconf/2, make_default_sconf/0, make_default_sconf/2,
          add_sconf/1,
          add_yaws_auth/1,
          add_yaws_soap_srv/1, add_yaws_soap_srv/2,
          load_mime_types_module/2,
+         compile_and_load_src_dir/1,
          search_sconf/2, search_group/2,
-         update_sconf/2, delete_sconf/2,
+         update_sconf/3, delete_sconf/2,
          eq_sconfs/2, soft_setconf/4, hard_setconf/2,
          can_hard_gc/2, can_soft_setconf/4,
          can_soft_gc/2, verify_upgrade_args/2, toks/2]).
@@ -60,22 +69,21 @@ load(E) ->
     case file:open(File, [read]) of
         {ok, FD} ->
             GC = make_default_gconf(E#env.debug, E#env.id),
-            GC2 = if E#env.traceoutput == undefined ->
+            GC1 = if E#env.traceoutput == undefined ->
                           GC;
                      true ->
                           ?gc_set_tty_trace(GC, E#env.traceoutput)
                   end,
-            GC3 =  ?gc_set_debug(GC2, E#env.debug),
-            GC4 = GC3#gconf{trace = E#env.trace},
-            R = (catch fload(FD, globals, GC4, undefined,
-                             [], 1, io:get_line(FD, ''))),
-            ?Debug("FLOAD: ~p", [R]),
+            GC2 =  ?gc_set_debug(GC1, E#env.debug),
+            GC3 = GC2#gconf{trace = E#env.trace},
+            R = fload(FD, GC3),
+            ?Debug("FLOAD(~s): ~p", [File, R]),
             case R of
-                {ok, GC5, Cs} ->
+                {ok, GC4, Cs} ->
                     yaws:mkdir(yaws:tmpdir()),
-                    Cs2 = add_yaws_auth(Cs),
-                    add_yaws_soap_srv(GC5),
-                    validate_cs(GC5, Cs2);
+                    Cs1 = add_yaws_auth(Cs),
+                    add_yaws_soap_srv(GC4),
+                    validate_cs(GC4, Cs1);
                 Err ->
                     Err
             end;
@@ -193,14 +201,14 @@ load_yaws_auth_from_authdir(Docroot, Auth) ->
 
 load_yaws_auth_file(Path, Auth) ->
     case file:consult(Path) of
-	{ok, TermList} ->
-	    error_logger:info_msg("Reading .yaws_auth ~s~n", [Path]),
-	    parse_yaws_auth_file(TermList, Auth);
-	{error, enoent} ->
-	    {error, enoent};
-	Error ->
-	    error_logger:format("Bad .yaws_auth file ~s ~p~n", [Path, Error]),
-	    Error
+        {ok, TermList} ->
+            error_logger:info_msg("Reading .yaws_auth ~s~n", [Path]),
+            parse_yaws_auth_file(TermList, Auth);
+        {error, enoent} ->
+            {error, enoent};
+        Error ->
+            error_logger:format("Bad .yaws_auth file ~s ~p~n", [Path, Error]),
+            Error
     end.
 
 
@@ -222,13 +230,13 @@ start_pam([#auth{pam = false}|T]) ->
     start_pam(T);
 start_pam([A|T]) ->
     case whereis(yaws_pam) of
-	undefined ->	% pam not started
+        undefined ->    % pam not started
             Spec = {yaws_pam, {yaws_pam, start_link,
                                [yaws:to_list(A#auth.pam),undefined,undefined]},
                     permanent, 5000, worker, [yaws_pam]},
-	    spawn(fun() -> supervisor:start_child(yaws_sup, Spec) end);
-	_ ->
-	    start_pam(T)
+            spawn(fun() -> supervisor:start_child(yaws_sup, Spec) end);
+        _ ->
+            start_pam(T)
     end.
 
 
@@ -386,11 +394,101 @@ load_mime_types_module(File, GInfo, SInfos) ->
     end.
 
 
+%% Compile modules found in the configured source directories, recursively.
+compile_and_load_src_dir(GC) ->
+    Incs = lists:map(fun(Dir) -> {i, Dir} end, GC#gconf.include_dir),
+    Opts = [binary, return] ++ Incs,
+    lists:foreach(fun(D) -> compile_and_load_src_dir([], [D], Opts) end,
+                  GC#gconf.src_dir).
+
+compile_and_load_src_dir(_Dir, [], _Opts) ->
+    ok;
+compile_and_load_src_dir(Dir, [Entry0|Rest], Opts) ->
+    Entry1 = case Dir of
+                 [] -> Entry0;
+                 _  -> filename:join(Dir, Entry0)
+             end,
+    case filelib:is_dir(Entry1) of
+        true ->
+            case file:list_dir(Entry1) of
+                {ok, Files} ->
+                    compile_and_load_src_dir(Entry1, Files, Opts);
+                {error, Reason} ->
+                    error_logger:format("Failed to compile modules in ~p: ~s~n",
+                                        [Entry1, file:format_error(Reason)])
+            end;
+        false ->
+            case filename:extension(Entry0) of
+                ".erl" -> compile_module_src_dir(Entry1, Opts);
+                _      -> ok
+            end
+    end,
+    compile_and_load_src_dir(Dir, Rest, Opts).
+
+
+compile_module_src_dir(File, Opts) ->
+    case catch compile:file(File, Opts) of
+        {ok, Mod, Bin} ->
+            error_logger:format("Compiled ~p~n", [File]),
+            load_src_dir(File, Mod, Bin);
+        {ok, Mod, Bin, Warnings} ->
+            WsMsg = [format_compile_warns(W,[]) || W <- Warnings],
+            error_logger:format("Compiled ~p [~p Errors - ~p Warnings]~n~s",
+                                [File,0,length(WsMsg),WsMsg]),
+            load_src_dir(File, Mod, Bin);
+        {error, [], Warnings} ->
+            WsMsg = [format_compile_warns(W,[]) || W <- Warnings],
+            error_logger:format("Failed to compile ~p "
+                                "[~p Errors - ~p Warnings]~n~s"
+                                "*** warnings being treated as errors~n",
+                                [File,0,length(WsMsg),WsMsg]);
+        {error, Errors, Warnings} ->
+            WsMsg = [format_compile_warns(W,[]) || W <- Warnings],
+            EsMsg = [format_compile_errs(E,[])  || E <- Errors],
+            error_logger:format("Failed to compile ~p "
+                                "[~p Errors - ~p Warnings]~n~s~s",
+                                [File,length(EsMsg),length(WsMsg),EsMsg,WsMsg]);
+        error ->
+            error_logger:format("Failed to compile ~p~n", [File]);
+        {'EXIT', Reason} ->
+            error_logger:format("Failed to compile ~p: ~p~n", [File, Reason])
+    end.
+
+
+load_src_dir(File, Mod, Bin) ->
+    case code:load_binary(Mod, File, Bin) of
+        {module, Mod}   -> ok;
+        {error, Reason} -> error_logger:format("Cannot load module ~p: ~p~n",
+                                               [Mod, Reason])
+    end.
+
+format_compile_warns({_, []}, Acc) ->
+    lists:reverse(Acc);
+format_compile_warns({File, [{L,M,E}|Rest]}, Acc) ->
+    Msg = io_lib:format("    ~s:~w: Warning: ~s~n", [File,L,M:format_error(E)]),
+    format_compile_warns({File, Rest}, [Msg|Acc]).
+
+format_compile_errs({_, []}, Acc) ->
+    lists:reverse(Acc);
+format_compile_errs({File, [{L,M,E}|Rest]}, Acc) ->
+    Msg = io_lib:format("    ~s:~w: ~s~n", [File,L,M:format_error(E)]),
+    format_compile_errs({File, Rest}, [Msg|Acc]).
+
+
 
 %% This is the function that arranges sconfs into
 %% different server groups
 validate_cs(GC, Cs) ->
-    L = lists:map(fun(SC) -> {{SC#sconf.listen, SC#sconf.port}, SC} end, Cs),
+    L = lists:map(fun(#sconf{listen=IP0}=SC0) ->
+                          SC = case is_tuple(IP0) of
+                                   false ->
+                                       {ok, IP} = inet_parse:address(IP0),
+                                       SC0#sconf{listen=IP};
+                                   true ->
+                                       SC0
+                               end,
+                              {{SC#sconf.listen, SC#sconf.port}, SC}
+                  end, Cs),
     L2 = lists:map(fun(X) -> element(2, X) end, lists:keysort(1,L)),
     L3 = arrange(L2, start, [], []),
     case validate_groups(L3) of
@@ -412,25 +510,30 @@ validate_groups([H|T]) ->
     end.
 
 validate_group(List) ->
-    %% all ssl servers with the same IP must share the same ssl  configuration
-    %% check if one ssl server in the group
-    case lists:any(fun(SC) -> SC#sconf.ssl  /= undefined end,List) of
-	true ->
-            [SC0|SCs] = List,
-            %% check if all servers in the group have the same ssl configuration
-            case lists:filter(
-                   fun(SC) -> SC#sconf.ssl /= SC0#sconf.ssl end,SCs) of
-                L when length(L) > 1 ->
-                    throw({error, ?F("SSL server per IP must share the "
-                                     "same certificate : ~p",
-                                     [(hd(L))#sconf.servername])});
-                _ ->
-                    ok
-            end;
-	_ ->
-            ok
+    [SC0|SCs] = List,
+
+    %% all servers with the same IP/Port must share the same tcp configuration
+    case lists:all(fun(SC) ->
+                           lists:keyfind(listen_opts, 1, SC#sconf.soptions) ==
+                               lists:keyfind(listen_opts, 1, SC0#sconf.soptions)
+                   end, SCs) of
+        true ->
+            ok;
+        false ->
+            throw({error, ?F("Servers in the same group must share the same tcp"
+                             " configuration: ~p", [SC0#sconf.servername])})
     end,
-    %% second all servernames in a group must be unique
+
+    %% all servers with the same IP/Port must share the same ssl configuration
+    case lists:all(fun(SC) -> SC#sconf.ssl == SC0#sconf.ssl end, SCs) of
+        true ->
+            ok;
+        false ->
+            throw({error, ?F("Servers in the same group must share the same ssl"
+                             " configuration: ~p", [SC0#sconf.servername])})
+    end,
+
+    %% all servernames in a group must be unique
     SN = lists:sort([yaws:to_lower(X#sconf.servername) || X <- List]),
     no_two_same(SN).
 
@@ -449,14 +552,14 @@ arrange([C|Tail], start, [], B) ->
 arrange([], _, [], B) ->
     B;
 arrange([], _, A, B) ->
-    [A | B];
+    [lists:reverse(A) | B];
 arrange([C1|Tail], {in, C0}, A, B) ->
     if
         C1#sconf.listen == C0#sconf.listen,
         C1#sconf.port == C0#sconf.port ->
             arrange(Tail, {in, C0}, [set_server(C1)|A], B);
         true ->
-            arrange(Tail, {in, C1}, [set_server(C1)], [A|B])
+            arrange(Tail, {in, C1}, [set_server(C1)], [lists:reverse(A)|B])
     end.
 
 
@@ -492,6 +595,15 @@ add_port(SC, Port) ->
 
 make_default_gconf(Debug, Id) ->
     Y = yaws_dir(),
+    Flags = case yaws_sendfile:have_sendfile() of
+                true ->
+                    (?GC_COPY_ERRLOG bor ?GC_FAIL_ON_BIND_ERR bor
+                         ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH bor
+                         ?GC_USE_YAWS_SENDFILE);
+                false ->
+                    (?GC_COPY_ERRLOG bor ?GC_FAIL_ON_BIND_ERR bor
+                         ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH)
+            end,
     #gconf{yaws_dir = Y,
            ebin_dir = [filename:join([Y, "examples/ebin"])],
            include_dir = [filename:join([Y, "examples/include"])],
@@ -503,14 +615,8 @@ make_default_gconf(Debug, Id) ->
                                     true ->
                                         30
                                 end,
-           flags = if Debug ->
-                           ?GC_DEBUG bor ?GC_COPY_ERRLOG
-                               bor ?GC_FAIL_ON_BIND_ERR bor
-                               ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH;
-
-                      true ->
-                           ?GC_COPY_ERRLOG bor ?GC_FAIL_ON_BIND_ERR bor
-                               ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH
+           flags = if Debug -> Flags bor ?GC_DEBUG;
+                      true  -> Flags
                    end,
 
            yaws = "Yaws " ++ yaws_generated:version(),
@@ -541,16 +647,22 @@ yaws_dir() ->
     yaws:get_app_dir().
 
 string_to_host_and_port(String) ->
-    case string:tokens(String, ":") of
-	[Host, Port] ->
-	    case string:to_integer(Port) of
-		{Integer, []} when Integer >= 0, Integer =< 65535 ->
-		    {ok, Host, Integer};
-		_Else ->
+    HostPortRE = "^(?:\\[([^\\]]+)\\]|([^:]+)):([0-9]+)$",
+    REOptions = [{capture, all_but_first, list}],
+    case re:run(String, HostPortRE, REOptions) of
+        {match, [IPv6, HostOrIPv4, Port]} ->
+            case string:to_integer(Port) of
+                {Integer, []} when Integer >= 0, Integer =< 65535 ->
+                    case IPv6 of
+                        "" -> {ok, HostOrIPv4, Integer};
+                        _  -> {ok, IPv6, Integer}
+                    end;
+                _Else ->
                     {error, ?F("~p is not a valid port number", [Port])}
-	    end;
-	_Else ->
-            {error, ?F("bad host and port specifier, expected HOST:PORT", [])}
+            end;
+        nomatch ->
+            {error, ?F("bad host and port specifier, expected HOST:PORT; "
+                "use [IP]:PORT for IPv6 address", [])}
     end.
 
 string_to_node_mod_fun(String) ->
@@ -567,136 +679,124 @@ string_to_node_mod_fun(String) ->
 
 
 %% two states, global, server
-fload(FD, globals, GC, _C, Cs, _Lno, eof) ->
+fload(FD, GC) ->
+    case catch fload(FD, GC, [], 1, ?NEXTLINE) of
+        {ok, GC1, Cs} -> {ok, GC1, lists:reverse(Cs)};
+        Err           -> Err
+    end.
+
+
+fload(FD, GC, Cs, _Lno, eof) ->
     file:close(FD),
     {ok, GC, Cs};
 
-
-fload(FD, _,  _GC, _C, _Cs, Lno, eof) ->
-    file:close(FD),
-    {error, ?F("Unexpected end-of-file at line ~w", [Lno])};
-
-fload(FD, globals, GC, C, Cs, Lno, Chars) ->
-    Next = io:get_line(FD, ''),
+fload(FD, GC, Cs, Lno, Chars) ->
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
         ["subconfig", '=', Name] ->
-            File = filename:absname(Name),
-            case is_file(File) of
-                true ->
-                    error_logger:info_msg(
-                      "Yaws: Using subconfig file ~s~n", [File]),
-                    case file:open(File, [read]) of
-                        {ok, FD1} ->
-                            R = (catch fload(FD1, globals, GC, undefined,
-                                             Cs, 1, io:get_line(FD1, ''))),
-                            ?Debug("FLOAD: ~p", [R]),
-                            case R of
-                                {ok, GC1, Cs1} ->
-                                    fload(FD, globals, GC1, C, Cs1, Lno+1,Next);
-                                Err ->
-                                    Err
-                            end;
+            case subconfigfiles(FD, Name, Lno) of
+                {ok, Files} ->
+                    case fload_subconfigfiles(Files, global, GC, Cs) of
+                        {ok, GC1, Cs1} ->
+                            fload(FD, GC1, Cs1, Lno+1, ?NEXTLINE);
                         Err ->
-                            {error, ?F("Can't open config file ~s:~p",
-                                       [File,Err])}
+                            Err
                     end;
-                false ->
-                    {error, ?F("Expect filename at line ~w", [Lno])}
+                Err ->
+                    Err
             end;
 
         ["subconfigdir", '=', Name] ->
-            Dir = filename:absname(Name),
-            case is_dir(Dir) of
-                true ->
-                    case file:list_dir(Dir) of
-                        {ok, Names} ->
-                            Sorted = lists:sort(Names),
-                            Paths = lists:map(
-                                      fun(N) ->
-                                              filename:absname(N, Dir)
-                                      end, Sorted),
-                            Fold = lists:foldl(
-                                     fun subconfigdir_fold/2,
-                                     {ok, GC, Cs}, Paths),
-                            case Fold of
-                                {ok, GC1, Cs1} ->
-                                    fload(FD, globals, GC1, C, Cs1, Lno+1, Next);
-                                Err ->
-                                    Err
-                            end;
-                        {error, Error} ->
-                            {error, ?F("Directory ~s is not readable: ~s",
-                                       [Name, Error])}
+            case subconfigdir(FD, Name, Lno) of
+                {ok, Files} ->
+                    case fload_subconfigfiles(Files, global, GC, Cs) of
+                        {ok, GC1, Cs1} ->
+                            fload(FD, GC1, Cs1, Lno+1, ?NEXTLINE);
+                        Err ->
+                            Err
                     end;
-                false ->
-                    {error, ?F("Expect directory at line ~w (subconfdir: ~s)",
-                               [Lno, Dir])}
+                Err ->
+                    Err
             end;
 
         ["trace", '=', Bstr] when GC#gconf.trace == false ->
             case Bstr of
                 "traffic" ->
-                    fload(FD, globals, GC#gconf{trace = {true, traffic}},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{trace = {true, traffic}}, Cs,
+                          Lno+1, ?NEXTLINE);
                 "http" ->
-                    fload(FD, globals, GC#gconf{trace = {true, http}},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{trace = {true, http}}, Cs,
+                          Lno+1, ?NEXTLINE);
                 "false" ->
-                    fload(FD, globals, GC#gconf{trace = false},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{trace = false}, Cs, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect false|http|traffic at line ~w",[Lno])}
             end;
         ["trace", '=', _Bstr] ->
             %% don't overwrite setting from commandline
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
 
         ["logdir", '=', Logdir] ->
-            Dir = filename:absname(Logdir),
+            Dir = case Logdir of
+                      "+" ++ D ->
+                          D1 = filename:absname(D),
+                          %% try to make the log directory if it doesn't exist
+                          yaws:mkdir(D1),
+                          D1;
+                      _ ->
+                          filename:absname(Logdir)
+                  end,
             case is_dir(Dir) of
                 true ->
                     put(logdir, Dir),
-                    fload(FD, globals, GC#gconf{logdir = Dir},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{logdir = Dir}, Cs, Lno+1, ?NEXTLINE);
                 false ->
-                    {error, ?F("Expect directory at line ~w (logdir ~s)", [Lno, Dir])}
+                    {error, ?F("Expect directory at line ~w (logdir ~s)",
+                               [Lno, Dir])}
             end;
 
         ["ebin_dir", '=', Ebindir] ->
             Dir = filename:absname(Ebindir),
             case warn_dir("ebin_dir", Dir) of
                 true ->
-                    fload(FD, globals, GC#gconf{ebin_dir =
-                                                    [Dir|GC#gconf.ebin_dir]},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{ebin_dir = [Dir|GC#gconf.ebin_dir]}, Cs,
+                          Lno+1, ?NEXTLINE);
                 false ->
-                    fload(FD, globals, GC, C, Cs, Lno+1, Next)
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE)
+            end;
 
+        ["src_dir", '=', Srcdir] ->
+            Dir = filename:absname(Srcdir),
+            case warn_dir("src_dir", Dir) of
+                true ->
+                    fload(FD, GC#gconf{src_dir = [Dir|GC#gconf.src_dir]}, Cs,
+                          Lno+1, ?NEXTLINE);
+                false ->
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE)
             end;
 
         ["runmod", '=', Mod0] ->
             Mod = list_to_atom(Mod0),
-            fload(FD, globals, GC#gconf{runmods = [Mod|GC#gconf.runmods]},
-                  C, Cs, Lno+1, Next);
+            fload(FD, GC#gconf{runmods = [Mod|GC#gconf.runmods]}, Cs,
+                  Lno+1, ?NEXTLINE);
 
         ["enable_soap", '=', Bool] ->
             if (Bool == "true") ->
-                    fload(FD, globals, GC#gconf{enable_soap = true},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{enable_soap = true}, Cs,
+                          Lno+1, ?NEXTLINE);
                true ->
-                    fload(FD, globals, GC#gconf{enable_soap = false},
-                          C, Cs, Lno+1, Next)
+                    fload(FD, GC#gconf{enable_soap = false}, Cs,
+                          Lno+1, ?NEXTLINE)
             end;
 
         ["soap_srv_mods", '=' | SoapSrvMods] ->
             case parse_soap_srv_mods(SoapSrvMods, []) of
                 {ok, L} ->
-                    fload(FD, globals, GC#gconf{soap_srv_mods = L},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{soap_srv_mods = L}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
@@ -704,10 +804,10 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["max_connections", '=', Int] ->
             case (catch list_to_integer(Int)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{max_connections = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{max_connections = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ when Int == "nolimit" ->
-                    fload(FD, globals, GC, C, Cs, Lno+1, Next);
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -715,8 +815,25 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["process_options", '=', POpts] ->
             case parse_process_options(POpts) of
                 {ok, ProcList} ->
-                    fload(FD, globals, GC#gconf{process_options=ProcList},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{process_options=ProcList}, Cs,
+                          Lno+1, ?NEXTLINE);
+                {error, Str} ->
+                    {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
+
+        ["large_file_chunk_size", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                I when is_integer(I) ->
+                    fload(FD, GC#gconf{large_file_chunk_size = I}, Cs,
+                          Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["large_file_sendfile", '=', Method] ->
+            case set_sendfile_flags(GC, Method) of
+                {ok, GC1} ->
+                    fload(FD, GC1, Cs, Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
@@ -724,8 +841,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["acceptor_pool_size", '=', Int] ->
             case catch list_to_integer(Int) of
                 I when is_integer(I), I >= 0 ->
-                    fload(FD, globals, GC#gconf{acceptor_pool_size = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{acceptor_pool_size = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer >= 0 at line ~w", [Lno])}
             end;
@@ -733,8 +850,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["log_wrap_size", '=', Int] ->
             case (catch list_to_integer(Int)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{log_wrap_size = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{log_wrap_size = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -742,8 +859,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["log_resolve_hostname", '=',  Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    fload(FD, globals, ?gc_log_set_resolve_hostname(GC, Val),
-                          C, Cs, Lno+1, Next);
+                    fload(FD, ?gc_log_set_resolve_hostname(GC, Val), Cs,
+                          Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
@@ -751,8 +868,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["fail_on_bind_err", '=',  Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    fload(FD, globals, ?gc_set_fail_on_bind_err(GC, Val),
-                          C, Cs, Lno+1, Next);
+                    fload(FD, ?gc_set_fail_on_bind_err(GC, Val), Cs,
+                          Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
@@ -762,11 +879,10 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
             Dir = filename:absname(Incdir),
             case warn_dir("include_dir", Dir) of
                 true ->
-                    fload(FD, globals, GC#gconf{include_dir=
-                                                    [Dir|GC#gconf.include_dir]},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{include_dir= [Dir|GC#gconf.include_dir]},
+                          Cs, Lno+1, ?NEXTLINE);
                 false ->
-                    fload(FD, globals, GC, C, Cs, Lno+1, Next)
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE)
 
             end;
 
@@ -775,8 +891,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
             case is_dir(Dir) of
                 true ->
                     put(mnesiadir, Dir),
-                    fload(FD, globals, GC#gconf{mnesia_dir = Dir},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mnesia_dir = Dir}, Cs, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect mnesia directory at line ~w", [Lno])}
             end;
@@ -784,18 +899,19 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["tmpdir", '=', _TmpDir] ->
             %% ignore
             error_logger:format(
-              "tmpdir in yaws.conf is no longer supported - ignoring\n",[]),
-            fload(FD, globals, GC,C, Cs, Lno+1, Next);
+              "tmpdir in yaws.conf is no longer supported - ignoring\n",[]
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
-        %% keep this bugger for backward compat for a while
         ["keepalive_timeout", '=', Val] ->
+            %% keep this bugger for backward compat for a while
             case (catch list_to_integer(Val)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{keepalive_timeout = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{keepalive_timeout = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ when Val == "infinity" ->
-                    fload(FD, globals, GC#gconf{keepalive_timeout = infinity},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{keepalive_timeout = infinity}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -803,11 +919,11 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["keepalive_maxuses", '=', Int] ->
             case (catch list_to_integer(Int)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{keepalive_maxuses = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{keepalive_maxuses = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ when Int == "nolimit" ->
                     %% nolimit is the default
-                    fload(FD, globals, GC, C, Cs, Lno+1, Next);
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -818,21 +934,23 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
               []),
             case is_file(PhpPath) of
                 true ->
-                    fload(FD, globals, GC#gconf{phpexe = PhpPath},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{phpexe = PhpPath}, Cs, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect executable file at line ~w", [Lno])}
             end;
 
-        %% deprected, don't use
         ["read_timeout", '=', _Val] ->
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            %% deprected, don't use
+            error_logger:format(
+              "read_timeout in yaws.conf is no longer supported - ignoring\n",[]
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
         ["max_num_cached_files", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{max_num_cached_files = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{max_num_cached_files = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -841,8 +959,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["max_num_cached_bytes", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{max_num_cached_bytes = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{max_num_cached_bytes = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -851,8 +969,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["max_size_cached_file", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 I when is_integer(I) ->
-                    fload(FD, globals, GC#gconf{max_size_cached_file = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{max_size_cached_file = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -860,8 +978,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["cache_refresh_secs", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 I when is_integer(I), I >= 0 ->
-                    fload(FD, globals, GC#gconf{cache_refresh_secs = I},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{cache_refresh_secs = I}, Cs,
+                          Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect 0 or positive integer at line ~w",[Lno])}
             end;
@@ -870,8 +988,8 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         ["copy_error_log", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    fload(FD, globals, ?gc_set_copy_errlog(GC, Val),
-                          C, Cs, Lno+1, Next);
+                    fload(FD, ?gc_set_copy_errlog(GC, Val), Cs,
+                          Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
@@ -883,220 +1001,358 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
               " it is now a per-server variable", []),
             case is_bool(Bool) of
                 {true, _Val} ->
-                    fload(FD, globals, GC, C, Cs, Lno+1, Next);
+                    fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["id", '=', String] when GC#gconf.id == undefined;
                                  GC#gconf.id == "default" ->
-            fload(FD, globals, GC#gconf{id=String},C, Cs, Lno+1, Next);
+            fload(FD, GC#gconf{id=String}, Cs, Lno+1, ?NEXTLINE);
         ["id", '=', String]  ->
             error_logger:format("Ignoring 'id = ~p' setting at line ~p~n",
                                 [String,Lno]),
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
+
         ["pick_first_virthost_on_nomatch", '=',  Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    fload(FD, globals,
-                          ?gc_set_pick_first_virthost_on_nomatch(GC,Val),
-                          C, Cs, Lno+1, Next);
+                    fload(FD, ?gc_set_pick_first_virthost_on_nomatch(GC,Val),
+                          Cs, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["use_fdsrv", '=',  _Bool] ->
             %% feature removed
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            error_logger:format(
+              "use_fdsrv in yaws.conf is no longer supported - ignoring\n",[]
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
+
         ["use_old_ssl", '=',  Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    fload(FD, globals,
-                          ?gc_set_use_old_ssl(GC,Val),
-                          C, Cs, Lno+1, Next);
+                    fload(FD, ?gc_set_use_old_ssl(GC,Val), Cs,
+                          Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["use_large_ssl_pool", '=',  _Bool] ->
             %% just ignore - not relevant any longer
-            fload(FD, globals, GC,
-                  C, Cs, Lno+1, Next);
+            error_logger:format(
+              "use_large_ssl_pool in yaws.conf is no longer supported"
+              " - ignoring\n", []
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
+
         ["x_forwarded_for_log_proxy_whitelist", '=' | _] ->
-            error_logger:info_msg("Warning, x_forwarded_for_log_proxy_whitelist"
-                                  " is deprecated and ignored~n", []),
-            fload(FD, globals, GC, C, Cs, Lno+1, Next);
+            error_logger:format(
+              "x_forwarded_for_log_proxy_whitelist in yaws.conf is no longer"
+              " supported - ignoring\n", []
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
+
         ["ysession_mod", '=', Mod_str] ->
             Ysession_mod = list_to_atom(Mod_str),
-            fload(FD, globals, GC#gconf{ysession_mod = Ysession_mod},
-                  C, Cs, Lno+1, Next);
-        ["server_signature", '=', Signature] ->
-            fload(FD, globals, GC#gconf{yaws=Signature},C, Cs, Lno+1, Next);
+            fload(FD, GC#gconf{ysession_mod = Ysession_mod}, Cs,
+                  Lno+1, ?NEXTLINE);
 
+        ["server_signature", '=', Signature] ->
+            fload(FD, GC#gconf{yaws=Signature}, Cs, Lno+1, ?NEXTLINE);
 
         ["default_type", '=', MimeType] ->
             case parse_mime_types_info(default_type, MimeType,
                                        GC#gconf.mime_types_info,
                                        #mime_types_info{}) of
                 {ok, Info} ->
-                    fload(FD, globals, GC#gconf{mime_types_info=Info},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mime_types_info=Info}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["default_charset", '=', Charset] ->
             case parse_mime_types_info(default_charset, Charset,
                                        GC#gconf.mime_types_info,
                                        #mime_types_info{}) of
                 {ok, Info} ->
-                    fload(FD, globals, GC#gconf{mime_types_info=Info},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mime_types_info=Info}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["mime_types_file", '=', File] ->
             case parse_mime_types_info(mime_types_file, File,
                                        GC#gconf.mime_types_info,
                                        #mime_types_info{}) of
                 {ok, Info} ->
-                    fload(FD, globals, GC#gconf{mime_types_info=Info},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mime_types_info=Info}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["add_types", '=' | NewTypes] ->
             case parse_mime_types_info(add_types, NewTypes,
                                        GC#gconf.mime_types_info,
                                        #mime_types_info{}) of
                 {ok, Info} ->
-                    fload(FD, globals, GC#gconf{mime_types_info=Info},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mime_types_info=Info}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["add_charsets", '=' | NewCharsets] ->
             case parse_mime_types_info(add_charsets, NewCharsets,
                                        GC#gconf.mime_types_info,
                                        #mime_types_info{}) of
                 {ok, Info} ->
-                    fload(FD, globals, GC#gconf{mime_types_info=Info},
-                          C, Cs, Lno+1, Next);
+                    fload(FD, GC#gconf{mime_types_info=Info}, Cs,
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
 
+        ["nslookup_pref", '=' | Pref] ->
+            case parse_nslookup_pref(Pref) of
+                {ok, Families} ->
+                    fload(FD, GC#gconf{nslookup_pref = Families}, Cs,
+                          Lno+1, ?NEXTLINE);
+                {error, Str} ->
+                    {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
 
-        ['<', "server", Server, '>'] ->  %% first server
-            PhpHandler = {cgi, GC#gconf.phpexe},
-            fload(FD, server, GC,
-                  #sconf{servername = Server, php_handler = PhpHandler,
-                         listen = []},
-                  Cs, Lno+1, Next);
+        ['<', "server", Server, '>'] ->
+            C = #sconf{servername = Server, listen = [],
+                       php_handler = {cgi, GC#gconf.phpexe}},
+            fload(FD, server, GC, C, Cs, Lno+1, ?NEXTLINE);
 
         [H|_] ->
             {error, ?F("Unexpected tokens ~p at line ~w", [H, Lno])};
         Err ->
             Err
-    end;
+    end.
 
+
+fload(FD, server, _GC, _C, _Cs, Lno, eof) ->
+    file:close(FD),
+    {error, ?F("Unexpected end-of-file at line ~w", [Lno])};
 
 fload(FD, server, GC, C, Cs, Lno, Chars) ->
-    Next = io:get_line(FD, ''),
+    case fload(FD, server, GC, C, Lno, Chars) of
+        {ok, _, _, Lno1, eof} ->
+            {error, ?F("Unexpected end-of-file at line ~w", [Lno1])};
+        {ok, GC1, C1, Lno1, ['<', "/server", '>']} ->
+            HasDocroot =
+                case C1#sconf.docroot of
+                    undefined ->
+                        Tests =
+                            [fun() ->
+                                     lists:keymember("/", #proxy_cfg.prefix,
+                                                     C1#sconf.revproxy)
+                             end,
+                             fun() ->
+                                     lists:keymember("/", 1,
+                                                     C1#sconf.redirect_map)
+                             end,
+                             fun() ->
+                                     lists:foldl(fun(_, true) -> true;
+                                                    ({"/", _}, _Acc) -> true;
+                                                    (_, Acc) -> Acc
+                                                 end, false, C1#sconf.appmods)
+                             end,
+                             fun() ->
+                                     ?sc_forward_proxy(C1)
+                             end],
+                        lists:any(fun(T) -> T() end, Tests);
+                    _ ->
+                        true
+                end,
+            case HasDocroot of
+                true ->
+                    case C1#sconf.listen of
+                        [] ->
+                            C2 = C1#sconf{listen = {127,0,0,1}},
+                            fload(FD, GC1, [C2|Cs], Lno1+1, ?NEXTLINE);
+                        Ls ->
+                            Cs1 = [C1#sconf{listen=L} || L <- Ls] ++ Cs,
+                            fload(FD, GC1, Cs1, Lno1+1, ?NEXTLINE)
+                    end;
+                false ->
+                    {error,
+                     ?F("No valid docroot configured for virthost "
+                        "'~s' (port: ~w)",
+                        [C1#sconf.servername, C1#sconf.port])}
+            end;
+        Err ->
+            Err
+    end.
+
+
+fload(FD, server, GC, C, Lno, eof) ->
+    file:close(FD),
+    {ok, GC, C, Lno, eof};
+fload(FD, _,  _GC, _C, Lno, eof) ->
+    file:close(FD),
+    {error, ?F("Unexpected end-of-file at line ~w", [Lno])};
+
+fload(FD, server, GC, C, Lno, Chars) ->
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, server, GC, C, Cs, Lno+1, Next);
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
 
-        ["server_signature", '=', Signature] ->
-            fload(FD, server, GC, C#sconf{yaws=Signature}, Cs, Lno+1, Next);
+        ["subconfig", '=', Name] ->
+            case subconfigfiles(FD, Name, Lno) of
+                {ok, Files} ->
+                    case fload_subconfigfiles(Files, server, GC, C) of
+                        {ok, GC1, C1} ->
+                            fload(FD, server, GC1, C1, Lno+1, ?NEXTLINE);
+                        Err ->
+                            Err
+                    end;
+                Err ->
+                    Err
+            end;
+
+        ["subconfigdir", '=', Name] ->
+            case subconfigdir(FD, Name, Lno) of
+                {ok, Files} ->
+                    case fload_subconfigfiles(Files, server, GC, C) of
+                        {ok, GC1, C1} ->
+                            fload(FD, server, GC1, C1, Lno+1, ?NEXTLINE);
+                        Err ->
+                            Err
+                    end;
+                Err ->
+                    Err
+            end;
+
+        ["server_signature", '=', Sig] ->
+            fload(FD, server, GC, C#sconf{yaws=Sig}, Lno+1, ?NEXTLINE);
+
         ["access_log", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_access_log(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_access_log(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["auth_log", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_auth_log(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_auth_log(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["logger_mod", '=', Module] ->
-            C2 = C#sconf{logger_mod = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{logger_mod = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
         ["dir_listings", '=', StrVal] ->
             case StrVal of
                 "true" ->
-                    C2 = ?sc_set_dir_listings(C, true),
-                    C3 = ?sc_set_dir_all_zip(C2, true),
-                    C4 = C3#sconf{appmods = [ {"all.zip", yaws_ls},
+                    C1 = ?sc_set_dir_listings(C, true),
+                    C2 = ?sc_set_dir_all_zip(C1, true),
+                    C3 = C2#sconf{appmods = [ {"all.zip", yaws_ls},
                                               {"all.tgz", yaws_ls},
                                               {"all.tbz2", yaws_ls}|
-                                              C3#sconf.appmods]},
-                    fload(FD, server, GC, C4, Cs, Lno+1, Next);
+                                              C2#sconf.appmods]},
+                    fload(FD, server, GC, C3, Lno+1, ?NEXTLINE);
                 "true_nozip" ->
-                    C2 = ?sc_set_dir_listings(C, true),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_dir_listings(C, true),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 "false" ->
-                    C2 = ?sc_set_dir_listings(C, false),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_dir_listings(C, false),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect true|true_nozip|false at line ~w",[Lno])}
             end;
+
         ["deflate", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
                     C1 = C#sconf{deflate_options=#deflate{}},
                     C2 = ?sc_set_deflate(C1, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    fload(FD, server, GC, C2, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["auth_skip_docroot",'=',Bool] ->
             case is_bool(Bool) of
                 {true,Val} ->
-                    C2 = ?sc_set_auth_skip_docroot(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_auth_skip_docroot(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["dav", '=', Bool] ->
             case is_bool(Bool) of
-                {true, Val} ->
-                    C2 = ?sc_set_dav(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                {true, true} ->
+                    %% Ever since WebDAV support was moved into an appmod,
+                    %% we must no longer set the dav flag in the
+                    %% sconf. Always turn it off instead.
+                    C1 = ?sc_set_dav(C, false),
+                    Runmods = GC#gconf.runmods,
+                    GC1 = case lists:member(yaws_runmod_lock, Runmods) of
+                              false ->
+                                  GC#gconf{runmods=[yaws_runmod_lock|Runmods]};
+                              true ->
+                                  GC
+                          end,
+                    DavAppmods = lists:keystore(yaws_appmod_dav, 2,
+                                                C1#sconf.appmods,
+                                                {"/",yaws_appmod_dav}),
+                    C2 = C1#sconf{appmods=DavAppmods},
+                    fload(FD, server, GC1, C2, Lno+1, ?NEXTLINE);
+                {true,false} ->
+                    C1 = ?sc_set_dav(C, false),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["port", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 I when is_integer(I) ->
-                    C2 = C#sconf{port = I},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{port = I},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
+
         ["rmethod", '=', Val] ->
             case Val of
                 "http" ->
-                    C2 = C#sconf{rmethod = Val},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{rmethod = Val},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 "https" ->
-                    C2 = C#sconf{rmethod = Val},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{rmethod = Val},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect http or https at line ~w", [Lno])}
             end;
+
         ["rhost", '=', Val] ->
-            C2 = C#sconf{rhost = Val},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{rhost = Val},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
         ["listen", '=', IP] ->
             case inet_parse:address(IP) of
                 {error, _} ->
                     {error, ?F("Expect IP address at line ~w:", [Lno])};
                 {ok,Addr} ->
                     Lstn = C#sconf.listen,
-                    C2 = if
+                    C1 = if
                              is_list(Lstn) ->
                                  case lists:member(Addr, Lstn) of
                                      false ->
@@ -1107,202 +1363,169 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                              true ->
                                  C#sconf{listen = [Addr, Lstn]}
                          end,
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next)
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE)
             end;
+
         ["listen_backlog", '=', Val] ->
             case (catch list_to_integer(Val)) of
                 B when is_integer(B) ->
-                    C2 = case proplists:get_value(listen_opts,
-                                                  C#sconf.soptions) of
-                             undefined ->
-                                 C#sconf{soptions =
-                                             [{listen_opts, [{backlog, B}]} |
-                                              C#sconf.soptions]};
-                             Opts ->
-                                 C#sconf{soptions =
-                                             [{listen_opts, [{backlog, B} | Opts]} |
-                                              C#sconf.soptions]}
-                         end,
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = update_soptions(C, listen_opts, backlog, B),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
+
         ["servername", '=', Name] ->
-            C2 = ?sc_set_add_port((C#sconf{servername = Name}),false),
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = ?sc_set_add_port((C#sconf{servername = Name}),false),
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
+        ["serveralias", '=' | Names] ->
+            C1 = C#sconf{serveralias = Names ++ C#sconf.serveralias},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
+        [ '<', "listen_opts", '>'] ->
+            fload(FD, listen_opts, GC, C, Lno+1, ?NEXTLINE);
 
         ["docroot", '=', Rootdir | XtraDirs] ->
             RootDirs = lists:map(fun(R) -> filename:absname(R) end,
                                  [Rootdir | XtraDirs]),
             case lists:filter(fun(R) -> not is_dir(R) end, RootDirs) of
                 [] when C#sconf.docroot =:= undefined ->
-                    C2 = C#sconf{docroot = hd(RootDirs),
+                    C1 = C#sconf{docroot = hd(RootDirs),
                                  xtra_docroots = tl(RootDirs)},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 [] ->
                     XtraDocroots = RootDirs ++ C#sconf.xtra_docroots,
-                    C2 = C#sconf{xtra_docroots = XtraDocroots},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{xtra_docroots = XtraDocroots},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 NoDirs ->
                     error_logger:info_msg("Warning, Skip invalid docroots"
                                           " at line ~w : ~s~n",
                                           [Lno, string:join(NoDirs, ", ")]),
                     case lists:subtract(RootDirs, NoDirs) of
                         [] ->
-                            fload(FD, server, GC, C, Cs, Lno+1, Next);
+                            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
                         [H|T] when C#sconf.docroot =:= undefined ->
-                            C2 = C#sconf{docroot = H, xtra_docroots = T},
-                            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                            C1 = C#sconf{docroot = H, xtra_docroots = T},
+                            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                         Ds ->
                             XtraDocroots = Ds ++ C#sconf.xtra_docroots,
-                            C2 = C#sconf{xtra_docroots = XtraDocroots},
-                            fload(FD, server, GC, C2, Cs, Lno+1, Next)
+                            C1 = C#sconf{xtra_docroots = XtraDocroots},
+                            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE)
                     end
             end;
 
         ["partial_post_size",'=',Size] ->
             case Size of
                 "nolimit" ->
-                    C2 = C#sconf{partial_post_size = nolimit},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{partial_post_size = nolimit},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 Val ->
                     case (catch list_to_integer(Val)) of
                         I when is_integer(I) ->
-                            C2 = C#sconf{partial_post_size = I},
-                            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                            C1 = C#sconf{partial_post_size = I},
+                            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                         _ ->
                             {error,
                              ?F("Expect integer or 'nolimit' at line ~w",
                                 [Lno])}
                     end
             end;
+
         ['<', "auth", '>'] ->
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, #auth{});
+            C1 = C#sconf{authdirs=[#auth{}|C#sconf.authdirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
 
         ['<', "redirect", '>'] ->
-            fload(FD, server_redirect, GC, C, Cs, Lno+1, Next, []);
+            fload(FD, server_redirect, GC, C, Lno+1, ?NEXTLINE);
 
         ['<', "deflate", '>'] ->
-            fload(FD, server_deflate, GC, C, Cs, Lno+1, Next,
-                  #deflate{mime_types=[]});
+            C1 = C#sconf{deflate_options=#deflate{mime_types=[]}},
+            fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
 
-        %% noop
         ["default_server_on_this_ip", '=', _Bool] ->
-            fload(FD, server, GC, C, Cs, Lno+1, Next);
+            error_logger:format(
+              "default_server_on_this_ip in yaws.conf is no longer"
+              " supported - ignoring\n", []
+             ),
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
 
         [ '<', "ssl", '>'] ->
             ssl_start(),
-            fload(FD, ssl, GC, C#sconf{ssl = #ssl{}}, Cs, Lno+1, Next);
+            fload(FD, ssl, GC, C#sconf{ssl = #ssl{}}, Lno+1, ?NEXTLINE);
 
         ["appmods", '=' | AppMods] ->
             case parse_appmods(AppMods, []) of
                 {ok, L} ->
-                    C2 = C#sconf{appmods = L ++ C#sconf.appmods},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{appmods = L ++ C#sconf.appmods},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["dispatchmod", '=', DispatchMod] ->
-            C2 = C#sconf{dispatch_mod = list_to_atom(DispatchMod)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{dispatch_mod = list_to_atom(DispatchMod)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["expires", '=' | Expires] ->
             case parse_expires(Expires, []) of
                 {ok, L} ->
-                    C2 = C#sconf{expires = L ++ C#sconf.expires},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{expires = L ++ C#sconf.expires},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["errormod_404", '=' , Module] ->
-            C2 = C#sconf{errormod_404 = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{errormod_404 = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["errormod_crash", '=', Module] ->
-            C2 = C#sconf{errormod_crash = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{errormod_crash = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["errormod_401", '=' , Module] ->
-            C2 = C#sconf{errormod_401 = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{errormod_401 = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["arg_rewrite_mod", '=', Module] ->
-            C2 = C#sconf{arg_rewrite_mod = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{arg_rewrite_mod = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["tilde_expand", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_tilde_expand(C,Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_tilde_expand(C,Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
-        ['<', "/server", '>'] ->
-            HasDocroot =
-                case C#sconf.docroot of
-                    undefined ->
-                        Tests = [fun() ->
-                                         lists:keymember("/", #proxy_cfg.prefix, C#sconf.revproxy)
-                                 end,
-                                 fun() ->
-                                         lists:keymember("/", 1, C#sconf.redirect_map)
-                                 end,
-                                 fun() ->
-                                         lists:foldl(fun(_, true) -> true;
-                                                        ({"/", _}, _Acc) -> true;
-                                                        (_, Acc) -> Acc
-                                                     end, false, C#sconf.appmods)
-                                 end,
-                                 fun() ->
-                                         ?sc_forward_proxy(C)
-                                 end],
-                        lists:any(fun(T) -> T() end, Tests);
-                    _ ->
-                        true
-                end,
-            case HasDocroot of
-                true ->
-                    case C#sconf.listen of
-                        [] ->
-                            C2 = C#sconf{listen = {127,0,0,1}},
-                            fload(FD, globals, GC, undefined, [C2|Cs], Lno+1, Next);
-                        Ls ->
-                            Cs2 = [C#sconf{listen=L} || L <- Ls] ++ Cs,
-                            fload(FD, globals, GC, undefined, Cs2, Lno+1, Next)
-                    end;
-                false ->
-                    {error,
-                     ?F("No valid docroot configured for virthost '~s' (port: ~w)",
-                        [C#sconf.servername, C#sconf.port])}
-            end;
-
         ['<', "opaque", '>'] ->
-            fload(FD, opaque, GC, C, Cs, Lno+1, Next);
+            fload(FD, opaque, GC, C, Lno+1, ?NEXTLINE);
 
         ["start_mod", '=' , Module] ->
-            C2 = C#sconf{start_mod = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{start_mod = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ['<', "rss", '>'] ->
             erase(rss_id),
             put(rss, []),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
 
         ["tilde_allowed_scripts", '=' | Suffixes] ->
-            C2 = C#sconf{tilde_allowed_scripts=Suffixes},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{tilde_allowed_scripts=Suffixes},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["allowed_scripts", '=' | Suffixes] ->
-            C2 = C#sconf{allowed_scripts=Suffixes},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{allowed_scripts=Suffixes},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
         ["index_files", '=' | Files] ->
             case parse_index_files(Files) of
                 ok ->
-                    C2 = C#sconf{index_files = Files},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{index_files = Files},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
@@ -1310,8 +1533,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         ["revproxy", '=' | Tail] ->
             case parse_revproxy(Tail) of
                 {ok, RevProxy} ->
-                    C2 = C#sconf{revproxy = [RevProxy | C#sconf.revproxy]},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{revproxy = [RevProxy | C#sconf.revproxy]},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, url} ->
                     {error, ?F("Bad url at line ~p",[Lno])};
                 {error, syntax} ->
@@ -1323,39 +1546,44 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         ["fwdproxy", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_forward_proxy(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_forward_proxy(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
         ['<', "extra_cgi_vars", "dir", '=', Dir, '>'] ->
-            fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next, {Dir, []});
+            C1 = C#sconf{extra_cgi_vars=[{Dir, []}|C#sconf.extra_cgi_vars]},
+            fload(FD, extra_cgi_vars, GC, C1, Lno+1, ?NEXTLINE);
 
         ["statistics", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_statistics(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_statistics(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
-        ["fcgi_app_server", '=', Val] ->
-            case string_to_host_and_port(Val) of
+        ["fcgi_app_server", '=' | Val] ->
+            HostPortSpec = case Val of
+                [HPS]                    -> HPS;
+                ['[', HSpec, ']', PSpec] -> "[" ++ HSpec ++ "]" ++ PSpec
+            end,
+            case string_to_host_and_port(HostPortSpec) of
                 {ok, Host, Port} ->
-                    C2 = C#sconf{fcgi_app_server = {Host, Port}},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{fcgi_app_server = {Host, Port}},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Reason} ->
                     {error, ?F("Invalid fcgi_app_server ~p at line ~w: ~s",
-                               [Val, Lno, Reason])}
+                               [HostPortSpec, Lno, Reason])}
             end;
 
         ["fcgi_trace_protocol", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_fcgi_trace_protocol(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_fcgi_trace_protocol(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
@@ -1363,8 +1591,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         ["fcgi_log_app_error", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_fcgi_log_app_error(C, Val),
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = ?sc_set_fcgi_log_app_error(C, Val),
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
@@ -1374,8 +1602,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
               "'phpfcgi' is deprecated, use 'php_handler' instead\n", []),
             case string_to_host_and_port(HostPortSpec) of
                 {ok, Host, Port} ->
-                    C2 = C#sconf{php_handler = {fcgi, {Host, Port}}},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{php_handler = {fcgi, {Host, Port}}},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Reason} ->
                     {error,
                      ?F("Invalid php fcgi server ~p at line ~w: ~s",
@@ -1385,8 +1613,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         ["php_handler", '=' | PhpMod] ->
             case parse_phpmod(PhpMod, GC#gconf.phpexe) of
                 {ok, I} ->
-                    C2 = C#sconf{php_handler = I},
-                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                    C1 = C#sconf{php_handler = I},
+                    fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Reason} ->
                     {error,
                      ?F("Invalide php_handler configuration at line ~w: ~s",
@@ -1394,8 +1622,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             end;
 
         ["shaper", '=', Module] ->
-            C2 = C#sconf{shaper = list_to_atom(Module)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{shaper = list_to_atom(Module)},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
 
 
         ["default_type", '=', MimeType] ->
@@ -1404,50 +1632,57 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                                        GC#gconf.mime_types_info) of
                 {ok, Info} ->
                     fload(FD, server, GC, C#sconf{mime_types_info=Info},
-                          Cs, Lno+1, Next);
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["default_charset", '=', Charset] ->
             case parse_mime_types_info(default_charset, Charset,
                                        C#sconf.mime_types_info,
                                        GC#gconf.mime_types_info) of
                 {ok, Info} ->
                     fload(FD, server, GC, C#sconf{mime_types_info=Info},
-                          Cs, Lno+1, Next);
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["mime_types_file", '=', File] ->
             case parse_mime_types_info(mime_types_file, File,
                                        C#sconf.mime_types_info,
                                        GC#gconf.mime_types_info) of
                 {ok, Info} ->
                     fload(FD, server, GC, C#sconf{mime_types_info=Info},
-                          Cs, Lno+1, Next);
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["add_types", '=' | NewTypes] ->
             case parse_mime_types_info(add_types, NewTypes,
                                        C#sconf.mime_types_info,
                                        GC#gconf.mime_types_info) of
                 {ok, Info} ->
                     fload(FD, server, GC, C#sconf{mime_types_info=Info},
-                          Cs, Lno+1, Next);
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["add_charsets", '=' | NewCharsets] ->
             case parse_mime_types_info(add_charsets, NewCharsets,
                                        C#sconf.mime_types_info,
                                        GC#gconf.mime_types_info) of
                 {ok, Info} ->
                     fload(FD, server, GC, C#sconf{mime_types_info=Info},
-                          Cs, Lno+1, Next);
+                          Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
+        ['<', "/server", '>'] ->
+            {ok, GC, C, Lno, ['<', "/server", '>']};
 
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
@@ -1456,331 +1691,397 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
     end;
 
 
-fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
-    Next = io_get_line(FD, '', []),
+fload(FD, listen_opts, GC, C, Lno, Chars) ->
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, ssl, GC, C, Cs, Lno+1, Next);
+            fload(FD, listen_opts, GC, C, Lno+1, ?NEXTLINE);
+
+        ["buffer", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                B when is_integer(B) ->
+                    C1 = update_soptions(C, listen_opts, buffer, B),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["delay_send", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = update_soptions(C, listen_opts, delay_send, Val),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+        ["linger", '=', Val] ->
+            case (catch list_to_integer(Val)) of
+                I when is_integer(I) ->
+                    C1 = update_soptions(C, listen_opts, linger, {true, I}),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ when Val == "false" ->
+                    C1 = update_soptions(C, listen_opts, linger, {false, 0}),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer|false at line ~w", [Lno])}
+            end;
+
+        ["nodelay", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = update_soptions(C, listen_opts, nodelay, Val),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+        ["priority", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                P when is_integer(P) ->
+                    C1 = update_soptions(C, listen_opts, priority, P),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["sndbuf", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                I when is_integer(I) ->
+                    C1 = update_soptions(C, listen_opts, sndbuf, I),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["recbuf", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                I when is_integer(I) ->
+                    C1 = update_soptions(C, listen_opts, recbuf, I),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["send_timeout", '=', Val] ->
+            case (catch list_to_integer(Val)) of
+                I when is_integer(I) ->
+                    C1 = update_soptions(C, listen_opts, send_timeout, I),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ when Val == "infinity" ->
+                    C1 = update_soptions(C, listen_opts, send_timeout,
+                                         infinity),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect integer|infinity at line ~w", [Lno])}
+            end;
+
+        ["send_timeout_close", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = update_soptions(C, listen_opts, send_timeout_close,
+                                         Val),
+                    fload(FD, listen_opts, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+        ['<', "/listen_opts", '>'] ->
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
+
+        [H|T] ->
+            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
+        Err ->
+            Err
+    end;
+
+fload(FD, ssl, GC, C, Lno, Chars) ->
+    case toks(Lno, Chars) of
+        [] ->
+            fload(FD, ssl, GC, C, Lno+1, ?NEXTLINE);
 
         %% A bunch of ssl options
 
         ["keyfile", '=', Val] ->
             case is_file(Val) of
-                true when  is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{keyfile = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])};
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{keyfile = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect existing file at line ~w", [Lno])}
             end;
+
         ["certfile", '=', Val] ->
             case is_file(Val) of
-                true when  is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{certfile = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])};
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{certfile = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect existing file at line ~w", [Lno])}
             end;
+
         ["cacertfile", '=', Val] ->
             case is_file(Val) of
-                true when  is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{cacertfile = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])};
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{cacertfile = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect existing file at line ~w", [Lno])}
             end;
+
         ["verify", '=', Val0] ->
-            Val =
-                try
-                    list_to_integer(Val0)
-                catch error:badarg ->
-                        list_to_atom(Val0)
-                end,
+            Val = try
+                      list_to_integer(Val0)
+                  catch error:badarg ->
+                          list_to_atom(Val0)
+                  end,
             case lists:member(Val, [0,1,2,verify_peer,verify_none]) of
-                true when  is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{verify = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])};
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{verify = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer or verify_none, "
                                "verify_peer at line ~w", [Lno])}
             end;
-        ["fail_if_no_peer_cert", '=', Val0] ->
-            Val = (catch list_to_atom(Val0)),
-            if
-                is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{
+
+        ["fail_if_no_peer_cert", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{
                                          fail_if_no_peer_cert = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
-                true ->
-                    {error, ?F("Need to set option fail_if_no_peer_cert "
-                               "to true before line ~w",
-                               [Lno])}
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["depth", '=', Val0] ->
             Val = (catch list_to_integer(Val0)),
             case lists:member(Val, [0, 1,2,3,4,5,6,7]) of
-                true when  is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{depth = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])};
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{depth = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer 0..7 at line ~w", [Lno])}
             end;
+
         ["password", '=', Val] ->
-            if
-                is_record(C#sconf.ssl, ssl) ->
-                    C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{password = Val}},
-                    fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
-                true ->
-                    {error, ?F("Need to set option ssl to true before line ~w",
-                               [Lno])}
-            end;
+            C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{password = Val}},
+            fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+
         ["ciphers", '=', Val] ->
             try
                 L = str2term(Val),
-                io:format("L = ~p~n",[L]),
                 Ciphers = ssl:cipher_suites(),
                 case check_ciphers(L, Ciphers) of
                     ok ->
-                        if
-                            is_record(C#sconf.ssl, ssl) ->
-                                C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{
-                                                     ciphers = L}},
-                                fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
-                            true ->
-                                {error, ?F("Need to set option ssl to "
-                                           "true before line ~w",
-                                           [Lno])}
-                        end;
+                        C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{ciphers = L}},
+                        fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
                     Err ->
                         Err
                 end
-            catch _:Err2 ->
-                    io:format("~p~n", [Err2]),
+            catch _:_ ->
                     {error, ?F("Bad cipherspec at line ~w", [Lno])}
             end;
-        ['<', "/ssl", '>'] ->
-            fload(FD, server, GC, C, Cs, Lno+1, Next);
 
-        [H|T] ->
-            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
-        Err ->
-            Err
-    end;
-
-fload(FD, rss, GC, C, Cs, Lno, Chars) ->
-    %%?Debug("Chars: ~s", [Chars]),
-    Next = io:get_line(FD, ''),
-    case toks(Lno, Chars) of
-        [] ->
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ['<', "/rss", '>'] ->
-            case get(rss_id) of
-                undefined ->
-                    {error, ?F("No rss_id specified at line ~w", [Lno])};
-                RSSid ->
-                    yaws_rss:open(RSSid, get(rss)),
-                    fload(FD, server, GC, C, Cs, Lno+1, Next)
+        ["secure_renegotiate", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = C#sconf{ssl=(C#sconf.ssl)#ssl{secure_renegotiate=Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
-        ["rss_id", '=', Value] ->   % mandatory !!
-            put(rss_id, list_to_atom(Value)),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ["rss_dir", '=', Value] ->   % mandatory !!
-            put(rss, [{db_dir, Value} | get(rss)]),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ["rss_expire", '=', Value] ->
-            put(rss, [{expire, Value} | get(rss)]),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ["rss_days", '=', Value] ->
-            put(rss, [{days, Value} | get(rss)]),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ["rss_rm_exp", '=', Value] ->
-            put(rss, [{rm_exp, Value} | get(rss)]),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
-        ["rss_max", '=', Value] ->
-            put(rss, [{rm_max, Value} | get(rss)]),
-            fload(FD, rss, GC, C, Cs, Lno+1, Next);
+
+        ["honor_cipher_order", '=', Bool] ->
+            %% below, ignore dialyzer warning:
+            case ?HONOR_CIPHER_ORDER of
+                true ->
+                    case is_bool(Bool) of
+                        {true, Val} ->
+                            C2 = C#sconf{
+                                   ssl=(C#sconf.ssl)#ssl{honor_cipher_order=Val}
+                                  },
+                            fload(FD, ssl, GC, C2, Lno+1, ?NEXTLINE);
+                        false ->
+                            {error, ?F("Expect true|false at line ~w", [Lno])}
+                    end;
+                _ ->
+                    error_logger:info_msg("Warning, honor_cipher_order SSL "
+                                          "option is not supported "
+                                          "at line ~w~n", [Lno]),
+                    fload(FD, ssl, GC, C, Lno+1, ?NEXTLINE)
+            end;
+
+        ["protocol_version", '=' | Vsns0] ->
+            try
+                Vsns = [list_to_existing_atom(V) || V <- Vsns0, not is_atom(V)],
+                ok = application:set_env(ssl, protocol_version, Vsns),
+                C1 = C#sconf{
+                       ssl=(C#sconf.ssl)#ssl{protocol_version=Vsns}
+                      },
+                fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE)
+            catch _:_ ->
+                    {error, ?F("Bad ssl protocol_version at line ~w", [Lno])}
+            end;
+
+        ['<', "/ssl", '>'] ->
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
         Err ->
             Err
     end;
 
-fload(FD, opaque, GC, C, Cs, Lno, Chars) ->
-    %%?Debug("Chars: ~s", [Chars]),
-    Next = io:get_line(FD, ''),
+fload(FD, server_auth, GC, C, Lno, Chars) ->
+    [Auth|AuthDirs] = C#sconf.authdirs,
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, opaque, GC, C, Cs, Lno+1, Next);
-        ['<', "/opaque", '>'] ->
-            fload(FD, server, GC, C, Cs, Lno+1, Next);
-        [Key, '=', Value] ->
-            C2 = C#sconf{opaque = [{Key,Value} | C#sconf.opaque]},
-            fload(FD, opaque, GC, C2, Cs, Lno+1, Next);
-        [Key, '='| Value] ->
-            String_value = lists:flatten(
-                             lists:map(
-                               fun(Item) when is_atom(Item) ->
-                                       atom_to_list(Item);
-                                  (Item) ->
-                                       Item
-                               end, Value)),
-            C2 = C#sconf{opaque = [{Key, String_value} | C#sconf.opaque]},
-            fload(FD, opaque, GC, C2, Cs, Lno+1, Next);
-        [H|T] ->
-            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
-        Err ->
-            Err
-    end.
+            fload(FD, server_auth, GC, C, Lno+1, ?NEXTLINE);
 
-
-fload(FD, server_auth, _GC, _C, _Cs, Lno, eof, _Auth) ->
-    file:close(FD),
-    {error, ?F("Unexpected end of file at line ~w", [Lno])};
-
-fload(FD, server_auth, GC, C, Cs, Lno, Chars, Auth) ->
-    %%?Debug("Chars: ~s", [Chars]),
-    Next = io:get_line(FD, ''),
-    case toks(Lno, Chars) of
-        [] ->
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, Auth);
         ["docroot", '=', Docroot] ->
-            A2 = Auth#auth{docroot = filename:absname(Docroot)},
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
-        ["dir", '=', Authdir] ->
-            case file:list_dir(Authdir) of
-                {ok,_} when Authdir /= "/" ->
+            Auth1 = Auth#auth{docroot = filename:absname(Docroot)},
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
+        ["dir", '=', Dir] ->
+            case file:list_dir(Dir) of
+                {ok,_} when Dir /= "/" ->
                     error_logger:info_msg("Warning, authdir must be set "
                                           "relative docroot ~n",[]);
                 _ ->
                     ok
             end,
-            Dir = yaws_api:path_norm(Authdir),
-            A2 = Auth#auth{dir = [Dir | Auth#auth.dir]},
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Dir1 = yaws_api:path_norm(Dir),
+            Auth1 = Auth#auth{dir = [Dir1 | Auth#auth.dir]},
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["realm", '=', Realm] ->
-            A2 = Auth#auth{realm = Realm},
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = Auth#auth{realm = Realm},
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["authmod", '=', Mod] ->
-            Mod2 = list_to_atom(Mod),
-            code:ensure_loaded(Mod2),
+            Mod1 = list_to_atom(Mod),
+            code:ensure_loaded(Mod1),
             %% Add the auth header for the mod
-	    H = try
-                    Mod2:get_header() ++ Auth#auth.headers
+            H = try
+                    Mod1:get_header() ++ Auth#auth.headers
                 catch _:_ ->
                         error_logger:format("Failed to ~p:get_header() \n",
-                                            [Mod2]),
+                                            [Mod1]),
                         Auth#auth.headers
                 end,
-            A2 = Auth#auth{mod = Mod2, headers = H},
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = Auth#auth{mod = Mod1, headers = H},
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["user", '=', User] ->
             case (catch string:tokens(User, ":")) of
                 [Name, Passwd] ->
-                    A2 = Auth#auth{users = [{Name, Passwd}|Auth#auth.users]},
-                    fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+                    Auth1 = Auth#auth{users = [{Name, Passwd}|Auth#auth.users]},
+                    C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+                    fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Invalid user at line ~w", [Lno])}
             end;
+
         ["allow", '=', "all"] ->
-            A2 = case Auth#auth.acl of
-                     none    -> Auth#auth{acl={all, [], deny_allow}};
-                     {_,D,O} -> Auth#auth{acl={all, D, O}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none    -> Auth#auth{acl={all, [], deny_allow}};
+                        {_,D,O} -> Auth#auth{acl={all, D, O}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["allow", '=' | IPs] ->
-            A2 = case Auth#auth.acl of
-                     none ->
-                         AllowIPs = parse_auth_ips(IPs, []),
-                         Auth#auth{acl={AllowIPs, [], deny_allow}};
-                     {all, _, _} ->
-                         Auth;
-                     {AllowIPs, DenyIPs, Order} ->
-                         AllowIPs2 = parse_auth_ips(IPs, []) ++ AllowIPs,
-                         Auth#auth{acl={AllowIPs2, DenyIPs, Order}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none ->
+                            AllowIPs = parse_auth_ips(IPs, []),
+                            Auth#auth{acl={AllowIPs, [], deny_allow}};
+                        {all, _, _} ->
+                            Auth;
+                        {AllowIPs, DenyIPs, Order} ->
+                            AllowIPs1 = parse_auth_ips(IPs, []) ++ AllowIPs,
+                            Auth#auth{acl={AllowIPs1, DenyIPs, Order}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["deny", '=', "all"] ->
-            A2 = case Auth#auth.acl of
-                     none    -> Auth#auth{acl={[], all, deny_allow}};
-                     {A,_,O} -> Auth#auth{acl={A, all, O}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none    -> Auth#auth{acl={[], all, deny_allow}};
+                        {A,_,O} -> Auth#auth{acl={A, all, O}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["deny", '=' | IPs] ->
-            A2 = case Auth#auth.acl of
-                     none ->
-                         DenyIPs = parse_auth_ips(IPs, []),
-                         Auth#auth{acl={[], DenyIPs, deny_allow}};
-                     {_, all, _} ->
-                         Auth;
-                     {AllowIPs, DenyIPs, Order} ->
-                         DenyIPs2 = parse_auth_ips(IPs, []) ++ DenyIPs,
-                         Auth#auth{acl={AllowIPs, DenyIPs2, Order}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none ->
+                            DenyIPs = parse_auth_ips(IPs, []),
+                            Auth#auth{acl={[], DenyIPs, deny_allow}};
+                        {_, all, _} ->
+                            Auth;
+                        {AllowIPs, DenyIPs, Order} ->
+                            DenyIPs1 = parse_auth_ips(IPs, []) ++ DenyIPs,
+                            Auth#auth{acl={AllowIPs, DenyIPs1, Order}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["order", '=', "allow", ',', "deny"] ->
-            A2 = case Auth#auth.acl of
-                     none    -> Auth#auth{acl={[], [], allow_deny}};
-                     {A,D,_} -> Auth#auth{acl={A, D, allow_deny}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none    -> Auth#auth{acl={[], [], allow_deny}};
+                        {A,D,_} -> Auth#auth{acl={A, D, allow_deny}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["order", '=', "deny", ',', "allow"] ->
-            A2 = case Auth#auth.acl of
-                     none    -> Auth#auth{acl={[], [], deny_allow}};
-                     {A,D,_} -> Auth#auth{acl={A, D, deny_allow}}
-                 end,
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = case Auth#auth.acl of
+                        none    -> Auth#auth{acl={[], [], deny_allow}};
+                        {A,D,_} -> Auth#auth{acl={A, D, deny_allow}}
+                    end,
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ["pam", "service", '=', Serv] ->
-            A2 = Auth#auth{pam=Serv},
-            fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
+            Auth1 = Auth#auth{pam=Serv},
+            C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
+            fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
+
         ['<', "/auth", '>'] ->
             Pam = Auth#auth.pam,
             Users = Auth#auth.users,
             Realm = Auth#auth.realm,
-            A2 =  case {Pam, Users} of
-                      {false, []} ->
-                          Auth;
-                      _ ->
-                          H = Auth#auth.headers ++
-                              yaws:make_www_authenticate_header({realm, Realm}),
-                          Auth#auth{headers = H}
-                  end,
-            Authdirs = case A2#auth.dir of
-                           [] -> [A2#auth{dir="/"}];
-                           Ds -> [A2#auth{dir=D} || D <- Ds]
-                       end,
-            C2 = C#sconf{authdirs = Authdirs ++ C#sconf.authdirs},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            Auth1 =  case {Pam, Users} of
+                         {false, []} ->
+                             Auth;
+                         _ ->
+                             H = Auth#auth.headers ++
+                                 yaws:make_www_authenticate_header({realm, Realm}),
+                             Auth#auth{headers = H}
+                     end,
+            AuthDirs1 = case Auth1#auth.dir of
+                            [] -> [Auth1#auth{dir="/"}|AuthDirs];
+                            Ds -> [Auth1#auth{dir=D} || D <- Ds] ++ AuthDirs
+                        end,
+            C1 = C#sconf{authdirs=AuthDirs1},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
         Err ->
             Err
     end;
 
-fload(FD, server_redirect, _GC, _C, _Cs, Lno, eof, _RedirMap) ->
-    file:close(FD),
-    {error, ?F("Unexpected end of file at line ~w", [Lno])};
-
-fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
-    %%?Debug("Chars: ~s", [Chars]),
-    Next = io:get_line(FD, ''),
-    Toks = toks(Lno, Chars),
-    case Toks of
+fload(FD, server_redirect, GC, C, Lno, Chars) ->
+    RedirMap = C#sconf.redirect_map,
+    case toks(Lno, Chars) of
         [] ->
-            fload(FD, server_redirect, GC, C, Cs, Lno+1, Next, RedirMap);
+            fload(FD, server_redirect, GC, C, Lno+1, ?NEXTLINE);
+
         [Path, '=', '=' | Rest] ->
             %% "Normalize" Path
             Path1 = filename:join([yaws_api:path_norm(Path)]),
@@ -1788,9 +2089,10 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
                 {error, Str} ->
                     {error, Str};
                 Redir ->
-                    fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
-                          [Redir|RedirMap])
+                    C1 = C#sconf{redirect_map=RedirMap ++ [Redir]},
+                    fload(FD, server_redirect, GC, C1, Lno+1, ?NEXTLINE)
             end;
+
         [Path, '=' | Rest] ->
             %% "Normalize" Path
             Path1 = filename:join([yaws_api:path_norm(Path)]),
@@ -1798,47 +2100,50 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
                 {error, Str} ->
                     {error, Str};
                 Redir ->
-                    fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
-                          [Redir|RedirMap])
+                    C1 = C#sconf{redirect_map=RedirMap ++ [Redir]},
+                    fload(FD, server_redirect, GC, C1, Lno+1, ?NEXTLINE)
             end;
+
         ['<', "/redirect", '>'] ->
-            C2 = C#sconf{redirect_map = lists:reverse(RedirMap)},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
         Err ->
             Err
     end;
 
-fload(FD, server_deflate, _GC, _C, _Cs, Lno, eof, _Deflate) ->
-    file:close(FD),
-    {error, ?F("Unexpected end of file at line ~w", [Lno])};
-
-fload(FD, server_deflate, GC, C, Cs, Lno, Chars, Deflate) ->
-    Next = io:get_line(FD, ''),
+fload(FD, server_deflate, GC, C, Lno, Chars) ->
+    Deflate = C#sconf.deflate_options,
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, Deflate);
+            fload(FD, server_deflate, GC, C, Lno+1, ?NEXTLINE);
+
         ["min_compress_size", '=', CSize] ->
             case (catch list_to_integer(CSize)) of
                 I when is_integer(I), I > 0 ->
-                    D2 = Deflate#deflate{min_compress_size=I},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{min_compress_size=I},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 _ when CSize == "nolimit" ->
-                    D2 = Deflate#deflate{min_compress_size=nolimit},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{min_compress_size=nolimit},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer > 0 at line ~w", [Lno])}
             end;
+
         ["mime_types", '=' | MimeTypes] ->
             case parse_compressible_mime_types(MimeTypes,
                                                Deflate#deflate.mime_types) of
                 {ok, L} ->
-                    D2 = Deflate#deflate{mime_types=L},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{mime_types=L},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
             end;
+
         ["compression_level", '=', CLevel] ->
             L = try
                     list_to_integer(CLevel)
@@ -1848,83 +2153,167 @@ fload(FD, server_deflate, GC, C, Cs, Lno, Chars, Deflate) ->
             if
                 L =:= none; L =:= default;
                 L =:= best_compression; L =:= best_speed ->
-                    D2 = Deflate#deflate{compression_level=L},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{compression_level=L},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 is_integer(L), L >= 0, L =< 9 ->
-                    D2 = Deflate#deflate{compression_level=L},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{compression_level=L},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 true ->
                     {error, ?F("Bad compression level at line ~w", [Lno])}
             end;
+
         ["window_size", '=', WSize] ->
             case (catch list_to_integer(WSize)) of
                 I when is_integer(I), I > 8, I < 16 ->
-                    D2 = Deflate#deflate{window_size=I * -1},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{window_size=I * -1},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error,
                      ?F("Expect integer between 9..15 at line ~w",
                         [Lno])}
             end;
+
         ["mem_level", '=', MLevel] ->
             case (catch list_to_integer(MLevel)) of
                 I when is_integer(I), I >= 1, I =< 9 ->
-                    D2 = Deflate#deflate{mem_level=I},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{mem_level=I},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 _ ->
                     {error, ?F("Expect integer between 1..9 at line ~w", [Lno])}
             end;
+
         ["strategy", '=', Strategy] ->
             if
                 Strategy =:= "default";
                 Strategy =:= "filtered";
                 Strategy =:= "huffman_only" ->
-                    D2 = Deflate#deflate{strategy=list_to_atom(Strategy)},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{strategy=list_to_atom(Strategy)},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 true ->
                     {error,
                      ?F("Unknown strategy ~p at line ~w", [Strategy, Lno])}
             end;
+
         ["use_gzip_static", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    D2 = Deflate#deflate{use_gzip_static=Val},
-                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                    Deflate1 = Deflate#deflate{use_gzip_static=Val},
+                    C1 = C#sconf{deflate_options=Deflate1},
+                    fload(FD, server_deflate, GC, C1, Lno+1, ?NEXTLINE);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ['<', "/deflate", '>'] ->
-            D2 = case Deflate#deflate.mime_types of
-                     [] ->
-                         Deflate#deflate{
-                           mime_types = ?DEFAULT_COMPRESSIBLE_MIME_TYPES
-                          };
-                     _ ->
-                         Deflate
-                 end,
-            C2 = C#sconf{deflate_options = D2},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            Deflate1 = case Deflate#deflate.mime_types of
+                           [] ->
+                               Deflate#deflate{
+                                 mime_types = ?DEFAULT_COMPRESSIBLE_MIME_TYPES
+                                };
+                           _ ->
+                               Deflate
+                       end,
+            C1 = C#sconf{deflate_options = Deflate1},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
         Err ->
             Err
     end;
 
-fload(FD, extra_cgi_vars, _GC, _C, _Cs, Lno, eof, _EVars) ->
-    file:close(FD),
-    {error, ?F("Unexpected end of file at line ~w", [Lno])};
-
-fload(FD, extra_cgi_vars, GC, C, Cs, Lno, Chars, EVars = {Dir, Vars}) ->
-    Next = io:get_line(FD, ''),
+fload(FD, extra_cgi_vars, GC, C, Lno, Chars) ->
+    [{Dir, Vars}|EVars] = C#sconf.extra_cgi_vars,
     case toks(Lno, Chars) of
         [] ->
-            fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next, EVars);
+            fload(FD, extra_cgi_vars, GC, C, Lno+1, ?NEXTLINE);
+
         [Var, '=', Val] ->
-	    fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next,
-                  {Dir, [{Var, Val} | Vars]});
+            C1 = C#sconf{extra_cgi_vars=[{Dir, [{Var, Val} | Vars]}|EVars]},
+            fload(FD, extra_cgi_vars, GC, C1, Lno+1, ?NEXTLINE);
+
         ['<', "/extra_cgi_vars", '>'] ->
-            C2 = C#sconf{extra_cgi_vars = [EVars | C#sconf.extra_cgi_vars]},
-            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+            C1 = C#sconf{extra_cgi_vars = [EVars | C#sconf.extra_cgi_vars]},
+            fload(FD, server, GC, C1, Lno+1, ?NEXTLINE);
+
+        [H|T] ->
+            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
+        Err ->
+            Err
+    end;
+
+fload(FD, rss, GC, C, Lno, Chars) ->
+    case toks(Lno, Chars) of
+        [] ->
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_id", '=', Value] ->   % mandatory !!
+            put(rss_id, list_to_atom(Value)),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_dir", '=', Value] ->   % mandatory !!
+            put(rss, [{db_dir, Value} | get(rss)]),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_expire", '=', Value] ->
+            put(rss, [{expire, Value} | get(rss)]),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_days", '=', Value] ->
+            put(rss, [{days, Value} | get(rss)]),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_rm_exp", '=', Value] ->
+            put(rss, [{rm_exp, Value} | get(rss)]),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ["rss_max", '=', Value] ->
+            put(rss, [{rm_max, Value} | get(rss)]),
+            fload(FD, rss, GC, C, Lno+1, ?NEXTLINE);
+
+        ['<', "/rss", '>'] ->
+            case get(rss_id) of
+                undefined ->
+                    {error, ?F("No rss_id specified at line ~w", [Lno])};
+                RSSid ->
+                    yaws_rss:open(RSSid, get(rss)),
+                    fload(FD, server, GC, C, Lno+1, ?NEXTLINE)
+            end;
+
+        [H|T] ->
+            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
+        Err ->
+            Err
+    end;
+
+fload(FD, opaque, GC, C, Lno, Chars) ->
+    case toks(Lno, Chars) of
+        [] ->
+            fload(FD, opaque, GC, C, Lno+1, ?NEXTLINE);
+
+        [Key, '=', Value] ->
+            C1 = C#sconf{opaque = [{Key,Value} | C#sconf.opaque]},
+            fload(FD, opaque, GC, C1, Lno+1, ?NEXTLINE);
+
+        [Key, '='| Value] ->
+            String_value = lists:flatten(
+                             lists:map(
+                               fun(Item) when is_atom(Item) ->
+                                       atom_to_list(Item);
+                                  (Item) ->
+                                       Item
+                               end, Value)),
+            C1 = C#sconf{opaque = [{Key, String_value} | C#sconf.opaque]},
+            fload(FD, opaque, GC, C1, Lno+1, ?NEXTLINE);
+
+        ['<', "/opaque", '>'] ->
+            fload(FD, server, GC, C, Lno+1, ?NEXTLINE);
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
         Err ->
@@ -1967,6 +2356,12 @@ is_file(Val) ->
         _ ->
             false
     end.
+
+is_wildcard(Val) ->
+    (lists:member($*, Val) orelse
+     lists:member($?, Val) orelse
+     (lists:member($[, Val) andalso lists:member($], Val)) orelse
+     (lists:member(${, Val) andalso lists:member($}, Val))).
 
 
 %% tokenizer
@@ -2163,6 +2558,12 @@ parse_revproxy([Prefix, Url, "intercept_mod", InterceptMod]) ->
         Error ->
             Error
     end;
+parse_revproxy([Prefix, Proto, '[', IPv6, ']', Rest, "intercept_mod", InterceptMod]) ->
+    Url = Proto ++ "[" ++ IPv6 ++ "]" ++ Rest,
+    parse_revproxy([Prefix, Url, "intercept_mod", InterceptMod]);
+parse_revproxy([Prefix, Proto, '[', IPv6, ']', Rest]) ->
+    Url = Proto ++ "[" ++ IPv6 ++ "]" ++ Rest,
+    parse_revproxy([Prefix, Url]);
 parse_revproxy(_Other) ->
     {error, syntax}.
 
@@ -2219,6 +2620,13 @@ parse_phpmod(['<', "cgi", ',', PhpPath, '>'], _) ->
     end;
 parse_phpmod(['<', "fcgi", ',', HostPortSpec, '>'], _) ->
     case string_to_host_and_port(HostPortSpec) of
+        {ok, Host, Port} ->
+            {ok, {fcgi, {Host, Port}}};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+parse_phpmod(['<', "fcgi", ',', '[', HostSpec, ']', PortSpec, '>'], _) ->
+    case string_to_host_and_port("[" ++ HostSpec ++ "]" ++ PortSpec) of
         {ok, Host, Port} ->
             {ok, {fcgi, {Host, Port}}};
         {error, Reason} ->
@@ -2332,6 +2740,45 @@ parse_mime_types_info(add_charsets, NewCharsets, Info) ->
     end.
 
 
+parse_nslookup_pref(Pref) ->
+    parse_nslookup_pref(Pref, []).
+
+parse_nslookup_pref(Empty, []) when Empty == [] orelse Empty == ['[', ']'] ->
+    %% Get default value, if nslookup_pref = [].
+    {ok, yaws:gconf_nslookup_pref(#gconf{})};
+parse_nslookup_pref([C, Family | Rest], Result)
+  when C == '[' orelse C == ',' ->
+    case Family of
+        "inet" ->
+            case lists:member(inet, Result) of
+                false -> parse_nslookup_pref(Rest, [inet | Result]);
+                true  -> parse_nslookup_pref(Rest, Result)
+            end;
+        "inet6" ->
+            case lists:member(inet6, Result) of
+                false -> parse_nslookup_pref(Rest, [inet6 | Result]);
+                true  -> parse_nslookup_pref(Rest, Result)
+            end;
+        _ ->
+            case Result of
+                [PreviousFamily | _] ->
+                    {error, ?F("Invalid nslookup_pref: invalid family or "
+                        "token '~s', after family '~s'",
+                        [Family, PreviousFamily])};
+                [] ->
+                    {error, ?F("Invalid nslookup_pref: invalid family or "
+                        "token '~s'", [Family])}
+            end
+    end;
+parse_nslookup_pref([']'], Result) ->
+    {ok, lists:reverse(Result)};
+parse_nslookup_pref([Invalid | _], []) ->
+    {error, ?F("Invalid nslookup_pref: unexpected token '~s'", [Invalid])};
+parse_nslookup_pref([Invalid | _], [Family | _]) ->
+    {error, ?F("Invalid nslookup_pref: unexpected token '~s', "
+        "after family '~s'", [Invalid, Family])}.
+
+
 parse_redirect(Path, [Code, URL], Mode, Lno) ->
     case catch list_to_integer(Code) of
         I when is_integer(I), I >= 300, I =< 399 ->
@@ -2391,7 +2838,7 @@ ssl_start() ->
 
 
 %% search for an SC within Pairs that have the same, listen,port,ssl,severname
-%% Return {Pid, SC} or false
+%% Return {Pid, SC, Scs} or false
 %% Pairs is the pairs in yaws_server #state{}
 search_sconf(NewSC, Pairs) ->
     case lists:zf(
@@ -2434,19 +2881,17 @@ search_group(SC, Pairs) ->
 
 
 %% Return a new Pairs list with one SC updated
-update_sconf(NewSC, Pairs) ->
+update_sconf(NewSc, Pos, Pairs) ->
     lists:map(
       fun({Pid, Scs}) ->
-              {Pid,
-               lists:map(fun(SC) ->
-                                 case same_sconf(SC, NewSC) of
-                                     true ->
-                                         NewSC;
-                                     false ->
-                                         SC
-                                 end
-                         end, Scs)
-              }
+              case same_virt_srv(hd(Scs), NewSc) of
+                  true ->
+                      L2 = lists:keydelete(NewSc#sconf.servername,
+                                           #sconf.servername, Scs),
+                      {Pid, yaws:insert_at(NewSc, Pos, L2)};
+                  false ->
+                      {Pid, Scs}
+              end
       end, Pairs).
 
 
@@ -2474,11 +2919,6 @@ same_virt_srv(S, NewSc) when
     true;
 same_virt_srv(_,_) ->
     false.
-
-
-same_sconf(S, NewSc) ->
-    same_virt_srv(S, NewSc) andalso
-        S#sconf.servername == NewSc#sconf.servername.
 
 
 eq_sconfs(S1,S2) ->
@@ -2530,16 +2970,17 @@ soft_setconf(GC, Groups, OLDGC, OldGroups) ->
         true ->
             ok
     end,
+    compile_and_load_src_dir(GC),
     Grps = load_mime_types_module(GC, Groups),
     Rems = remove_old_scs(lists:flatten(OldGroups), Grps),
-    Adds = soft_setconf_scs(lists:flatten(Grps), OldGroups),
+    Adds = soft_setconf_scs(lists:flatten(Grps), 1, OldGroups),
     lists:foreach(
       fun({delete_sconf, SC}) ->
               delete_sconf(SC);
-         ({add_sconf, SC}) ->
-              add_sconf(SC);
-         ({update_sconf, SC}) ->
-              update_sconf(SC)
+         ({add_sconf, N, SC}) ->
+              add_sconf(N, SC);
+         ({update_sconf, N, SC}) ->
+              update_sconf(N, SC)
       end, Rems ++ Adds).
 
 
@@ -2570,19 +3011,19 @@ remove_old_scs([Sc|Scs], NewGroups) ->
 remove_old_scs([],_) ->
     [].
 
-soft_setconf_scs([Sc|Scs], OldGroups) ->
+soft_setconf_scs([Sc|Scs], N, OldGroups) ->
     case find_group(Sc, OldGroups) of
         false ->
-            [{add_sconf,Sc} | soft_setconf_scs(Scs, OldGroups)];
+            [{add_sconf,N,Sc} | soft_setconf_scs(Scs, N+1, OldGroups)];
         {true, G} ->
             case find_sc(Sc, G) of
                 false ->
-                    [{add_sconf, Sc} | soft_setconf_scs(Scs, OldGroups)];
+                    [{add_sconf,N,Sc} | soft_setconf_scs(Scs,N+1,OldGroups)];
                 {true, _OldSc} ->
-                    [{update_sconf,Sc} | soft_setconf_scs(Scs, OldGroups)]
+                    [{update_sconf,N,Sc} | soft_setconf_scs(Scs,N+1,OldGroups)]
             end
     end;
-soft_setconf_scs([],_) ->
+soft_setconf_scs([], _, _) ->
     [].
 
 
@@ -2664,57 +3105,48 @@ find_sc(_SC,[]) ->
 
 
 verify_upgrade_args(GC, Groups0) when is_record(GC, gconf) ->
-    case is_groups(Groups0) of
+    SCs0 = lists:flatten(Groups0),
+    case lists:all(fun(SC) -> is_record(SC, sconf) end, SCs0) of
         true ->
             %% Embedded code may give appmods as a list of strings, or
             %% appmods can be {StringPathElem,ModAtom} or
             %% {StringPathElem,ModAtom,ExcludePathsList} tuples. Handle
             %% all possible variants here.
-            Groups = yaws:deepmap(
-                       fun(SC) ->
-                               SC#sconf{appmods =
-                                            lists:map(
-                                              fun({PE, Mod}) ->
-                                                      {PE, Mod};
-                                                 ({PE,Mod,Ex}) ->
-                                                      {PE,Mod,Ex};
-                                                 (AM) when is_list(AM) ->
-                                                      {AM,list_to_atom(AM)};
-                                                 (AM) when is_atom(AM) ->
-                                                      {atom_to_list(AM), AM}
-                                              end,
-                                              SC#sconf.appmods)}
-                       end, Groups0),
-            {GC, Groups};
-        _ ->
+            SCs1 = lists:map(
+                     fun(SC) ->
+                             SC#sconf{appmods =
+                                          lists:map(
+                                            fun({PE, Mod}) ->
+                                                    {PE, Mod};
+                                               ({PE,Mod,Ex}) ->
+                                                    {PE,Mod,Ex};
+                                               (AM) when is_list(AM) ->
+                                                    {AM,list_to_atom(AM)};
+                                               (AM) when is_atom(AM) ->
+                                                    {atom_to_list(AM), AM}
+                                            end,
+                                            SC#sconf.appmods)}
+                     end, SCs0),
+            case catch validate_cs(GC, SCs1) of
+                {ok, GC, Groups1} -> {GC, Groups1};
+                {error, Reason}   -> erlang:error(Reason);
+                _                 -> erlang:error(badgroups)
+            end;
+        false ->
             erlang:error(badgroups)
     end.
 
 
-%% verify args to setconf
-is_groups([H|T]) ->
-    case is_list_of_scs(H) of
-        true ->
-            is_groups(T);
-        false ->
-            false
-    end;
-is_groups([]) ->
-    true.
-
-is_list_of_scs([H|T]) when is_record(H, sconf) ->
-    is_list_of_scs(T);
-is_list_of_scs([]) ->
-    true;
-is_list_of_scs(_) ->
-    false.
 
 add_sconf(SC) ->
-    ok= gen_server:call(yaws_server, {add_sconf, SC}, infinity),
+    add_sconf(-1, SC).
+
+add_sconf(Pos, SC) ->
+    ok= gen_server:call(yaws_server, {add_sconf, Pos, SC}, infinity),
     ok = yaws_log:add_sconf(SC).
 
-update_sconf(SC) ->
-    ok = gen_server:call(yaws_server, {update_sconf, SC}, infinity).
+update_sconf(Pos, SC) ->
+    ok = gen_server:call(yaws_server, {update_sconf, Pos, SC}, infinity).
 
 delete_sconf(SC) ->
     ok = gen_server:call(yaws_server, {delete_sconf, SC}, infinity),
@@ -2734,30 +3166,94 @@ parse_auth_ips([Str|Rest], Result) ->
     end.
 
 
-subconfigdir_fold(_File, {error, _Err}=Acc) ->
-    Acc;
-subconfigdir_fold(File, {ok, GCp, Csp}=Acc) ->
-    case is_file(File) of
+subconfigfiles(FD, Name, Lno) ->
+    {ok, Config} = file:pid2name(FD),
+    ConfPath = filename:dirname(filename:absname(Config)),
+    File = filename:absname(Name, ConfPath),
+    case {is_file(File), is_wildcard(Name)} of
+        {true,_} ->
+            {ok, [File]};
+        {false,true} ->
+            %% below, ignore dialyzer warning:
+            case ?WILDCARD_SUPPORTED of
+                true ->
+                    Names = filelib:wildcard(Name, ConfPath),
+                    Files = [filename:absname(N, ConfPath)
+                             || N <- lists:sort(Names)],
+                    {ok, lists:filter(fun filter_subconfigfile/1, Files)};
+                false ->
+                    {error, ?F("Unsupport wildcard at line ~w"
+                               " [support by releases >= R16A ]",[Lno])}
+            end;
+        {false,false} ->
+            {error, ?F("Expect filename or wildcard at line ~w"
+                       " (subconfig: ~s)", [Lno, Name])}
+    end.
+
+subconfigdir(FD, Name, Lno) ->
+    {ok, Config} = file:pid2name(FD),
+    ConfPath = filename:dirname(filename:absname(Config)),
+    Dir = filename:absname(Name, ConfPath),
+    case is_dir(Dir) of
         true ->
-            error_logger:info_msg("Yaws: Using subconfig file ~s~n", [File]),
-            case file:open(File, [read]) of
-                {ok, FD1} ->
-                    R = (catch fload(FD1,
-                                     globals,
-                                     GCp,
-                                     undefined,
-                                     Csp,
-                                     1,
-                                     io:get_line(FD1, ''))),
-                    ?Debug("FLOAD: ~p", [R]),
-                    R;
-                _ ->
-                    {error, "Can't open config file " ++ File}
+            case file:list_dir(Dir) of
+                {ok, Names} ->
+                    Files = [filename:absname(N, Dir) || N <- lists:sort(Names)],
+                    {ok, lists:filter(fun filter_subconfigfile/1, Files)};
+                {error, Error} ->
+                    {error, ?F("Directory ~s is not readable: ~s",
+                               [Name, Error])}
             end;
         false ->
-            %% Ignore subdirectories
-            Acc
+            {error, ?F("Expect directory at line ~w (subconfdir: ~s)",
+                       [Lno, Dir])}
     end.
+
+filter_subconfigfile(File) ->
+    case filename:basename(File) of
+        [$.|_] ->
+            error_logger:info_msg("Yaws: Ignore subconfig file ~s~n", [File]),
+            false;
+        _ ->
+            true
+    end.
+
+fload_subconfigfiles([], global, GC, Cs) ->
+    {ok, GC, Cs};
+fload_subconfigfiles([File|Files], global, GC, Cs) ->
+    error_logger:info_msg("Yaws: Using global subconfig file ~s~n", [File]),
+    case file:open(File, [read]) of
+        {ok, FD} ->
+            R = (catch fload(FD, GC, Cs, 1, ?NEXTLINE)),
+            ?Debug("FLOAD(~s): ~p", [File, R]),
+            case R of
+                {ok, GC1, Cs1} -> fload_subconfigfiles(Files, global, GC1, Cs1);
+                Err            -> Err
+            end;
+        Err ->
+            {error, ?F("Can't open subconfig file ~s: ~p", [File,Err])}
+    end;
+fload_subconfigfiles([], server, GC, C) ->
+    {ok, GC, C};
+fload_subconfigfiles([File|Files], server, GC, C) ->
+    error_logger:info_msg("Yaws: Using server subconfig file ~s~n", [File]),
+    case file:open(File, [read]) of
+        {ok, FD} ->
+            R = (catch fload(FD, server, GC, C, 1, ?NEXTLINE)),
+            ?Debug("FLOAD(~s): ~p", [File, R]),
+            case R of
+                {ok, GC1, C1, _, eof} ->
+                    fload_subconfigfiles(Files, server, GC1, C1);
+                {ok, _, _, Lno, ['<', "/server", '>']} ->
+                    {error, ?F("Unexpected closing tag in subconfgile ~s"
+                               " at line ~w ", [File, Lno])};
+                Err ->
+                    Err
+            end;
+        Err ->
+            {error, ?F("Can't open subconfig file ~s: ~p", [File,Err])}
+    end.
+
 
 str2term(Str0) ->
     Str=Str0++".",
@@ -2779,7 +3275,6 @@ check_ciphers(X,_) ->
     {error, ?F("Bad cipherspec ~p",[X])}.
 
 
-
 io_get_line(FD, Prompt, Acc) ->
     Next = io:get_line(FD, Prompt),
     if
@@ -2793,3 +3288,22 @@ io_get_line(FD, Prompt, Acc) ->
         true ->
             Next
     end.
+
+update_soptions(SC, Name, Key, Value) ->
+    Opts0 = proplists:get_value(Name, SC#sconf.soptions),
+    Opts1 = lists:keystore(Key, 1, Opts0, {Key, Value}),
+    SOpts = lists:keystore(Name, 1, SC#sconf.soptions, {Name, Opts1}),
+    SC#sconf{soptions = SOpts}.
+
+
+set_sendfile_flags(GC, "erlang") ->
+    GC1 = ?gc_set_use_erlang_sendfile(GC, true),
+    {ok, ?gc_set_use_yaws_sendfile(GC1, false)};
+set_sendfile_flags(GC, "yaws") ->
+    GC1 = ?gc_set_use_erlang_sendfile(GC, false),
+    {ok, ?gc_set_use_yaws_sendfile(GC1, true)};
+set_sendfile_flags(GC, "disable") ->
+    GC1 = ?gc_set_use_erlang_sendfile(GC, false),
+    {ok, ?gc_set_use_yaws_sendfile(GC1, false)};
+set_sendfile_flags(_, _) ->
+    {error, "Expect erlang|yaws|disable"}.
