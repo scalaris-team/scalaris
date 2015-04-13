@@ -603,6 +603,7 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(t.read(str(self._testTime) + key), data)
         # commit the transaction and try to read the data with a new one:
         t.commit()
+        t.close_connection()
         t = Transaction()
         self.assertEqual(t.read(str(self._testTime) + key), data)
         
@@ -1109,6 +1110,10 @@ class TestPubSub(unittest.TestCase):
             
             msg = "Port %s not bound on %s" % (repr(self.server_port), repr(self.server_name))
             raise IOError(msg)
+
+        def shutdown(self):
+            HTTPServer.shutdown(self)
+            HTTPServer.server_close(self)
     
     class SubscriptionHandler(BaseHTTPRequestHandler):
         def do_POST(self):
@@ -1584,6 +1589,7 @@ class TestScalarisVM(unittest.TestCase):
         vm.close_connection()
         #self.assertRaises(scalaris.ConnectionError, vm.getOtherVMs(0))
         vm.getOtherVMs(1)
+        vm.close_connection()
         
     def testGetOtherVMs1(self):
         """Test method for ScalarisVM.getOtherVMs(1)."""
@@ -1615,12 +1621,14 @@ class TestScalarisVM(unittest.TestCase):
         vm.close_connection()
         #self.assertRaises(scalaris.ConnectionError, vm.shutdownVM())
         vm.shutdownVM()
+        vm.close_connection()
         
     # not tested because we still need the Scalaris Erlang VM:
     def _testShutdownVM1(self):
         """Test method for ScalarisVM.shutdownVM()."""
         vm = ScalarisVM()
         vm.shutdownVM()
+        vm.close_connection()
 
     # not tested because we still need the Scalaris Erlang VM:
     def _testKillVM_NotConnected(self):
@@ -1629,12 +1637,14 @@ class TestScalarisVM(unittest.TestCase):
         vm.close_connection()
         #self.assertRaises(scalaris.ConnectionError, vm.killVM())
         vm.killVM()
+        vm.close_connection()
 
     # not tested because we still need the Scalaris Erlang VM:
     def _testKillVM1(self):
         """Test method for ScalarisVM.killVM()."""
         vm = ScalarisVM()
         vm.killVM()
+        vm.close_connection()
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
