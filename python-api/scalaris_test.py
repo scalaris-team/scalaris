@@ -483,6 +483,7 @@ class TestTransaction(unittest.TestCase):
         
         # commit the transaction and try to read the data with a new one:
         t.commit()
+        t.close_connection()
         t = Transaction()
         for i in xrange(len(_TEST_DATA)):
             actual = t.read(str(self._testTime) + key + str(i))
@@ -504,10 +505,9 @@ class TestTransaction(unittest.TestCase):
             actual = t.read(str(self._testTime) + key + str(i))
             self.assertEqual(actual, [_TEST_DATA[i], _TEST_DATA[i + 1]])
         
-        t.close_connection()
-        
         # commit the transaction and try to read the data with a new one:
         t.commit()
+        t.close_connection()
         t = Transaction()
         for i in xrange(0, len(_TEST_DATA), 2):
             actual = t.read(str(self._testTime) + key + str(i))
