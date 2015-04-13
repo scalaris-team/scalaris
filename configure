@@ -4304,9 +4304,9 @@ ERTS_MAINT=${3:-0}
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for file:sendfile/5" >&5
 $as_echo_n "checking for file:sendfile/5... " >&6; }
-file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",#[[erlang:function_exported(file,sendfile,5)]]), erlang:halt().' | tail -1`
+file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",[erlang:function_exported(file,sendfile,5)]), erlang:halt().' | tail -1`
 if test "$file_sendfile" = true; then
-  if $ERTS_MAJOR -gt 5 -o \
+  if test $ERTS_MAJOR -gt 5 -o \
          '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
          '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')'; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5

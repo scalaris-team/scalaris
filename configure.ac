@@ -393,9 +393,9 @@ ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
 
 AC_MSG_CHECKING([for file:sendfile/5])
-file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",#[[erlang:function_exported(file,sendfile,5)]]), erlang:halt().' | tail -1`
+file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",[[erlang:function_exported(file,sendfile,5)]]), erlang:halt().' | tail -1`
 if test "$file_sendfile" = true; then
-  AS_IF([$ERTS_MAJOR -gt 5 -o \
+  AS_IF([test $ERTS_MAJOR -gt 5 -o \
          '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
          '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')'],
         [AC_MSG_RESULT([yes])
