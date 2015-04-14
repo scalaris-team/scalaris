@@ -484,34 +484,39 @@ next_hop(State, Id) ->
     RT = dht_node_state:get(State, rt),
     next_hop(Neighbors, RT, Id).
 
--spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> {succ | other, comm:mypid()}.
+-spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
-    % check routing table:
-    RTSize = get_size(RT),
-    {NextHopId, NextHop1} =
-    case util:gb_trees_largest_smaller_than(Id, RT) of
-        {value, Key, Node} ->
-            {Key, Node};
-        nil when RTSize =:= 0 ->
-            Succ = nodelist:succ(Neighbors),
-            {node:id(Succ), node:pidX(Succ)};
-        nil -> % forward to largest finger
-            gb_trees:largest(RT)
-    end,
-    % TODO: better create a separate gb_tree for the neighbourhood nodes (dht_node pids!) and always look there, too
-    %       but beware to prefer rt_loop pids if an entry with the same Id is found!
-    %       -> this is faster and more generic
-    %       -> remove rt_size_use_neighbors config parameter
-    %       -> need to update neighbourhood gb_tree when neigbours change!
-    case RTSize < config:read(rt_size_use_neighbors) of
+    case intervals:in(Id, nodelist:succ_range(Neighbors)) of
+        true -> succ;
         false ->
-            NextHop1;
-        _     -> % check neighborhood:
-            % create a fake LastFound node:node_type() for largest_smaller_than
-            % (only Id is used in largest_smaller_than)
-            BestSoFar = node:new(NextHop1, NextHopId, 0),
-            NextHop2 = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
-            node:pidX(NextHop2)
+            % check routing table:
+            RTSize = get_size(RT),
+            {NextHopId, NextHop1} =
+            case util:gb_trees_largest_smaller_than(Id, RT) of
+                {value, Key, Node} ->
+                    {Key, Node};
+                nil when RTSize =:= 0 ->
+                    Succ = nodelist:succ(Neighbors),
+                    {node:id(Succ), node:pidX(Succ)};
+                nil -> % forward to largest finger
+                    gb_trees:largest(RT)
+            end,
+            % TODO: better create a separate gb_tree for the neighbourhood nodes (dht_node pids!) and always look there, too
+            %       but beware to prefer rt_loop pids if an entry with the same Id is found!
+            %       -> this is faster and more generic
+            %       -> remove rt_size_use_neighbors config parameter
+            %       -> need to update neighbourhood gb_tree when neigbours change!
+            % check neighborhood:
+            case RTSize < config:read(rt_size_use_neighbors) of
+                false ->
+                    NextHop1;
+                _     ->
+                    % create a fake LastFound node:node_type() for largest_smaller_than
+                    % (only Id is used in largest_smaller_than)
+                    BestSoFar = node:new(NextHop1, NextHopId, 0),
+                    NextHop2 = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
+                    node:pidX(NextHop2)
+            end
     end.
 %% userdevguide-end rt_chord:next_hop
 

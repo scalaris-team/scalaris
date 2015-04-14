@@ -236,7 +236,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     %% later: retrieve the request id from the assigned round number
     %% to get the entry from the pdb
     MyId = {my_id(), ReqId},
-    Dest = pid_groups:find_a(dht_node),
+    Dest = pid_groups:find_a(routing_table),
     DB = db_selector(State),
     _ = [ begin
               %% let fill in whether lookup was consistent

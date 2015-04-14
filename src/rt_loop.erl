@@ -247,13 +247,12 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
     % ==> change wrap_message/4: instead of State, use Neighbors and RT-State!
     WrappedMsg = Msg,
     % NOTE: chord-like routing requires routing through predecessor -> only decide at pred:
-    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
-        true ->
+    case rt_chord:next_hop(Neighbors, ERT, Key) of
+        succ ->
             %% TODO: do I need a WrappedMsg here ??!
             % TODO: check efficients of pid_groups:get_my/1 vs. caching the PID or retrieving from Neighbors - caching is probably the best
             comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
-        false ->
-            NextHop = rt_chord:next_hop(Neighbors, ERT, Key), % TODO change rt_chord
+        NextHop ->
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
             comm:send(NextHop, NewMsg, [{shepherd, self()}])
     end.
@@ -273,13 +272,10 @@ lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
         false ->
             %% next_hop and nodelist:succ(Neighbors) return different nodes if
             %% key is in the interval of the succ.
-            NextHop =
-            case intervals:in(Key, nodelist:succ_range(Neighbors)) of
-                true ->
-                    node:pidX(nodelist:succ(Neighbors));
-                false ->
-                    ?RT:next_hop(Neighbors, ERT, Key)
-            end,
+            NextHop = case ?RT:next_hop(Neighbors, ERT, Key) of
+                          succ -> node:pidX(nodelist:succ(Neighbors));
+                          Pid -> Pid
+                      end,
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
             comm:send(NextHop, NewMsg, [{shepherd, self()}])
     end.
