@@ -171,16 +171,16 @@ on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, Snap
 % Lookup (see api_dht_raw.erl and dht_node_lookup.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% route lookup_aux msg to the routing_table (rt_loop)
-on({?lookup_aux, Key, Hops, Msg}=FullMsg, State) ->
-    % legacy message - should be handled in the rt_loop process
-    % -> forward message:
+on({?lookup_aux, _Key, _Hops, _Msg}=FullMsg, State) ->
+    % forward msg to the routing_table (rt_loop)
+    % if possible it should be sent directly to routing_table (rt_loop)
     % TODO: check efficients of pid_groups:get_my/1 vs. caching the PID
     %       (process dictionary for first evaluations but ultimately inside the State)
     comm:send_local(pid_groups:get_my(routing_table), FullMsg),
     State;
 
-on({lookup_decision, Key, Hops, Msg}=FullMsg, State) ->
+on({lookup_decision, Key, Hops, Msg}, State) ->
+    % message from rt_loop requesting a decision about a aux-fin transformation
     dht_node_lookup:lookup_decision(State, Key, Hops, Msg),
     State;
 

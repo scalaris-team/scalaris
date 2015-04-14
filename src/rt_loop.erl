@@ -252,7 +252,7 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
             %% TODO: do I need a WrappedMsg here ??!
             % TODO: check efficients of pid_groups:get_my/1 vs. caching the PID or retrieving from Neighbors - caching is probably the best
             comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
-        _ ->
+        false ->
             NextHop = rt_chord:next_hop(Neighbors, ERT, Key), % TODO change rt_chord
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
             comm:send(NextHop, NewMsg, [{shepherd, self()}])
@@ -272,7 +272,7 @@ lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
                             {lookup_decision, Key, Hops, WrappedMsg});
         false ->
             %% next_hop and nodelist:succ(Neighbors) return different nodes if
-            %% key is in the interval of the succ. TODO: fix this
+            %% key is in the interval of the succ.
             NextHop =
             case intervals:in(Key, nodelist:succ_range(Neighbors)) of
                 true ->
