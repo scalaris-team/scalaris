@@ -1,0 +1,126 @@
+#!/bin/bash
+
+FIRSTNODE=`scontrol show hostnames | head -n1`
+LASTNODES=`scontrol show hostnames | tail -n +2`
+JOINNODES=`echo $LASTNODES | sed s/\ /\,/g`
+
+ETCDIR=""
+
+fix_paths() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    ERLPATH=`which erl`
+    BINDIR="dirname $ERLPATH"
+    # is this a svn checkout or an (rpm/deb/manual) installation?
+    if [ "$DIRNAME" != "$BINDIR" -a "$DIRNAME" != "/bin" ]; then
+        # scalaris
+        SCALARISDIR=`dirname $DIRNAME`
+        # /etc/scalaris/
+        ETCDIR=$SCALARISDIR/bin
+    else
+        echo "error: we do not support rpm/deb/manual installations"
+        exit
+    fi
+}
+
+fix_known_hosts() {
+    if [ ! -f "$ETCDIR/scalaris.local.cfg" ]; then
+        touch "$ETCDIR/scalaris.local.cfg"
+    fi
+    # save scalaris.local.cfg
+    cp $ETCDIR/scalaris.local.cfg $ETCDIR/scalaris.local.cfg.slurm-backup
+    echo "{known_hosts, [" >> $ETCDIR/scalaris.local.cfg
+    LASTNODE=`scontrol show hostnames | tail -n1`
+    for host in `scontrol show hostnames`; do
+        IP=$host
+        ## TODO
+        ## IP=`nslookup $host | grep Address | grep -v "#" | cut -d ' ' -f 2 | sed s/\\./\,/g`
+        IP1=`srun --nodelist=$host -N1 ifconfig eth0 | grep 'inet addr:' | cut -d ':' -f 2 | cut -d ' ' -f 1`
+        echo -n "{{" >> $ETCDIR/scalaris.local.cfg
+        echo -n $IP1 | sed s/\\./\,/g >> $ETCDIR/scalaris.local.cfg
+        if [ $LASTNODE != $host ]; then
+            echo "}, 14195, service_per_vm}," >> $ETCDIR/scalaris.local.cfg
+        else
+            echo "}, 14195, service_per_vm}" >> $ETCDIR/scalaris.local.cfg
+        fi
+    done
+    echo "]}." >> $ETCDIR/scalaris.local.cfg
+
+    ## fix mgmt_server
+    echo -n "{mgmt_server, {{" >> $ETCDIR/scalaris.local.cfg
+    IP1=`srun --nodelist=$FIRSTNODE -N1 ifconfig eth0 | grep 'inet addr:' | cut -d ':' -f 2 | cut -d ' ' -f 1`
+    echo -n $IP1 | sed s/\\./\,/g >> $ETCDIR/scalaris.local.cfg
+    echo "}, 14195, mgmt_server}}." >> $ETCDIR/scalaris.local.cfg
+}
+
+usage(){
+    echo "usage slurm [options] <cmd>"
+    echo " options:"
+    echo "    --help      - print this message"
+    echo " <cmd>:"
+    echo "    start"
+    echo "                - start joining nodes on all but the first node"
+    echo "                  start an interactive first node on the first node"
+    echo "    stop"
+    echo "                - stop Erlang VM on all but the first node"
+    echo "    kill"
+    echo "                - kill all beam.smp processes"
+    echo "    killscreens"
+    echo "                - kill all scalaris screen sessions"
+    echo ""
+    exit $1
+}
+
+scalarisstart() {
+    fix_known_hosts
+
+    srun --nodelist=$JOINNODES -N$(expr $SLURM_NNODES - 1) ./bin/scalarisctl --screen -d -t joining start
+    srun --nodelist=$FIRSTNODE --pty -N1  ./bin/scalarisctl -m -t first start
+}
+
+scalarisstop() {
+    srun --nodelist=$JOINNODES -N$(expr $SLURM_NNODES - 1) ./bin/scalarisctl -t joining stop
+    scalariskillscreens
+    ## restore scalaris.local.cfg
+    mv $ETCDIR/scalaris.local.cfg.slurm-backup $ETCDIR/scalaris.local.cfg
+}
+
+scalariskill() {
+    srun -N4 killall beam.smp
+}
+
+scalariskillscreens () {
+    srun -N4 bash -c "screen -ls | grep Detached | grep scalaris_node | cut -d. -f1 | awk '{print $1}' | xargs -r kill"
+}
+
+fix_paths
+
+
+cmd=""
+
+until [ -z "$1" ]; do
+  OPTIND=1
+  case $1 in
+    "--help")
+      shift
+      usage 0;;
+    start | stop | kill | killscreens)
+      cmd="$1"
+      shift;;
+    *)
+  esac
+done
+
+case $cmd in
+    start)
+        scalarisstart;;
+    stop)
+        scalarisstop;;
+    kill)
+        scalariskill;;
+    killscreens)
+        scalariskillscreens;;
+    *)
+        echo "Unknown command: $cmd."
+        usage 1;;
+esac
