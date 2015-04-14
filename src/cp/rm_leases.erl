@@ -109,18 +109,10 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, Lease} ->
-            case l_on_cseq:is_live_aux_field(Lease) of
-                true ->
-                    LeaseId = l_on_cseq:get_id(Lease),
-                    Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
-                    l_on_cseq:lease_takeover(Lease, Pid),
-                    add_takeover(State, Lease);
-                false ->
-                    ?TRACE("the proposed range is marked as dead ~w", [_MissingRange]),
-                    ?TRACE("the qread result is ~w", [Result]),
-                    % @todo tell rm to ignore range, because it was merged?
-                    State
-            end;
+            LeaseId = l_on_cseq:get_id(Lease),
+            Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
+            l_on_cseq:lease_takeover(Lease, Pid),
+            add_takeover(State, Lease);
         _ ->
             log:log("not so well-formed qread-response"),
             State

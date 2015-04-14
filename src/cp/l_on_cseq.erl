@@ -76,11 +76,10 @@
          new_timeout/0, set_timeout/1, get_timeout/1, get_pretty_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
-         get_aux/1, set_aux/2, is_live_aux_field/1,
+         get_aux/1, set_aux/2,
          get_range/1, set_range/2,
          split_range/1,
-         is_valid/1, has_timed_out/1,
-         invalid_lease/0]).
+         is_valid/1, has_timed_out/1]).
 
 -export([add_first_lease_to_db/2]).
 
@@ -98,7 +97,6 @@
       | {invalid, split, intervals:interval(), intervals:interval()}
       | {valid,   split, intervals:interval(), intervals:interval()}
       | {invalid, merge, intervals:interval(), intervals:interval()}
-      | {invalid, merge, no_renew}
       | {valid,   merge, intervals:interval(), intervals:interval()}.
 
 -record(lease, {
@@ -339,8 +337,6 @@ on({l_on_cseq, renew_reply,
                     renew_and_update_round(Value, Round, Mode, State);
                 {invalid, merge, _, _} ->
                     renew_and_update_round(Value, Round, Mode, State);
-                {invalid, merge, no_renew} ->
-                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode);
                 {valid, split, _, _}   ->
                     renew_and_update_round(Value, Round, Mode, State);
                 {valid, merge, _, _}   ->
@@ -990,7 +986,7 @@ on({l_on_cseq, renew_leases}, State) ->
             lease_renew(self(), ActiveLease, active)
     end,
     _ = [lease_renew(self(), L, passive) ||
-            L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, no_renew}],
+            L <- PassiveLeaseList],
     msg_delay:send_trigger(delta() div 2, {l_on_cseq, renew_leases}),
     State.
 
@@ -1355,22 +1351,6 @@ is_valid(L) ->
 -spec has_timed_out(lease_t()) -> boolean().
 has_timed_out(L) ->
     not is_valid(L).
-
--spec is_live_aux_field(lease_t()) -> boolean().
-is_live_aux_field(L) ->
-    {invalid, merge, no_renew} =/= get_aux(L).
-
--spec invalid_lease() -> lease_t().
-invalid_lease() ->
-    {A, B, C} = os:timestamp(),
-    #lease{
-       id      = ?RT:get_random_node_id(),
-       epoch   = 0,
-       owner   = nil,
-       range   = intervals:empty(),
-       aux     = {invalid, merge, no_renew},
-       version = 0,
-       timeout = {A+1, B, C}}.
 
 -spec id(intervals:interval()) -> ?RT:key().
 id([all]) -> ?MINUS_INFINITY;

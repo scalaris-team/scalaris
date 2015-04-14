@@ -32,7 +32,6 @@ recover(Leases1, Leases2, Leases3, Leases4) ->
     Candidates = [L || {Id, L} <- AllLeases,
                        L =/= prbr_bottom, %% ??
                        Id =:= l_on_cseq:get_id(L), %% is first replica?
-                       l_on_cseq:is_live_aux_field(L),
                        l_on_cseq:has_timed_out(L)],
     %% log:log("candidates ~p~n", [Candidates]),
     case Candidates of
