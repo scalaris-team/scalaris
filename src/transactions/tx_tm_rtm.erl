@@ -699,10 +699,10 @@ on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     %% forward request to a node which is ready to serve requests
-    DHTNode = pid_groups:get_my(dht_node),
     %% there, redirect message to tx_tm
     RedirectMsg = {?send_to_group_member, tx_tm, Msg},
-    comm:send_local(DHTNode, {?lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
+    comm:send_local(pid_groups:get_my(routing_table),
+                    {?lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
     State;
 
 %% perform operations on already running transactions, should not be a problem

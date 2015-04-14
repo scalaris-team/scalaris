@@ -367,7 +367,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                           comm:this(), 3,
                           {qread_write_through_collect, ReqId, '_'}),
 
-            Dest = pid_groups:find_a(dht_node),
+            Dest = pid_groups:find_a(routing_table),
             DB = db_selector(State),
             _ = [ begin
                       %% let fill in whether lookup was consistent

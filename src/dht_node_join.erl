@@ -517,7 +517,7 @@ process_join_state({join, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _R
     Connections = get_connections(JoinState),
     case lists:dropwhile(fun({_, Pid}) -> lists:member(Pid, FailedPids) end, Connections) of
         [] ->
-            _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+            _ = comm:send_local_after(100, pid_groups:get_my(routing_table), {?lookup_aux, Key, Hops + 1, Msg}),
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:

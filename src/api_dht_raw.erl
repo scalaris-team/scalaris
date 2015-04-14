@@ -34,8 +34,7 @@ get_replica_keys(Key) -> ?RT:get_replica_keys(Key).
 %% userdevguide-begin api_dht_raw:lookup
 -spec unreliable_lookup(Key::?RT:key(), Msg::comm:message()) -> ok.
 unreliable_lookup(Key, Msg) ->
-    comm:send_local(pid_groups:find_a(dht_node),
-                    {?lookup_aux, Key, 0, Msg}).
+    comm:send_local(pid_groups:find_a(routing_table), {?lookup_aux, Key, 0, Msg}).
 
 -spec unreliable_get_key(Key::?RT:key()) -> ok.
 unreliable_get_key(Key) ->
