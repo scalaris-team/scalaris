@@ -1,0 +1,19 @@
+<img src="images/scalaris-logo.png">
+
+<ul>
+  <li class="{% if page.overview %}current{% endif %}">
+    <a href="/">Home</a>
+  </li>
+  <li class="{% if page.url contains '/releases' %}current{% endif %}">
+    <!-- <a href="/releases.html">Releases</a> -->
+  </li>
+  <li class="{% if page.url contains '/faq %}current{% endif %}">
+    <!-- <a href="/faq.html">FAQ</a> -->
+  </li>
+  <li class="{% if page.url contains '/blog %}current{% endif %}">
+    <!-- <a href="/blog/">Blog</a> -->
+  </li>
+  <li>
+    <a href="{{ site.repository }}">GitHub</a>
+  </li>
+</ul>
