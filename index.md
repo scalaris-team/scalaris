@@ -18,7 +18,7 @@ replicas. Scalaris is implemented in Erlang.
 
 Documentation / Download / Discussion:
 
-* Users and Developers Guide ([pdf]({{ site.repository }}/user-dev-guide/main.pdf))
+* Users and Developers Guide ([pdf]({{ site.repository }}/blob/master/user-dev-guide/main.pdf))
 * [Downloads](http://sourceforge.net/projects/scalaris/files/)
 * [Prebuild Packages](http://download.opensuse.org/repositories/home:/scalaris/)
 * [Mailing list](http://groups.google.com/group/scalaris)
