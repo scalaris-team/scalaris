@@ -5,6 +5,7 @@
 5) copy src/mime_types.erl, src/yaws_appdeps.hrl, src/yaws_charset.hrl and
    src/yaws_generated.erl to <scalaris>/contrib/yaws/src
 5a) fix absolute include path in mime_types.erl to yaws.hrl
+5b) remove src/*.hrl.in
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
