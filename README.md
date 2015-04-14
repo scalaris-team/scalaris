@@ -4,8 +4,7 @@ Scalaris is a scalable, transactional, distributed and fault-tolerant
 key-value-store with strong data consistency for online databases and
 Web 2.0 services.
 
-Instructions can be found in the 'Users and Developers Guide':
-user-dev-guide/main.pdf
+Instructions can be found in the [Users and Developers Guide](https://github.com/scalaris-team/scalaris/blob/master/user-dev-guide/main.pdf)
 
 Additional information, including download links for rpm-packages, can
 be found on the project homepage:
