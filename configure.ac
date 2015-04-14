@@ -383,35 +383,39 @@ AC_RUN_IFELSE(
 # check for file:send_file/5 for yaws
 #
 ###########################################################
+YAWS_OPTIONS=
+HAVE_ERLANG_SENDFILE=false
+
 # split erlang ets version:
 set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
 ERTS_MAJOR=$1
 ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
 
-HAVE_YAWS_SENDFILE=false
-HAVE_ERL_SENDFILE=false
+AC_MSG_CHECKING([for file:sendfile/5])
+file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",[[erlang:function_exported(file,sendfile,5)]]), erlang:halt().' | tail -1`
+if test "$file_sendfile" = true; then
+  AS_IF([test $ERTS_MAJOR -gt 5 -o \
+         '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
+         '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')'],
+        [AC_MSG_RESULT([yes])
+         HAVE_ERLANG_SENDFILE=true],
+        [AC_MSG_RESULT([no])])
+else
+        AC_MSG_RESULT([no])
+fi
 
-file_sendfile=`"${ERL}" -noshell -eval 'io:format("~p~n",[[erlang:function_exported(file, sendfile, 5)]]), erlang:halt().' | tail -1`
+AS_IF([test "$HAVE_ERLANG_SENDFILE" = true],
+      [YAWS_OPTIONS=", {d, 'HAVE_ERLANG_SENDFILE'}"
+       YAWS_OPTIONS_DIALYZER=" -DHAVE_ERLANG_SENDFILE"
+       AC_MSG_NOTICE([using file:sendfile/5 for yaws])],
+      [YAWS_OPTIONS=""
+       YAWS_OPTIONS_DIALYZER=""
+       AC_MSG_NOTICE([using fallback gen_tcp:send/2 for yaws])])
 
-AS_IF([test "$file_sendfile" = true -a \
-           '(' $ERTS_MAJOR -gt 5 -o \
-           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
-           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')' ')'],
-      [HAVE_ERL_SENDFILE=true; AC_MSG_NOTICE(found file:sendfile/5)])
-
-AS_IF([test "$HAVE_ERL_SENDFILE" = true],
-      [HAVE_YAWS_SENDFILE=""
-       HAVE_YAWS_SENDFILE_DIALYZER=""
-       AC_MSG_NOTICE([file:sendfile/5 is available for yaws])])
-AS_IF([test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = true],
-      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"
-       HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"
-       AC_MSG_NOTICE([using yaws_sendfile for yaws])])
-AS_IF([test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = false],
-      [HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"
-       HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"
-       AC_MSG_NOTICE([no send_file suitable for yaws, using fallback])])
+AS_IF([test "${crypto_hash}" = "true"],
+      [YAWS_OPTIONS="${YAWS_OPTIONS}, {d, 'HAVE_CRYPTO_HASH'}"
+       YAWS_OPTIONS_DIALYZER="${YAWS_OPTIONS_DIALYZER} -DHAVE_CRYPTO_HASH"])
 
 ###########################################################
 #
@@ -421,14 +425,14 @@ AS_IF([test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = false],
 
 EMAKEFILEDEFINES="${EMAKEFILEDEFINES}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}"
 EDOCMACROS="${EDOCMACROS#, }${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}"
-DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}"
+DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${YAWS_OPTIONS_DIALYZER}"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(EDOCMACROS)
 AC_SUBST(DIALYZER_FLAGS)
 
 AC_SUBST(EMAKEFILECOMPILECOMPAT)
-AC_SUBST(HAVE_YAWS_SENDFILE)
+AC_SUBST(YAWS_OPTIONS)
 
 ###########################################################
 #

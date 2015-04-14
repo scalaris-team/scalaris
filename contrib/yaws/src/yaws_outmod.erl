@@ -13,9 +13,9 @@
 -include("../include/yaws_api.hrl").
 
 -export([out401/3,
-	 out404/3,
+         out404/3,
          out404/1,
-	 out/1,
+         out/1,
          crashmsg/3]).
 
 
@@ -29,7 +29,7 @@
 out404(Arg) ->
     out404(Arg, get(gc), get(sc)).
 out404(Arg, GC, SC) ->
-    Req = Arg#arg.req,
+    Req = Arg#arg.orig_req,
     {abs_path, Path} = Req#http_request.path,
     B = not_found_body(Path, GC, SC),
     [{status, 404},
@@ -46,10 +46,10 @@ out401(_Arg, _Auth, _Realm) ->
     {ehtml,
      [{html,[],
        [
-	{body, [],
-	 [{h1,[], "401 authentication needed"}
-	 ]
-	}
+        {body, [],
+         [{h1,[], "401 authentication needed"}
+         ]
+        }
        ]
       }
      ]

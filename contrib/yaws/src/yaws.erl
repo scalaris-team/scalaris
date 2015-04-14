@@ -10,28 +10,30 @@
 
 -include("../include/yaws.hrl").
 -include("../include/yaws_api.hrl").
+-include("yaws_appdeps.hrl").
 -include("yaws_debug.hrl").
 
 -include_lib("kernel/include/file.hrl").
--export([start/0, stop/0, hup/1, restart/0, modules/0, load/0]).
+-export([start/0, stop/0, hup/0, hup/1, restart/0, modules/0, load/0]).
 -export([start_embedded/1, start_embedded/2, start_embedded/3, start_embedded/4,
-         add_server/2, create_gconf/2, create_sconf/2]).
+         add_server/2, create_gconf/2, create_sconf/2, setup_sconf/2]).
 
 -export([gconf_yaws_dir/1, gconf_trace/1, gconf_flags/1, gconf_logdir/1,
-         gconf_ebin_dir/1, gconf_runmods/1, gconf_keepalive_timeout/1,
-         gconf_keepalive_maxuses/1, gconf_max_num_cached_files/1,
-         gconf_max_num_cached_bytes/1, gconf_max_size_cached_file/1,
-         gconf_max_connections/1, gconf_process_options/1,
-         gconf_large_file_chunk_size/1, gconf_mnesia_dir/1,
-         gconf_log_wrap_size/1, gconf_cache_refresh_secs/1, gconf_include_dir/1,
-         gconf_phpexe/1, gconf_yaws/1, gconf_id/1, gconf_enable_soap/1,
-         gconf_soap_srv_mods/1, gconf_ysession_mod/1,
-         gconf_acceptor_pool_size/1, gconf_mime_types_info/1]).
+         gconf_ebin_dir/1, gconf_src_dir/1, gconf_runmods/1,
+         gconf_keepalive_timeout/1, gconf_keepalive_maxuses/1,
+         gconf_max_num_cached_files/1, gconf_max_num_cached_bytes/1,
+         gconf_max_size_cached_file/1, gconf_max_connections/1,
+         gconf_process_options/1, gconf_large_file_chunk_size/1,
+         gconf_mnesia_dir/1, gconf_log_wrap_size/1, gconf_cache_refresh_secs/1,
+         gconf_include_dir/1, gconf_phpexe/1, gconf_yaws/1, gconf_id/1,
+         gconf_enable_soap/1, gconf_soap_srv_mods/1, gconf_ysession_mod/1,
+         gconf_acceptor_pool_size/1, gconf_mime_types_info/1,
+         gconf_nslookup_pref/1]).
 
 -export([sconf_port/1, sconf_flags/1, sconf_redirect_map/1, sconf_rhost/1,
          sconf_rmethod/1, sconf_docroot/1, sconf_xtra_docroots/1,
-         sconf_listen/1, sconf_servername/1, sconf_yaws/1, sconf_ets/1,
-         sconf_ssl/1, sconf_authdirs/1, sconf_patial_post_size/1,
+         sconf_listen/1, sconf_servername/1, sconf_serveralias/1, sconf_yaws/1,
+         sconf_ets/1, sconf_ssl/1, sconf_authdirs/1, sconf_partial_post_size/1,
          sconf_appmods/1, sconf_expires/1, sconf_errormod_401/1,
          sconf_errormod_404/1, sconf_arg_rewrite_mode/1, sconf_logger_mod/1,
          sconf_opaque/1, sconf_start_mod/1, sconf_allowed_scripts/1,
@@ -63,7 +65,9 @@
          ssl_password/1, ssl_password/2,
          ssl_cacertfile/1, ssl_cacertfile/2,
          ssl_ciphers/1, ssl_ciphers/2,
-         ssl_cachetimeout/1, ssl_cachetimeout/2]).
+         ssl_cachetimeout/1, ssl_cachetimeout/2,
+         ssl_secure_renegotiate/1, ssl_secure_renegotiate/2,
+         ssl_honor_cipher_order/1, ssl_honor_cipher_order/2]).
 
 -export([new_deflate/0,
          deflate_min_compress_size/1, deflate_min_compress_size/2,
@@ -145,6 +149,8 @@
          exists/1,
          mkdir/1]).
 
+-export([tcp_connect/3, tcp_connect/4, ssl_connect/3, ssl_connect/4]).
+
 -export([do_recv/3, do_recv/4, cli_recv/3,
          gen_tcp_send/2,
          http_get_headers/2]).
@@ -152,19 +158,20 @@
 -export([sconf_to_srvstr/1,
          redirect_host/2, redirect_port/1,
          redirect_scheme_port/1, redirect_scheme/1,
-         tmpdir/0, tmpdir/1, mktemp/1, split_at/2,
+         tmpdir/0, tmpdir/1, mktemp/1, split_at/2, insert_at/3,
          id_dir/1, ctl_file/1]).
 
 -export([parse_ipmask/1, match_ipmask/2]).
 
 -export([get_app_dir/0, get_ebin_dir/0, get_priv_dir/0,
-         get_inc_dir/0, get_src_dir/0]).
+         get_inc_dir/0]).
 
 %% Internal
 -export([local_time_as_gmt_string/1, universal_time_as_string/1,
          stringdate_to_datetime/1]).
 
 start() ->
+    ok = start_app_deps(),
     application:start(yaws, permanent).
 
 stop() ->
@@ -184,8 +191,9 @@ start_embedded(DocRoot, SL, GL) when is_list(DocRoot),is_list(SL),is_list(GL) ->
     start_embedded(DocRoot, SL, GL, "default").
 start_embedded(DocRoot, SL, GL, Id)
   when is_list(DocRoot), is_list(SL), is_list(GL) ->
+    ok = start_app_deps(),
     {ok, SCList, GC, _} = yaws_api:embedded_start_conf(DocRoot, SL, GL, Id),
-    ok = application:start(yaws),
+    ok = application:start(yaws, permanent),
     yaws_config:add_yaws_soap_srv(GC),
     yaws_api:setconf(GC, SCList),
     ok.
@@ -208,7 +216,16 @@ create_sconf(DocRoot, SL) when is_list(DocRoot), is_list(SL) ->
     SC = yaws_config:make_default_sconf(DocRoot, lkup(port, SL, undefined)),
     setup_sconf(SL, SC).
 
-
+start_app_deps() ->
+    Deps = split_sep(?YAWS_APPDEPS, $,),
+    catch lists:foldl(fun(App0, Acc) ->
+                              App = list_to_existing_atom(App0),
+                              case application:start(App, permanent) of
+                                  ok -> Acc;
+                                  {error,{already_started,App}} -> Acc;
+                                  Else -> throw(Else)
+                              end
+                      end, ok, Deps).
 
 %% Access functions for the GCONF and SCONF records.
 gconf_yaws_dir             (#gconf{yaws_dir              = X}) -> X.
@@ -216,6 +233,7 @@ gconf_trace                (#gconf{trace                 = X}) -> X.
 gconf_flags                (#gconf{flags                 = X}) -> X.
 gconf_logdir               (#gconf{logdir                = X}) -> X.
 gconf_ebin_dir             (#gconf{ebin_dir              = X}) -> X.
+gconf_src_dir              (#gconf{src_dir               = X}) -> X.
 gconf_runmods              (#gconf{runmods               = X}) -> X.
 gconf_keepalive_timeout    (#gconf{keepalive_timeout     = X}) -> X.
 gconf_keepalive_maxuses    (#gconf{keepalive_maxuses     = X}) -> X.
@@ -237,6 +255,7 @@ gconf_soap_srv_mods        (#gconf{soap_srv_mods         = X}) -> X.
 gconf_ysession_mod         (#gconf{ysession_mod          = X}) -> X.
 gconf_acceptor_pool_size   (#gconf{acceptor_pool_size    = X}) -> X.
 gconf_mime_types_info      (#gconf{mime_types_info       = X}) -> X.
+gconf_nslookup_pref        (#gconf{nslookup_pref         = X}) -> X.
 
 
 sconf_port                 (#sconf{port                  = X}) -> X.
@@ -248,11 +267,12 @@ sconf_docroot              (#sconf{docroot               = X}) -> X.
 sconf_xtra_docroots        (#sconf{xtra_docroots         = X}) -> X.
 sconf_listen               (#sconf{listen                = X}) -> X.
 sconf_servername           (#sconf{servername            = X}) -> X.
+sconf_serveralias          (#sconf{serveralias           = X}) -> X.
 sconf_yaws                 (#sconf{yaws                  = X}) -> X.
 sconf_ets                  (#sconf{ets                   = X}) -> X.
 sconf_ssl                  (#sconf{ssl                   = X}) -> X.
 sconf_authdirs             (#sconf{authdirs              = X}) -> X.
-sconf_patial_post_size     (#sconf{partial_post_size     = X}) -> X.
+sconf_partial_post_size    (#sconf{partial_post_size     = X}) -> X.
 sconf_appmods              (#sconf{appmods               = X}) -> X.
 sconf_expires              (#sconf{expires               = X}) -> X.
 sconf_errormod_401         (#sconf{errormod_401          = X}) -> X.
@@ -339,6 +359,8 @@ ssl_password            (#ssl{password             = X}) -> X.
 ssl_cacertfile          (#ssl{cacertfile           = X}) -> X.
 ssl_ciphers             (#ssl{ciphers              = X}) -> X.
 ssl_cachetimeout        (#ssl{cachetimeout         = X}) -> X.
+ssl_secure_renegotiate  (#ssl{secure_renegotiate   = X}) -> X.
+ssl_honor_cipher_order  (#ssl{honor_cipher_order   = X}) -> X.
 
 ssl_keyfile             (S, File)    -> S#ssl{keyfile              = File}.
 ssl_certfile            (S, File)    -> S#ssl{certfile             = File}.
@@ -349,15 +371,34 @@ ssl_password            (S, Pass)    -> S#ssl{password             = Pass}.
 ssl_cacertfile          (S, File)    -> S#ssl{cacertfile           = File}.
 ssl_ciphers             (S, Ciphers) -> S#ssl{ciphers              = Ciphers}.
 ssl_cachetimeout        (S, Timeout) -> S#ssl{cachetimeout         = Timeout}.
+ssl_secure_renegotiate  (S, Bool)    -> S#ssl{secure_renegotiate   = Bool}.
 
+-ifdef(HAVE_SSL_HONOR_CIPHER_ORDER).
+ssl_honor_cipher_order  (S, Bool)    -> S#ssl{honor_cipher_order   = Bool}.
+-else.
+ssl_honor_cipher_order  (S, _)       -> S.
+-endif.
 
 setup_ssl(SL, DefaultSSL) ->
     case lkup(ssl, SL, undefined) of
         undefined ->
             DefaultSSL;
         SSL when is_record(SSL, ssl) ->
+            #ssl{protocol_version=ProtocolVersion} = SSL,
+            case ProtocolVersion of
+                undefined -> ok;
+                _ ->
+                    ok = application:set_env(ssl, protocol_version, ProtocolVersion)
+            end,
             SSL;
         SSLProps when is_list(SSLProps) ->
+            ProtocolVersion = case lkup(protocol_version, SSLProps, undefined) of
+                                  undefined -> undefined;
+                                  PVList ->
+                                      ok = application:set_env(ssl, protocol_version,
+                                                               PVList),
+                                      PVList
+                              end,
             SSL = #ssl{},
             #ssl{keyfile              = lkup(keyfile, SSLProps,
                                              SSL#ssl.keyfile),
@@ -374,7 +415,12 @@ setup_ssl(SL, DefaultSSL) ->
                  ciphers              = lkup(ciphers, SSLProps,
                                              SSL#ssl.ciphers),
                  cachetimeout         = lkup(cachetimeout, SSLProps,
-                                             SSL#ssl.cachetimeout)}
+                                             SSL#ssl.cachetimeout),
+                 secure_renegotiate   = lkup(secure_renegotiate, SSLProps,
+                                             SSL#ssl.secure_renegotiate),
+                 honor_cipher_order   = lkup(honor_cipher_order, SSLProps,
+                                             SSL#ssl.honor_cipher_order),
+                 protocol_version     = ProtocolVersion}
     end.
 
 
@@ -451,16 +497,19 @@ setup_mime_types_info(SL, DefaultMTI) ->
             M;
         MProps when is_list(MProps) ->
             M = #mime_types_info{},
-            #mime_types_info{mime_types_file = lkup(mime_types_file, MProps,
-                                                    M#mime_types_info.mime_types_file),
+            #mime_types_info{mime_types_file =
+                                 lkup(mime_types_file, MProps,
+                                      M#mime_types_info.mime_types_file),
                              types           = lkup(types, MProps,
                                                     M#mime_types_info.types),
                              charsets        = lkup(charsets, MProps,
                                                     M#mime_types_info.charsets),
-                             default_type    = lkup(default_type, MProps,
-                                                    M#mime_types_info.default_type),
-                             default_charset = lkup(default_charset, MProps,
-                                                    M#mime_types_info.default_charset)}
+                             default_type    =
+                                 lkup(default_type, MProps,
+                                      M#mime_types_info.default_type),
+                             default_charset =
+                                 lkup(default_charset, MProps,
+                                      M#mime_types_info.default_charset)}
     end.
 
 
@@ -473,6 +522,7 @@ setup_gconf(GL, GC) ->
                                                 GC#gconf.flags),
            logdir                = lkup(logdir, GL, GC#gconf.logdir),
            ebin_dir              = lkup(ebin_dir, GL, GC#gconf.ebin_dir),
+           src_dir               = lkup(src_dir, GL, GC#gconf.src_dir),
            runmods               = lkup(runmods, GL, GC#gconf.runmods),
            keepalive_timeout     = lkup(keepalive_timeout, GL,
                                         GC#gconf.keepalive_timeout),
@@ -508,7 +558,9 @@ setup_gconf(GL, GC) ->
                                         GC#gconf.acceptor_pool_size),
            mime_types_info       = setup_mime_types_info(
                                      GL, GC#gconf.mime_types_info
-                                    )
+                                    ),
+           nslookup_pref         = lkup(nslookup_pref, GL,
+                                        GC#gconf.nslookup_pref)
           }.
 
 set_gc_flags([{tty_trace, Bool}|T], Flags) ->
@@ -529,6 +581,10 @@ set_gc_flags([{pick_first_virthost_on_nomatch, Bool}|T], Flags) ->
     set_gc_flags(T, flag(Flags, ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH,Bool));
 set_gc_flags([{use_old_ssl, Bool}|T], Flags) ->
     set_gc_flags(T, flag(Flags,?GC_USE_OLD_SSL,Bool));
+set_gc_flags([{use_erlang_sendfile, Bool}|T], Flags) ->
+    set_gc_flags(T, flag(Flags,?GC_USE_ERLANG_SENDFILE,Bool));
+set_gc_flags([{use_yaws_sendfile, Bool}|T], Flags) ->
+    set_gc_flags(T, flag(Flags,?GC_USE_YAWS_SENDFILE,Bool));
 set_gc_flags([_|T], Flags) ->
     set_gc_flags(T, Flags);
 set_gc_flags([], Flags) ->
@@ -540,7 +596,8 @@ setup_sconf(SL, SC) ->
     #sconf{port                  = lkup(port, SL, SC#sconf.port),
            flags                 = set_sc_flags(lkup(flags, SL, []),
                                                 SC#sconf.flags),
-           redirect_map          = lkup(redirect_map, SL, SC#sconf.redirect_map),
+           redirect_map          = lkup(redirect_map, SL,
+                                        SC#sconf.redirect_map),
            rhost                 = lkup(rhost, SL, SC#sconf.rhost),
            rmethod               = lkup(rmethod, SL, SC#sconf.rmethod),
            docroot               = lkup(docroot, SL, SC#sconf.docroot),
@@ -548,6 +605,7 @@ setup_sconf(SL, SC) ->
                                         SC#sconf.xtra_docroots),
            listen                = lkup(listen, SL, SC#sconf.listen),
            servername            = lkup(servername, SL, SC#sconf.servername),
+           serveralias           = lkup(serveralias, SL, SC#sconf.serveralias),
            yaws                  = lkup(yaws, SL, SC#sconf.yaws),
            ets                   = lkup(ets, SL, SC#sconf.ets),
            ssl                   = setup_ssl(SL, SC#sconf.ssl),
@@ -556,8 +614,10 @@ setup_sconf(SL, SC) ->
                                         SC#sconf.partial_post_size),
            appmods               = lkup(appmods, SL, SC#sconf.appmods),
            expires               = lkup(expires, SL, SC#sconf.expires),
-           errormod_401          = lkup(errormod_401, SL, SC#sconf.errormod_401),
-           errormod_404          = lkup(errormod_404, SL, SC#sconf.errormod_404),
+           errormod_401          = lkup(errormod_401, SL,
+                                        SC#sconf.errormod_401),
+           errormod_404          = lkup(errormod_404, SL,
+                                        SC#sconf.errormod_404),
            errormod_crash        = lkup(errormod_crash, SL,
                                         SC#sconf.errormod_crash),
            arg_rewrite_mod       = lkup(arg_rewrite_mod, SL,
@@ -626,6 +686,9 @@ lkup(Key, List, Def) ->
 
 
 
+hup() ->
+    dohup(undefined).
+
 hup(Sock) ->
     spawn(fun() ->
                   group_leader(whereis(user), self()),
@@ -643,8 +706,13 @@ dohup(Sock) ->
           end,
     gen_event:notify(yaws_event_manager, {yaws_hupped, Res}),
     yaws_log:rotate(Res),
-    gen_tcp:send(Sock, io_lib:format("hupped: ~p~n", [Res])),
-    gen_tcp:close(Sock).
+    case Sock of
+        undefined ->
+            {yaws_hupped, Res};
+        _  ->
+            gen_tcp:send(Sock, io_lib:format("hupped: ~p~n", [Res])),
+            gen_tcp:close(Sock)
+    end.
 
 
 
@@ -1029,7 +1097,8 @@ accepts_gzip(H, Mime) ->
     case [Val || {_,_,'Accept-Encoding',_,Val}<- H#headers.other] of
         [] ->
             false;
-        [AcceptEncoding] ->
+        [_|_]=AcceptEncoding0 ->
+            AcceptEncoding = join_sep(AcceptEncoding0, ","),
             EncList = [parse_qval(X) || X <- split_sep(AcceptEncoding, $,)],
             case [Q || {"gzip",Q} <- EncList] ++ [Q || {"*",Q} <- EncList] of
                 [] ->
@@ -1037,9 +1106,7 @@ accepts_gzip(H, Mime) ->
                 [Q|_] ->
                     (Q > 100) %% just for fun
                         and not has_buggy_gzip(H#headers.user_agent, Mime)
-            end;
-        _ ->
-            false
+            end
     end.
 
 %%% Advice partly taken from Apache's documentation of `mod_deflate'.
@@ -1426,14 +1493,7 @@ make_allow_header() ->
 make_allow_header(Options) ->
     case Options of
         [] ->
-            HasDav = ?sc_has_dav(get(sc)),
-            ["Allow: GET, POST, OPTIONS, HEAD",
-             case HasDav of
-                 true ->
-                     ", PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, MOVE, COPY";
-                 false ->
-                     ""
-             end, "\r\n"];
+            ["Allow: GET, POST, OPTIONS, HEAD\r\n"];
         _ ->
             ["Allow: ",
              lists:foldl(fun(M, "") -> atom_to_list(M);
@@ -1443,14 +1503,11 @@ make_allow_header(Options) ->
     end.
 make_server_header() ->
     Sc = get(sc),
-    HasDav = ?sc_has_dav(Sc),
     Signature = case Sc#sconf.yaws of
                     undefined -> (get(gc))#gconf.yaws;
                     S         -> S
                 end,
-    ["Server: ", Signature, "\r\n" | if HasDav == true -> ["DAV: 1, 2, 3\r\n"];
-                                        true           -> []
-                                     end].
+    ["Server: ", Signature, "\r\n"].
 
 make_last_modified_header(FI) ->
     Then = FI#file_info.mtime,
@@ -1555,7 +1612,7 @@ make_www_authenticate_header(Method) ->
     ["WWW-Authenticate: ", Method, ["\r\n"]].
 
 make_date_header() ->
-    N = element(2, now()),
+    N = element(2, os:timestamp()),
     case get(date_header) of
         {_Str, Secs} when (Secs+10) < N ->
             H = ["Date: ", universal_time_as_string(), "\r\n"],
@@ -1657,7 +1714,8 @@ outh_serialize() ->
     SC=get(sc),
     Vary = case (?sc_has_deflate(SC) orelse H#outh.encoding == deflate) of
                true when H#outh.contlen /= undefined, H#outh.contlen /= 0;
-                         H#outh.act_contlen /= undefined, H#outh.act_contlen /= 0 ->
+                         H#outh.act_contlen /= undefined,
+                         H#outh.act_contlen /= 0 ->
                    Fields = outh_get_vary_fields(),
                    Fun    = fun("*") -> true;
                                (F)   -> (to_lower(F) == "accept-encoding")
@@ -1966,6 +2024,129 @@ ensure_exist(Path) ->
             end
     end.
 
+%%
+%%
+%% TCP/SSL connection with a configurable IPv4/IPv6 preference on NS lookup.
+%%
+%%
+
+tcp_connect(Host, Port, Options) ->
+    tcp_connect(Host, Port, Options, infinity).
+
+tcp_connect(Host, Port, Options, Timeout) ->
+    parse_ipaddr_and_connect(tcp, Host, Port, Options, Timeout).
+
+ssl_connect(Host, Port, Options) ->
+    ssl_connect(Host, Port, Options, infinity).
+
+ssl_connect(Host, Port, Options, Timeout) ->
+    parse_ipaddr_and_connect(ssl, Host, Port, Options, Timeout).
+
+parse_ipaddr_and_connect(Proto, IP, Port, Options, Timeout)
+when is_tuple(IP) ->
+    %% The caller handled name resolution himself.
+    filter_tcpoptions_and_connect(Proto, undefined,
+      IP, Port, Options, Timeout);
+parse_ipaddr_and_connect(Proto, [$[ | Rest], Port, Options, Timeout) ->
+    %% yaws_api:parse_url/1 keep the "[...]" enclosing an IPv6 address.
+    %% Remove them now, and parse the address.
+    IP = string:strip(Rest, right, $]),
+    parse_ipaddr_and_connect(Proto, IP, Port, Options, Timeout);
+parse_ipaddr_and_connect(Proto, Host, Port, Options, Timeout) ->
+    %% First, try to parse an IP address, because inet:getaddr/2 could
+    %% return nxdomain if the family doesn't match the IP address
+    %% format.
+    case parse_strict_address(Host) of
+        {ok, IP} ->
+            filter_tcpoptions_and_connect(Proto, undefined,
+              IP, Port, Options, Timeout);
+        {error, einval} ->
+            NsLookupPref = get_nslookup_pref(Options),
+            filter_tcpoptions_and_connect(Proto, NsLookupPref,
+              Host, Port, Options, Timeout)
+    end.
+
+-ifdef(HAVE_INET_PARSE_STRICT_ADDRESS).
+
+parse_strict_address(Host) ->
+    inet:parse_strict_address(Host).
+
+-else.
+
+parse_strict_address(Host) when is_list(Host) ->
+    case inet_parse:ipv4strict_address(Host) of
+        {ok,IP} -> {ok,IP};
+        _       -> inet_parse:ipv6strict_address(Host)
+    end;
+parse_strict_address(_) ->
+    {error, einval}.
+
+-endif.
+
+filter_tcpoptions_and_connect(Proto, NsLookupPref,
+  Host, Port, Options, Timeout) ->
+    %% Now that we have IP addresses, remove family from the TCP options,
+    %% because calling gen_tcp:connect/3 with {127,0,0,1} and [inet6]
+    %% would return {error, nxdomain otherwise}.
+    OptionsWithoutFamily = lists:filter(fun
+          (inet)  -> false;
+          (inet6) -> false;
+          (_)     -> true
+      end, Options),
+    resolve_and_connect(Proto, NsLookupPref, Host, Port, OptionsWithoutFamily, Timeout).
+
+resolve_and_connect(Proto, _, IP, Port, Options, Timeout)
+when is_tuple(IP) ->
+    do_connect(Proto, IP, Port, Options, Timeout);
+resolve_and_connect(Proto, [Family | Rest], Host, Port, Options, Timeout) ->
+    Result = case inet:getaddr(Host, Family) of
+        {ok, IP} -> do_connect(Proto, IP, Port, Options, Timeout);
+        R        -> R
+    end,
+    case Result of
+        {ok, Socket} ->
+            {ok, Socket};
+        {error, _} when length(Rest) >= 1 ->
+            %% If the connection fails here, ignore the error and
+            %% continue with the next address family.
+            resolve_and_connect(Proto, Rest, Host, Port, Options, Timeout);
+        {error, Reason} ->
+            %% This was the last IP address in the list, return the
+            %% connection error.
+            {error, Reason}
+    end.
+
+do_connect(Proto, IP, Port, Options, Timeout) ->
+    case Proto of
+        tcp -> gen_tcp:connect(IP, Port, Options, Timeout);
+        ssl -> ssl:connect(IP, Port, Options, Timeout)
+    end.
+
+%% If the caller specified inet or inet6 in the TCP options, prefer
+%% this to the global nslookup_pref parameter.
+%%
+%% This can be used in processes which can't use get(gc) to get the
+%% global conf: if they are given the global conf, they can get
+%% nslookup_pref value and add it the TCP options.
+%%
+%% If neither TCP options specify the family, nor the global conf is
+%% accessible, use default value declared in #gconf definition.
+get_nslookup_pref(TcpOptions) ->
+    get_nslookup_pref(TcpOptions, []).
+
+get_nslookup_pref([inet | Rest], Result) ->
+    get_nslookup_pref(Rest, [inet | Result]);
+get_nslookup_pref([inet6 | Rest], Result) ->
+    get_nslookup_pref(Rest, [inet6 | Result]);
+get_nslookup_pref([_ | Rest], Result) ->
+    get_nslookup_pref(Rest, Result);
+get_nslookup_pref([], []) ->
+    case get(gc) of
+        undefined -> gconf_nslookup_pref(#gconf{});
+        GC        -> gconf_nslookup_pref(GC)
+    end;
+get_nslookup_pref([], Result) ->
+    lists:reverse(Result).
 
 %%
 %%
@@ -2009,12 +2190,11 @@ gen_tcp_send(S, Data) ->
               undefined -> gen_tcp:send(S, Data);
               _SSL      -> ssl:send(S, Data)
           end,
-    Size = iolist_size(Data),
     case ?gc_has_debug((get(gc))) of
         false ->
             case Res of
                 ok ->
-                    yaws_stats:sent(Size),
+                    yaws_stats:sent(iolist_size(Data)),
                     ok;
                 _Err ->
                     exit(normal)   %% keep quiet
@@ -2022,7 +2202,7 @@ gen_tcp_send(S, Data) ->
         true ->
             case Res of
                 ok ->
-                    yaws_stats:sent(Size),
+                    yaws_stats:sent(iolist_size(Data)),
                     ?Debug("Sent ~p~n", [yaws_debug:nobin(Data)]),
                     ok;
                 Err ->
@@ -2072,7 +2252,7 @@ do_http_get_headers(CliSock, SSL) ->
         R ->
             %% Http request received. Store the current time. it will be usefull
             %% to get the time taken to serve the request.
-            put(request_start_time, now()),
+            put(request_start_time, os:timestamp()),
             case http_collect_headers(CliSock, R,  #headers{}, SSL, 0) of
                 {error, _}=Error ->
                     Error;
@@ -2173,8 +2353,15 @@ http_collect_headers(CliSock, Req, H, SSL, Count) when Count < 1000 ->
                                  H#headers{authorization = parse_auth(X)},
                                  SSL, Count+1);
         {ok, {http_header, _Num, 'X-Forwarded-For', _, X}} ->
-            http_collect_headers(CliSock, Req, H#headers{x_forwarded_for=X},
-                                 SSL, Count+1);
+            case H#headers.x_forwarded_for of
+                undefined ->
+                    http_collect_headers(CliSock, Req, H#headers{x_forwarded_for=X},
+                                         SSL, Count+1);
+                PrevXF ->
+                    NewXF = join_sep([PrevXF,X], ", "),
+                    http_collect_headers(CliSock, Req, H#headers{x_forwarded_for=NewXF},
+                                         SSL, Count+1)
+            end;
         {ok, http_eoh} ->
             H;
 
@@ -2504,6 +2691,20 @@ split_at([H|T], Char, Ack) ->
 split_at([], _Char, Ack) ->
     {lists:reverse(Ack), []}.
 
+%% insert an elemant at a given position into a list
+insert_at(Elm, 0, Ls) ->
+    Ls ++ [Elm];
+insert_at(Elm, Pos, Ls) ->
+    insert_at(Elm, Pos, Ls, []).
+
+insert_at(Elm, _, [], Res) ->
+    lists:reverse([Elm|Res]);
+insert_at(Elm, 1, Ls, Res) ->
+    lists:reverse([Elm|Res]) ++ Ls;
+insert_at(Elm, Pos, [H|T], Res) ->
+    insert_at(Elm, Pos-1, T, [H|Res]).
+
+
 
 %% Parse an Ip address or an Ip address range
 %% Return Ip || {IpMin, IpMax} where:
@@ -2640,30 +2841,22 @@ compare_ips(_,                  _)                               -> error.
 
 %% ----
 get_app_subdir(SubDir) when is_atom(SubDir) ->
-    %% below, ignore dialyzer warning:
-    %% "The pattern 'false' can never match the type 'true'"
-    case yaws_generated:is_local_install() of
-        true ->
-            EbinDir = get_ebin_dir(),
-            filename:join(filename:dirname(EbinDir), atom_to_list(SubDir));
-        false ->
-            code:lib_dir(yaws, SubDir)
-    end.
+    filename:join(get_app_dir(), atom_to_list(SubDir)).
 
 get_app_dir() ->
-    %% below, ignore dialyzer warning:
-    %% "The pattern 'false' can never match the type 'true'"
-    case yaws_generated:is_local_install() of
-        true  -> filename:dirname(get_ebin_dir());
-        false -> code:lib_dir(yaws)
+    case application:get_env(yaws, app_dir) of
+        {ok, AppDir} ->
+            AppDir;
+        undefined ->
+            AppDir = filename:absname(
+                       filename:dirname(filename:dirname(code:which(?MODULE)))
+                      ),
+            application:set_env(yaws, app_dir, AppDir),
+            AppDir
     end.
 
-get_src_dir() ->
-    Info = ?MODULE:module_info(compile),
-    filename:dirname(proplists:get_value(source, Info)).
-
 get_ebin_dir() ->
-    filename:dirname(code:which(?MODULE)).
+    get_app_subdir(ebin).
 
 get_priv_dir() ->
     get_app_subdir(priv).

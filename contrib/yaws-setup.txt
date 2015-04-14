@@ -2,14 +2,10 @@
 2) extract somewhere else
 3) copy ebin/, include/, src/, LICENSE, vsn.mk to <scalaris>/contrib/yaws
 4) ./configure && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
-5) copy src/mime_types.erl and src/yaws_generated.erl to <scalaris>/contrib/yaws/src
+5) copy src/mime_types.erl, src/yaws_appdeps.hrl, src/yaws_charset.hrl and
+   src/yaws_generated.erl to <scalaris>/contrib/yaws/src
 5a) fix absolute include path in mime_types.erl to yaws.hrl
-5b) if still needed, fix non-UTF8 files for Erlang/master (in yaws dir):
-for file in yaws_xmlrpc.erl yaws_rpc.erl yaws_ls.erl yaws_jsonrpc.erl yaws_exhtml.erl ; do \
-  sed -i -e "1i %% -*- coding: Latin-1 -*-" src/$file ; \
-done
-5c) to fix a performance regression for yaws = 1.96: download and apply patch from:
-https://github.com/klacke/yaws/commit/e4bbac37992d77ecc90d6fae482fc8267e1ec298.patch
+5b) remove src/*.hrl.in
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make

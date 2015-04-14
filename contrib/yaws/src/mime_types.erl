@@ -4,7 +4,7 @@
 -export([t/1, revt/1]).
 -export([t/2, revt/2]).
 
--include("../include/yaws.hrl").
+-include("yaws.hrl").
 
 default_type() -> default_type(global).
 t(Ext) -> t(global, Ext).
@@ -1952,8 +1952,8 @@ t(global, "gpx") -> {regular, "application/gpx+xml"};
 t(global, "GPX") -> {regular, "application/gpx+xml"};
 t(global, "gml") -> {regular, "application/gml+xml"};
 t(global, "GML") -> {regular, "application/gml+xml"};
-t(global, "woff") -> {regular, "application/x-font-woff"};
-t(global, "WOFF") -> {regular, "application/x-font-woff"};
+t(global, "woff") -> {regular, "application/font-woff"};
+t(global, "WOFF") -> {regular, "application/font-woff"};
 t(global, "pfr") -> {regular, "application/font-tdpfr"};
 t(global, "PFR") -> {regular, "application/font-tdpfr"};
 t(global, "exi") -> {regular, "application/exi"};
@@ -3945,8 +3945,8 @@ revt(global, "xpg") -> {regular, "gpx", "application/gpx+xml"};
 revt(global, "XPG") -> {regular, "GPX", "application/gpx+xml"};
 revt(global, "lmg") -> {regular, "gml", "application/gml+xml"};
 revt(global, "LMG") -> {regular, "GML", "application/gml+xml"};
-revt(global, "ffow") -> {regular, "woff", "application/x-font-woff"};
-revt(global, "FFOW") -> {regular, "WOFF", "application/x-font-woff"};
+revt(global, "ffow") -> {regular, "woff", "application/font-woff"};
+revt(global, "FFOW") -> {regular, "WOFF", "application/font-woff"};
 revt(global, "rfp") -> {regular, "pfr", "application/font-tdpfr"};
 revt(global, "RFP") -> {regular, "PFR", "application/font-tdpfr"};
 revt(global, "ixe") -> {regular, "exi", "application/exi"};

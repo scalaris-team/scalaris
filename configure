@@ -597,7 +597,7 @@ RUBYSITELIBDIR
 ENABLERUBYINSTALL
 BUILDCLASSPATH
 JAVAFUNCTIONS
-HAVE_YAWS_SENDFILE
+YAWS_OPTIONS
 EMAKEFILECOMPILECOMPAT
 DIALYZER_FLAGS
 EDOCMACROS
@@ -4293,42 +4293,49 @@ fi
 # check for file:send_file/5 for yaws
 #
 ###########################################################
+YAWS_OPTIONS=
+HAVE_ERLANG_SENDFILE=false
+
 # split erlang ets version:
 set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
 ERTS_MAJOR=$1
 ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
 
-HAVE_YAWS_SENDFILE=false
-HAVE_ERL_SENDFILE=false
-
-file_sendfile=`"${ERL}" -noshell -eval 'io:format("~p~n",[erlang:function_exported(file, sendfile, 5)]), erlang:halt().' | tail -1`
-
-if test "$file_sendfile" = true -a \
-           '(' $ERTS_MAJOR -gt 5 -o \
-           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
-           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')' ')'; then :
-  HAVE_ERL_SENDFILE=true; { $as_echo "$as_me:${as_lineno-$LINENO}: found file:sendfile/5" >&5
-$as_echo "$as_me: found file:sendfile/5" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for file:sendfile/5" >&5
+$as_echo_n "checking for file:sendfile/5... " >&6; }
+file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",[erlang:function_exported(file,sendfile,5)]), erlang:halt().' | tail -1`
+if test "$file_sendfile" = true; then
+  if test $ERTS_MAJOR -gt 5 -o \
+         '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
+         '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')'; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+         HAVE_ERLANG_SENDFILE=true
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+else
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 fi
 
-if test "$HAVE_ERL_SENDFILE" = true; then :
-  HAVE_YAWS_SENDFILE=""
-       HAVE_YAWS_SENDFILE_DIALYZER=""
-       { $as_echo "$as_me:${as_lineno-$LINENO}: file:sendfile/5 is available for yaws" >&5
-$as_echo "$as_me: file:sendfile/5 is available for yaws" >&6;}
+if test "$HAVE_ERLANG_SENDFILE" = true; then :
+  YAWS_OPTIONS=", {d, 'HAVE_ERLANG_SENDFILE'}"
+       YAWS_OPTIONS_DIALYZER=" -DHAVE_ERLANG_SENDFILE"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: using file:sendfile/5 for yaws" >&5
+$as_echo "$as_me: using file:sendfile/5 for yaws" >&6;}
+else
+  YAWS_OPTIONS=""
+       YAWS_OPTIONS_DIALYZER=""
+       { $as_echo "$as_me:${as_lineno-$LINENO}: using fallback gen_tcp:send/2 for yaws" >&5
+$as_echo "$as_me: using fallback gen_tcp:send/2 for yaws" >&6;}
 fi
-if test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = true; then :
-  HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"
-       HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"
-       { $as_echo "$as_me:${as_lineno-$LINENO}: using yaws_sendfile for yaws" >&5
-$as_echo "$as_me: using yaws_sendfile for yaws" >&6;}
-fi
-if test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = false; then :
-  HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"
-       HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"
-       { $as_echo "$as_me:${as_lineno-$LINENO}: no send_file suitable for yaws, using fallback" >&5
-$as_echo "$as_me: no send_file suitable for yaws, using fallback" >&6;}
+
+if test "${crypto_hash}" = "true"; then :
+  YAWS_OPTIONS="${YAWS_OPTIONS}, {d, 'HAVE_CRYPTO_HASH'}"
+       YAWS_OPTIONS_DIALYZER="${YAWS_OPTIONS_DIALYZER} -DHAVE_CRYPTO_HASH"
 fi
 
 ###########################################################
@@ -4339,7 +4346,7 @@ fi
 
 EMAKEFILEDEFINES="${EMAKEFILEDEFINES}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}"
 EDOCMACROS="${EDOCMACROS#, }${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}"
-DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}"
+DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${YAWS_OPTIONS_DIALYZER}"
 
 
 

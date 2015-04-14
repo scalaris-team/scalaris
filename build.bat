@@ -23,10 +23,9 @@ call "%~dp0"\bin\find_erlang.bat
 :: http module, the following line needs to be added to Emakefile:
 :: ["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]
 :: refer to configure.ac for the appropriate checks for necessity
-::if yaws should use the file:sendfile/5 functionality, set @HAVE_YAWS_SENDFILE@ to
-::  {d, 'HAVE_YAWS_SENDFILE'}
-::otherwise use the following for maximum compatibility (used by default)
-::  {d, 'NO_FILE_SENDFILE'}
+::if yaws should use the file:sendfile/5 functionality, set @YAWS_OPTIONS@ to
+::  {d, 'HAVE_ERLANG_SENDFILE'}
+::but note the issues in R15 & R16 mentioned at http://erlang.org/pipermail/erlang-questions/2013-October/075676.html
 :: Note: Search & Replace functionality from http://www.dostips.com
 if not exist Emakefile (
     echo Creating Emakefile...
@@ -35,7 +34,6 @@ if not exist Emakefile (
         if defined line (
             call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_cthooks_support}, {d, with_export_type_support}%%"
             call set "line=%%line:@EMAKEFILECOMPILECOMPAT@=%%"
-            call set "line=%%line:  @HAVE_YAWS_SENDFILE@=, {d, 'NO_FILE_SENDFILE'}%%"
             for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
         ) ELSE echo.
     )

@@ -6,39 +6,95 @@
 -module(yaws_sendfile).
 -author('vinoski@ieee.org').
 
--export([start_link/0, start/0, stop/0,
-         enabled/0, send/2, send/3, send/4]).
-
--include("yaws_configure.hrl").
 -include("../include/yaws.hrl").
 -include_lib("kernel/include/file.hrl").
 
--ifndef(HAVE_YAWS_SENDFILE).
--ifndef(NO_FILE_SENDFILE).
--define(HAVE_FILE_SENDFILE, 1).
--endif.
--endif.
+-export([send/2, send/3, send/4]).
+-export([have_sendfile/0, have_erlang_sendfile/0, check_gc_flags/1]).
+
+%% export bytes_to_transfer to avoid warning when sendfile is disabled (or not
+%% supported)
+-export([bytes_to_transfer/3]).
 
 
--ifdef(HAVE_YAWS_SENDFILE).
+-ifdef(HAVE_SENDFILE).
+
 -behavior(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
+
+-export([start_link/0, stop/0]).
+
+have_sendfile() -> true.
+
+-else.
+
+have_sendfile() -> false.
+
 -endif.
+
+-ifdef(HAVE_ERLANG_SENDFILE).
+
+have_erlang_sendfile() -> true.
+
+-else.
+
+have_erlang_sendfile() -> false.
+
+-endif.
+
+
+check_gc_flags(GC) ->
+    %% below, ignore dialyzer warning:
+    %% The pattern depends on the macro HAVE_ERLANG_SENDFILE
+    case have_erlang_sendfile() of
+        false when ?gc_use_erlang_sendfile(GC) ->
+            error_logger:error_msg("Cannot use file:sendfile/5: not supported, "
+                                   "gen_tcp:send/2 will be used instead.~n",
+                                   []);
+        _ ->
+            ok
+    end,
+
+    %% below, ignore dialyzer warning:
+    %% The pattern depends on the macro HAVE_SENDFILE
+    case have_sendfile() of
+        false when ?gc_use_yaws_sendfile(GC) ->
+            error_logger:error_msg("Cannot use Yaws sendfile linked-in driver:"
+                                   " not supported, gen_tcp:send/2 will be used"
+                                   " instead.~n",
+                                   []);
+        _ ->
+            ok
+    end.
+
 
 send(Out, Filename) ->
     send(Out, Filename, 0, all).
 send(Out, Filename, Offset) ->
     send(Out, Filename, Offset, all).
 
+send(Out, Filename, Offset, Count) ->
+    GC             = get(gc),
+    ChunkSize      = GC#gconf.large_file_chunk_size,
+    ErlangSendFile = ?gc_use_erlang_sendfile(GC),
+    YawsSendFile   = ?gc_use_yaws_sendfile(GC),
+    if
+        ErlangSendFile ->
+            erlang_sendfile(Out, Filename, Offset, Count, ChunkSize);
+        YawsSendFile ->
+            yaws_sendfile(Out, Filename, Offset, Count, ChunkSize);
+        true ->
+            compat_send(Out, Filename, Offset, Count, ChunkSize)
+    end.
+
+
 bytes_to_transfer(Filename, Offset, Count) ->
     case Count of
         all ->
             case file:read_file_info(Filename) of
-                {ok, #file_info{size = Size}} ->
-                    Size - Offset;
-                Error ->
-                    Error
+                {ok, #file_info{size = Size}} -> Size - Offset;
+                Error -> Error
             end;
         Count when is_integer(Count) ->
             Count;
@@ -46,11 +102,11 @@ bytes_to_transfer(Filename, Offset, Count) ->
             {error, badarg}
     end.
 
--ifdef(HAVE_FILE_SENDFILE). %% OTP > R15B; use file:sendfile/5
 
-enabled() ->
-    true.
-send(Out, Filename, Offset, Count) ->
+
+-ifdef(HAVE_ERLANG_SENDFILE).
+
+erlang_sendfile(Out, Filename, Offset, Count, ChunkSize) ->
     Count1 = bytes_to_transfer(Filename, Offset, Count),
     case Count1 of
         {error, _}=Error1 ->
@@ -58,34 +114,26 @@ send(Out, Filename, Offset, Count) ->
         _ ->
             case file:open(Filename, [raw, read, binary]) of
                 {ok, RawFile} ->
-                    Res = file:sendfile(RawFile, Out, Offset, Count1, []),
+                    Res = file:sendfile(RawFile, Out, Offset, Count1,
+                                        [{chunk_size, ChunkSize}]),
                     ok = file:close(RawFile),
                     Res;
                 Error2 ->
                     Error2
             end
     end.
-start_link() ->
-    ignore.
-start() ->
-    ignore.
-stop() ->
-    ok.
 
 -else.
 
--ifdef(HAVE_YAWS_SENDFILE).
+erlang_sendfile(Out, Filename, Offset, Count, ChunkSize) ->
+    compat_send(Out, Filename, Offset, Count, ChunkSize).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+-endif.
 
-start() ->
-    gen_server:start({local, ?MODULE}, ?MODULE, [], []).
 
-enabled() ->
-    true.
+-ifdef(HAVE_SENDFILE).
 
-send(Out, Filename, Offset, Count) ->
+yaws_sendfile(Out, Filename, Offset, Count, ChunkSize) ->
     Count1 = bytes_to_transfer(Filename, Offset, Count),
     case Count1 of
         {error, _}=Error ->
@@ -93,19 +141,23 @@ send(Out, Filename, Offset, Count) ->
         _ ->
             case prim_inet:getfd(Out) of
                 {ok, SocketFd} ->
-                    do_send(Out, SocketFd, Filename, Offset, Count1);
+                    do_send(Out, SocketFd, Filename, Offset, Count1, ChunkSize);
                 Error2 ->
                     Error2
             end
     end.
 
-stop() ->
-    gen_server:cast(?MODULE, stop).
 
 -record(state, {
           port,                    % driver port
           caller_tbl               % table mapping socket fd to caller
          }).
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+stop() ->
+    gen_server:cast(?MODULE, stop).
 
 init([]) ->
     process_flag(trap_exit, true),
@@ -161,34 +213,32 @@ terminate(_Reason, #state{port = Port, caller_tbl = CallerTable}) ->
 code_change(_OldVsn, Data, _Extra) ->
     {ok, Data}.
 
-do_send(_Out, _SocketFd, _Filename, _Offset, Count) when Count =< 0 ->
+do_send(_Out, _SocketFd, _Filename, _Offset, Count, _) when Count =< 0 ->
     {ok, 0};
-do_send(Out, SocketFd, Filename, Offset, Count) ->
+do_send(Out, SocketFd, Filename0, Offset, Count, ChunkSize) ->
+    Filename = case file:native_name_encoding() of
+                   latin1 -> Filename0;
+                   utf8 -> unicode:characters_to_binary(Filename0)
+               end,
     Call = list_to_binary([<<Offset:64, Count:64, SocketFd:32>>,
                            Filename, <<0:8>>]),
     case gen_server:call(?MODULE, {send, SocketFd, Call}, infinity) of
         {error, eoverflow} ->
-            compat_send(Out, Filename, Offset, Count);
+            compat_send(Out, Filename, Offset, Count, ChunkSize);
         Else ->
             Else
     end.
 
 -else.
 
-enabled() ->
-    false.
-send(Out, Filename, Offset, Count) ->
-    compat_send(Out, Filename, Offset, Count).
-start_link() ->
-    ignore.
-start() ->
-    ignore.
-stop() ->
-    ok.
+yaws_sendfile(Out, Filename, Offset, Count, ChunkSize) ->
+    compat_send(Out, Filename, Offset, Count, ChunkSize).
 
 -endif.
 
-compat_send(Out, Filename, Offset, Count0) ->
+
+
+compat_send(Out, Filename, Offset, Count0, ChunkSize) ->
     Count = case Count0 of
                 0 -> all;
                 _ -> Count0
@@ -196,7 +246,6 @@ compat_send(Out, Filename, Offset, Count0) ->
     case file:open(Filename, [read, binary, raw]) of
         {ok, Fd} ->
             file:position(Fd, {bof, Offset}),
-            ChunkSize = (get(gc))#gconf.large_file_chunk_size,
             Ret = loop_send(Fd, ChunkSize, file:read(Fd, ChunkSize), Out,
                             Count, 0),
             file:close(Fd),
@@ -239,5 +288,3 @@ loop_send(Fd, ChunkSize, {ok, Bin}, Out, Count, BytesSent) ->
     end;
 loop_send(_Fd, _, Err, _, _, _) ->
     Err.
-
--endif.
