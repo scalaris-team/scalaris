@@ -106,7 +106,7 @@ test_merge(_Config) ->
     ?assert(0 =:= mockup_l_on_cseq:get_renewal_counter()),
     % check L1
     case l_on_cseq:read(l_on_cseq:get_id(L1)) of
-        {ok, L1_} -> ?assert(l_on_cseq:get_aux(L1_) =:= {invalid,merge,no_renew});
+        {ok, L1_} -> ?assert(L1_ =:= prbr_bottom);
         {fail, not_found} -> ?assert(false)
     end,
     % check L2
@@ -222,7 +222,7 @@ test_merge_with_renewal_at(_Config, Step, FirstOrSecond) ->
     ?assert(1 =:= mockup_l_on_cseq:get_renewal_counter()),
     % check L1
     case l_on_cseq:read(l_on_cseq:get_id(L1)) of
-        {ok, L1_} -> ?assert(l_on_cseq:get_aux(L1_) =:= {invalid,merge,no_renew});
+        {ok, L1_} -> ?assert(L1_ =:= prbr_bottom);
         {fail, not_found} -> ?assert(false)
     end,
     % check L2

@@ -158,7 +158,7 @@ tester_type_check_l_on_cseq(_Config) ->
           {lease_list,
            [
              {update_lease_in_dht_node_state, 4}, %% cannot create dht_node_state (reference for bulkowner)
-             {remove_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
+             {remove_lease_from_dht_node_state, 4}, %% cannot create dht_node_state (reference for bulkowner)
              {get_next_round, 2}, %% cannot create dht_node_state (reference for bulkowner)
              {update_next_round, 3} %% cannot create dht_node_state (reference for bulkowner)
            ],
@@ -166,8 +166,8 @@ tester_type_check_l_on_cseq(_Config) ->
             {update_lease_in_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
             {update_active_lease, 2}, %% assert fails for random input
             {remove_next_round, 2}, %% cannot create dht_node_state (reference for bulkowner)
-            {remove_passive_lease_from_dht_node_state, 2}, %% cannot create dht_node_state (reference for bulkowner)
-            {remove_active_lease_from_dht_node_state, 2} %% cannot create dht_node_state (reference for bulkowner)
+            {remove_passive_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
+            {remove_active_lease_from_dht_node_state, 3} %% cannot create dht_node_state (reference for bulkowner)
            ]},
           {leases,
            [

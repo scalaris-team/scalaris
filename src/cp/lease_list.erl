@@ -44,7 +44,7 @@
 
 -export([empty/0]).
 -export([update_lease_in_dht_node_state/4]).
--export([remove_lease_from_dht_node_state/3]).
+-export([remove_lease_from_dht_node_state/4]).
 %-export([remove_lease_from_dht_node_state/3]).
 %-export([disable_lease_in_dht_node_state/2]).
 -export([make_lease_list/3]).
@@ -183,10 +183,10 @@ update_lease_in_dht_node_state(Lease, State, Mode) ->
     end.
 
 
--spec remove_active_lease_from_dht_node_state(l_on_cseq:lease_t(),
+-spec remove_active_lease_from_dht_node_state(l_on_cseq:lease_t(), l_on_cseq:lease_id(),
                                               dht_node_state:state()) ->
                                                      dht_node_state:state().
-remove_active_lease_from_dht_node_state(Lease, State) ->
+remove_active_lease_from_dht_node_state(Lease, Id, State) ->
     log:log("you are trying to remove an active lease via any?!? ~w", [Lease]),
     LeaseList = dht_node_state:get(State, lease_list),
     Active = LeaseList#lease_list_t.active,
@@ -204,32 +204,32 @@ remove_active_lease_from_dht_node_state(Lease, State) ->
             end
     end.
 
--spec remove_passive_lease_from_dht_node_state(l_on_cseq:lease_t(),
+-spec remove_passive_lease_from_dht_node_state(l_on_cseq:lease_t(), l_on_cseq:lease_id(),
                                               dht_node_state:state()) ->
                                                      dht_node_state:state().
-remove_passive_lease_from_dht_node_state(Lease, State) ->
+remove_passive_lease_from_dht_node_state(_Lease, Id, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
     Passive = LeaseList#lease_list_t.passive,
-    Id = l_on_cseq:get_id(Lease),
     NewPassive = lists:keydelete(Id, 2, Passive),
     dht_node_state:set_lease_list(remove_next_round(Id, State),
                                   LeaseList#lease_list_t{passive=NewPassive}).
 
--spec remove_lease_from_dht_node_state(l_on_cseq:lease_t(), dht_node_state:state(),
+-spec remove_lease_from_dht_node_state(l_on_cseq:lease_t(), l_on_cseq:lease_id(),
+                                       dht_node_state:state(),
                                        active | passive | any) ->
                                               dht_node_state:state().
-remove_lease_from_dht_node_state(Lease, State, Mode) ->
+remove_lease_from_dht_node_state(Lease, Id, State, Mode) ->
     case Mode of
         passive ->
-            remove_passive_lease_from_dht_node_state(Lease, State);
+            remove_passive_lease_from_dht_node_state(Lease, Id, State);
         active ->
             log:log("you are trying to remove an active lease"),
             % disable_mnesia_dbs(State) ?
             service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-            remove_active_lease_from_dht_node_state(Lease, State);
+            remove_active_lease_from_dht_node_state(Lease, Id, State);
         any ->
-            remove_passive_lease_from_dht_node_state(Lease,
-              remove_active_lease_from_dht_node_state(Lease, State))
+            remove_passive_lease_from_dht_node_state(Lease, Id,
+              remove_active_lease_from_dht_node_state(Lease, Id, State))
     end.
 
 %-spec disable_lease_in_dht_node_state(l_on_cseq:lease_t(), dht_node_state:state()) ->

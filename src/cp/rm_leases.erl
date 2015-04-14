@@ -111,7 +111,8 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
         {qread_done, _ReqId, _Round, Lease} ->
             case l_on_cseq:is_live_aux_field(Lease) of
                 true ->
-                    Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, Lease, '_'}),
+                    LeaseId = l_on_cseq:get_id(Lease),
+                    Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
                     l_on_cseq:lease_takeover(Lease, Pid),
                     add_takeover(State, Lease);
                 false ->
@@ -125,7 +126,7 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
             State
     end;
 
-on({takeover_after_rm_change, _Lease, Result}, State) ->
+on({takeover_after_rm_change, LeaseId, _Lease, Result}, State) ->
     ?TRACE("takeover_after_rm_change ~w", [Result]),
     case Result of
         {takeover, failed, L, Error} ->
@@ -137,7 +138,7 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                                 true ->
                                     ?TRACE("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
                                     LeaseTimeout = l_on_cseq:get_timeout(L),
-                                    Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, L, '_'}),
+                                    Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, L, '_'}),
                                     WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
                                     ?TRACE("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
                                     case WaitTime < 500*1000 of
@@ -151,17 +152,22 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                                     State;
                                 false ->
                                     propose_new_neighbors(l_on_cseq:get_owner(L)),
-                                    remove_takeover(State, L)
+                                    remove_takeover(State, LeaseId, L)
                             end;
                         none ->
                             propose_new_neighbors(l_on_cseq:get_owner(L)),
-                            remove_takeover(State, L)
+                            remove_takeover(State, LeaseId, L)
                     end;
                 _ ->
-                    propose_new_neighbors(l_on_cseq:get_owner(L)),
-                    %log:log("unknown error in takeover_after_rm_change ~w", [Error]),
-                    remove_takeover(State, L)
-            end;
+                    case L of
+                        prbr_bottom ->
+                            ok;
+                        _ ->
+                            propose_new_neighbors(l_on_cseq:get_owner(L))
+                    end,
+                    %%log:log("unknown error in takeover_after_rm_change ~w", [Error]),
+                    remove_takeover(State, LeaseId, L)
+                end;
         {takeover, success, L2} ->
             ?TRACE("takeover_after_rm_change success", []),
             % @todo we call receive in an on-handler ?!?
@@ -173,7 +179,7 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
             ActiveLease = lease_list:get_active_lease(LeaseList),
             Pid = comm:reply_as(self(), 4, {merge_after_rm_change, L2, ActiveLease, '_'}),
             l_on_cseq:lease_merge(L2, ActiveLease, Pid),
-            remove_takeover(State, L2)
+            remove_takeover(State, LeaseId, L2)
     end;
 
 on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
@@ -280,9 +286,8 @@ add_takeover(#state{takeovers=Takeovers} = State, Lease) ->
             State#state{takeovers=NewTakeovers}
     end.
 
--spec remove_takeover(state(), l_on_cseq:lease_t()) -> state().
-remove_takeover(#state{takeovers=Takeovers} = State, Lease) ->
-    Id = l_on_cseq:get_id(Lease),
+-spec remove_takeover(state(), l_on_cseq:lease_id(), l_on_cseq:lease_t()) -> state().
+remove_takeover(#state{takeovers=Takeovers} = State, Id, Lease) ->
     NewTakeovers = gb_trees:delete_any(Id, Takeovers),
     State#state{takeovers=NewTakeovers}.
 

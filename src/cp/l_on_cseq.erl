@@ -22,8 +22,12 @@
 -author('schuett@zib.de').
 -vsn('$Id:$ ').
 
-%-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), log:log(X,Y)).
 -define(TRACE(X,Y), ok).
+
+%-define(TRACE_ERROR(X,Y), log:log(X,Y)).
+-define(TRACE_ERROR(X,Y), ok).
+
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
@@ -213,7 +217,7 @@ lease_split_and_change_owner(Lease, R1, R2, Keep, NewOwner, ReplyPid) ->
 
 -spec disable_lease(State::dht_node_state:state(), Lease::lease_t()) -> dht_node_state:state().
 disable_lease(State, Lease) ->
-    lease_list:remove_lease_from_dht_node_state(Lease, State, passive).
+    lease_list:remove_lease_from_dht_node_state(Lease, get_id(Lease), State, passive).
 
 % for unit tests
 -spec unittest_lease_update(lease_t(), lease_t(), active | passive) -> ok | failed.
@@ -305,17 +309,17 @@ on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
     _New, Mode, Renew}, State) ->
     % @todo retry
-    ?TRACE("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
-    ?TRACE("id: ~p~n", [dht_node_state:get(State, node_id)]),
-    ?TRACE("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
-    ?TRACE("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
+    ?TRACE_ERROR("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
+    ?TRACE_ERROR("id: ~p~n", [dht_node_state:get(State, node_id)]),
+    ?TRACE_ERROR("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
+    ?TRACE_ERROR("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
     case Reason of
         lease_does_not_exist ->
             case Value of %@todo is this necessary?
                 prbr_bottom ->
                     State;
                 _ ->
-                    lease_list:remove_lease_from_dht_node_state(Value, State,
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State,
                                                                 Mode)
             end;
         unexpected_owner   ->
@@ -325,7 +329,7 @@ on({l_on_cseq, renew_reply,
                     % the owner was already changed in a recover
                     State;
                 _ ->
-                    lease_list:remove_lease_from_dht_node_state(Value, State, Mode)
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode)
             end;
         unexpected_aux     ->
             case get_aux(Value) of
@@ -336,7 +340,7 @@ on({l_on_cseq, renew_reply,
                 {invalid, merge, _, _} ->
                     renew_and_update_round(Value, Round, Mode, State);
                 {invalid, merge, no_renew} ->
-                    lease_list:remove_lease_from_dht_node_state(Value, State, Mode);
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode);
                 {valid, split, _, _}   ->
                     renew_and_update_round(Value, Round, Mode, State);
                 {valid, merge, _, _}   ->
@@ -443,7 +447,7 @@ on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                                 {content_check_failed, {Reason, _Current, _Next}}},
     ReplyTo, NewOwner, _New}, State) ->
-    ?TRACE("handover denied: ~p ~p ~p~n", [Reason, Value, _New]),
+    ?TRACE_ERROR("handover denied: ~p ~p ~p~n", [Reason, Value, _New]),
     case Reason of
         lease_does_not_exist ->
             comm:send_local(ReplyTo, {handover, failed, Value}),
@@ -451,11 +455,11 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                 prbr_bottom ->
                     State;
                 _ ->
-                    lease_list:remove_lease_from_dht_node_state(Value, State, any)
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, any)
             end;
         unexpected_owner   ->
             comm:send_local(ReplyTo, {handover, failed, Value}),
-            lease_list:remove_lease_from_dht_node_state(Value, State, any);
+            lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, any);
         unexpected_aux     ->
             comm:send_local(ReplyTo, {handover, failed, Value}), State;
         unexpected_range   ->
@@ -522,12 +526,12 @@ on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE_ERROR("merge step1 failed~n~w~n~w~n~w~n~w:~w~n", [Reason, L1, L2, _ReqId, Round]),
     % retry?
     case Reason of
         %lease_does_not_exist ->
         %  % cannot happen
-        %  State;
+        %    State;
         %unexpected_id ->
         %  % cannot happen
         %    State;
@@ -588,7 +592,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2,
      {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, _Current, _Next]),
+    ?TRACE_ERROR("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, _Current, _Next]),
     case Reason of
         %lease_does_not_exist ->
         %    % cannot happen
@@ -632,26 +636,21 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
 % lease merge (step3)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=OldEpoch}, ReplyTo,
+on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=_OldEpoch}, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    % @todo if success update lease in State
-    %log:pal("merge step3~n~w~n~w", [L1, L2]),
-    New = L1#lease{epoch   = OldEpoch + 1,
-                   version = 0,
-                   aux     = {invalid, merge, no_renew},
-                   timeout = new_timeout()},
-    ContentCheck = generic_content_check(L1, New, merge_step3),
+    New = prbr_bottom,
+    ContentCheck = cc_delete_lease(L1, merge_step3),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step3,
-                                     L2, ReplyTo, '_'}),
+                                     {get_id(L1), L2}, ReplyTo, '_'}),
     update_lease(Self, ContentCheck, L1, New, State),
     lease_list:update_lease_in_dht_node_state(L2, State, active,
                                               merge_reply_step2);
 
-on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
+on({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE_ERROR("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
         %lease_does_not_exist ->
         %  % cannot happen
@@ -670,7 +669,7 @@ on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
             State;
         unexpected_timeout ->
             % retry
-            NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
+            NextState = lease_list:update_next_round(L1Id,
                                                      Round, State),
             gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState);
         %unexpected_epoch ->
@@ -695,7 +694,7 @@ on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
 % lease merge (step4)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, merge_reply_step3, L2 = #lease{epoch=OldEpoch}, ReplyTo,
+on({l_on_cseq, merge_reply_step3, {L1Id, L2 = #lease{epoch=OldEpoch}}, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     % @todo if success update lease in State
     ?TRACE("successful merge step3 ~p~n", [L1]),
@@ -705,11 +704,11 @@ on({l_on_cseq, merge_reply_step3, L2 = #lease{epoch=OldEpoch}, ReplyTo,
                    timeout = new_timeout()},
     ContentCheck = generic_content_check(L2, New, merge_step4),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step4,
-                                     L1, ReplyTo, '_'}),
+                                     {L1Id, L1}, ReplyTo, '_'}),
     update_lease(Self, ContentCheck, L2, New, State),
-    lease_list:remove_lease_from_dht_node_state(L1, State, passive);
+    lease_list:remove_lease_from_dht_node_state(L1, L1Id, State, passive);
 
-on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
+on({l_on_cseq, merge_reply_step4, {_L1Id, L1}, ReplyTo,
     {qwrite_done, _ReqId, Round, L2}}, State) ->
     ?TRACE("successful merge ~p~p~n", [ReplyTo, L2]),
     comm:send_local(ReplyTo, {merge, success, L2, L1}),
@@ -719,21 +718,21 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
                                               active,
                                               merge_reply_step3);
 
-on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
+on({l_on_cseq, merge_reply_step4, {L1Id, L1}, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2, {content_check_failed, 
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    ?TRACE_ERROR("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     case Reason of
         unexpected_timeout ->
             % retry
-            gen_component:post_op({l_on_cseq, merge_reply_step3, L2, ReplyTo,
+            gen_component:post_op({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
                                    {qwrite_done, fake_reqid, fake_round, L1}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op({l_on_cseq, merge_reply_step3, L2, ReplyTo,
+            gen_component:post_op({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
                                    {qwrite_done, fake_reqid, fake_round, L1}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State))
     end;
@@ -765,7 +764,7 @@ on({l_on_cseq, split, Lease, R1, R2, Keep, ReplyTo, PostAux}, State) ->
 
 on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, _Keep, ReplyTo, _PostAux,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
-    ?TRACE("split first step failed: ~p~n", [Reason]),
+    ?TRACE_ERROR("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
             comm:send_local(ReplyTo, {split, fail, Lease}),
@@ -805,11 +804,12 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=_Id,epoch=OldEpoch}, R1, R2,
 on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
-    ?TRACE("split second step failed: ~p~n", [Reason]),
+    ?TRACE_ERROR("split second step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L2}),
-                                lease_list:remove_lease_from_dht_node_state(L2, State, any); %@todo
+                                lease_list:remove_lease_from_dht_node_state(L2, get_id(L2),
+                                                                            State, any); %@todo
         unexpected_range     -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_timeout ->
@@ -864,11 +864,12 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
-    ?TRACE("split third step failed: ~p~n", [Reason]),
+    ?TRACE_ERROR("split third step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L1}), State; %@todo
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L1}),
-                                lease_list:remove_lease_from_dht_node_state(L1, State, any); %@todo
+                                lease_list:remove_lease_from_dht_node_state(L1, get_id(L1),
+                                                                            State, any); %@todo
         unexpected_range     -> comm:send_local(ReplyTo, {split, fail, L1}), State; %@todo
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L1}), State; %@todo
         unexpected_timeout ->
@@ -930,11 +931,12 @@ on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
-    ?TRACE("split fourth step: ~p~n", [Reason]),
+    ?TRACE_ERROR("split fourth step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State;
         unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L2}),
-                                lease_list:remove_lease_from_dht_node_state(L2, State, active);
+                                lease_list:remove_lease_from_dht_node_state(L2, get_id(L2),
+                                                                            State, active);
         unexpected_range     -> comm:send_local(ReplyTo, {split, fail, L2}), State;
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L2}), State;
         unexpected_timeout ->
@@ -1124,6 +1126,47 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
             end
     end.
                             
+
+-spec cc_delete_lease(lease_t(), atom()) ->
+                             content_check_t(). %% content check
+cc_delete_lease(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
+                                          epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
+                                   Writer) ->
+    fun(Current, _WriteFilter, Next) ->
+            New = prbr_bottom,
+            case Current of
+                %% check for re-write
+                New -> %% Current =:= New
+                    log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n",
+                            [Current, Next, Old, New, Writer]),
+                    {true, null};
+                %% check that epoch and version match with Old
+                #lease{epoch = E0, version = V0} when  E0 =:= OldEpoch andalso V0 =:= OldVersion ->
+                    {true, null};
+                % epoch and/or version did not match: give useful error message
+                #lease{id = Id0, epoch = E0, owner = O0, range = R0, aux = Aux0,
+                       version = V0, timeout = T0} ->
+                    if
+                        Id0 =/= OldId ->
+                            {false, {unexpected_id, Current, Next}};
+                        O0 =/= OldOwner ->
+                            {false, {unexpected_owner, Current, Next}};
+                        Aux0 =/= OldAux ->
+                            {false, {unexpected_aux, Current, Next}};
+                        R0 =/= OldRange ->
+                            {false, {unexpected_range, Current, Next}};
+                        T0 =/= OldTimeout ->
+                            {false, {unexpected_timeout, Current, Next}};
+                        E0 =/= OldEpoch ->
+                            {false, {unexpected_epoch, Current, Next}};
+                        V0 =/= OldVersion ->
+                            {false, {unexpected_version, Current, Next}}%;
+                        %not (T0 < NewTimeout) ->
+                        %    {false, {timeout_is_not_newer_than_current_lease, Current, Next}}
+                    end
+            end
+    end.
+
 
 % @doc only for unittests
 -spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
@@ -1417,10 +1460,10 @@ format_utc_timestamp({_,_,Micro} = TS) ->
 %      possible. almost all leases updates use this routine
 -spec update_lease(ReplyTo::comm:erl_local_pid(),
                    ContentCheck::content_check_t(),
-                   Old::lease_t(), New::lease_t(), dht_node_state:state()) -> ok.
+                   Old::lease_t(), New::lease_t() | prbr_bottom, dht_node_state:state()) -> ok.
 update_lease(ReplyTo, ContentCheck, Old, New, State) ->
-    ?DBG_ASSERT(get_id(Old) =:= get_id(New)), % the lease id may not be changed
-    LeaseId = get_id(New),
+    ?DBG_ASSERT(New =:= prbr_bottom orelse get_id(Old) =:= get_id(New)), % the lease id may not be changed
+    LeaseId = get_id(Old), %% New could prbr_bottom
     DB = get_db_for_id(LeaseId),
     case lease_list:get_next_round(LeaseId, State) of
         failed ->

@@ -206,7 +206,8 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, _Msg) ->
         {ok, Lease} ->
             Owner = l_on_cseq:get_owner(Lease),
             l_on_cseq:lease_send_lease_to_node(Owner, Lease, active),
-            State1 = lease_list:remove_lease_from_dht_node_state(Lease, State, passive),
+            State1 = lease_list:remove_lease_from_dht_node_state(Lease, l_on_cseq:get_id(Lease),
+                                                                 State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
             log:log("error in finish_delta_ack2"),
