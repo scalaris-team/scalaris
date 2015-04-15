@@ -56,15 +56,11 @@ req_list(TLog, ReqList, EnDecode) ->
     %% (0) Check TLog? Costs performance, may save some requests
 
     %% (1) Ensure commit is only at end of req_list (otherwise abort),
-    %% (2) encode write values to ?DB:value format
-    %% (3) drop {commit} request at end &and remember whether to
+    %% (2) drop {commit} request at end and remember whether to
     %%     commit or not
-    {ReqList1, OKorAbort, FoundCommitAtEnd} =
-        rl_chk_and_encode(ReqList, [], ok),
-
-    case OKorAbort of
+    case rl_chk(ReqList, []) of
         abort -> tlog_and_results_to_abort(TLog, ReqList);
-        ok ->
+        {ReqList1, FoundCommitAtEnd} ->
             TLog2 = upd_tlog_via_rdht(TLog, ReqList1),
 
             %% perform all requests based on TLog to compute result
@@ -85,25 +81,18 @@ req_list(TLog, ReqList, EnDecode) ->
     end.
 
 %% @doc Check whether commit is only at end (OKorAbort).
-%%      Encode all values of write requests.
 %%      Cut commit at end and inform caller via boolean (CommitAtEnd).
--spec rl_chk_and_encode(
-        InTodo::[api_tx:request()], Acc::[api_tx:request()], ok|abort)
-                       -> {Acc::[api_tx:request()], ok|abort, CommitAtEnd::boolean()}.
-rl_chk_and_encode([], Acc, OKorAbort) ->
-    {lists:reverse(Acc), OKorAbort, false};
-rl_chk_and_encode([{commit}], Acc, OKorAbort) ->
-    {lists:reverse(Acc), OKorAbort, true};
-rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
-    case Req of
-        {write, _Key, _Value} = Write ->
-            rl_chk_and_encode(RL, [Write | Acc], OKorAbort);
-        {commit} = Commit ->
-            log:log(info, "Commit not at end of a req_list. Deciding abort."),
-            rl_chk_and_encode(RL, [Commit | Acc], abort);
-        Op ->
-            rl_chk_and_encode(RL, [Op | Acc], OKorAbort)
-    end.
+-spec rl_chk(InTodo::[api_tx:request()], Acc::[api_tx:request()])
+        -> abort | {Acc::[api_tx:request()], CommitAtEnd::boolean()}.
+rl_chk([], Acc) ->
+    {lists:reverse(Acc), false};
+rl_chk([{commit}], Acc) ->
+    {lists:reverse(Acc), true};
+rl_chk([{commit} | _RL], _Acc) ->
+    log:log(info, "Commit not at end of a req_list. Deciding abort."),
+    abort;
+rl_chk([Op | RL], Acc) ->
+    rl_chk(RL, [Op | Acc]).
 
 %% @doc Fill all fields with {fail, abort} information.
 -spec tlog_and_results_to_abort(tx_tlog:tlog(), [api_tx:request()]) ->
@@ -209,18 +198,28 @@ do_reqs_on_tlog(TLog, ReqList, EnDecode) ->
 -spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], [api_tx:result()], EnDecode::boolean())
         -> {tx_tlog:tlog(), [api_tx:result()]}.
 do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
-    Key = req_get_key(Req),
-    Entry = tx_tlog:find_entry_by_key(TLog, Key),
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
-            {read, Key}           -> rdht_tx_read:extract_from_tlog(Entry, Key, read, EnDecode);
-            {read, Key, Op}       -> rdht_tx_read:extract_from_tlog(Entry, Key, Op, EnDecode);
-            {write, Key, Value}   -> rdht_tx_write:extract_from_tlog(Entry, Key, Value, EnDecode);
+            {read, Key} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_read:extract_from_tlog(Entry, Key, read, EnDecode);
+            {read, Key, Op} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_read:extract_from_tlog(Entry, Key, Op, EnDecode);
+            {write, Key, Value} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_write:extract_from_tlog(Entry, Key, Value, EnDecode);
             %% non-native functions:
-            {add_del_on_list, Key, ToAdd, ToDel} -> rdht_tx_add_del_on_list:extract_from_tlog(Entry, Key, ToAdd, ToDel, EnDecode);
-            {add_on_nr, Key, X}           -> rdht_tx_add_on_nr:extract_from_tlog(Entry, Key, X, EnDecode);
-            {test_and_set, Key, Old, New} -> rdht_tx_test_and_set:extract_from_tlog(Entry, Key, Old, New, EnDecode)
+            {add_del_on_list, Key, ToAdd, ToDel} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_add_del_on_list:extract_from_tlog(Entry, Key, ToAdd, ToDel, EnDecode);
+            {add_on_nr, Key, X} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_add_on_nr:extract_from_tlog(Entry, Key, X, EnDecode);
+            {test_and_set, Key, Old, New} ->
+                Entry = tx_tlog:find_entry_by_key(TLog, Key),
+                rdht_tx_test_and_set:extract_from_tlog(Entry, Key, Old, New, EnDecode)
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
     do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc], EnDecode);
@@ -259,7 +258,7 @@ decode_value(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
 decode_value(Value)                       -> Value.
 
 %% commit phase
--spec commit(tx_tlog:tlog()) ->  api_tx:commit_result().
+-spec commit(tx_tlog:tlog()) -> api_tx:commit_result().
 -ifdef(TXNEW).
 commit(TLog) ->
     %% set steering parameters, we need for the transactions engine:

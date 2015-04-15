@@ -143,22 +143,17 @@ sort_by_key(TLog) -> lists:keysort(2, TLog).
 find_entry_by_key(TLog, Key) ->
     lists:keyfind(Key, 2, TLog).
 
--spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
-entry_is_sane_for_commit(Entry, Acc) ->
-    Acc andalso get_entry_status(Entry) =:= ?ok.
+-spec entry_is_sane_for_commit(tlog_entry()) -> boolean().
+entry_is_sane_for_commit(Entry) ->
+    get_entry_status(Entry) =:= ?ok.
 
 -spec is_sane_for_commit(tlog()) -> boolean().
 is_sane_for_commit(TLog) ->
-    lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
+    lists:all(fun entry_is_sane_for_commit/1, TLog).
 
 -spec get_insane_keys(tlog_ext()) -> [client_key()].
 get_insane_keys(TLog) ->
-    lists:foldl(fun(X, Acc) ->
-                        case entry_is_sane_for_commit(X, true) of
-                            true -> Acc;
-                            false -> [get_entry_key(X) | Acc]
-                        end
-                end, [], TLog).
+    [get_entry_key(X) || X <- TLog, not entry_is_sane_for_commit(X)].
 
 %% @doc Merge TLog entries from sorted translogs (see sort_by_key/1), if same
 %%      key. Check for version mismatch, take over values.
