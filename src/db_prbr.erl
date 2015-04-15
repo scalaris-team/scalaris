@@ -45,10 +45,7 @@
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
--export([new/0, new/1]).
--ifdef(PRBR_MNESIA).
--export([open/1]).
--endif.
+-export([new/0, new/1, open/1]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
@@ -105,16 +102,12 @@ new(DBName) ->
   SubscrName = DBNameNew ++ ":subscribers",
   {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
 
--ifdef(PRBR_MNESIA).
-%% Re-opens an existing database.
-%% NOTE: we cannot tag this as DOC as in case of undefined PRBR_MNESIA there is
-%%       a multiple doc tag error
+%% @doc Re-opens an existing database.
 -spec open(DB::atom()) -> db().
 open(DBName) ->
   DB = ?DB:open(DBName),
   SubscrName = ?DB:get_name(DB) ++ ":subscribers",
   {DB, db_ets:new(SubscrName), {false, 0, 0}}.
--endif.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
