@@ -122,8 +122,13 @@ is_disjoint(I, [H|T]) ->
 
 -spec get_relative_range(intervals:interval()) -> float().
 get_relative_range(ActiveInterval) ->
-    {_, Begin, End, _} = intervals:get_bounds(ActiveInterval),
-    ?RT:get_range(Begin, End) / ?RT:n().
+    case intervals:empty() of
+        ActiveInterval ->
+            0.0 / ?RT:n();
+        _ ->
+            {_, Begin, End, _} = intervals:get_bounds(ActiveInterval),
+            ?RT:get_range(Begin, End) / ?RT:n()
+    end.
 
 -spec get_dht_node_state(comm:mypid(), atom() | list(atom())) -> term() | list(term()).
 get_dht_node_state(Pid, What) ->
