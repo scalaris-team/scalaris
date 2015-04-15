@@ -336,7 +336,7 @@ get_tables_of(Pid)->
 
 -spec delete_tables(pid(), {MNesia::[atom()], Ets::[tid() | atom()]}) -> ok.
 delete_tables(Pid, {MNesia, Ets}) ->
-    _ = db_mnesia:delete_tables(MNesia),
+    _ = db_mnesia:delete_mnesia_tables(MNesia),
     _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
     ok.
 -else.

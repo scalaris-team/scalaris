@@ -105,10 +105,9 @@ mnesia_tables_of(Pid) ->
 
 %% @doc Close recursivly all mnesia tables in List
 -spec delete_mnesia_tables(list()) -> ok.
-delete_mnesia_tables([Tab | Tail]) ->
-  close(Tab),
-  delete_mnesia_tables(Tail);
-delete_mnesia_tables([]) -> ok.
+delete_mnesia_tables(Tabs) ->
+    _ = [close(Tab) || Tab <- Tabs],
+    ok.
 
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
