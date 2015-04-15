@@ -59,7 +59,7 @@
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
 
--type db() :: {DB::pid(), FileName::nonempty_string()}.
+-type db() :: {DB::pid(), DBName::nonempty_string()}.
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
 -type entry() :: db_backend_beh:entry().
 
@@ -70,31 +70,25 @@
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
-    Dir = util:make_filename(atom_to_list(node())),
-    FullDir = [config:read(db_directory), "/", Dir],
-    _ = case file:make_dir(FullDir) of
-        ok -> ok;
-        {error, eexist} -> ok;
-        {error, Error} -> erlang:exit({db_toke, 'cannot create dir', FullDir, Error})
-    end,
-    {_Now_Ms, _Now_s, Now_us} = Now = os:timestamp(),
-    {{Year, Month, Day}, {Hour, Minute, Second}} =
-        calendar:now_to_local_time(Now),
-    FileBaseName = util:make_filename(
-                     io_lib:format("db_~s_~B~B~B-~B~B~B\.~B.tch",
-                                   [DBName, Year, Month, Day, Hour, Minute, Second, Now_us])),
-    FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
-    new_db(FullFileName, [read, write, create, truncate]).
+    new_db(DBName, [read, write, create, truncate]).
 
 %% @doc Open a previously existing database.
 -spec open(DBName::nonempty_string()) -> db().
-open(FileName) ->
-    new_db(FileName, [read, write]).
+open(DBName) ->
+    new_db(DBName, [read, write]).
 
--spec new_db(FileName::string(),
+-spec new_db(DBName::nonempty_string(),
              TokeOptions::[read | write | create | truncate | no_lock |
                            lock_no_block | sync_on_transaction]) -> db().
-new_db(FileName, TokeOptions) ->
+new_db(DBName, TokeOptions) ->
+    FullDir = [config:read(db_directory), "/", atom_to_list(node())],
+    _ = case file:make_dir(FullDir) of
+        ok -> ok;
+        {error, eexist} -> ok;
+        {error, Error0} -> erlang:exit({db_toke, 'cannot create dir', FullDir, Error0})
+    end,
+    FileBaseName = util:make_filename(io_lib:format("~s.tch", [DBName])),
+    FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
     DB = case toke_drv:start_link() of
         {ok, Pid} -> Pid;
         ignore ->
@@ -107,8 +101,8 @@ new_db(FileName, TokeOptions) ->
     end,
     case toke_drv:new(DB) of
         ok ->
-            case toke_drv:open(DB, FileName, TokeOptions) of
-                ok -> {DB, FileName};
+            case toke_drv:open(DB, FullFileName, TokeOptions) of
+                ok -> {DB, DBName};
                 Error2 ->
                     log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                     erlang:error({toke_failed, Error2})
@@ -120,15 +114,17 @@ new_db(FileName, TokeOptions) ->
 
 %% @doc Closes the DB named DBName
 -spec close(DB::db()) -> true.
-close({DB, _FileName}) ->
+close({DB, _DBName}) ->
     toke_drv:close(DB),
     toke_drv:delete(DB),
     toke_drv:stop(DB).
 
 %% @doc Closes and deletes the DB named DBName
 -spec close_and_delete(DB::db()) -> true.
-close_and_delete({_DB, FileName} = State) ->
+close_and_delete({_DB, DBName} = State) ->
     close(State),
+    FileName = [config:read(db_directory), "/", atom_to_list(node()), "/",
+                DBName, ".tch"],
     case file:delete(FileName) of
         ok -> ok;
         {error, Reason} ->
@@ -140,13 +136,13 @@ close_and_delete({_DB, FileName} = State) ->
 %% @doc Saves arbitrary tuple Entry in DB DBName and returns the new DB.
 %%      The key is expected to be the first element of Entry.
 -spec put(DB::db(), Entry::entry()) -> db().
-put({DB, _FileName} = State, Entry) ->
+put({DB, _DBName} = State, Entry) ->
     toke_drv:insert(DB, ?IN(element(1, Entry)), ?IN(Entry)),
     State.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
 -spec get(DB::db(), Key::key()) -> entry() | {}.
-get({DB, _FileName}, Key) ->
+get({DB, _DBName}, Key) ->
     case toke_drv:get(DB, ?IN(Key)) of
         not_found -> {};
         Entry -> ?OUT(Entry)
@@ -155,18 +151,18 @@ get({DB, _FileName}, Key) ->
 %% @doc Deletes the tuple saved under Key and returns the new DB.
 %%      If such a tuple does not exists nothing is changed.
 -spec delete(DB::db(), Key::key()) -> db().
-delete({DB, _FileName} = State, Key) ->
+delete({DB, _DBName} = State, Key) ->
     toke_drv:delete(DB, ?IN(Key)),
     State.
 
 %% @doc Returns the name of the DB specified in @see new/1.
 -spec get_name(DB::db()) -> nonempty_string().
-get_name({_DB, FileName}) ->
-    FileName.
+get_name({_DB, DBName}) ->
+    DBName.
 
 %% @doc Returns the current load (i.e. number of stored tuples) of the DB.
 -spec get_load(DB::db()) -> non_neg_integer().
-get_load({DB, _FileName}) ->
+get_load({DB, _DBName}) ->
     %% TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
 
@@ -201,7 +197,7 @@ foldl(State, Fun, Acc, Interval, MaxNum) ->
 %%          data is to be retrieved.
 -spec foldl_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
-foldl_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
+foldl_helper({DB, _DBName}, Fun, Acc, Interval, MaxNum) ->
     Keys = get_all_keys(DB, Interval, MaxNum),
     lists:foldr(Fun, Acc, Keys).
 
@@ -231,7 +227,7 @@ foldr(State, Fun, Acc, Interval, MaxNum) ->
 %%          data is to be retrieved.
 -spec foldr_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
-foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
+foldr_helper({DB, _DBName}, Fun, Acc, Interval, MaxNum) ->
     %% first only retrieve keys so we don't have to load the whole db into memory
     Keys = get_all_keys(DB, Interval, -1),
     CutData = case MaxNum of
