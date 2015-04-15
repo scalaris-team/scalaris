@@ -265,11 +265,11 @@ reply_with_send_error(_Msg, State) ->
 % note: do not loose local messages:
 %{move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
 %{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
-%{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
+%{move, data, MovingData::db_dht:db_as_list(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
     {{move, data, '_', '_', '_', '_'}, [], 1..5, reply_with_send_error} |
 %{move, data_ack, MoveFullId::slide_op:id()} |
     {{move, data_ack, '_'}, [], 1..5, reply_with_send_error} |
-%{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
+%{move, delta, ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
     {{move, delta, '_', '_', '_'}, [], 1..5, reply_with_send_error} |
 %%{move, delta_ack, MoveFullId::slide_op:id(), {none}} |
     {{move, delta_ack, '_', {none}}, [], 1..2, reply_with_send_error} |
