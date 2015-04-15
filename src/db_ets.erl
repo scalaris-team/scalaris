@@ -64,11 +64,9 @@ new(_DBName, Options) ->
 
 %% @doc Open a previously existing database. Not supported by ets.
 %%      A new database is created
--spec open(DBName::nonempty_string()) -> db().
-open(DBName) ->
-    log:log(warn, "~p: open/1 is not supported by ets, calling new/1 instead",
-            [self()]),
-    new(DBName).
+-spec open(DBName::nonempty_string()) -> no_return().
+open(_DBName) ->
+    erlang:throw("open/1 not supported by ets").
 
 %% @doc Closes and deletes the DB named DBName
 -spec close(DBName::db()) -> true.
