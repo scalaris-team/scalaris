@@ -46,6 +46,7 @@
 
 %% whole DB management
 -export([new/0, new/1, open/1]).
+-export([get_recoverable_dbs/0]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
@@ -102,8 +103,17 @@ new(DBName) ->
   SubscrName = DBNameNew ++ ":subscribers",
   {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
 
+-spec get_recoverable_dbs()
+        -> [{DB_type::nonempty_string(), PID_group::pid_groups:groupname(), DB_name::nonempty_string()}].
+get_recoverable_dbs() ->
+    Tables = ?DB:get_persisted_tables(),
+    %% io:format("tables list: ~w~n", [Tables]),
+    %% creating tuples with DB_names different parts : {DB_type, PID_group, DB_name}
+    [{string:sub_word(Table, 1, $:), string:sub_word(Table, 2, $:), Table}
+    || Table <- Tables].
+
 %% @doc Re-opens an existing database.
--spec open(DB::atom()) -> db().
+-spec open(DB::nonempty_string()) -> db().
 open(DBName) ->
   DB = ?DB:open(DBName),
   SubscrName = ?DB:get_name(DB) ++ ":subscribers",

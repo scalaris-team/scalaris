@@ -53,7 +53,7 @@
 -export([new/1, open/1, close/1, close_and_delete/1,
          put/2, get/2, delete/2]).
 %% db info
--export([get_name/1, get_load/1]).
+-export([get_persisted_tables/0, get_name/1, get_load/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -130,6 +130,17 @@ close_and_delete({_DB, DBName} = State) ->
         {error, Reason} ->
             log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
                     [self(), FileName, Reason])
+    end.
+
+%% @doc Gets a list of persisted tables.
+-spec get_persisted_tables() -> [nonempty_string()].
+get_persisted_tables() ->
+    FullDir = [config:read(db_directory), "/", atom_to_list(node())],
+    case file:list_dir(FullDir) of
+        {ok, Files} ->
+            [lists:sublist(File, length(File) - 4)
+            || File <- Files, lists:suffix(".tch", File)];
+        {error, enoent} -> []
     end.
 
 

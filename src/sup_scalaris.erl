@@ -95,27 +95,18 @@ supspec(_) ->
 
 -spec get_dht_node_descs([tuple()]) -> [ProcessDescr::supervisor:child_spec()].
 get_dht_node_descs(Options) ->
-
   case config:read(start_type) of
     recover ->
-      Tables = lists:delete(schema, mnesia:system_info(tables)),
-      %% io:format("tables list: ~w~n", [Tables]),
-      %% creating tuples with DB_names different parts : {DB_type, PID_group, Random_id}
-      DB_list = lists:usort([begin
-                                 TableStr = atom_to_list(Table),
-                                 {string:sub_word(TableStr, 1, $:),
-                                  string:sub_word(TableStr, 2, $:),
-                                  string:sub_word(TableStr, 3, $:)}
-                             end || Table <- Tables]),
+      %% creating tuples with DB_names different parts : {DB_type, PID_group, DB_name}
+      DB_list = db_prbr:get_recoverable_dbs(),
       %% creating list of all nodes per vm and removing duplicates
       PID_groups = lists:usort([PidGroup || {_, PidGroup, _} <- DB_list]),
 
       %% create descriptions for all dht nodes to recover:
       [begin
            Option_new =
-               [{list_to_atom(Type),
-                 list_to_atom(lists:append([Type, ":", Name, ":", Rdm]))}
-               || {Type, Name, Rdm} <- DB_list, Name =:= PID_group],
+               [{list_to_atom(Type), DBName}
+               || {Type, X, DBName} <- DB_list, X =:= PID_group],
            DhtNodeId = randoms:getRandomString(),
            TheOptions = [{my_sup_dht_node_id, DhtNodeId} | lists:append(Options, Option_new)],
            sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,

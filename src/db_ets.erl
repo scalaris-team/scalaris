@@ -32,7 +32,7 @@
 %% primitives
 -export([new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
--export([get_name/1, get_load/1]).
+-export([get_persisted_tables/0, get_name/1, get_load/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -109,6 +109,11 @@ get(DBName, Key) ->
 delete(DBName, Key) ->
     ets:delete(DBName, Key),
     DBName.
+
+%% @doc Gets a list of persisted tables (none with ets!).
+-spec get_persisted_tables() -> [nonempty_string()].
+get_persisted_tables() ->
+    [].
 
 %% @doc Returns the name of the DB specified in new/1.
 -spec get_name(DB::db()) -> nonempty_string().

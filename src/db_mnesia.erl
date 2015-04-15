@@ -31,7 +31,7 @@
 %% primitives
 -export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
--export([get_name/1, get_load/1]).
+-export([get_persisted_tables/0, get_name/1, get_load/1]).
 %% cleanup functions
 -export([mnesia_tables_of/1, delete_mnesia_tables/1, close_and_delete/1]).
 
@@ -104,6 +104,11 @@ mnesia_tables_of(Pid) ->
   Tabs = mnesia:system_info(tables),
   [ Tab || Tab <- Tabs, string:sub_word(mnesia:table_info(Tab, name), 2, $:) =:= Pid ].
 
+%% @doc Gets a list of persisted tables.
+-spec get_persisted_tables() -> [nonempty_string()].
+get_persisted_tables() ->
+      [atom_to_list(Table) || Table <- mnesia:system_info(tables), Table =/= schema].
+
 %% @doc Close recursivly all mnesia tables in List
 -spec delete_mnesia_tables(list()) -> ok.
 delete_mnesia_tables(Tabs) ->
@@ -128,9 +133,7 @@ new(DBName, Options) ->
 
 %% @doc Open a previously existing database assuming the database has been
 %%      restored by the start of the mnesia application.
--spec open(DBName::atom() | nonempty_string()) -> db().
-open(DBName) when is_atom(DBName) ->
-    DBName;
+-spec open(DBName::nonempty_string()) -> db().
 open(DBName) ->
     erlang:list_to_atom(DBName).
 
