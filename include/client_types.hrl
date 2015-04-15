@@ -32,4 +32,4 @@
 -type unicode_char() :: 0..16#D7FF | 16#E000..16#FFFD | 16#10000..16#10ffff.
 -type client_key() :: [unicode_char()].
 -type client_value() :: any().
--type client_version() :: non_neg_integer(). %%?DB:version().
+-type client_version() :: non_neg_integer().

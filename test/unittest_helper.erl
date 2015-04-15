@@ -52,6 +52,7 @@
 -endif.
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 -include("unittest.hrl").
 
 -type kv_opts() :: [{Key::atom(), Value::term()}].
@@ -585,7 +586,7 @@ end_per_group(_Group, Config) ->
           {exception, Level::throw | error | exit, Reason::term(), Stacktrace::term()}.
 
 -spec get_ring_data(full) -> ring_data(db_dht:db_as_list());
-                   (kv) -> ring_data([{?RT:key(), db_dht:version()}]).
+                   (kv) -> ring_data([{?RT:key(), client_version()}]).
 get_ring_data(Type) ->
     Self = self(),
     erlang:spawn(

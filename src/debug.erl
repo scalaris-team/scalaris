@@ -20,6 +20,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([get_round_trip/2]).
 -export([
@@ -255,7 +256,7 @@ rr_count_old_replicas_nd(Key) ->
     receive ?SCALARIS_RECV({get_node_details_response, NodeDetails},% ->
                            NodeDetails) end.
 
--spec rr_count_old_replicas_data(Pid::comm:mypid()) -> [{?RT:key(), db_dht:version()}].
+-spec rr_count_old_replicas_data(Pid::comm:mypid()) -> [{?RT:key(), client_version()}].
 rr_count_old_replicas_data(Pid) ->
     comm:send(Pid, {unittest_get_bounds_and_data, comm:this(), kv}),
     trace_mpath:thread_yield(),

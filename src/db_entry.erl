@@ -21,6 +21,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([new/1, new/3,
          get_key/1,
@@ -44,19 +45,19 @@
 % note: WriteLock is either false or the version (>= Version) that a write
 % operation is working on (this allows proper cleanup - see rdht_tx_write)
 -type entry_ex() ::
-          {Key::?RT:key(), Value::db_dht:value(), WriteLock::false | db_dht:version(),
-           ReadLock::non_neg_integer(), Version::db_dht:version()}.
+          {Key::?RT:key(), Value::db_dht:value(), WriteLock::false | client_version(),
+           ReadLock::non_neg_integer(), Version::client_version()}.
 -type entry_empty() ::
-          {Key::?RT:key(), empty_val | db_dht:value(), WriteLock::false | -1 | db_dht:version(),
+          {Key::?RT:key(), empty_val | db_dht:value(), WriteLock::false | -1 | client_version(),
            ReadLock::non_neg_integer(), Version::-1}.
 -type entry() :: entry_ex() | entry_empty().
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
 
--spec new(Key::?RT:key(), Value::db_dht:value(), Version::db_dht:version()) ->
+-spec new(Key::?RT:key(), Value::db_dht:value(), Version::client_version()) ->
     {Key::?RT:key(), Value::db_dht:value(), WriteLock::false,
-     ReadLock::0, Version::db_dht:version()}.
+     ReadLock::0, Version::client_version()}.
 new(Key, Value, Version) -> {Key, Value, false, 0, Version}.
 
 -spec get_key(DBEntry::entry()) -> ?RT:key().
@@ -65,15 +66,15 @@ get_key(DBEntry) -> element(1, DBEntry).
 -spec get_value(DBEntry::entry()) -> db_dht:value().
 get_value(DBEntry) -> element(2, DBEntry).
 
--spec set_value(DBEntry::entry(), Value::db_dht:value(), Version::db_dht:version()) -> entry().
+-spec set_value(DBEntry::entry(), Value::db_dht:value(), Version::client_version()) -> entry().
 set_value(DBEntry, Value, Version) ->
     setelement(2, setelement(5, DBEntry, Version), Value).
 
--spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | db_dht:version().
+-spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | client_version().
 get_writelock(DBEntry) -> element(3, DBEntry).
 
--spec set_writelock(entry_ex(), false | db_dht:version()) -> entry_ex();
-                   (entry_empty(), false | -1 | db_dht:version()) -> entry_empty().
+-spec set_writelock(entry_ex(), false | client_version()) -> entry_ex();
+                   (entry_empty(), false | -1 | client_version()) -> entry_empty().
 set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
 
 -spec unset_writelock(DBEntry::entry()) -> entry().
@@ -95,7 +96,7 @@ dec_readlock(DBEntry) ->
         N -> set_readlock(DBEntry, N - 1)
     end.
 
--spec get_version(DBEntry::entry()) -> db_dht:version() | -1.
+-spec get_version(DBEntry::entry()) -> client_version() | -1.
 get_version(DBEntry) -> element(5, DBEntry).
 
 -spec inc_version(DBEntry::entry()) -> entry().
@@ -106,7 +107,7 @@ dec_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) - 1).
 
 -spec reset_locks(DBEntry::entry()) ->
     {Key::?RT:key(), Value::db_dht:value(), WriteLock::false,
-     ReadLock::0, Version::db_dht:version()} |
+     ReadLock::0, Version::client_version()} |
     {Key::?RT:key(), empty_val | db_dht:value(), WriteLock::false,
      ReadLock::0, Version::-1}.
 reset_locks(DBEntry) ->

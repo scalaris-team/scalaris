@@ -24,6 +24,7 @@
 -compile(export_all).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 -include("unittest.hrl").
 
 groups() ->
@@ -332,7 +333,7 @@ tester_set_entry(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_update_entry(DBEntry1::db_entry:entry(), Value2::db_dht:value(), WriteLock2::boolean(),
-                        ReadLock2::0..10, Version2::db_dht:version()) -> true.
+                        ReadLock2::0..10, Version2::client_version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
     DB = db_dht:new(),
@@ -417,7 +418,7 @@ tester_delete_entry2(_Config) ->
 % db_dht:write/2, db_dht getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_write(Key::?RT:key(), Value::db_dht:value(), Version::db_dht:version(), Key2::?RT:key()) -> true.
+-spec prop_write(Key::?RT:key(), Value::db_dht:value(), Version::client_version(), Key2::?RT:key()) -> true.
 prop_write(Key, Value, Version, Key2) ->
     DBEntry = db_entry:new(Key, Value, Version),
     DB = db_dht:new(),
@@ -440,7 +441,7 @@ tester_write(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
-                  ReadLock::0..10, Version::db_dht:version(), Key2::?RT:key()) -> true.
+                  ReadLock::0..10, Version::client_version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     DB = db_dht:new(),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
@@ -855,7 +856,7 @@ prop_changed_keys_read(Data, ChangesInterval, Key) ->
 
 -spec prop_changed_keys_write(
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
-        Key::?RT:key(), Value::db_dht:value(), Version::db_dht:version()) -> true.
+        Key::?RT:key(), Value::db_dht:value(), Version::client_version()) -> true.
 prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
@@ -1425,7 +1426,7 @@ tester_stop_record_changes(_Config) ->
 % helper functions:
 
 -spec check_entry(DB::db_dht:db(), Key::?RT:key(), ExpDBEntry::db_entry:entry(),
-                  ExpRead::{ok, Value::db_dht:value(), Version::db_dht:version()} | {ok, empty_val, -1},
+                  ExpRead::{ok, Value::db_dht:value(), Version::client_version()} | {ok, empty_val, -1},
                   ExpExists::boolean(), Note::string()) -> true.
 check_entry(DB, Key, ExpDBEntry, ExpRead, _ExpExists, Note) ->
     ?equals_w_note(db_dht:get_entry(DB, Key), ExpDBEntry, Note),
@@ -1433,7 +1434,7 @@ check_entry(DB, Key, ExpDBEntry, ExpRead, _ExpExists, Note) ->
 
 % note: use manageable values for ReadLock!
 -spec create_db_entry(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
-                      ReadLock::0..1000, Version::db_dht:version()) -> db_entry:entry();
+                      ReadLock::0..1000, Version::client_version()) -> db_entry:entry();
                      (Key::?RT:key(), Value::empty_val, WriteLock::boolean(),
                       ReadLock::0..1000, Version::-1) -> db_entry:entry().
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->

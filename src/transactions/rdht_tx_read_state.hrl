@@ -33,7 +33,7 @@
 % {?ok|fail, Val|FailReason, Vers}
 -type result() :: {?ok | ?fail,
                    rdht_tx:encoded_value() | 0 | ?not_found | ?empty_list | ?not_a_list,
-                   -1 | db_dht:version()}.
+                   -1 | client_version()}.
 -type read_state() ::
                   { ID               :: rdht_tx:req_id(),
                     ClientPid        :: pid() | unknown,
@@ -108,9 +108,9 @@ state_get_numreplied(State) ->
     state_get_numok(State) + state_get_numfailed(State).
 
 -spec state_add_reply(read_state(),
-                      Result::{?ok, rdht_tx:encoded_value(), db_dht:version()} | {?ok, empty_val, -1} |
+                      Result::{?ok, rdht_tx:encoded_value(), client_version()} | {?ok, empty_val, -1} |
                           {?fail, ?not_found | ?empty_list | ?not_a_list,
-                           db_dht:version()}, tx_tlog:snap_number())
+                           client_version()}, tx_tlog:snap_number())
         -> read_state().
 state_add_reply(State, Result, SnapNumber) ->
     ?TRACE("state_add_reply state res majok majdeny ~p ~p ~n", [State, Result]),

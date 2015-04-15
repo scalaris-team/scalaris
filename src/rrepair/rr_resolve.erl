@@ -39,6 +39,7 @@
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([init/1, on/2, start/0]).
 -export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
@@ -60,7 +61,7 @@
                     {session_id, rrepair:session_id()} |
                     {from_my_node, 0 | 1}.
 -type options()  :: [option()].
--type kvv_list() :: [{?RT:key(), db_dht:value(), db_dht:version()}].
+-type kvv_list() :: [{?RT:key(), db_dht:value(), client_version()}].
 -type exit_reason() :: resolve_ok | resolve_abort.
 
 -record(resolve_stats,
@@ -92,7 +93,7 @@
          fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
          fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
-         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), db_dht:version()),
+         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), client_version()),
          send_stats     = undefined                               :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                        :: stats(),
          from_my_node   = 1                                       :: 0 | 1
@@ -408,7 +409,7 @@ start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
         [{Entry::db_entry:entry_ex(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
-        FBItems::kvv_list(), OtherKvTree::gb_trees:tree(?RT:key(), db_dht:version()), FBOn::boolean())
+        FBItems::kvv_list(), OtherKvTree::gb_trees:tree(?RT:key(), client_version()), FBOn::boolean())
         -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
             RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
             FBItems::kvv_list()}.
@@ -520,8 +521,8 @@ make_unique_kvv([_|_] = KVV) ->
 %%      entry for every replica key of the KVV list.
 %%      Note: Assumes, KVs at the same node have the same version and sets
 %%            an (arbitrary) version from these for each replica group.
--spec make_other_kv_tree([{?RT:key(), Val::term(), db_dht:version()}])
-        -> gb_trees:tree(?RT:key(), db_dht:version()).
+-spec make_other_kv_tree([{?RT:key(), Val::term(), client_version()}])
+        -> gb_trees:tree(?RT:key(), client_version()).
 make_other_kv_tree(KVV) ->
     gb_trees:from_orddict(
           orddict:from_list(
@@ -599,7 +600,7 @@ send_local(Pid, Msg) ->
     ?TRACE_SEND(Pid, Msg),
     comm:send_local(Pid, Msg).
 
--spec entry_to_kvv(db_entry:entry_ex()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
+-spec entry_to_kvv(db_entry:entry_ex()) -> {?RT:key(), db_dht:value(), client_version()}.
 entry_to_kvv(Entry) ->
     {db_entry:get_key(Entry),
      db_entry:get_value(Entry),

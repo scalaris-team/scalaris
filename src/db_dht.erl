@@ -25,6 +25,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 %% -define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -95,7 +96,7 @@
                SnaphotInfo :: {?DB:db() | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
--type version() :: non_neg_integer().
+-type version() :: client_version().
 -type value() :: rdht_tx:encoded_value().
 -type db_as_list() :: [db_entry:entry()].
 

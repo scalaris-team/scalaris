@@ -21,6 +21,7 @@
 
 -include("yaws_api.hrl").
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
          get_and_cache_ring/0, flush_ring_cache/0,
@@ -56,7 +57,7 @@ isPost(A) ->
 
 -spec lookup(Key::?RT:key())
         -> {TimeInMs::integer(),
-            Result::{Value::db_dht:value(), Version::db_dht:version()} |
+            Result::{Value::db_dht:value(), Version::client_version()} |
                     {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
     util:tc(api_tx, read, [Key]).

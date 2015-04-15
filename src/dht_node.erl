@@ -21,6 +21,8 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
+
 -behaviour(gen_component).
 
 -export([start_link/2, on/2, init/1]).
@@ -39,7 +41,7 @@
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer() | all} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
-      {update_key_entries, Source_PID::comm:mypid(), [{HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()}]} |
+      {update_key_entries, Source_PID::comm:mypid(), [{HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::client_version()}]} |
 %%      % DB subscriptions:
 %%      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
 %%      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
@@ -568,7 +570,7 @@ is_alive_fully_joined(State) ->
     catch _:_ -> false
     end.
 
--spec update_key_entries(Entries::[{?RT:key(), db_dht:value(), db_dht:version()}],
+-spec update_key_entries(Entries::[{?RT:key(), db_dht:value(), client_version()}],
                          DB, dht_node_state:state(), NewEntries) -> {DB, NewEntries}
     when is_subtype(DB, db_dht:db()),
          is_subtype(NewEntries, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]).

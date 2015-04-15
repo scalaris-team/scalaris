@@ -37,6 +37,7 @@
 -endif.
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -type(message() :: {mr_master, init, Client::comm:mypid(), mr_state:jobid(),
                     JobSpec::mr_state:job_description()} |
@@ -163,7 +164,7 @@ on(_Msg, State) ->
 
 -spec filter_data([{?RT:key(),
                    {{string(), term()} | {atom(), string(), term()}},
-                   db_dht:version()}],
+                   client_version()}],
                   {tag, atom()}) -> mr_state:data_list().
 filter_data(Data, {tag, FilterTag}) ->
     ?TRACE("Filtering! tag is ~p~ndata: ~p~n", [FilterTag, Data]),
@@ -172,7 +173,7 @@ filter_data(Data, {tag, FilterTag}) ->
 
 -spec filter_data([{?RT:key(),
                    {{string(), term()} | {atom(), string(), term()}},
-                   db_dht:version()}]) -> mr_state:data_list().
+                   client_version()}]) -> mr_state:data_list().
 filter_data(Data) ->
     [{?RT:hash_key(K), K, V} || {_HashedKey, {K, V}, _Version} <- Data].
 

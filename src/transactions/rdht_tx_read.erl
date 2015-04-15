@@ -119,12 +119,12 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
 
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
-        (rdht_tx:encoded_value(), db_dht:version(), Op::?read) -> Result::{?ok, rdht_tx:encoded_value(), db_dht:version()};
-        (rdht_tx:encoded_value(), db_dht:version(), Op::?random_from_list)
-            -> Result::{?ok, rdht_tx:encoded_value(), db_dht:version()} | {?fail, ?empty_list | ?not_a_list, db_dht:version()};
-        (rdht_tx:encoded_value(), db_dht:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{?ok, rdht_tx:encoded_value(), db_dht:version()} | {?fail, ?not_a_list, db_dht:version()};
-        (rdht_tx:encoded_value(), db_dht:version(), Op::?write) -> Result::{?ok, ?value_dropped, db_dht:version()};
+        (rdht_tx:encoded_value(), client_version(), Op::?read) -> Result::{?ok, rdht_tx:encoded_value(), client_version()};
+        (rdht_tx:encoded_value(), client_version(), Op::?random_from_list)
+            -> Result::{?ok, rdht_tx:encoded_value(), client_version()} | {?fail, ?empty_list | ?not_a_list, client_version()};
+        (rdht_tx:encoded_value(), client_version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{?ok, rdht_tx:encoded_value(), client_version()} | {?fail, ?not_a_list, client_version()};
+        (rdht_tx:encoded_value(), client_version(), Op::?write) -> Result::{?ok, ?value_dropped, client_version()};
         (empty_val, -1, Op::?read | ?write) -> Result::{?ok, ?value_dropped, -1};
         (empty_val, -1, Op::?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
             -> Result::{?fail, ?not_found, -1}.

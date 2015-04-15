@@ -45,7 +45,7 @@ range_read(From, To) ->
 -spec data_to_json(Data::[db_entry:entry()]) ->
             {array, [{struct, [{key, ?RT:key()} | 
                                {value, api_json_tx:value()} |
-                               {version, db_dht:version()}]
+                               {version, client_version()}]
                      }]}.
 data_to_json(Data) ->
     {array, [ {struct, [{key, db_entry:get_key(DBEntry)},

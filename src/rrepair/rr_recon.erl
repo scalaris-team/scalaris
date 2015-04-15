@@ -24,6 +24,7 @@
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([init/1, on/2, start/2, check_config/0]).
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
@@ -68,10 +69,10 @@
                           sync_finished |       %finish recon on local node
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
--type db_chunk_kv()    :: [{?RT:key(), db_dht:version()}].
--type 'db_chunk_kv+'() :: [{?RT:key(), db_dht:version()},...].
--type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
--type 'db_chunk_kvv+'():: [{?RT:key(), db_dht:version(), db_dht:value()},...].
+-type db_chunk_kv()    :: [{?RT:key(), client_version()}].
+-type 'db_chunk_kv+'() :: [{?RT:key(), client_version()},...].
+-type db_chunk_kvv()   :: [{?RT:key(), client_version(), db_dht:value()}].
+-type 'db_chunk_kvv+'():: [{?RT:key(), client_version(), db_dht:value()},...].
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
 -type kvi_tree()       :: gb_trees:tree(KeyBin::bitstring(), {VersionShort::non_neg_integer(), Idx::non_neg_integer()}).
@@ -1140,7 +1141,7 @@ get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSi
 %% @doc Transforms a single key and version tuple into a compact binary
 %%      representation.
 %%      Similar to compress_kv_list/4.
--spec compress_kv_pair(Key::?RT:key(), Version::db_dht:version(),
+-spec compress_kv_pair(Key::?RT:key(), Version::client_version(),
                         SigSize::signature_size(), VMod::pos_integer())
         -> {BinKey::bitstring(), VersionShort::integer()}.
 compress_kv_pair(Key, Version, SigSize, VMod) ->
@@ -1150,7 +1151,7 @@ compress_kv_pair(Key, Version, SigSize, VMod) ->
 
 %% @doc Transforms a single key into a compact binary representation.
 %%      Similar to compress_kv_pair/4.
--spec compress_key(Key::?RT:key() | {Key::?RT:key(), Version::db_dht:version()},
+-spec compress_key(Key::?RT:key() | {Key::?RT:key(), Version::client_version()},
                    SigSize::signature_size()) -> BinKey::bitstring().
 compress_key(Key, SigSize) ->
     KBin = erlang:md5(erlang:term_to_binary(Key)),
@@ -2331,9 +2332,9 @@ send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, resolve) ->
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
--spec get_chunk_kv(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1}.
+-spec get_chunk_kv(db_entry:entry()) -> {?RT:key(), client_version() | -1}.
 get_chunk_kv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
--spec get_chunk_kvv(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1, db_dht:value()}.
+-spec get_chunk_kvv(db_entry:entry()) -> {?RT:key(), client_version() | -1, db_dht:value()}.
 get_chunk_kvv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry), db_entry:get_value(DBEntry)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
