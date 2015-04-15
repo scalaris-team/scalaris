@@ -112,10 +112,7 @@ delete_mnesia_tables(Tabs) ->
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
-  ?TRACE("new:~nDB_name:~p~n",[DBName]),
-    %% IMPORTANT: this module only works correctly when using ordered_set ets
-    %% tables. Other table types could throw bad_argument exceptions while
-    %% calling ets:next/
+    ?TRACE("new:~nDB_name:~p~n",[DBName]),
     DbAtom = list_to_atom(DBName),
     mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set}]),
     DbAtom.
@@ -123,11 +120,8 @@ new(DBName) ->
 %% @doc Creates new DB handle named DBName with possibility to pass Options.
 -spec new(DBName::nonempty_string(), Options::[term()] ) -> db().
 new(DBName, Options) ->
-  ?TRACE("new:~nDB_name:~p~nOption~p~n",[DBName, Options]),
-    %% IMPORTANT: this module only works correctly when using ordered_set ets
-    %% tables. Other table types could throw bad_argument exceptions while
-    %% calling ets:next/2
-  DbAtom = list_to_atom(DBName),
+    ?TRACE("new:~nDB_name:~p~nOption~p~n",[DBName, Options]),
+    DbAtom = list_to_atom(DBName),
     mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set} | Options]),
     DbAtom.
 
