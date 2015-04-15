@@ -66,7 +66,7 @@ init_per_group(Group, Config) ->
       application:stop(mnesia),
       PWD = os:cmd(pwd),
       WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-         "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
+         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
       file:delete(WorkingDir ++ "schema.DAT"),
 
       {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -89,7 +89,7 @@ end_per_group(Group, Config) ->
       % stop ring, stop mnesia and clean repository
       PWD = os:cmd(pwd),
       WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-          "/../data/" ++ atom_to_list(erlang:node()) ++ "/",
+          "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
       Tabs = lists:delete(schema, mnesia:system_info(tables)),
       unittest_helper:stop_ring(),
       application:stop(mnesia),

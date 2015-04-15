@@ -52,7 +52,8 @@
 
 -spec start() -> ok.
 start() ->
-  application:set_env(mnesia, dir, list_to_atom("../data/" ++ atom_to_list(node()))),
+  FullDataDir = config:read(db_directory) ++ "/" ++ atom_to_list(node()),
+  application:set_env(mnesia, dir, FullDataDir),
 %  case config:read(_type) of
   case config:read(start_type) of
     recover ->
