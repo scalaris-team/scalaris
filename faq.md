@@ -1,5 +1,5 @@
 ---
-title: Scalaris
+title: Scalaris &mdash; FAQ
 root: .
 layout: default
 ---

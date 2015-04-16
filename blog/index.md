@@ -1,5 +1,5 @@
 ---
-title: Scalaris
+title: Scalaris &mdash; Blog
 root: ..
 layout: default
 ---
