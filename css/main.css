@@ -73,10 +73,11 @@ body {
 
 #navigationbar .current a {
     color:#002A61;
+    background-color:#5F89C0;
     }
 
 #navigationbar a:hover {
-    background-color:#5F89C0; /* light green */
+    background-color:#5F89C0;
 }
 
 .content {
