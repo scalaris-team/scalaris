@@ -1,11 +1,11 @@
 ---
 title: Scalaris
 root: .
+overview: true
 layout: default
 ---
 
-Scalaris, a distributed transactional key-value store
-=====================================================
+#What is Scalaris?
 
 Scalaris is a scalable, transactional, distributed key-value store. It
 was the first NoSQL database, that supported the ACID properties for
@@ -23,3 +23,4 @@ Documentation / Download / Discussion:
 * [Prebuild Packages](http://download.opensuse.org/repositories/home:/scalaris/)
 * [Mailing list](http://groups.google.com/group/scalaris)
 
+<br><br><br><br><br><br><br><br><br><br><br>
