@@ -4,55 +4,55 @@ root: .
 layout: default
 ---
 
-### List of Scalaris Releases
+# List of Scalaris Releases
 
 * auto-gen TOC:
 {:toc}
 
-# Scalaris 0.7.2 - October 23, 2014 - [scalaris-0.7.2.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.2.tar.gz/download)
+## Scalaris 0.7.2 - October 23, 2014 - [scalaris-0.7.2.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.2.tar.gz/download)
 
 (partly supported by the EU project IES Cities [http://iescities.eu/]()
 and the EIT ICT Labs project MCData)
 
-### Packaging
+#### Packaging
 
  * fix ArchLinux packages with newest Java versions
 
-### Demonstrator "Wiki on Scalaris"
+#### Demonstrator "Wiki on Scalaris"
 
  * fix the separate count key optimisation not using Scalaris' increment operation
 
-### Business Logic
+#### Business Logic
 
  * rrepair: let the trivial algorithm assume the worst case in order to always meet the configured "recon probability of one error" (p1e)
  * rrepair: fix the trivial algorithm having an effectively doubled p1e
  * rrepair: fix the bloom algorithm having an effectively tripled p1e
  * rrepair: allow disabling byte-alignment
 
-### Bugs
+#### Bugs
 
  * fix a few minor bugs
 
-# Scalaris 0.7.1 - September 30, 2014 - [scalaris-0.7.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.1.tar.gz/download)
+## Scalaris 0.7.1 - September 30, 2014 - [scalaris-0.7.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.1.tar.gz/download)
 (partly supported by the EU project IES Cities [http://iescities.eu/]()
 and the EIT ICT Labs project MCData)
 
-### Packaging
+#### Packaging
 
  * add support for new distribution versions
  * support systemd and SELinux
  * include daemon for monitoring Scalaris through JMX
 
-### API
+#### API
 
  * Java-API: integrate new OtpErlang library (1.5.10 from Erlang 17.3)
 
-### Demonstrator "Wiki on Scalaris"
+#### Demonstrator "Wiki on Scalaris"
 
  * fix storing template back-links for magic words
  * fix ARTICLE_COUNT partitioning with hashes
 
-### Business Logic
+#### Business Logic
 
  * more robust (still experimental) support for active load balancing with Karger and Ruhl's algorithm including more flexible "load" definitions
  * rm_tman: less overhead by only sending unknown nodes to neighbours
@@ -62,35 +62,35 @@ and the EIT ICT Labs project MCData)
  * vivaldi: move to new gossip framework
  * monitor: move performance monitor to the basic_services group (once per VM)
 
-### Infrastructure
+#### Infrastructure
 
  * several smaller performance optimisations
  * support for Erlang R13B01 up to 17.3 and current otp master
 
-### Tests
+#### Tests
 
  * some new unit tests and higher test coverage
 
-### Documentation
+#### Documentation
 
  * add rrepair sequence diagrams
 
-### Bugs
+#### Bugs
 
  * fix numerous bugs
 
-# Scalaris 0.7.0 (codename "Stauroderus scalaris") - April 28, 2014 - [scalaris-0.7.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.0.tar.gz/download)
+## Scalaris 0.7.0 (codename "Stauroderus scalaris") - April 28, 2014 - [scalaris-0.7.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.0.tar.gz/download)
 
-### API
+##### API
 
  * Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
 
-### Demonstrator "Wiki on Scalaris"
+##### Demonstrator "Wiki on Scalaris"
 (supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
 
  * add support for reading 7z dumps
 
-### Business Logic
+##### Business Logic
 (partly supported by the EU project IES Cities [http://iescities.eu/]() and the EIT ICT Labs project MCData):
 
  * add an experimental Map-Reduce framework on top of Scalaris
@@ -111,7 +111,7 @@ and the EIT ICT Labs project MCData)
  * rt_chord: skip trying to contact nodes in the own range
  * rt_chord: stop stabilize when the own node is reached
 
-### Infrastructure
+##### Infrastructure
 
  * intervals: more compact (and transfer-friendly) representation
  * trigger: replace modules with msg_delay:send_trigger/2
@@ -121,16 +121,16 @@ and the EIT ICT Labs project MCData)
  * several smaller performance optimisations
  * support for Erlang R13B01 up to 17.0 and current otp master
 
-### Tests
+##### Tests
 
  * improve test coverage (manual tests and random tests)
  * change test definitions and allow groups of tests, e.g. test (default), test-skipped, all_TESTS, all_with_cover_TESTS, performance_TESTS, proto_sched_TESTS, type_check_TESTS
 
-### Documentation
+##### Documentation
 
  * add rrepair documentation
 
-### Tools
+##### Tools
 
  * proto_sched: new API, better determinism, more strict self-control
  * proto_sched: support for short-lived processes
@@ -140,19 +140,19 @@ and the EIT ICT Labs project MCData)
  * tester: full support for Erlang 17.0
  * make: re-compile after Emakefile changes
 
-### Bugs
+##### Bugs
 
  * rrepair: fix unnecessary feedback for KVV items of the same version
  * bulkowner: some fixes for (gracefully) leaving nodes
  * fix numerous more (less severe) bugs
 
-# Scalaris 0.6.1 - October 11, 2013 - [scalaris-0.6.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.1.tar.gz/download)
+## Scalaris 0.6.1 - October 11, 2013 - [scalaris-0.6.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.1.tar.gz/download)
 
-### Packaging
+##### Packaging
 
  * add ArchLinux ruby API packages
 
-### API
+##### API
 
  * Java-API: add Maven build support
  * Java-API: add CircularByteArrayOutputStream#clear()
@@ -160,14 +160,14 @@ and the EIT ICT Labs project MCData)
  * Java-API: add a "-monitor" command line parameter
  * api_monitor: return the latency and stddev values of the micro-benchmark executed by monitor_perf for node and service performance
 
-### Demonstrator "Wiki on Scalaris"
+##### Demonstrator "Wiki on Scalaris"
 (supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
 
  * separate list counters from their list partitions for a better data layout
  * fix high memory use of the Scalaris import if the import is slow
  * use tomcat 7.0.42
 
-### Business Logic
+##### Business Logic
 
  * rrepair: reduce overhead of ART reconciliation
  * rrepair: allow resolving of multiple merkle node leaves with a single resolve request
@@ -178,7 +178,7 @@ and the EIT ICT Labs project MCData)
  * tx_tm_rtm: re-enable takeover by rtms on tm crash
  * rt_chord: only re-build the RT if the pred or succ processes change or the own new node ID is not between the new pred and succ any more
 
-### Infrastructure
+##### Infrastructure
 
  * DB: improve performance of fold[lr] implementations by a factor of 2
  * FD: get rid of annoying, wrongly raised log warnings
@@ -188,21 +188,21 @@ and the EIT ICT Labs project MCData)
  * RT, FRT: reduce the number of messages sent on lookups
  * log: don't exit with a badmatch if our error_logger is not the only one
 
-### Tests
+##### Tests
 
  * add protocol scheduler tests for slide, join and leave
 
-### Documentation
+##### Documentation
 
  * user-dev-guide: add section on scalarisctl checkinstallation
  * user-dev-guide: clarify the section about how to set up Scalaris
 
-### Tools
+##### Tools
 
  * proto scheduler: continue in case of send errors
  * top: improve process messages output
 
-### Bugs
+##### Bugs
 
  * node join: fix not being able to join a system with passive load balancer if the number of items in the DB is too high
  * tx_tm_rtm: fix wrong asserts
@@ -212,14 +212,14 @@ and the EIT ICT Labs project MCData)
  * dn_cache: fix reporting wrong PIDs back as zombies after node reboots
  * fix some more (less severe) bugs
 
-# Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013 - [scalaris-0.6.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.0.tar.gz/download)
+## Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013 - [scalaris-0.6.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.0.tar.gz/download)
 
-### Packaging
+##### Packaging
 
  * add ArchLinux packages
  * add support for new distribution versions
 
-### API
+##### API
 
  * no more timeouts in client APIs
  * Java-API: re-worked the request and result list handling -> move result processing to the operation classes
@@ -240,7 +240,7 @@ and the EIT ICT Labs project MCData)
  * all APIs: support lists of composite types
 
 
-### Demonstrator "Wiki on Scalaris"
+##### Demonstrator "Wiki on Scalaris"
 (supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
 
  * allow monitoring via JMX in the FourCaastMonitoringPlugin
@@ -255,7 +255,7 @@ and the EIT ICT Labs project MCData)
  * add auto-import ability
  * use tomcat 7.0.33
 
-### Business Logic
+##### Business Logic
 
  * replace common message tags with integers to reduce bandwidth
  * more flexible read operations (easier to extend)
@@ -299,7 +299,7 @@ and the EIT ICT Labs project MCData)
  * cyclon: if the cache is empty, try one of the nodes in known_hosts
  * add support for consistent snapshots (experimental)
 
-### Infrastructure
+##### Infrastructure
 
  * add a daemon to monitor Scalaris via JMX
  * disable message compression (only client values are compressed - the rest is too expensive, at least on GbE)
@@ -308,7 +308,7 @@ and the EIT ICT Labs project MCData)
  * yaws 1.96 (with patch to compile on otp master and a patch to fix a performance regression)
  * support for Erlang R13B01 up to R16B01 and current otp master
 
-### Tests
+##### Tests
 
  * add test suite to find memory leaks
  * let "make test" run the major test suites and "make test-skipped" for some more (time-consuming) tests
@@ -316,7 +316,7 @@ and the EIT ICT Labs project MCData)
  * new ?compare macro for custom comparison functions
  * higher test coverage with more random-testing via the "tester"
 
-### Documentation
+##### Documentation
 
  * user-dev-guide: add user tutorial on using scalaris
  * user-dev-guide: add a section about the slide protocol
@@ -324,7 +324,7 @@ and the EIT ICT Labs project MCData)
  * add replica repair sequence diagrams
  * better code descriptions
 
-### Tools
+##### Tools
 
  * gen_component: synchronous breakpoint set and delete for more deterministic usage
  * trace_mpath: allow selective tracing via filter fun
@@ -344,7 +344,7 @@ and the EIT ICT Labs project MCData)
  * allow recursive reply_as envelopes
  * experimental protocol scheduler to check protocols with random message interleavings (see proto_sched module)
 
-### Bugs
+##### Bugs
 
  * fix RM handling of (out-dated) nodes with the same ID as newly added nodes
  * fix ganglia integration not working any more
@@ -356,9 +356,9 @@ and the EIT ICT Labs project MCData)
  * fix dc_clustering
  * fix numerous other bugs
 
-# Scalaris 0.5.0 (codename "Saperda scalaris") - October 11, 2012 - [scalaris-0.5.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.5.0.tar.gz/download)
+## Scalaris 0.5.0 (codename "Saperda scalaris") - October 11, 2012 - [scalaris-0.5.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.5.0.tar.gz/download)
 
-### Packaging
+##### Packaging
 
  * new init.d script to start Scalaris
  * added chef scripts to deploy Scalaris nodes
@@ -367,7 +367,7 @@ and the EIT ICT Labs project MCData)
  * support for new linux distributions (Fedora 17, Ubuntu 12.04, openSUSE 12.2)
  * let scalarisctl checkinstallation also perform runtime tests for the APIs
 
-### API
+##### API
 
  * allow Scalaris monitoring via JMX through the Java API
  * added an executor-service to the Java-API (de.zib.scalaris.executor)
@@ -378,7 +378,7 @@ and the EIT ICT Labs project MCData)
  * fixed api_tx:req_list_commit_each/1 not running requests in parallel
    ** do not assure any order of requests, even if on same key!
 
-### Demonstrator "Wiki on Scalaris"
+##### Demonstrator "Wiki on Scalaris"
 (supported by 4CaaSt [http://www.4caast.eu/]()):
 
  * allow different partitioned data models for better performance and scalability
@@ -393,7 +393,7 @@ and the EIT ICT Labs project MCData)
  * improved overall performance
  * several rendering fixes
 
-### Business Logic
+##### Business Logic
 
  * added (experimental) support for replica repair (disabled by default) (thanks to Maik Lange)
  * added monitoring of memory statistics (also available via web interface)
@@ -409,18 +409,18 @@ and the EIT ICT Labs project MCData)
  * better scalability in pid_groups (find processes round-robin in find_a/1)
  * several changes to improve overall performance and/or CPU time at the nodes
 
-### Tests
+##### Tests
 
  * support for more types in the runtime type-checker
  * verify several API functions via runtime type-checker (also test private functions if possible!)
 
-### Tools
+##### Tools
 
  * distributed protocol visualisation via trace_mpath (text-based or latex-file for graphical presentation)
  * better profiling via top for Erlang processes
  * better debugging, e.g. via ASCII supervisor-tree rendering in verbose mode
 
-### Bugs
+##### Bugs
 
  * fixed memory leaks in read and write operations
  * fixed memory leaks in tx_tm_rtm
@@ -428,22 +428,22 @@ and the EIT ICT Labs project MCData)
  * fixed inform RTMs sometimes informing the wrong RTMs
  * fixed numerous other bugs
 
-# Scalaris 0.4.1 - March 22, 2012 - [scalaris-0.4.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.1.tar.gz/download)
+## Scalaris 0.4.1 - March 22, 2012 - [scalaris-0.4.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.1.tar.gz/download)
 
-### Packaging
+##### Packaging
 
  * new official ConPaaS packages ([http://www.conpaas.eu/]())
  * install rubygem dependencies in Debian postinstall scripts for Ruby API
  * improved Windows start scripts (if set, uses the ERLANG_HOME environment variable to find Erlang, otherwise searches for Erlang in common paths)
 
-### Bugs
+##### Bugs
 
  * better tx cleanup (should fix rare occurance of duplicate client inform)
  * forward additional parameters of the start scripts to new syntax of scalarisctl
 
-# Scalaris 0.4.0 (codename "Pomacea scalaris") - January 25, 2012 - [scalaris-0.4.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.0.tar.gz/download)
+## Scalaris 0.4.0 (codename "Pomacea scalaris") - January 25, 2012 - [scalaris-0.4.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.0.tar.gz/download)
 
-### API
+##### API
 
  * new functions for incremental data change:
    ** test_and_set: check for a provided old value before setting a new one
@@ -453,14 +453,14 @@ and the EIT ICT Labs project MCData)
  * added monitoring API to retrieve some live metrics
  * added a connection pool convenience class (Java, Python)
 
-### Demonstrator "Wiki on Scalaris"
+##### Demonstrator "Wiki on Scalaris"
 (supported by 4CaaSt [http://www.4caast.eu/]())
 
  * improved performance of page edits
  * improved performance of Wikipedia dump loading
  * several rendering fixes
 
-### Business Logic
+##### Business Logic
 
  * improved handling of large values by reducing overhead of transaction log handling (empty TLog after commit), no copy of value in TLog returned to user after read requests)
  * eliminated timeouts in data hand-over protocol (relies on fd now)
@@ -468,7 +468,7 @@ and the EIT ICT Labs project MCData)
  * fixed a strong consistency issue in the tx protocol
  * gather some run-time statistics and expose them via the APIs and the web debug interface
 
-### Infrastructure
+##### Infrastructure
 
  * support for Erlang 15B
  * fd now also uses feedback from TCP layer
@@ -478,32 +478,32 @@ and the EIT ICT Labs project MCData)
  * added tools for using Scalaris as the Database as a Service component in ConPaaS ([http://www.conpaas.eu/]()) which is part of the EU project Contrail ([http://contrail-project.eu/]())
  * added a separate communication channel for priority messages, e.g. fd (reduces falsely reported node crashes under heavy load)
 
-### Tests
+##### Tests
 
  * added runtime type-checker for random testing extended unittests
 
-### Documentation
+##### Documentation
 
  * updated documentation to extended APIs
 
-### Bugs
+##### Bugs
 
  * fixed numerous bugs
 
-# Scalaris 0.3.0 (codename "Rhinechis Scalaris") - July 15, 2011 - [scalaris-0.3.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.3.0.tar.gz/download)
+## Scalaris 0.3.0 (codename "Rhinechis Scalaris") - July 15, 2011 - [scalaris-0.3.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.3.0.tar.gz/download)
 
-### API
+##### API
 
  * new API with interoperable bindings to Java, Python, Ruby, and JSON
  * support for several data types, including strings, integers, JSON objects, binary objects.
  * new transaction interface with support for bundled requests for better latency.
  * separate APIs to access the raw DHT, a DHT with replication, and the transactional DHT
 
-### Demonstrator
+##### Demonstrator
 
  * added Wikipedia-hosting using Scalaris as demonstrator application
 
-### Business Logic
+##### Business Logic
 
  * fault-tolerant startup: start Scalaris when a quorum of the known_hosts becomes available (option -q in bin/scalarisctl)
  * perform data hand-over when nodes join/gracefully leave (also works when transactions are executed concurrently)
@@ -515,7 +515,7 @@ and the EIT ICT Labs project MCData)
  * more reliable unreliable look-up
  * better ring start-up on slow networks
 
-### Infrastructure
+##### Infrastructure
 
  * Vivaldi and topology inference
  * support for Erlang 13B01 and newer
@@ -524,18 +524,18 @@ and the EIT ICT Labs project MCData)
  * added numerous Erlang type specifications
  * extended unittests
 
-### Tests
+##### Tests
 
  * added own random testing framework that reads type specifications and scans the source code for constants to generate proper random test-data
  * extended gen_component with breakpoint-support for debugging and testing (perform deterministic pseudo-random message interleaving tests)
  * added numerous unittests
  * added language-binding interoperability tests
 
-### Documentation
+##### Documentation
 
  * extended, but - as always - by far not enough...
 
-### Bugs
+##### Bugs
 
  * fixed countless bugs
 
