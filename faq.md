@@ -32,9 +32,10 @@ If a single failed node does crash and recover, which is not foreseen in the
 crash-stop model, but might happen if we have local persistent storage, we
 have
 three choices:
-  # drop the persistent storage and start as new node (crash-stop model)
-  # get some inconsistencies as another node already took over. For a short timeframe there might be more replicas in the system than allowed, which destroys the proper functioning of our majority based algorithms.
-  # friendly join the system and update the stored persistent state with the current state in the system (one way to implement that would be (1)).
+
+0. drop the persistent storage and start as new node (crash-stop model)
+0. get some inconsistencies as another node already took over. For a short timeframe there might be more replicas in the system than allowed, which destroys the proper functioning of our majority based algorithms.
+0. friendly join the system and update the stored persistent state with the current state in the system (one way to implement that would be (1)).
 
 So, persistent storage does not help in improving the availability or
 robustness of the system.
@@ -62,7 +63,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 ## Minimum Requirements
 
-  * Erlang >= R13B01 (see [FAQ#Known_Issues Known Issues] below)
+  * Erlang >= R13B01 (see [Known Issues](#known-issues) below)
 
 ### Optional requirements
 
@@ -174,17 +175,17 @@ Your source and binary RPMs will be generated in `/usr/src/packages/SRPMS` and `
 
 No. Well, maybe.
 
-  # install Erlang (http://www.erlang.org/download.html)
-  # install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
-  # checkout Scalaris code from SVN
-  # adapt the path to your Erlang installation in build.bat
-  # start a `cmd.exe`
-  # go to the Scalaris directory
-  # run `build.bat` in the cmd window
-  # check that there were no errors during the compilation; warnings are fine
-  # go to the `bin` sub-directory
-  # adapt the path to your Erlang installation in `firstnode.bat`, and `joining_node.bat`
-  # run `firstnode.bat` in the cmd window
+  0. install Erlang (http://www.erlang.org/download.html)
+  0. install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
+  0. checkout Scalaris code from SVN
+  0. adapt the path to your Erlang installation in build.bat
+  0. start a `cmd.exe`
+  0. go to the Scalaris directory
+  0. run `build.bat` in the cmd window
+  0. check that there were no errors during the compilation; warnings are fine
+  0. go to the `bin` sub-directory
+  0. adapt the path to your Erlang installation in `firstnode.bat`, and `joining_node.bat`
+  0. run `firstnode.bat` in the cmd window
 
 If you have Erlang < R13B04, you will need to adapt the `Emakefile` that `build.bat` generates if it doesn't exist.
 Replace every occurrence of
@@ -206,10 +207,10 @@ Note: we do not support Scalaris on Windows at the moment.
 If you have a firewall on your servers, you have to open the following ports. If you run Scalaris on Amazon EC2, you have to open these ports in the management console for your security group.
 
 || **Port**  || **Purpose**                             || **How to change** ||
-|| 14195 || Used for all internal communication || see below||
-|| 8000  || Web-server and JSON-RPC             || see below ||
+|| 14195 || Used for all internal communication || [see below](#how-can-i-change-the-port-used-for-internal-communication)||
+|| 8000  || Web-server and JSON-RPC             || [see below](#how-can-i-change-the-web-server-portyaws-port) ||
 || 4369  || necessary, if you want to access Scalaris via the Java-API from a remote node (epmd) || - ||
-|| random port || necessary, if you want to access Scalaris via the Java-API from a remote node || see below||
+|| random port || necessary, if you want to access Scalaris via the Java-API from a remote node || [see below](#how-can-i-change-the-ports-used-for-the-java-api) ||
 
 ## How can I change the port used for internal communication?
 
