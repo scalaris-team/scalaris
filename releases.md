@@ -4,26 +4,31 @@ root: .
 layout: default
 ---
 
+### List of Scalaris Releases
+
+* auto-gen TOC:
+{:toc}
+
 # Scalaris 0.7.2 - October 23, 2014
 (partly supported by the EU project IES Cities [http://iescities.eu/]()
 and the EIT ICT Labs project MCData)
 
-## Packaging
+### Packaging
 
  * fix ArchLinux packages with newest Java versions
 
-## Demonstrator "Wiki on Scalaris"
+### Demonstrator "Wiki on Scalaris"
 
  * fix the separate count key optimisation not using Scalaris' increment operation
 
-## Business Logic
+### Business Logic
 
  * rrepair: let the trivial algorithm assume the worst case in order to always meet the configured "recon probability of one error" (p1e)
  * rrepair: fix the trivial algorithm having an effectively doubled p1e
  * rrepair: fix the bloom algorithm having an effectively tripled p1e
  * rrepair: allow disabling byte-alignment
 
-## Bugs
+### Bugs
 
  * fix a few minor bugs
 
