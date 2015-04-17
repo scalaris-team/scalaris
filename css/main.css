@@ -1,6 +1,18 @@
+@font-face {
+    font-family:myFont;
+    src: url(/css/pt-serif.ttf);
+}
+
+@font-face {
+    font-family:myFontMono;
+    src: url(/css/pt-mono.ttf);
+}
 
 body {
-    	font-family: "PT Serif", Tahoma;
+    font-family: myFont, "PT Serif", Tahoma;
+}
+code {
+        font-family: myFontMono, "PT Mono", Courier;
 }
 
 /* Header */
@@ -27,7 +39,6 @@ body {
 	top:30px;
 	margin:0px;
 	padding:0px;
-	font-family: "PT Serif", Tahoma;
         color:#FFF;
 	font-size:25pt;
 /*	font-style:italic;*/
@@ -61,7 +72,6 @@ body {
     text-align:center;
     font-weight:bolder;
     font-size:15pt;
-    font-family: "PT Serif", Tahoma;
     height:39px;
     line-height:39px;
     float:left;
