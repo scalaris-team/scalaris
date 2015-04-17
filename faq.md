@@ -300,6 +300,27 @@ It is not so much an error but a message created by the Erlang runtime that this
 
 ## Java-API
 
+### Maven repository
+
+Alternatively to installing the Java-API from the sources or using the [packages](#prebuild-packages), we also provide a Maven repository at [http://scalaris.zib.de/maven](http://scalaris.zib.de/maven). To use this repository, add it to your `pom.xml`:
+
+{% highlight xml %}
+<dependencies>
+  <dependency>
+    <groupId>de.zib.scalaris</groupId>
+    <artifactId>java-api</artifactId>
+      <version>[0.7.2,)</version>
+  </dependency>
+</dependencies>
+
+<repositories>
+  <repository>
+    <id>scalaris-repo</id>
+    <url>http://scalaris.zib.de/maven</url>
+  </repository>
+</repositories>
+{% endhighlight %}
+
 ### The Java-client cannot connect to Scalaris. What is wrong?
 
 If you do not use our client script (java-api/scalaris) your hostname configuration probably needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result in order to be able to connect.
