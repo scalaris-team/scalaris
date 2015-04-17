@@ -34,14 +34,14 @@ code {
 
 #header h1{
     position:relative;
-        line-height:30pt;
-	left:285px;
-	top:30px;
-	margin:0px;
-	padding:0px;
-        color:#FFF;
-	font-size:25pt;
-/*	font-style:italic;*/
+    line-height:30pt;
+    left:285px;
+    top:30px;
+    margin:0px;
+    padding:0px;
+    color:#FFF;
+    font-size:25pt;
+    float:left;
 }
 
 
