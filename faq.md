@@ -104,9 +104,9 @@ Afterwards you can install Scalaris using the usual `yum install scalaris` comma
 
 #### Ruby on CentOS and RHEL
 
-CentOS and RHEL do not come with the needed packages for our ruby bindings. If you have not already done so, add the appropriate EPEL repositories which provide them - follow https://fedoraproject.org/wiki/EPEL for further instructions.
+CentOS and RHEL do not come with the needed packages for our ruby bindings. If you have not already done so, add the appropriate EPEL repositories which provide them - follow [https://fedoraproject.org/wiki/EPEL]() for further instructions.
 
-Note that the rubygem-json package provided by rpmforge for version 5 of CentOS and RHEL has a critical bug which makes it unusable - the EPEL packages have a fix (ref. https://bugzilla.redhat.com/show_bug.cgi?id=634380)
+Note that the rubygem-json package provided by rpmforge for version 5 of CentOS and RHEL has a critical bug which makes it unusable - the EPEL packages have a fix (ref. [https://bugzilla.redhat.com/show_bug.cgi?id=634380]())
 
 ### How to add our repository to Mandriva-based distributions (Mandriva)?
 
@@ -132,7 +132,7 @@ apt-get update
 apt-get install scalaris
 {% endhighlight %}
 
-Refer to http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
+Refer to [http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list]() if you are having trouble adding .deb-based repositories.
 
 ### How to add our repository to Arch Linux?
 
