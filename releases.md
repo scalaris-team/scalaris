@@ -9,7 +9,8 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
-# Scalaris 0.7.2 - October 23, 2014
+# Scalaris 0.7.2 - October 23, 2014 - [scalaris-0.7.2.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.2.tar.gz/download)
+
 (partly supported by the EU project IES Cities [http://iescities.eu/]()
 and the EIT ICT Labs project MCData)
 
@@ -32,7 +33,7 @@ and the EIT ICT Labs project MCData)
 
  * fix a few minor bugs
 
-# Scalaris 0.7.1 - September 30, 2014
+# Scalaris 0.7.1 - September 30, 2014 - [scalaris-0.7.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.1.tar.gz/download)
 (partly supported by the EU project IES Cities [http://iescities.eu/]()
 and the EIT ICT Labs project MCData)
 
@@ -78,7 +79,7 @@ and the EIT ICT Labs project MCData)
 
  * fix numerous bugs
 
-# Scalaris 0.7.0 (codename "Stauroderus scalaris") - April 28, 2014
+# Scalaris 0.7.0 (codename "Stauroderus scalaris") - April 28, 2014 - [scalaris-0.7.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.0.tar.gz/download)
 
 ### API
 
@@ -145,7 +146,7 @@ and the EIT ICT Labs project MCData)
  * bulkowner: some fixes for (gracefully) leaving nodes
  * fix numerous more (less severe) bugs
 
-# Scalaris 0.6.1 - October 11, 2013
+# Scalaris 0.6.1 - October 11, 2013 - [scalaris-0.6.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.1.tar.gz/download)
 
 ### Packaging
 
@@ -211,7 +212,7 @@ and the EIT ICT Labs project MCData)
  * dn_cache: fix reporting wrong PIDs back as zombies after node reboots
  * fix some more (less severe) bugs
 
-# Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013
+# Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013 - [scalaris-0.6.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.6.0.tar.gz/download)
 
 ### Packaging
 
@@ -355,7 +356,7 @@ and the EIT ICT Labs project MCData)
  * fix dc_clustering
  * fix numerous other bugs
 
-# Scalaris 0.5.0 (codename "Saperda scalaris") - October 11, 2012
+# Scalaris 0.5.0 (codename "Saperda scalaris") - October 11, 2012 - [scalaris-0.5.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.5.0.tar.gz/download)
 
 ### Packaging
 
@@ -427,7 +428,7 @@ and the EIT ICT Labs project MCData)
  * fixed inform RTMs sometimes informing the wrong RTMs
  * fixed numerous other bugs
 
-# Scalaris 0.4.1 - March 22, 2012
+# Scalaris 0.4.1 - March 22, 2012 - [scalaris-0.4.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.1.tar.gz/download)
 
 ### Packaging
 
@@ -440,7 +441,7 @@ and the EIT ICT Labs project MCData)
  * better tx cleanup (should fix rare occurance of duplicate client inform)
  * forward additional parameters of the start scripts to new syntax of scalarisctl
 
-# Scalaris 0.4.0 (codename "Pomacea scalaris") - January 25, 2012
+# Scalaris 0.4.0 (codename "Pomacea scalaris") - January 25, 2012 - [scalaris-0.4.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.4.0.tar.gz/download)
 
 ### API
 
@@ -489,7 +490,7 @@ and the EIT ICT Labs project MCData)
 
  * fixed numerous bugs
 
-# Scalaris 0.3.0 (codename "Rhinechis Scalaris") - July 15, 2011
+# Scalaris 0.3.0 (codename "Rhinechis Scalaris") - July 15, 2011 - [scalaris-0.3.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.3.0.tar.gz/download)
 
 ### API
 
