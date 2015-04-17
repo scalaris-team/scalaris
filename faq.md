@@ -75,7 +75,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 ## Prebuild packages
 
 We build RPM and DEB packages for the newest tagged Scalaris version
-as well as periodic snapshots of git HEAD and provide them using the Open Build Service. The latest stable version is available at [http://download.opensuse.org/repositories/home:/scalaris/](). The latest git snapshot is available at [http://download.opensuse.org/repositories/home:/scalaris:/git/]().
+as well as periodic snapshots of git HEAD and provide them using the Open Build Service. The latest stable version is available at [http://download.opensuse.org/repositories/home:/scalaris/](http://download.opensuse.org/repositories/home:/scalaris/). The latest git snapshot is available at [http://download.opensuse.org/repositories/home:/scalaris:/svn/](http://download.opensuse.org/repositories/home:/scalaris:/svn/).
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
@@ -84,7 +84,7 @@ and Arch Linux:
 
   * For SLE and openSUSE 11.4, we provide Erlang R14B04.
   * For RHEL-based distributions (CentOS 5 & 6, RHEL 5 & 6) we include the Erlang package from the EPEL repository of RHEL 6.
-  * For Arch Linux we include the Erlang package from the [https://www.archlinux.org/packages/community/x86_64/erlang/]() community repository].
+  * For Arch Linux we include the Erlang package from the [https://www.archlinux.org/packages/community/x86_64/erlang/](https://www.archlinux.org/packages/community/x86_64/erlang/) community repository].
 
 ### How to add our repository to openSUSE-based distributions (openSUSE, SLE)?
 
@@ -104,9 +104,9 @@ Afterwards you can install Scalaris using the usual `yum install scalaris` comma
 
 #### Ruby on CentOS and RHEL
 
-CentOS and RHEL do not come with the needed packages for our ruby bindings. If you have not already done so, add the appropriate EPEL repositories which provide them - follow [https://fedoraproject.org/wiki/EPEL]() for further instructions.
+CentOS and RHEL do not come with the needed packages for our ruby bindings. If you have not already done so, add the appropriate EPEL repositories which provide them - follow [https://fedoraproject.org/wiki/EPEL](https://fedoraproject.org/wiki/EPEL) for further instructions.
 
-Note that the rubygem-json package provided by rpmforge for version 5 of CentOS and RHEL has a critical bug which makes it unusable - the EPEL packages have a fix (ref. [https://bugzilla.redhat.com/show_bug.cgi?id=634380]())
+Note that the rubygem-json package provided by rpmforge for version 5 of CentOS and RHEL has a critical bug which makes it unusable - the EPEL packages have a fix (ref. [https://bugzilla.redhat.com/show_bug.cgi?id=634380](https://bugzilla.redhat.com/show_bug.cgi?id=634380))
 
 ### How to add our repository to Mandriva-based distributions (Mandriva)?
 
@@ -132,7 +132,7 @@ apt-get update
 apt-get install scalaris
 {% endhighlight %}
 
-Refer to [http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list]() if you are having trouble adding .deb-based repositories.
+Refer to [http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list](http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list) if you are having trouble adding .deb-based repositories.
 
 ### How to add our repository to Arch Linux?
 
@@ -175,8 +175,8 @@ Your source and binary RPMs will be generated in `/usr/src/packages/SRPMS` and `
 
 No. Well, maybe.
 
-  0. install Erlang (http://www.erlang.org/download.html)
-  0. install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
+  0. install Erlang ([http://www.erlang.org/download.html](http://www.erlang.org/download.html))
+  0. install OpenSSL (for crypto module) ([http://www.slproweb.com/products/Win32OpenSSL.html](http://www.slproweb.com/products/Win32OpenSSL.html))
   0. checkout Scalaris code from SVN
   0. adapt the path to your Erlang installation in build.bat
   0. start a `cmd.exe`
