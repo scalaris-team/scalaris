@@ -19,6 +19,9 @@ EMAKEFILEDEFINES=
 EDOCMACROS=
 DIALYZER_FLAGS=
 
+AC_PATH_PROG(FALSE, false)
+AC_SUBST(FALSE)
+
 ###########################################################
 #
 # check tokyo cabinet and toke
@@ -63,9 +66,8 @@ AS_IF([test "$BROWSER" = ""],
 # check screen availability for 'scalarisctl -d --screen'
 #
 ###########################################################
-
-AC_PATH_PROG(SCREEN, screen, "/bin/false")
-if test "$ac_cv_path_SCREEN" = "/bin/false" ; then
+AC_PATH_PROG(SCREEN, screen, [$FALSE])
+if test "$ac_cv_path_SCREEN" = "$FALSE" ; then
   AC_MSG_NOTICE([screen not found - you won't be able to run scalaris deamonized with screen, i.e. 'scalarisctl -d --screen'])
 fi
 
@@ -75,7 +77,7 @@ fi
 #
 ###########################################################
 
-AC_PATH_PROG(SUDO, sudo, "/bin/false")
+AC_PATH_PROG(SUDO, sudo, [$FALSE])
 
 RUNUSER=""
 AC_ARG_ENABLE([runuser],
@@ -84,7 +86,7 @@ AC_ARG_ENABLE([runuser],
 AS_IF([test "$enable_runuser" != "no"],
       [AC_PATH_PROG(RUNUSER, runuser, "", [$PATH$PATH_SEPARATOR/usr/sbin])])
 
-if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
+if test "$ac_cv_path_SUDO" = "$FALSE" -a "$ac_cv_path_RUNUSER" = ""; then
   AC_MSG_NOTICE([sudo or runuser not found - you won't be able to use our init.d script])
 fi
 
@@ -165,7 +167,7 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
     ])
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
-AC_PATH_PROG(EPMD, epmd, "/bin/false", "$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin")
+AC_PATH_PROG(EPMD, epmd, [$FALSE], "$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin")
 
 AS_IF([test "x$COMPILE_NATIVE" != xno], [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, native"])
 
@@ -503,7 +505,7 @@ AS_IF([test "$ac_cv_path_PYTHON2" != ""],
        AC_MSG_CHECKING([for python 2.x sitelibdir])
        AC_MSG_RESULT([$PYTHON2SITELIBDIR])
        ENABLEPYTHON2INSTALL="install-python"],
-      [PYTHON2=/bin/false])
+      [PYTHON2=$FALSE])
 AC_SUBST(PYTHON2)
 AC_SUBST(PYTHON2SITELIBDIR)
 AC_SUBST(ENABLEPYTHON2INSTALL)
@@ -530,7 +532,7 @@ AS_IF([test "$ac_cv_path_PYTHON3" != ""],
              [ENABLEPYTHON3="python3-compile"
               ENABLEPYTHON3INSTALL="install-python3"],
              [AC_MSG_WARN([2to3 not found - you won't be able to build the Python3 API])])],
-      [PYTHON3=/bin/false])
+      [PYTHON3=$FALSE])
 AC_SUBST(PYTHON3)
 AC_SUBST(PYTHON3_2TO3)
 AC_SUBST(PYTHON3SITELIBDIR)

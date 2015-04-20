@@ -22,7 +22,7 @@ SCALARISDIR=@libdir@/scalaris
 PYTHON2="@PYTHON2@"
 SCALARISCLIENT_PYTHON2="@PYTHON2SITELIBDIR@/scalaris_client.py"
 
-if [ -x "$PYTHON2" -o "x$PYTHON2" = "x/bin/false" ] ; then
+if [ -x "$PYTHON2" -o "x$PYTHON2" = "x@FALSE@" ] ; then
   echo "Python not found or not executable: $PYTHON2"
   exit 1
 fi
