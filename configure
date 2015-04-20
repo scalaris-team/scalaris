@@ -4518,19 +4518,19 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_path_PYTHON2" >&5
 $as_echo "$ac_cv_path_PYTHON2" >&6; }
-PYTHON2=$ac_cv_path_PYTHON2
 
-
-
-if test "$PYTHON2" != ""; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python 2.x sitelibdir" >&5
+if test "$ac_cv_path_PYTHON2" != ""; then :
+  PYTHON2=$ac_cv_path_PYTHON2
+       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python 2.x sitelibdir" >&5
 $as_echo_n "checking for python 2.x sitelibdir... " >&6; }
        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON2SITELIBDIR" >&5
 $as_echo "$PYTHON2SITELIBDIR" >&6; }
        ENABLEPYTHON2INSTALL="install-python"
-       #sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py
-
+else
+  PYTHON2=/bin/false
 fi
+
+
 
 
 PYTHON3SITELIBDIR=
@@ -4571,17 +4571,20 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_path_PYTHON3" >&5
 $as_echo "$ac_cv_path_PYTHON3" >&6; }
-PYTHON3=$ac_cv_path_PYTHON3
 
-
-
-if test "$PYTHON3" != ""; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python 3.x sitelibdir" >&5
+PYTHON3=
+if test "$ac_cv_path_PYTHON3" != ""; then :
+  PYTHON3=$ac_cv_path_PYTHON3
+       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python 3.x sitelibdir" >&5
 $as_echo_n "checking for python 3.x sitelibdir... " >&6; }
        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON3SITELIBDIR" >&5
 $as_echo "$PYTHON3SITELIBDIR" >&6; }
        ENABLEPYTHON3INSTALL="install-python3"
+else
+  PYTHON3=/bin/false
 fi
+
+
 
 
 ###########################################################

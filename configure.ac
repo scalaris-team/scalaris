@@ -497,15 +497,15 @@ AC_CACHE_CHECK([for python 2.x >= 2.6], [ac_cv_path_PYTHON2],
       PYTHON2SITELIBDIR=`$ac_path_PYTHON2 -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib(0,0,prefix="${prefix}"))'  2>/dev/null` && \
       ac_cv_path_PYTHON2=$ac_path_PYTHON2 ac_path_PYTHON2_found=:]],
     [AC_MSG_RESULT([not found])])])
-AC_SUBST([PYTHON2], [$ac_cv_path_PYTHON2])
-AC_SUBST(PYTHON2SITELIBDIR)
 
-AS_IF([test "$PYTHON2" != ""],
-      [AC_MSG_CHECKING([for python 2.x sitelibdir])
+AS_IF([test "$ac_cv_path_PYTHON2" != ""],
+      [PYTHON2=$ac_cv_path_PYTHON2
+       AC_MSG_CHECKING([for python 2.x sitelibdir])
        AC_MSG_RESULT([$PYTHON2SITELIBDIR])
-       ENABLEPYTHON2INSTALL="install-python"
-       #sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py
-       ])
+       ENABLEPYTHON2INSTALL="install-python"],
+      [PYTHON2=/bin/false])
+AC_SUBST(PYTHON2)
+AC_SUBST(PYTHON2SITELIBDIR)
 AC_SUBST(ENABLEPYTHON2INSTALL)
 
 PYTHON3SITELIBDIR=
@@ -516,13 +516,16 @@ AC_CACHE_CHECK([for python 3.x], [ac_cv_path_PYTHON3],
       PYTHON3SITELIBDIR=`$ac_path_PYTHON3 -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib(0,0,prefix="${prefix}"))'  2>/dev/null` && \
       ac_cv_path_PYTHON3=$ac_path_PYTHON3 ac_path_PYTHON3_found=:]],
     [AC_MSG_RESULT([not found])])])
-AC_SUBST([PYTHON3], [$ac_cv_path_PYTHON3])
-AC_SUBST(PYTHON3SITELIBDIR)
 
-AS_IF([test "$PYTHON3" != ""],
-      [AC_MSG_CHECKING([for python 3.x sitelibdir])
+PYTHON3=
+AS_IF([test "$ac_cv_path_PYTHON3" != ""],
+      [PYTHON3=$ac_cv_path_PYTHON3
+       AC_MSG_CHECKING([for python 3.x sitelibdir])
        AC_MSG_RESULT([$PYTHON3SITELIBDIR])
-       ENABLEPYTHON3INSTALL="install-python3"])
+       ENABLEPYTHON3INSTALL="install-python3"],
+      [PYTHON3=/bin/false])
+AC_SUBST(PYTHON3)
+AC_SUBST(PYTHON3SITELIBDIR)
 AC_SUBST(ENABLEPYTHON3INSTALL)
 
 ###########################################################
