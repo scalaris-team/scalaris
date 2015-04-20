@@ -518,14 +518,23 @@ AC_CACHE_CHECK([for python 3.x], [ac_cv_path_PYTHON3],
     [AC_MSG_RESULT([not found])])])
 
 PYTHON3=
+PYTHON3_2TO3=
+ENABLEPYTHON3=python3-not-found
+ENABLEPYTHON3INSTALL=
 AS_IF([test "$ac_cv_path_PYTHON3" != ""],
       [PYTHON3=$ac_cv_path_PYTHON3
        AC_MSG_CHECKING([for python 3.x sitelibdir])
        AC_MSG_RESULT([$PYTHON3SITELIBDIR])
-       ENABLEPYTHON3INSTALL="install-python3"],
+       AC_PATH_PROG([PYTHON3_2TO3], [2to3], "")
+       AS_IF([test -x "$PYTHON3_2TO3"],
+             [ENABLEPYTHON3="python3-compile"
+              ENABLEPYTHON3INSTALL="install-python3"],
+             [AC_MSG_WARN([2to3 not found - you won't be able to build the Python3 API])])],
       [PYTHON3=/bin/false])
 AC_SUBST(PYTHON3)
+AC_SUBST(PYTHON3_2TO3)
 AC_SUBST(PYTHON3SITELIBDIR)
+AC_SUBST(ENABLEPYTHON3)
 AC_SUBST(ENABLEPYTHON3INSTALL)
 
 ###########################################################

@@ -20,6 +20,7 @@ CD = cd
 MAKE = make
 PYTHON2=@PYTHON2@
 PYTHON3=@PYTHON3@
+PYTHON3_2TO3=@PYTHON3_2TO3@
 VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.12
 COMMONS_CLI_VERSION=1.2
@@ -306,14 +307,18 @@ python-doc-pdf:
 	cd python-api ; epydoc --config=epydoc.pdf.cfg ; FAILED=$$? ; cd .. ; \
 	  if [ $$FAILED -ne 0 ]; then false ; else  true ; fi
 
-python3: python3-compile
+python3: @ENABLEPYTHON3@
+
+python3-not-found:
+	@echo "cannot create the Python3 API - python 3.x or 2to3 not found"
+	@false
 
 python3-convert: python3-clean
 	if [ ! -d python3-api ]; then \
 	  mkdir -p python3-api ; \
 	fi
 	cp python-api/*.py python3-api/
-	cd python3-api && 2to3 -f all -f buffer -w -n . >/dev/null
+	cd python3-api && $(PYTHON3_2TO3) -f all -f buffer -w -n . >/dev/null
 
 python3-compile: python3-convert
 	$(PYTHON3) -mcompileall python3-api
