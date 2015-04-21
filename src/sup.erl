@@ -328,27 +328,29 @@ sup_pause_childs(SupPid) ->
                   Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
     ok.
 
--ifdef(PRBR_MNESIA).
--spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[tid() | atom()]}.
+-spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[tid() | atom()]} | [tid() | atom()].
 get_tables_of(Pid)->
-  {db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
-   util:ets_tables_of(Pid)}.
+  case config:read(db_backend) of 
+    db_mnesia ->
+      {db_mnesia:mnesia_tables_of(pid_groups:my_groupname()),
+      util:ets_tables_of(Pid)};
+    _ ->
+      util:ets_tables_of(Pid)
+  end.      
 
--spec delete_tables(pid(), {MNesia::[atom()], Ets::[tid() | atom()]}) -> ok.
-delete_tables(Pid, {MNesia, Ets}) ->
-    _ = db_mnesia:delete_mnesia_tables(MNesia),
-    _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
-    ok.
--else.
--spec get_tables_of(pid()) -> [tid() | atom()].
-get_tables_of(Pid)->
-  util:ets_tables_of(Pid).
-
--spec delete_tables(pid(), Ets::[tid() | atom()]) -> ok.
-delete_tables(Pid, Ets) ->
-    _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
-    ok.
--endif.
+-spec delete_tables(pid(), {MNesia::[atom()], Ets::[tid() | atom()]} | [tid() | atom()] ) -> ok.
+delete_tables(Pid, Db) ->
+  case config:read(db_backend) of
+    db_mnesia ->
+      {MNesia, Ets} = Db,
+      _ = db_mnesia:delete_mnesia_tables(MNesia),
+      _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
+      ok;
+    _ ->
+      Ets = Db,
+      _ = [ util:wait_for_ets_table_to_disappear(Pid, Tab) || Tab <- Ets ],
+      ok
+  end.
 
 %% @doc Kills all children of the given supervisor (recursively) after they
 %%      have been paused by sup_pause_childs/1.

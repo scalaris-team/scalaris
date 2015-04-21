@@ -43,41 +43,41 @@ groups() ->
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
--ifdef(PRBR_MNESIA).
 init_per_suite(Config) ->
-  unittest_helper:init_per_suite(Config).
--else.
-init_per_suite(_TestCase, _Config) -> {skip, "db_mnesia not set -> skipping test SUITE"}.
--endif.
+  case config:read(db_backend) of
+    db_mnesia -> unittest_helper:init_per_suite(Config);
+    _ -> {skip, "db_mnesia not set -> skipping test SUITE"}
+  end.
 
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
--ifdef(PRBR_MNESIA).
-init_per_group(Group, Config) ->
-  case Group of
-    recover_data_group ->
-      unittest_helper:init_per_group(Group, Config);
-    remove_node ->
-      unittest_helper:init_per_group(Group, Config);
-    _ ->
-      %% stop ring and clean repository from previous test case (it may have run into a timeout)
-      unittest_helper:stop_ring(),
-      application:stop(mnesia),
-      PWD = os:cmd(pwd),
-      WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-      file:delete(WorkingDir ++ "schema.DAT"),
 
-      {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-      unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
-        {leases, true}]}]),
-      unittest_helper:check_ring_size_fully_joined(4),
-      unittest_helper:init_per_group(Group, Config)
+init_per_group(Group, Config) ->
+  case config:read(db_backend) of
+    db_mnesia -> 
+      case Group of
+        recover_data_group ->
+          unittest_helper:init_per_group(Group, Config);
+        remove_node ->
+          unittest_helper:init_per_group(Group, Config);
+        _ ->
+          %% stop ring and clean repository from previous test case (it may have run into a timeout)
+          unittest_helper:stop_ring(),
+          application:stop(mnesia),
+          PWD = os:cmd(pwd),
+          WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+             "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
+          file:delete(WorkingDir ++ "schema.DAT"),
+
+          {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+          unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+            {leases, true}]}]),
+          unittest_helper:check_ring_size_fully_joined(4),
+          unittest_helper:init_per_group(Group, Config)
+      end;
+    _ -> {skip, "db_mnesia not set -> skipping test group"}
   end.
--else.
-init_per_group(_Group, _Config) -> {skip, "db_mnesia not set -> skipping test group"}.
--endif.
 
 end_per_group(Group, Config) ->
   case Group of

@@ -34,13 +34,7 @@
 %% -define(TRACE_CHUNK(X, Y), ct:pal(X, Y)).
 -define(TRACE_CHUNK(X, Y), ok).
 
--ifdef(PRBR_MNESIA).
--define(DB, db_mnesia). %% DB backend
--endif.
-
--ifdef(PRBR_ETS).
--define(DB, db_ets). %% DB backend
--endif.
+-define(DB, (config:read(db_backend))). %% DB backend
 
 -define(CKETS, ets). %% changed keys database
 
@@ -64,9 +58,9 @@
 -export([get_changes/2]).
 -export([delete_entries/2]).
 
--type db() :: {KeyValueDB  :: ?DB:db(),
+-type db() :: {KeyValueDB  :: term,
                Subscribers :: db_ets:db(), %% for delta recording
-               SnaphotInfo :: {?DB:db() | false,
+               SnaphotInfo :: {term | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
 -type version() :: non_neg_integer().
@@ -153,14 +147,13 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
             end, 0).
 
 -spec tab2list(db()) -> [entry()].
--ifdef(PRBR_MNESIA).
+
 tab2list({DB, _Subscr, _Snap}) ->
-    db_mnesia:tab2list(DB).
--endif.
--ifdef(PRBR_ETS).
-tab2list({DB, _Subscr, _Snap}) ->
-    ets:tab2list(DB).
--endif.
+    case ?DB of
+        db_mnesia -> db_mnesia:tab2list(DB);
+        db_ets -> ets:tab2list(DB);
+        _ -> ok 
+    end.
 
 %%%%%%
 %%% raw whole db entry operations
