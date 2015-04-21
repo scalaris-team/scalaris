@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin,
+% @copyright 2013-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,9 +58,9 @@
 -export([get_changes/2]).
 -export([delete_entries/2]).
 
--type db() :: {KeyValueDB  :: term,
+-type db() :: {KeyValueDB  :: term(),
                Subscribers :: db_ets:db(), %% for delta recording
-               SnaphotInfo :: {term | false,
+               SnaphotInfo :: {term() | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
 -type version() :: non_neg_integer().
