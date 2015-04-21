@@ -34,7 +34,7 @@
 -define(TRACE_SNAP(X, Y), ok).
 %% -define(TRACE_CHUNK(X, Y), ct:pal(X, Y)).
 -define(TRACE_CHUNK(X, Y), ok).
--define(DB, db_ets). %% DB backend
+-define(DB, (config:read(db_backend))). %% DB backend
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
@@ -91,9 +91,9 @@
 -export([update_entries/4]).
 
 
--type db() :: {KeyValueDB  :: ?DB:db(),
+-type db() :: {KeyValueDB  :: term,
                Subscribers :: db_ets:db(), %% for delta recording
-               SnaphotInfo :: {?DB:db() | false,
+               SnaphotInfo :: {term | false,
                                LiveLockCount :: non_neg_integer(),
                                SnapLockCount :: non_neg_integer()}}.
 -type version() :: client_version().

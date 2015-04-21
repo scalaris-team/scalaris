@@ -281,11 +281,12 @@ stop_first_services() ->
     ok.
 
 -spec start_mnesia() -> ok.
--ifdef(PRBR_MNESIA).
-start_mnesia() -> db_mnesia:start().
--else.
-start_mnesia() -> ok.
--endif.
+
+start_mnesia() -> 
+  case config:read(db_backend) of
+    db_mnesia -> db_mnesia:start();
+    _ -> ok
+  end.
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
