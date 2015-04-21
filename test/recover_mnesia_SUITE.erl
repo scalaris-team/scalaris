@@ -35,7 +35,7 @@ all() -> [
   ].
 groups() ->
   [
-    {make_ring_group, [sequence], [tester_ring, tester_write, {group, recover_data_group}]},
+    {make_ring_group, [sequence], [test_make_ring, tester_write, {group, recover_data_group}]},
     {recover_data_group, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_read]},
     {remove_node_group, [sequence], [tester_write, {group, remove_node}]},
     {remove_node, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_remove_node]}
@@ -44,61 +44,49 @@ groups() ->
 suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
-  case config:read(db_backend) of
-    db_mnesia -> unittest_helper:init_per_suite(Config);
-    _ -> {skip, "db_mnesia not set -> skipping test SUITE"}
-  end.
+    unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
+init_per_group(recover_data_group = Group, Config) ->
+    unittest_helper:init_per_group(Group, Config);
+init_per_group(remove_node = Group, Config) ->
+    unittest_helper:init_per_group(Group, Config);
 init_per_group(Group, Config) ->
-  case config:read(db_backend) of
-    db_mnesia -> 
-      case Group of
-        recover_data_group ->
-          unittest_helper:init_per_group(Group, Config);
-        remove_node ->
-          unittest_helper:init_per_group(Group, Config);
-        _ ->
-          %% stop ring and clean repository from previous test case (it may have run into a timeout)
-          unittest_helper:stop_ring(),
-          application:stop(mnesia),
-          %% need config to get db path
-          Config2 = unittest_helper:start_minimal_procs(Config, [], false),
-          PWD = os:cmd(pwd),
-          WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-             "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-          file:delete(WorkingDir ++ "schema.DAT"),
-          unittest_helper:stop_minimal_procs(Config2),
+    %% stop ring and clean repository from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
+    application:stop(mnesia),
+    %% need config to get db path
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+    PWD = os:cmd(pwd),
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+                     "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
+    file:delete(WorkingDir ++ "schema.DAT"),
+    unittest_helper:stop_minimal_procs(Config2),
+    
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+                                            {leases, true},
+                                            {db_backend, db_mnesia}]}]),
+    unittest_helper:check_ring_size_fully_joined(4),
+    unittest_helper:init_per_group(Group, Config).
 
-          {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-          unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
-            {leases, true}]}]),
-          unittest_helper:check_ring_size_fully_joined(4),
-          unittest_helper:init_per_group(Group, Config)
-      end;
-    _ -> {skip, "db_mnesia not set -> skipping test group"}
-  end.
-
+end_per_group(recover_data_group = Group, Config) ->
+      unittest_helper:end_per_group(Group, Config);
+end_per_group(remove_node = Group, Config) ->
+      unittest_helper:end_per_group(Group, Config);
 end_per_group(Group, Config) ->
-  case Group of
-    recover_data_group ->
-      unittest_helper:end_per_group(Group, Config);
-    remove_node ->
-      unittest_helper:end_per_group(Group, Config);
-    _ ->
-      % stop ring, stop mnesia and clean repository
-      PWD = os:cmd(pwd),
-      WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
-          "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-      Tabs = lists:delete(schema, mnesia:system_info(tables)),
-      unittest_helper:stop_ring(),
-      application:stop(mnesia),
-      [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
-      ok = file:delete(WorkingDir ++ "schema.DAT"),
-      unittest_helper:end_per_group(Group, Config)
-   end.
+    % stop ring, stop mnesia and clean repository
+    PWD = os:cmd(pwd),
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+                     "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
+    Tabs = lists:delete(schema, mnesia:system_info(tables)),
+    unittest_helper:stop_ring(),
+    application:stop(mnesia),
+    [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
+    ok = file:delete(WorkingDir ++ "schema.DAT"),
+    unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
   Config.
@@ -112,15 +100,15 @@ rw_suite_runs(N) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test create_ring/1 of mnesia recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec tester_ring([db_backend_beh:entry()]) -> true.
-tester_ring(Config) ->
+test_make_ring(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
   % wait for leases to expire
   timer:sleep(11000),
   unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
-                                     {leases, true},
-                                     {start_type, recover}]}]),
+                                               {leases, true},
+                                               {db_backend, db_mnesia},
+                                               {start_type, recover}]}]),
   util:wait_for(fun admin:check_leases/0, 10000),
   true.
 
@@ -140,8 +128,9 @@ tester_read(Config) ->
   % wait for leases to expire
   timer:sleep(11000),
   unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
-    {leases, true},
-    {start_type, recover}]}]),
+                                                {leases, true},
+                                                {db_backend, db_mnesia},
+                                                {start_type, recover}]}]),
   util:wait_for(fun admin:check_leases/0, 10000),
   % ring restored -> checking KV data integrity
   [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
