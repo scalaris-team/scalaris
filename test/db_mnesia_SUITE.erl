@@ -37,6 +37,8 @@ suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
+    %% need config here to get db path
+    Config2 = unittest_helper:start_minimal_procs(Config1, [], false),
 
     %% cleanup schema generated possibly in earlier failed run
     PWD = os:cmd(pwd),
@@ -50,7 +52,7 @@ init_per_suite(Config) ->
 
     tester:register_type_checker({typedef, db_backend_beh, entry}, db_backend_beh, tester_is_valid_db_entry),
     tester:register_value_creator({typedef, db_backend_beh, entry}, db_backend_beh, tester_create_db_entry, 1),
-    unittest_helper:start_minimal_procs(Config1, [], false).
+    Config2.
 
 end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key}),

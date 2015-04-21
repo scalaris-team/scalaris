@@ -52,7 +52,6 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
   unittest_helper:end_per_suite(Config).
 
-
 init_per_group(Group, Config) ->
   case config:read(db_backend) of
     db_mnesia -> 
@@ -65,10 +64,13 @@ init_per_group(Group, Config) ->
           %% stop ring and clean repository from previous test case (it may have run into a timeout)
           unittest_helper:stop_ring(),
           application:stop(mnesia),
+          %% need config to get db path
+          Config2 = unittest_helper:start_minimal_procs(Config, [], false),
           PWD = os:cmd(pwd),
           WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
              "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
           file:delete(WorkingDir ++ "schema.DAT"),
+          unittest_helper:stop_minimal_procs(Config2),
 
           {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
           unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
