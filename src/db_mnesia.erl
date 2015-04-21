@@ -99,10 +99,15 @@ traverse_table_and_show(Table_name)->
   end.
 
 %% @doc Return all the tables owned by PidGroup
--spec mnesia_tables_of(pid()) -> [atom()].
-mnesia_tables_of(Pid) ->
+%%      NOTE: only returns tables with names according to this regular expression:
+%%            <tt>^[^:]+:PidGroup(:.*)?$</tt>
+-spec mnesia_tables_of(PidGroup::pid_groups:groupname()) -> [atom()].
+mnesia_tables_of(PidGroup) ->
   Tabs = mnesia:system_info(tables),
-  [ Tab || Tab <- Tabs, string:sub_word(mnesia:table_info(Tab, name), 2, $:) =:= Pid ].
+  [ Tab || Tab <- Tabs,
+           string:sub_word(
+             erlang:atom_to_list(
+               mnesia:table_info(Tab, name)), 2, $:) =:= PidGroup ].
 
 %% @doc Gets a list of persisted tables.
 -spec get_persisted_tables() -> [nonempty_string()].
