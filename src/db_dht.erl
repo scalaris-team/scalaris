@@ -117,10 +117,11 @@
 %% @doc Initializes a new database.
 -spec new() -> db().
 new() ->
+    DBName = "db",
     RandomName = randoms:getRandomString(),
-    DBName = "db_" ++ RandomName,
-    SubscrName = DBName ++ ":subscribers",
-    {?DB:new(DBName), db_ets:new(SubscrName), {false, 0, 0}}.
+    DBNameNew = DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName,
+    SubscrName = DBNameNew ++ ":subscribers",
+    {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
