@@ -38,7 +38,7 @@
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
--export([new/0, close/1]).
+-export([new/1, close/1]).
 -export([get_load/1, get_load/2]).
 -export([get_data/1]).
 
@@ -115,12 +115,10 @@
 %%%%%%
 
 %% @doc Initializes a new database.
--spec new() -> db().
-new() ->
-    DBName = "db",
-    RandomName = randoms:getRandomString(),
-    DBNameNew = DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName,
-    SubscrName = DBNameNew ++ ":subscribers",
+-spec new(nonempty_string() | atom()) -> db().
+new(DBName) ->
+    DBNameNew = db_util:get_name(DBName),
+    SubscrName = db_util:get_subscriber_name(DBNameNew),
     {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be

@@ -114,6 +114,13 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
+init_per_testcase(_TestCase, Config) ->
+    pid_groups:join_as("ct_tests", ?MODULE),
+    Config.
+
+end_per_testcase(_TestCase, Config) ->
+    Config.
+
 -define(db_equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
@@ -140,7 +147,7 @@ delete(_Config) ->
     prop_delete(?KEY("DeleteKey1"), ?VALUE("Value1"), false, 1, 1, ?KEY("DeleteKey2")).
 
 get_load_and_middle(_Config) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     ?equals(db_dht:get_load(DB), 0),
     DB2 = db_dht:write(DB, rt_SUITE:number_to_key(1), ?VALUE("Value1"), 1),
     ?equals(db_dht:get_load(DB2), 1),
@@ -261,7 +268,7 @@ update_entries(_Config) ->
                       <<6>>, false, 7, 4).
 
 changed_keys(_Config) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
 
     ?equals(db_dht:get_changes(DB), {[], []}),
 
@@ -290,7 +297,7 @@ various_tests(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_new(Key::?RT:key()) -> true.
 prop_new(Key) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     check_db(DB, {true, []}, 0, [], "check_db_new_1"),
     ?equals(db_dht:read(DB, Key), {ok, empty_val, -1}),
     check_entry(DB, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
@@ -307,7 +314,7 @@ tester_new(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_set_entry(DBEntry::db_entry:entry()) -> true.
 prop_set_entry(DBEntry) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:set_entry(DB, DBEntry),
     IsNullEntry = db_entry:is_null(DBEntry),
     check_entry(DB2, db_entry:get_key(DBEntry), DBEntry,
@@ -336,7 +343,7 @@ tester_set_entry(_Config) ->
                         ReadLock2::0..10, Version2::client_version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:set_entry(DB, DBEntry1),
     case db_entry:is_null(DBEntry1) of
         true -> % update not possible
@@ -370,7 +377,7 @@ tester_update_entry(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete_entry1(DBEntry1::db_entry:entry()) -> true.
 prop_delete_entry1(DBEntry1) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:set_entry(DB, DBEntry1),
     DB3 = db_dht:delete_entry(DB2, DBEntry1),
     check_entry(DB3, db_entry:get_key(DBEntry1), db_entry:new(db_entry:get_key(DBEntry1)),
@@ -381,7 +388,7 @@ prop_delete_entry1(DBEntry1) ->
 
 -spec prop_delete_entry2(DBEntry1::db_entry:entry(), DBEntry2::db_entry:entry()) -> true.
 prop_delete_entry2(DBEntry1, DBEntry2) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:set_entry(DB, DBEntry1),
     % note: DBEntry2 may not be the same
     DB3 = db_dht:delete_entry(DB2, DBEntry2),
@@ -421,7 +428,7 @@ tester_delete_entry2(_Config) ->
 -spec prop_write(Key::?RT:key(), Value::db_dht:value(), Version::client_version(), Key2::?RT:key()) -> true.
 prop_write(Key, Value, Version, Key2) ->
     DBEntry = db_entry:new(Key, Value, Version),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:write(DB, Key, Value, Version),
     check_entry(DB2, Key, DBEntry, {ok, Value, Version}, true, "check_entry_write_1"),
     check_db(DB2, {true, []}, 1, [DBEntry], "check_db_write_1"),
@@ -443,7 +450,7 @@ tester_write(_Config) ->
 -spec prop_delete(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
                   ReadLock::0..10, Version::client_version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
     DB2 = db_dht:set_entry(DB, DBEntry),
 
@@ -495,7 +502,7 @@ tester_delete(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_add_data(Data::db_dht:db_as_list()) -> true.
 prop_add_data(Data) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
 
     UniqueCleanData = unittest_helper:scrub_data(Data),
 
@@ -518,7 +525,7 @@ tester_add_data(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries3_1(Data::db_dht:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries3_1(Data, Range) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since db_dht:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -550,7 +557,7 @@ tester_get_entries3_1(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries3_2(Data::db_dht:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries3_2(Data, Range) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since db_dht:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -584,7 +591,7 @@ tester_get_entries3_2(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries2(Data::db_dht:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries2(Data, Range) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since db_dht:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -613,7 +620,7 @@ tester_get_entries2(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_load2(Data::db_dht:db_as_list(), LoadInterval::intervals:interval()) -> true.
 prop_get_load2(Data, LoadInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     UniqueCleanData = unittest_helper:scrub_data(Data),
 
     DB2 = db_dht:add_data(DB, Data),
@@ -641,7 +648,7 @@ tester_get_load2(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_split_data(Data::db_dht:db_as_list(), Range::intervals:interval()) -> true.
 prop_split_data(Data, Range) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     UniqueCleanData = unittest_helper:scrub_data(Data),
 
@@ -686,7 +693,7 @@ prop_update_entries(Data, ItemsToUpdate) ->
 
 -spec prop_update_entries_helper(UniqueData::db_dht:db_as_list(), UniqueUpdateData::db_dht:db_as_list(), ExpUpdatedData::db_dht:db_as_list()) -> true.
 prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, UniqueData),
 
     UpdatePred = fun(OldEntry, NewEntry) ->
@@ -714,7 +721,7 @@ tester_update_entries(_Config) ->
 -spec prop_delete_entries1(Data::db_dht:db_as_list(), Range::intervals:interval()) -> true.
 prop_delete_entries1(Data, Range) ->
     % use a range to delete entries
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
 
     DB3 = db_dht:delete_entries(DB2, Range),
@@ -731,7 +738,7 @@ prop_delete_entries1(Data, Range) ->
 prop_delete_entries2(Data, Range) ->
     % use a range to delete entries
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
 
     DB3 = db_dht:delete_entries(DB2, FilterFun),
@@ -759,7 +766,7 @@ tester_delete_entries2(_Config) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
 prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -775,7 +782,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Entry::db_entry:entry()) -> true.
 prop_changed_keys_set_entry(Data, ChangesInterval, Entry) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
@@ -794,7 +801,7 @@ prop_changed_keys_set_entry(Data, ChangesInterval, Entry) ->
         Data::[db_entry:entry(),...], ChangesInterval::intervals:interval(),
         UpdateVal::db_dht:value()) -> true.
 prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since db_dht:add_data will keep the last element
@@ -824,7 +831,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Entry::db_entry:entry()) -> true.
 prop_changed_keys_delete_entry(Data, ChangesInterval, Entry) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
@@ -842,7 +849,7 @@ prop_changed_keys_delete_entry(Data, ChangesInterval, Entry) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
 prop_changed_keys_read(Data, ChangesInterval, Key) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -858,7 +865,7 @@ prop_changed_keys_read(Data, ChangesInterval, Key) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key(), Value::db_dht:value(), Version::client_version()) -> true.
 prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, Key),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
@@ -877,7 +884,7 @@ prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
 prop_changed_keys_delete(Data, ChangesInterval, Key) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, Key),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
@@ -895,7 +902,7 @@ prop_changed_keys_delete(Data, ChangesInterval, Key) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Interval::intervals:interval()) -> true.
 prop_changed_keys_get_entries2(Data, ChangesInterval, Interval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -911,7 +918,7 @@ prop_changed_keys_get_entries2(Data, ChangesInterval, Interval) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Interval::intervals:interval()) -> true.
 prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -932,7 +939,7 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
 prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
     Keys = lists:usort(Keys2),
     %% ct:pal("prop_get_chunk4(~w, ~w, ~w, ~w)", [Keys2, StartId, Interval, ChunkSize]),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = lists:foldl(fun(Key, DBA) -> db_dht:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
     {Next, Chunk} = db_dht:get_chunk(DB2, StartId, Interval, ChunkSize),
     % note: prevent erlang default printing from converting small int lists to strings:
@@ -987,7 +994,7 @@ prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
 -spec prop_get_split_key5(Keys::[?RT:key(),...], Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward) -> true.
 prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
     Keys = lists:usort(Keys2),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = lists:foldl(fun(Key, DBA) -> db_dht:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
     {SplitKey, TakenLoad} = db_dht:get_split_key(DB2, Begin, End, TargetLoad, ForwardBackward),
     SplitInterval = case ForwardBackward of
@@ -1014,7 +1021,7 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval(),
         Entry1::db_entry:entry(), Entry2::db_entry:entry()) -> true.
 prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     Old1 = db_dht:get_entry(DB2, db_entry:get_key(Entry1)),
     Old2 = db_dht:get_entry(DB2, db_entry:get_key(Entry2)),
@@ -1044,7 +1051,7 @@ prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
         ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_delete_entries1(Data, ChangesInterval, Range) ->
     % use a range to delete entries
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1066,7 +1073,7 @@ prop_changed_keys_delete_entries1(Data, ChangesInterval, Range) ->
 prop_changed_keys_delete_entries2(Data, ChangesInterval, Range) ->
     % use a range to delete entries
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1085,7 +1092,7 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval, Range) ->
 -spec prop_changed_keys_get_load(
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_load(Data, ChangesInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1101,7 +1108,7 @@ prop_changed_keys_get_load(Data, ChangesInterval) ->
         Data::db_dht:db_as_list(), LoadInterval::intervals:interval(),
         ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_load2(Data, LoadInterval, ChangesInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1118,7 +1125,7 @@ prop_changed_keys_get_load2(Data, LoadInterval, ChangesInterval) ->
         ChangesInterval::intervals:interval(),
         MyNewInterval1::intervals:interval()) -> true.
 prop_changed_keys_split_data1(Data, ChangesInterval, MyNewInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1137,7 +1144,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval, MyNewInterval) ->
 prop_changed_keys_split_data2(Data, ChangesInterval, MyNewInterval) ->
     %% db_entries that are null won't be inserted into db anymore
     CleanData = unittest_helper:scrub_data(Data),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:record_changes(DB, ChangesInterval),
     DB3 = db_dht:add_data(DB2, CleanData),
 
@@ -1153,7 +1160,7 @@ prop_changed_keys_split_data2(Data, ChangesInterval, MyNewInterval) ->
 -spec prop_changed_keys_get_data(
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_data(Data, ChangesInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1171,7 +1178,7 @@ prop_changed_keys_get_data(Data, ChangesInterval) ->
         Data::db_dht:db_as_list(),
         ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_add_data(Data, ChangesInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:record_changes(DB, ChangesInterval),
 
     DB3 = db_dht:add_data(DB2, Data),
@@ -1193,7 +1200,7 @@ prop_changed_keys_add_data(Data, ChangesInterval) ->
 -spec prop_changed_keys_check_db(
         Data::db_dht:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_check_db(Data, ChangesInterval) ->
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
@@ -1215,7 +1222,7 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
     CI2 = intervals:union(intervals:new(db_entry:get_key(Entry3)),
                           intervals:new(db_entry:get_key(Entry4))),
     CI1_2 = intervals:union(CI1, CI2),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
 
     DB3 = db_dht:record_changes(DB2, CI1),
@@ -1258,7 +1265,7 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
                           intervals:new(db_entry:get_key(Entry4))),
     CI1_2 = intervals:union(CI1, CI2),
     CI1_wo2 = intervals:minus(CI1, CI2),
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     DB2 = db_dht:add_data(DB, Data),
 
     DB3 = db_dht:record_changes(DB2, CI1_2),

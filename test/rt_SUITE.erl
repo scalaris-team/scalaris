@@ -83,7 +83,7 @@ next_hop(_Config) ->
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 0),
     
@@ -119,7 +119,7 @@ next_hop2(_Config) ->
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    DB = db_dht:new(),
+    DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 10),
     

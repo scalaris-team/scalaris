@@ -39,8 +39,7 @@
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
--export([new/0, new/1, open/1]).
--export([get_recoverable_dbs/0]).
+-export([new/1, open/1]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
@@ -83,28 +82,11 @@
 %%%%%%
 
 %% @doc Initializes a new database.
--spec new() -> db().
-new() ->
-    RandomName = randoms:getRandomString(),
-    DBName = pid_groups:my_groupname() ++ ":" ++ RandomName,
-    SubscrName = DBName ++ ":subscribers",
-    {?DB:new(DBName), db_ets:new(SubscrName), {false, 0, 0}}.
-%% @doc Initializes a new database.
--spec new(nonempty_string()) -> db().
+-spec new(nonempty_string() | atom()) -> db().
 new(DBName) ->
-  RandomName = randoms:getRandomString(),
-  DBNameNew = DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName,
-  SubscrName = DBNameNew ++ ":subscribers",
+  DBNameNew = db_util:get_name(DBName),
+  SubscrName = db_util:get_subscriber_name(DBNameNew),
   {?DB:new(DBNameNew), db_ets:new(SubscrName), {false, 0, 0}}.
-
--spec get_recoverable_dbs()
-        -> [{DB_type::nonempty_string(), PID_group::pid_groups:groupname(), DB_name::nonempty_string()}].
-get_recoverable_dbs() ->
-    Tables = ?DB:get_persisted_tables(),
-    %% io:format("tables list: ~w~n", [Tables]),
-    %% creating tuples with DB_names different parts : {DB_type, PID_group, DB_name}
-    [{string:sub_word(Table, 1, $:), string:sub_word(Table, 2, $:), Table}
-    || Table <- Tables].
 
 %% @doc Re-opens an existing database.
 -spec open(DB::nonempty_string()) -> db().
