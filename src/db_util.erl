@@ -21,6 +21,8 @@
 -author('schuett@zib.de').
 -author('kruber@zib.de').
 
+-include("scalaris.hrl").
+
 -export([get_name/1, get_subscriber_name/1,
          get_recoverable_dbs/0, parse_table_name/1]).
 
@@ -29,12 +31,14 @@
 get_name(DBName) when is_atom(DBName) ->
     get_name(erlang:atom_to_list(DBName));
 get_name(DBName) ->
+    ?DBG_ASSERT(not lists:member($+, DBName)),
     RandomName = randoms:getRandomString(),
-    DBName ++ ":" ++ pid_groups:my_groupname() ++ ":" ++ RandomName.
+    DBName ++ "+" ++ pid_groups:my_groupname() ++ "+" ++ RandomName.
 
 -spec get_subscriber_name(DBName::nonempty_string()) -> nonempty_string().
 get_subscriber_name(DBName) ->
-    DBName ++ ":subscribers".
+    ?DBG_ASSERT(not lists:member($#, DBName)),
+    DBName ++ "#subscribers".
 
 -spec get_recoverable_dbs()
         -> [{DB_type::nonempty_string(), PID_group::pid_groups:groupname(), DB_name::nonempty_string()}].
@@ -47,4 +51,4 @@ get_recoverable_dbs() ->
 -spec parse_table_name(Table::nonempty_string() | atom())
         -> {DB_type::nonempty_string(), PID_group::pid_groups:groupname(), Table::nonempty_string()}.
 parse_table_name(Table) ->
-    {string:sub_word(Table, 1, $:), string:sub_word(Table, 2, $:), Table}.
+    {string:sub_word(Table, 1, $+), string:sub_word(Table, 2, $+), Table}.
