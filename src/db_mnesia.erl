@@ -142,10 +142,10 @@ open(DBName) ->
     erlang:list_to_atom(DBName).
 
 %% @doc Closes the DB named DBName
--spec close(DBName::db()) -> true.
-close(DBName) ->
-  ?TRACE("close:~nDB_name:~p~n",[DBName]),
-  {atomic, ok} = mnesia:delete_table(DBName),
+-spec close(DB::db()) -> true.
+close(DB) ->
+  ?TRACE("close:~nDB_name:~p~n",[DB]),
+  {atomic, ok} = mnesia:delete_table(DB),
   true.
 
 %% @doc Closes and deletes the DB named DBName

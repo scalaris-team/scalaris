@@ -148,7 +148,7 @@ tester_remove_node(_Config) ->
   {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
   % wait for leases to expire
   timer:sleep(11000),
-  [{atomic, ok} = mnesia:delete_table(X) || X <- PidGroupTabs],
+  _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
   util:wait_for(fun admin:check_leases/0),
   % check data integrity
   [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
