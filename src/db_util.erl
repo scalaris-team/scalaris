@@ -50,5 +50,7 @@ get_recoverable_dbs() ->
 
 -spec parse_table_name(Table::nonempty_string() | atom())
         -> {DB_type::nonempty_string(), PID_group::pid_groups:groupname(), Table::nonempty_string()}.
+parse_table_name(Table) when is_atom(Table) ->
+    parse_table_name(erlang:atom_to_list(Table));
 parse_table_name(Table) ->
     {string:sub_word(Table, 1, $+), string:sub_word(Table, 2, $+), Table}.
