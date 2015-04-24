@@ -98,7 +98,7 @@ get_dht_node_descs(Options) ->
   case config:read(start_type) of
     recover ->
       %% creating tuples with DB_names different parts : {DB_type, PID_group, DB_name}
-      DB_list = db_prbr:get_recoverable_dbs(),
+      DB_list = db_util:get_recoverable_dbs(),
       %% creating list of all nodes per vm and removing duplicates
       PID_groups = lists:usort([PidGroup || {_, PidGroup, _} <- DB_list]),
 

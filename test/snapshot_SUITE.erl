@@ -80,6 +80,11 @@ end_per_group(_GroupName, Config) ->
 init_per_testcase(_TestCase, Config) ->
     %% stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
+    % for unit tests without a ring, we need to be in a pid_group:
+    case proplists:get_value(name, proplists:get_value(tc_group_properties, Config, []), none) of
+        without_ring -> pid_groups:join_as("ct_tests", ?MODULE);
+        _ -> ok
+    end,
     Config.
 
 end_per_testcase(_TestCase, Config) ->
@@ -95,7 +100,7 @@ end_per_testcase(_TestCase, Config) ->
 
 -spec test_copy_value_to_snapshot_table(any()) -> ok.
 test_copy_value_to_snapshot_table(_Config) ->
-    InitDb = db_dht:new(),
+    InitDb = db_dht:new(db_dht),
     Db = db_dht:init_snapshot(InitDb),
     EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 0),
     Db = db_dht:set_entry(Db, EntryFoo),
@@ -110,7 +115,7 @@ test_copy_value_to_snapshot_table(_Config) ->
 
 -spec test_set_get_for_snapshot_table(any()) -> ok.
 test_set_get_for_snapshot_table(_Config) ->
-    InitDb = db_dht:new(),
+    InitDb = db_dht:new(db_dht),
     Db = db_dht:init_snapshot(InitDb),
     EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 5),
     Db = db_dht:set_snapshot_entry(Db, EntryFoo),
@@ -120,7 +125,7 @@ test_set_get_for_snapshot_table(_Config) ->
 
 -spec test_delete_from_snapshot_table(any()) -> ok.
 test_delete_from_snapshot_table(_Config) ->
-    InitDb = db_dht:new(),
+    InitDb = db_dht:new(db_dht),
     Db = db_dht:init_snapshot(InitDb),
     EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 5),
     Db = db_dht:set_snapshot_entry(Db, EntryFoo),
@@ -135,7 +140,7 @@ test_delete_from_snapshot_table(_Config) ->
 
 -spec test_init_snapshot(any()) -> ok.
 test_init_snapshot(_Config) ->
-    InitDb = db_dht:new(),
+    InitDb = db_dht:new(db_dht),
     Db = db_dht:init_snapshot(InitDb),
     Db = db_dht:set_snapshot_entry(Db, db_entry:new(?KEY("foo"), ?VALUE("bar"), 5)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 4711),
@@ -151,7 +156,7 @@ test_init_snapshot(_Config) ->
 
 -spec test_delete_snapshot(any()) -> ok.
 test_delete_snapshot(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     Db = db_dht:set_snapshot_entry(Db, db_entry:new(?KEY("foo"), ?VALUE("bar"), 5)),
     DelDb = db_dht:delete_snapshot(Db),
     ?equals(db_dht:snapshot_is_running(DelDb), false),
@@ -164,7 +169,7 @@ tester_get_snapshot_data(_Conf) ->
 -spec test_get_snapshot_data(db_dht:db_as_list(), intervals:interval()) -> true.
 test_get_snapshot_data(Data, Interval) ->
     CleanData = unittest_helper:scrub_data(Data),
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     LoadedDB = db_dht:add_snapshot_data(Db, Data),
     All = db_dht:get_snapshot_data(LoadedDB),
     ?equals(length(All), length(CleanData)),
@@ -191,7 +196,7 @@ tester_add_snapshot_data(_Conf) ->
 -spec test_add_snapshot_data(Data::db_dht:db_as_list()) -> true.
 test_add_snapshot_data(Data) ->
     CleanData = unittest_helper:scrub_data(Data),
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     NewDB = db_dht:add_snapshot_data(Db, CleanData),
     ?equals(length(db_dht:get_snapshot_data(NewDB)), length(CleanData)),
     db_dht:close(NewDB),
@@ -217,7 +222,7 @@ make_even_db_entry_list(N) ->
 % snapshot number in entry less than local number -> abort
 -spec test_rdht_tx_read_validate_should_abort(any()) -> ok.
 test_rdht_tx_read_validate_should_abort(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     Db = db_dht:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
     TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("new_val")),
     {_NewDb, Vote} = rdht_tx_read:validate(Db, 5, TLogEntry),
@@ -227,7 +232,7 @@ test_rdht_tx_read_validate_should_abort(_) ->
 % snapshot number in entry equals local number -> prepared
 -spec test_rdht_tx_read_validate_should_prepare(any()) -> ok.
 test_rdht_tx_read_validate_should_prepare(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     Db = db_dht:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
     TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 4711, ?value, ?VALUE("new_val")),
     {_NewDb, Vote} = rdht_tx_read:validate(Db, 4711, TLogEntry),
@@ -238,7 +243,7 @@ test_rdht_tx_read_validate_should_prepare(_) ->
 % -> "old" entries should be copied to the snapshot-db in copy-on-write fashion
 -spec test_rdht_tx_read_validate_db_copy(any()) -> ok.
 test_rdht_tx_read_validate_db_copy(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     Db = db_dht:set_entry(Db, EntryKey),
     TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 2, ?ok, 1, ?value, ?VALUE("new_val")),
@@ -254,7 +259,7 @@ test_rdht_tx_read_validate_db_copy(_) ->
 % (in this case: decreasing the readlock count) should be applied to both dbs.
 -spec test_rdht_tx_read_commit_with_snap_1(any()) -> ok.
 test_rdht_tx_read_commit_with_snap_1(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     TmpDb = db_dht:set_entry(Db, db_entry:inc_readlock(EntryKey)),
     NewDb = db_dht:set_snapshot_entry(TmpDb, db_entry:inc_readlock(EntryKey)),
@@ -272,7 +277,7 @@ test_rdht_tx_read_commit_with_snap_1(_) ->
 % because there is no cow-value for this key in the snapshot db. the "live" value is valid for both!
 -spec test_rdht_tx_read_commit_with_snap_2(any()) -> ok.
 test_rdht_tx_read_commit_with_snap_2(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     NewDb = db_dht:set_entry(Db, db_entry:inc_readlock(EntryKey)),
     TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
@@ -286,7 +291,7 @@ test_rdht_tx_read_commit_with_snap_2(_) ->
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_read_commit_without_snap(any()) -> ok.
 test_rdht_tx_read_commit_without_snap(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     EntryKey_RL = db_entry:inc_readlock(EntryKey),
     TmpDb = db_dht:set_entry(Db, EntryKey_RL),
@@ -306,7 +311,7 @@ test_rdht_tx_read_commit_without_snap(_) ->
 % snapshot number in entry less than local number -> abort
 -spec test_rdht_tx_write_validate_should_abort(any()) -> ok.
 test_rdht_tx_write_validate_should_abort(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     Db = db_dht:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
     TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     {_NewDb, Vote} = rdht_tx_write:validate(Db, 5, TLogEntry),
@@ -316,7 +321,7 @@ test_rdht_tx_write_validate_should_abort(_) ->
 % snapshot number in entry equals local number -> prepared
 -spec test_rdht_tx_write_validate_should_prepare(any()) -> ok.
 test_rdht_tx_write_validate_should_prepare(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     Db = db_dht:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
     TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 4711, ?value, ?VALUE("val")),
     {_NewDb, Vote} = rdht_tx_write:validate(Db, 4711, TLogEntry),
@@ -327,7 +332,7 @@ test_rdht_tx_write_validate_should_prepare(_) ->
 % -> "old" entries should be copied to the snapshot-db in copy-on-write fashion
 -spec test_rdht_tx_write_validate_db_copy(any()) -> ok.
 test_rdht_tx_write_validate_db_copy(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     Db = db_dht:set_entry(Db, EntryKey),
     TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
@@ -341,7 +346,7 @@ test_rdht_tx_write_validate_db_copy(_) ->
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2), changes should be applied to both dbs.
 -spec test_rdht_tx_write_commit_with_snap(any()) -> ok.
 test_rdht_tx_write_commit_with_snap(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
     TmpDb = db_dht:set_entry(Db, EntryKey_WL),
@@ -358,7 +363,7 @@ test_rdht_tx_write_commit_with_snap(_) ->
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_write_commit_without_snap(any()) -> ok.
 test_rdht_tx_write_commit_without_snap(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
     TmpDb = db_dht:set_entry(Db, EntryKey_WL),
@@ -375,7 +380,7 @@ test_rdht_tx_write_commit_without_snap(_) ->
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2), changes should be applied to both dbs.
 -spec test_rdht_tx_write_abort_with_snap(any()) -> ok.
 test_rdht_tx_write_abort_with_snap(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
     TmpDb = db_dht:set_entry(Db, EntryKey_WL),
@@ -393,7 +398,7 @@ test_rdht_tx_write_abort_with_snap(_) ->
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_write_abort_without_snap(any()) -> ok.
 test_rdht_tx_write_abort_without_snap(_) ->
-    Db = db_dht:init_snapshot(db_dht:new()),
+    Db = db_dht:init_snapshot(db_dht:new(db_dht)),
     EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
     EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
     TmpDb = db_dht:set_entry(Db, EntryKey_WL),
@@ -410,7 +415,7 @@ test_rdht_tx_write_abort_without_snap(_) ->
 
 -spec test_lock_counting_on_live_db(any()) -> ok.
 test_lock_counting_on_live_db(_) ->
-    Db = db_dht:new(),
+    Db = db_dht:new(db_dht),
     EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 0),
     EntryFoo_WL = db_entry:set_writelock(EntryFoo, 1),
     NewDB = {_, _, {_, LiveLC, _SnapLC}} = db_dht:set_entry(Db, EntryFoo_WL),

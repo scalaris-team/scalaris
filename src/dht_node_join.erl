@@ -113,7 +113,7 @@ join_as_first(Id, IdVersion, _Options) ->
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
-    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new(), []).
+    finish_join(Me, Me, Me, db_dht:new(db_dht), msg_queue:new(), []).
 %% userdevguide-end dht_node_join:join_as_first
 
 %% userdevguide-begin dht_node_join:join_as_other
@@ -445,7 +445,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
 
                             JoinOptions = get_join_options(JoinState),
 
-                            finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
+                            finish_join_and_slide(Me, Pred, Succ, db_dht:new(db_dht),
                                                   QueuedMessages, MoveId, NextOp, JoinOptions)
                     end
             end

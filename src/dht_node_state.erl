@@ -147,7 +147,7 @@ new_on_recover(RT, RMState,
     #state{rt = RT,
            rm_state = RMState,
            join_time = now(),
-           db = db_dht:new(), % ?!?
+           db = db_dht:new(db_dht),
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
            monitor_proc = pid_groups:get_my(dht_node_monitor),

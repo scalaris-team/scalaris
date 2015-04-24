@@ -105,9 +105,8 @@ traverse_table_and_show(Table_name)->
 mnesia_tables_of(PidGroup) ->
   Tabs = mnesia:system_info(tables),
   [ Tab || Tab <- Tabs,
-           string:sub_word(
-             erlang:atom_to_list(
-               mnesia:table_info(Tab, name)), 2, $:) =:= PidGroup ].
+           element(2, db_util:parse_table_name(
+                     erlang:atom_to_list(Tab))) =:= PidGroup ].
 
 %% @doc Gets a list of persisted tables.
 -spec get_persisted_tables() -> [nonempty_string()].

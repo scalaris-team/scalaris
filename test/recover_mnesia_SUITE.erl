@@ -109,7 +109,7 @@ test_make_ring(Config) ->
                                                {leases, true},
                                                {db_backend, db_mnesia},
                                                {start_type, recover}]}]),
-  util:wait_for(fun admin:check_leases/0, 10000),
+  util:wait_for(fun admin:check_leases/0),
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +117,7 @@ test_make_ring(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_write(_Config) ->
   % write data to KV
-  [kv_on_cseq:write(integer_to_list(X),X)||X<-lists:seq(1,100)].
+  [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test read/1 ensure data integrity after recovery
@@ -131,26 +131,27 @@ tester_read(Config) ->
                                                 {leases, true},
                                                 {db_backend, db_mnesia},
                                                 {start_type, recover}]}]),
-  util:wait_for(fun admin:check_leases/0, 10000),
+  util:wait_for(fun admin:check_leases/0),
   % ring restored -> checking KV data integrity
-  [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
+  [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test remove_node/1 remove a node and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tester_remove_node(_Config) ->
-  Tabs = lists:delete(schema, mnesia:system_info(tables)),
+  Tabs = db_mnesia:get_persisted_tables(),
   % delete random node from ring
-  Node_name = string:sub_word(atom_to_list(lists:last(Tabs)), 2, $:),
-  Node_tabs = [ Tab || Tab <- Tabs, string:sub_word(atom_to_list(Tab), 2, $:) =:= Node_name ],
-  {[Node_name], _Not_found} = admin:del_nodes_by_name([Node_name], false),
+  PidGroup = element(2, db_util:parse_table_name(util:randomelem(Tabs))),
+  PidGroupTabs = [Table || Table <- Tabs,
+                           element(2, db_util:parse_table_name(Table)) =:= PidGroup],
+  {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
   % wait for leases to expire
   timer:sleep(11000),
-  [{atomic, ok} = mnesia:delete_table(X)||X<-Node_tabs],
-  util:wait_for(fun admin:check_leases/0, 10000),
+  [{atomic, ok} = mnesia:delete_table(X) || X <- PidGroupTabs],
+  util:wait_for(fun admin:check_leases/0),
   % check data integrity
-  [{ok, X} = kv_on_cseq:read(integer_to_list(X))||X<-lists:seq(1,100)],
+  [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
   % add node to reform 4 node ring
   admin:add_nodes(1),
   timer:sleep(3000),
