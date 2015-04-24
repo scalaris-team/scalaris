@@ -17,8 +17,8 @@ require 'rubygems'
 begin
 gem 'json', '>=1.4.1'
 rescue LoadError
-require 'json'
 end
+require 'json'
 require 'optparse'
 require 'pp'
 begin
