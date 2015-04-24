@@ -204,7 +204,7 @@ elsif (ARGV[0] == "write")
   basekey = ARGV[1]
   basekey += '_json_ruby'
   mode = :write
-  puts 'Python-JSON-API: writing values'
+  puts 'Ruby-JSON-API: writing values'
 else
   puts 'unknown commands: ' + ARGV.to_s
   exit 1
