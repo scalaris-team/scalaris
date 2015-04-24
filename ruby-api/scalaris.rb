@@ -14,8 +14,11 @@
 #    limitations under the License.
 
 require 'rubygems'
+begin
 gem 'json', '>=1.4.1'
+rescue LoadError
 require 'json'
+end
 require 'net/http'
 require 'base64'
 require 'open-uri'
