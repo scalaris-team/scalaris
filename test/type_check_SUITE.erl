@@ -471,7 +471,7 @@ tester_type_check_rrepair(_Config) ->
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
-             {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
+             {decompress_kv_list, 5}, %% needs a special binary to correspond to a number of bits
              {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
              {shash_compress_k_list, 7}, %% needs a special binary to correspond to a number of bits
@@ -758,7 +758,6 @@ tester_type_check_util(_Config) ->
              {log2, 1}, %% floats become too large and raise badarith
              {logged_exec, 1}, %% not execute random strings
              {map_with_nr, 3}, %% cannot create funs; tested via feeder
-             {mnesia_tables_of, 1}, %% requires system state
              {par_map, 2}, %% cannot create funs; tested via feeder
              {par_map, 3}, %% cannot create funs; tested via feeder
              {parallel_run, 5}, %% cannot create funs
