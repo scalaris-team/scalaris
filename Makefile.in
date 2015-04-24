@@ -557,7 +557,7 @@ rrd-init:
 install-doc: doc
 	install -d $(DOCDIR)
 	install -m 644 -t $(DOCDIR) \
-	           AUTHORS README LICENSE ChangeLog
+	           AUTHORS README.md LICENSE ChangeLog
 	install -m 644 user-dev-guide/main.pdf $(DOCDIR)/user-dev-guide.pdf
 	install -d $(DOCDIR)/erlang
 	install -m 644 -t $(DOCDIR)/erlang \
