@@ -28,6 +28,13 @@
 
 -define(NUM_EXECUTIONS, 5).
 -define(CLOSE, close).
+-define(RINGSIZE, 16).
+
+num_executions() ->
+    5.
+
+ring_size() ->
+    16.
 
 all() -> [
     {group, make_ring_group},
@@ -35,10 +42,10 @@ all() -> [
   ].
 groups() ->
   [
-    {make_ring_group, [sequence], [test_make_ring, tester_write, {group, recover_data_group}]},
-    {recover_data_group, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_read]},
-    {remove_node_group, [sequence], [tester_write, {group, remove_node}]},
-    {remove_node, [sequence, {repeat, ?NUM_EXECUTIONS}], [tester_remove_node]}
+    {make_ring_group, [sequence], [test_make_ring, write, {group, recover_data_group}]},
+    {recover_data_group, [sequence, {repeat, num_executions()}], [read]},
+    {remove_node_group, [sequence], [write, {group, remove_node}]},
+    {remove_node, [sequence, {repeat, num_executions()}], [remove_node]}
   ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
@@ -66,10 +73,10 @@ init_per_group(Group, Config) ->
     unittest_helper:stop_minimal_procs(Config2),
     
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+    unittest_helper:make_ring(ring_size(), [{config, [{log_path, PrivDir},
                                             {leases, true},
                                             {db_backend, db_mnesia}]}]),
-    unittest_helper:check_ring_size_fully_joined(4),
+    unittest_helper:check_ring_size_fully_joined(ring_size()),
     unittest_helper:init_per_group(Group, Config).
 
 end_per_group(recover_data_group = Group, Config) ->
@@ -115,14 +122,14 @@ test_make_ring(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test write/1 write data to KV DBs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tester_write(_Config) ->
+write(_Config) ->
   % write data to KV
   [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test read/1 ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tester_read(Config) ->
+read(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
   unittest_helper:stop_ring(),
   % wait for leases to expire
@@ -139,7 +146,8 @@ tester_read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test remove_node/1 remove a node and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tester_remove_node(_Config) ->
+remove_node(_Config) ->
+  util:wait_for(fun admin:check_leases/0),
   Tabs = db_mnesia:get_persisted_tables(),
   % delete random node from ring
   PidGroup = element(2, db_util:parse_table_name(util:randomelem(Tabs))),
@@ -152,8 +160,8 @@ tester_remove_node(_Config) ->
   util:wait_for(fun admin:check_leases/0),
   % check data integrity
   [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
-  % add node to reform 4 node ring
+  % add node to reform ring_size() node ring
   admin:add_nodes(1),
   timer:sleep(3000),
-  unittest_helper:check_ring_size_fully_joined(4),
+  unittest_helper:check_ring_size_fully_joined(ring_size()),
   true.
