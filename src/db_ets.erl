@@ -32,7 +32,7 @@
 %% primitives
 -export([new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
--export([get_persisted_tables/0, get_name/1, get_load/1]).
+-export([get_persisted_tables/0, get_name/1, get_load/1, supports_feature/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -120,6 +120,11 @@ get_persisted_tables() ->
 -spec get_name(DB::db()) -> nonempty_string().
 get_name(DB) ->
     erlang:atom_to_list(ets:info(DB, name)).
+
+%% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
+-spec supports_feature(Feature:atom()) -> boolean().
+supports_feature(_Feature) -> 
+    false.
 
 %% @doc Returns the current load (i.e. number of stored tuples) of the DB.
 -spec get_load(DB::db()) -> non_neg_integer().

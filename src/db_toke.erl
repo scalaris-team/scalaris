@@ -51,7 +51,7 @@
 
 %% primitives
 -export([new/1, open/1, close/1, close_and_delete/1,
-         put/2, get/2, delete/2]).
+         put/2, get/2, delete/2, supports_feature/1]).
 %% db info
 -export([get_persisted_tables/0, get_name/1, get_load/1]).
 
@@ -171,6 +171,14 @@ delete({DB, _DBName} = State, Key) ->
 -spec get_name(DB::db()) -> nonempty_string().
 get_name({_DB, DBName}) ->
     DBName.
+
+%% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
+-spec supports_feature(Feature:atom()) -> boolean().
+supports_feature(Feature) -> 
+    case Feature of
+        recover -> true;
+        _ -> false
+    end.
 
 %% @doc Returns the current load (i.e. number of stored tuples) of the DB.
 -spec get_load(DB::db()) -> non_neg_integer().
