@@ -237,4 +237,4 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
 %% @doc Returns a list of all objects in the table Table_name.
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list(Table_name) ->
-	ets:tab2list(Table_name).
+    ets:tab2list(Table_name).

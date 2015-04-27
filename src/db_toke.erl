@@ -284,5 +284,5 @@ is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso
 %% @doc Returns a list of all objects in the table Table_name.
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list(_Table_name) ->
-	%% Not implemented yet.
-	[].
+    %% Not implemented yet.
+    [].

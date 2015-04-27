@@ -131,7 +131,7 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
 
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list({DB, _Subscr, _Snap}) ->
-	?DB:tab2list(DB).
+    ?DB:tab2list(DB).
 
 %%%%%%
 %%% raw whole db entry operations
@@ -587,5 +587,5 @@ entry_key(E) -> element(1, E).
 
 -spec check_config() -> boolean().
 check_config() ->
-	config:cfg_is_module(db_backend) and 
-	config:cfg_is_in(db_backend, [db_ets, db_mnesia, db_toke]).
+    config:cfg_is_module(db_backend) and 
+    config:cfg_is_in(db_backend, [db_ets, db_mnesia, db_toke]).
