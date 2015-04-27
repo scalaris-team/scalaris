@@ -173,7 +173,7 @@ get_name({_DB, DBName}) ->
     DBName.
 
 %% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
--spec supports_feature(Feature:atom()) -> boolean().
+-spec supports_feature(Feature::atom()) -> boolean().
 supports_feature(Feature) -> 
     case Feature of
         recover -> true;

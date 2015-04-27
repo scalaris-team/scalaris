@@ -122,7 +122,7 @@ get_name(DB) ->
     erlang:atom_to_list(ets:info(DB, name)).
 
 %% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
--spec supports_feature(Feature:atom()) -> boolean().
+-spec supports_feature(Feature::atom()) -> boolean().
 supports_feature(_Feature) -> 
     false.
 
