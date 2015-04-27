@@ -97,7 +97,7 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
     randoms:stop(),
     _ = inets:stop(),
     error_logger:tty(true),
-    tester_global_state:delete(),
+    unittest_global_state:delete(),
     unittest_helper:kill_new_processes(State#state.processes),
     {Return, State#state{processes = [], suite = undefined, tc_start = [] } }.
 

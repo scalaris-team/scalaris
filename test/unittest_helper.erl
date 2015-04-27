@@ -533,7 +533,7 @@ end_per_suite(Config) ->
     error_logger:tty(false),
     randoms:stop(),
     error_logger:tty(true),
-    tester_global_state:delete(),
+    unittest_global_state:delete(),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
     ok.
