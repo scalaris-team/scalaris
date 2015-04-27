@@ -55,8 +55,13 @@ all() ->
 
 -include("join_leave_SUITE.hrl").
 
--spec proto_sched_fun(start | stop) -> ok.
+-spec proto_sched_fun(start | restart | stop) -> ok.
 proto_sched_fun(start) ->
+    %% ct:pal("Starting proto scheduler"),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed), % clear previous stats
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin();
+proto_sched_fun(restart) ->
     %% ct:pal("Starting proto scheduler"),
     proto_sched:thread_num(1),
     proto_sched:thread_begin();
@@ -73,6 +78,6 @@ proto_sched_fun(stop) ->
             %% will raise an exception
             proto_sched:thread_end(),
             proto_sched:wait_for_end(),
-            unittest_helper:print_proto_sched_stats(),
+            unittest_helper:print_proto_sched_stats(at_end_if_failed_append),
             proto_sched:cleanup()
     end.

@@ -35,7 +35,8 @@
                     _ ->
                         unittest_helper:print_ring_data()
                 end,
-                unittest_helper:print_proto_sched_stats()
+                ct:pal("Proto scheduler stats: ~.2p",
+                       [unittest_global_state:lookup(proto_sched_stats)])
         end,
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 

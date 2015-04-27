@@ -153,7 +153,7 @@ add_3_rm_3_data(Config, Incremental) ->
     _ = api_vm:add_nodes(3),
     ?proto_sched(stop),
     unittest_helper:check_ring_size_fully_joined(4),
-    ?proto_sched(start),
+    ?proto_sched(restart),
     ct:pal("######## starting graceful leave ########"),
     _ = api_vm:shutdown_nodes(3),
     ?proto_sched(stop),
@@ -441,13 +441,13 @@ check_size(Size) ->
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(Size),
-    ?IIF(Infected, ?proto_sched(start), ok).
+    ?IIF(Infected, ?proto_sched(restart), ok).
 
 %% @doc Waits for the given process to die (without putting the wait messages
 %%      into the proto_sched if enabled).
 -spec wait_for_process_to_die(Pid::pid()) -> ok.
 wait_for_process_to_die(Pid) ->
     Infected = trace_mpath:infected(),
-    trace_mpath:clear_infection(),
+    ?IIF(Infected, ?proto_sched(stop), ok),
     util:wait_for_process_to_die(Pid),
-    trace_mpath:restore_infection().
+    ?IIF(Infected, ?proto_sched(restart), ok).
