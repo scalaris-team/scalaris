@@ -184,7 +184,7 @@ add_2x3_load_test() ->
     _ = api_vm:add_nodes(3),
     check_size(7),
     ct:pal("######## waiting for bench finish ########"),
-    util:wait_for_process_to_die(BenchPid).
+    wait_for_process_to_die(BenchPid).
 
 make_4_add_1_rm_1_load(Config) ->
     make_4_add_x_rm_y_load(Config, 1, 1, true).
@@ -235,7 +235,7 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
      end || {I, Group} <- lists:zip(lists:seq(1, Y), ToShutdown)],
     check_size(X + 4 - Y),
     ct:pal("######## waiting for bench finish ########"),
-    util:wait_for_process_to_die(BenchPid).
+    wait_for_process_to_die(BenchPid).
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
 prop_join_at(FirstId, SecondId, Incremental) ->
@@ -260,7 +260,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
-    util:wait_for_process_to_die(BenchPid),
+    wait_for_process_to_die(BenchPid),
     unittest_helper:check_ring_load(ExpLoad + BenchSlaves * 4),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
@@ -402,7 +402,7 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_, IgnMsgAt1st, IgnMsgAt
        true        -> ok
     end,
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
-    util:wait_for_process_to_die(BenchPid),
+    wait_for_process_to_die(BenchPid),
     MoreOpts = if IgnMsgAt2nd -> [{match_specs, IgnoredMessages}];
                   true        -> []
                end,
@@ -442,3 +442,12 @@ check_size(Size) ->
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(Size),
     ?IIF(Infected, ?proto_sched(start), ok).
+
+%% @doc Waits for the given process to die (without putting the wait messages
+%%      into the proto_sched if enabled).
+-spec wait_for_process_to_die(Pid::pid()) -> ok.
+wait_for_process_to_die(Pid) ->
+    Infected = trace_mpath:infected(),
+    trace_mpath:clear_infection(),
+    util:wait_for_process_to_die(Pid),
+    trace_mpath:restore_infection().
