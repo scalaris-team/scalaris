@@ -58,6 +58,7 @@
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
+-export([tab2list/1]).
 
 -type db() :: {DB::pid(), DBName::nonempty_string()}.
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
@@ -280,3 +281,8 @@ is_in({'(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key =:= R));
 is_in({'[', L, R, ')'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso Key < R;
 is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso
                                           ((Key < R) orelse (Key =:= R)).
+%% @doc Returns a list of all objects in the table Table_name.
+-spec tab2list(Table_name::db()) -> [Entries::entry()].
+tab2list(_Table_name) ->
+	%% Not implemented yet.
+	[].

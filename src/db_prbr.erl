@@ -129,14 +129,9 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
                 end
             end, 0).
 
--spec tab2list(db()) -> [entry()].
-
+-spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list({DB, _Subscr, _Snap}) ->
-    case ?DB of
-        db_mnesia -> db_mnesia:tab2list(DB);
-        db_ets -> ets:tab2list(DB);
-        _ -> ok 
-    end.
+	?DB:tab2list(DB).
 
 %%%%%%
 %%% raw whole db entry operations
