@@ -39,6 +39,7 @@
 -define(CKETS, ets). %% changed keys database
 
 %% whole DB management
+-export([check_config/0]).
 -export([new/1, open/1]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
@@ -588,3 +589,8 @@ calc_last_key_rem_int([X | Rest], StartId, Max, false) ->
     end.
 
 entry_key(E) -> element(1, E).
+
+-spec check_config() -> boolean().
+check_config() ->
+	config:cfg_is_module(db_backend) and 
+	config:cfg_is_in(db_backend, [db_ets, db_mnesia, db_toke]).
