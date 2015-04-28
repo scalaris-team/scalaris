@@ -699,7 +699,7 @@ set_val(Entry, Val) -> setelement(4, Entry, Val).
          ({client_value(), version()}, {client_value(), version()}) -> {client_value(), version()}.
 max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
     %% partial entries A and B produced by read filter rf_val_vers
-    log:log("A (~p) > B (~p)?", [A,B]),
+    ?TRACE("A (~p) > B (~p)?", [A,B]),
     if VersA > VersB ->
            A;
        true ->
@@ -709,7 +709,7 @@ max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
            B
     end;
 max(A, B) ->
-    log:log("A (~p) > B (~p)?", [A,B]),
+    ?TRACE("A (~p) > B (~p)?", [A,B]),
     VersA = vers(A), VersB = vers(B),
     if VersA > VersB ->
            A;

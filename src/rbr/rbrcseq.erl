@@ -349,8 +349,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                          entry_val(ReadEntry)};
                     WTInfos ->
                         %% WTInfo = write through infos
-                        log:log("Setting write through write filter ~p",
-                                [WTInfos]),
+                        ?TRACE("Setting write through write filter ~p",
+                               [WTInfos]),
                         WTInfos
                  end,
             Filters = {fun prbr:noop_read_filter/1,
