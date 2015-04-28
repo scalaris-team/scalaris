@@ -97,7 +97,7 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
     randoms:stop(),
     _ = inets:stop(),
     error_logger:tty(true),
-    tester_global_state:delete(),
+    unittest_global_state:delete(),
     unittest_helper:kill_new_processes(State#state.processes),
     {Return, State#state{processes = [], suite = undefined, tc_start = [] } }.
 
@@ -130,7 +130,11 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
             end,
-            catch unittest_helper:print_proto_sched_stats(),
+            catch unittest_helper:print_proto_sched_stats(now),
+            case unittest_global_state:lookup(proto_sched_stats) of
+                failed -> ok;
+                Stats -> ct:pal("Proto scheduler stats2: ~.2p", [Stats])
+            end,
             catch tester_global_state:log_last_calls(),
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)
@@ -146,6 +150,12 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             ok;
         {skip, {failed, {_FailedMod, _FailedFun, {timetrap_timeout, TimeTrapTime_ms}}}} ->
             ok;
+        {fail, _Reason} ->
+            TimeTrapTime_ms = 0,
+            case unittest_global_state:lookup(proto_sched_stats) of
+                failed -> ok;
+                Stats -> ct:pal("Proto scheduler stats: ~.2p", [Stats])
+            end;
         _ ->
             TimeTrapTime_ms = 0,
             ok

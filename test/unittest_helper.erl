@@ -37,7 +37,7 @@
          create_ct_all/1, create_ct_groups/2,
          init_per_group/2, end_per_group/2,
          get_ring_data/1, print_ring_data/0,
-         print_proto_sched_stats/0,
+         print_proto_sched_stats/1, print_proto_sched_stats/2,
          macro_equals/5, macro_compare/7,
          macro_equals_failed/6,
          expect_no_message_timeout/1,
@@ -533,7 +533,7 @@ end_per_suite(Config) ->
     error_logger:tty(false),
     randoms:stop(),
     error_logger:tty(true),
-    tester_global_state:delete(),
+    unittest_global_state:delete(),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
     ok.
@@ -630,10 +630,29 @@ print_ring_data() ->
     DataAll = get_ring_data(full),
     ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
 
--spec print_proto_sched_stats() -> ok.
-print_proto_sched_stats() ->
+-spec print_proto_sched_stats(now | now_short | at_end_if_failed | at_end_if_failed_append) -> ok.
+print_proto_sched_stats(When) ->
+    % NOTE: keep the default tag in sync!
+    print_proto_sched_stats(When, default).
+
+-spec print_proto_sched_stats(now | now_short | at_end_if_failed | at_end_if_failed_append,
+                              TraceId::term()) -> ok.
+print_proto_sched_stats(now, TraceId) ->
+    ct:pal("Proto scheduler stats: ~.2p", [proto_sched:get_infos(TraceId)]);
+print_proto_sched_stats(now_short, TraceId) ->
     ct:pal("Proto scheduler stats: ~.2p",
-           [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]).
+           [proto_sched:info_shorten_messages(proto_sched:get_infos(TraceId), 200)]);
+print_proto_sched_stats(at_end_if_failed, TraceId) ->
+    unittest_global_state:insert(proto_sched_stats, proto_sched:get_infos(TraceId)),
+    ok;
+print_proto_sched_stats(at_end_if_failed_append, TraceId) ->
+    Current = case unittest_global_state:lookup(proto_sched_stats) of
+                  failed -> [];
+                  X when is_list(X) -> X
+              end,
+    unittest_global_state:insert(proto_sched_stats,
+                                 Current ++ proto_sched:get_infos(TraceId)),
+    ok.
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(),
                    ExpectedStr::string(), Note::term()) -> true | no_return().

@@ -56,7 +56,7 @@ proto_sched2_fun(setup, Arg) ->
     proto_sched:thread_num(Arg);
 proto_sched2_fun(cleanup, _Arg) ->
     proto_sched:wait_for_end(),
-    unittest_helper:print_proto_sched_stats(),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed),
     proto_sched:cleanup().
 
 test_join(_Config) ->

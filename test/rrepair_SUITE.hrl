@@ -438,18 +438,18 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
     _ = db_generator:fill_ring(random, DBSize, DBParams),
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
+    ?proto_sched(start),
     _ = util:for_to_ex(1, Rounds,
                        fun(I) ->
                                ct:pal("Starting round ~p", [I]),
-                               ?proto_sched(start),
                                startSyncRound(NodeKeys),
                                waitForSyncRoundEnd(NodeKeys, false),
-                               ?proto_sched(stop),
                                if I =/= Rounds ->
                                       print_status(I, get_db_status());
                                   true -> ok
                                end
                        end),
+    ?proto_sched(stop),
     EndStat = get_db_status(),
     print_status(Rounds, EndStat),
     ?compare_w_note(CompFun, sync_degree(InitDBStat), sync_degree(EndStat),

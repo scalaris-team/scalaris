@@ -28,7 +28,6 @@
          get_value_creator/1]).
 -export([set_last_call/4, get_last_call/1, reset_last_call/1]).
 -export([log_last_calls/0]).
--export([delete/0]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -41,134 +40,47 @@
 
 -spec register_type_checker(type_spec(), module(), Fun::atom()) -> true.
 register_type_checker(Type, Module, Fun) ->
-    insert({type_checker, Type}, {Module, Fun}).
+    unittest_global_state:insert({type_checker, Type}, {Module, Fun}).
 
 -spec unregister_type_checker(type_spec()) -> true | ok.
 unregister_type_checker(Type) ->
-    delete({type_checker, Type}).
+    unittest_global_state:delete({type_checker, Type}).
 
 -spec get_type_checker(type_spec()) -> failed | {module(), Fun::atom()}.
 get_type_checker(Type) ->
-    lookup({type_checker, Type}).
+    unittest_global_state:lookup({type_checker, Type}).
 
 -spec register_value_creator(type_spec(), module(), Fun::atom(), Arity::non_neg_integer()) -> true.
 register_value_creator(Type, Module, Function, Arity) ->
-    insert({value_creator, Type}, {Module, Function, Arity}).
+    unittest_global_state:insert({value_creator, Type}, {Module, Function, Arity}).
 
 -spec unregister_value_creator(type_spec()) -> true | ok.
 unregister_value_creator(Type) ->
-    delete({value_creator, Type}).
+    unittest_global_state:delete({value_creator, Type}).
 
 -spec get_value_creator(type_spec()) -> failed | {module(), Fun::atom(), Arity::non_neg_integer()}.
 get_value_creator(Type) ->
-    lookup({value_creator, Type}).
+    unittest_global_state:lookup({value_creator, Type}).
 
 -spec set_last_call(Thread::pos_integer(), module(), Fun::atom(), Args::list()) -> true.
 set_last_call(Thread, Module, Function, Args) ->
-    insert({last_call, Thread}, {Module, Function, Args}).
+    unittest_global_state:insert({last_call, Thread}, {Module, Function, Args}).
 
 -spec reset_last_call(Thread::pos_integer()) -> true | ok.
 reset_last_call(Thread) ->
-    case ets:member(?MODULE, {last_call, Thread}) of
-        true ->  delete({last_call, Thread});
-        false -> ok
+    case unittest_global_state:lookup({last_call, Thread}) of
+        failed -> ok;
+        _ ->  unittest_global_state:delete({last_call, Thread})
     end.
 
 -spec get_last_call(Thread::pos_integer()) -> failed | {module(), Fun::atom(), Args::list()}.
 get_last_call(Thread) ->
-    lookup({last_call, Thread}).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% create and query ets-table
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec lookup(any()) -> failed | any().
-lookup(Key) ->
-    try ets:lookup(?MODULE, Key) of
-        [{Key, Value}] -> Value;
-        [] -> failed
-    catch error:badarg -> failed
-    end.
-
--spec insert(Key::term(), Value::term()) -> true.
-insert(Key, Value) ->
-    try ets:insert(?MODULE, {Key, Value})
-    catch error:badarg ->
-              % probably the table does not exist
-              create_table(),
-              ets:insert(?MODULE, {Key, Value})
-    end.
-
--spec delete(Key::term()) -> true | ok.
-delete(Key) ->
-    try begin
-            case ets:member(?MODULE, Key) of
-                true ->
-                    ets:delete(?MODULE, Key);
-                _ ->
-                    %% unregister non registered object
-                    ct:pal("you tried to unregister ~w which is not registered~nStacktrace: ~p", 
-                           [Key, util:get_stacktrace()]),
-                    throw({tester_global_state_delete_unregistered_object, Key})
-            end
-        end
-    catch error:badarg ->
-              % probably the table does not exist
-              ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
-              throw({tester_global_state_unknown_table, Key})
-    end.
-
-%% @doc Deletes the whole table (and the accompanying test)
--spec delete() -> ok.
-delete() ->
-    case erlang:whereis(?MODULE) of
-        undefined -> ok;
-        Pid when is_pid(Pid) ->
-            MonitorRef = erlang:monitor(process, Pid),
-            Pid ! {kill, self()},
-            receive
-                ok -> erlang:demonitor(MonitorRef, [flush]), ok;
-                {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
-            end,
-            ok
-end.
-
--spec create_table() -> true.
-create_table() ->
-    P = self(),
-    spawn(
-      fun() ->
-              IsOwner =
-                  try
-                      _ = ets:new(?MODULE, [set, public, named_table]),
-                      true
-                  catch
-                      % is there a race-condition?
-                      Error:Reason ->
-                          case ets:info(?MODULE) of
-                              undefined ->
-                                  ?ct_fail("could not create ets table for tester_global_state: ~p:~p",
-                                           [Error, Reason]);
-                              _ -> false
-                          end
-                  end,
-              P ! go,
-              case IsOwner of
-                  true ->
-                      erlang:register(?MODULE, self()),
-                      receive {kill, Pid} -> Pid ! ok
-                      end;
-                  false -> ok
-              end
-      end),
-    receive go -> true end.
+    unittest_global_state:lookup({last_call, Thread}).
 
 -spec log_last_calls() -> ok.
 log_last_calls() ->
     _ = [begin
-             case tester_global_state:get_last_call(Thread) of
+             case get_last_call(Thread) of
                  failed -> ok;
                  {Module, Function, Args} ->
                      ct:pal("Last call by tester (thread ~B):~n"

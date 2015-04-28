@@ -174,7 +174,7 @@ write(Key, Value) ->
 -spec cc_single_write(no_value_yet | {readlock(), writelock(), version()},
                       prbr:write_filter(), Value :: any()) ->
                              {true, UI :: version()} |
-                             {false, [readlock_is_set | write_lock_is_set]}.
+                             {false, [readlock_is_set | writelock_is_set]}.
 cc_single_write(no_value_yet, _WriteFilter, _Val) ->
     {true, -1};
 cc_single_write({RL, WL, Vers}, _WriteFilter, _Val) ->
