@@ -112,21 +112,12 @@ lease_checker(TargetSize) ->
 %@doc returns a random node, which covers 0.25 or less of the key-space
 -spec get_random_save_node() -> comm:mypid().
 get_random_save_node() ->
-    NodesAndLeaseLists = [
-        {Node, get_dht_node_state(Node, lease_list)}
-                            || Node <- all_dht_nodes()],
-    SaveNodes = lists:filter(fun ({_Node, LeaseList}) ->
-                                     case LeaseList of
-                                         {true, LL} ->
-                                             Lease = lease_list:get_active_lease(LL),
-                                             Interval = l_on_cseq:get_range(Lease),
-                                             get_relative_range(Interval) =< 0.25;
-                                         false ->
-                                             false
-                                     end
-                             end, NodesAndLeaseLists),
-    {TheNode, I} = util:randomelem(SaveNodes),
-    TheNode.
+    SaveNodes = [Node || Node <- all_dht_nodes(),
+                         {true, LL} <- [get_dht_node_state(Node, lease_list)],
+                         get_relative_range(
+                           l_on_cseq:get_range(
+                             lease_list:get_active_lease(LL))) =< 0.25],
+    util:randomelem(SaveNodes).
 
 -spec is_disjoint([intervals:interval()]) -> boolean().
 is_disjoint([]) ->
