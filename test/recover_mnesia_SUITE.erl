@@ -34,7 +34,7 @@ num_executions() ->
     5.
 
 ring_size() ->
-    16.
+    4.
 
 all() -> [
     {group, make_ring_group},
@@ -148,10 +148,10 @@ read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(_Config) ->
   util:wait_for(fun admin:check_leases/0),
-  Tabs = db_mnesia:get_persisted_tables(),
   % delete random node from ring
-  PidGroup = element(2, db_util:parse_table_name(util:randomelem(Tabs))),
-  PidGroupTabs = [Table || Table <- Tabs,
+  RandomNode = comm:make_local(lease_checker:get_random_save_node()),
+  PidGroup = pid_groups:group_of(RandomNode),
+  PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
                            element(2, db_util:parse_table_name(Table)) =:= PidGroup],
   {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
   % wait for leases to expire
