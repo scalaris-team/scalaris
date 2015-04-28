@@ -51,9 +51,10 @@
 
 %% primitives
 -export([new/1, open/1, close/1, close_and_delete/1,
-         put/2, get/2, delete/2, supports_feature/1]).
+         put/2, get/2, delete/2]).
 %% db info
--export([get_persisted_tables/0, get_name/1, get_load/1]).
+-export([get_persisted_tables/0, get_name/1, get_load/1, 
+         is_available/0, supports_feature/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -171,6 +172,15 @@ delete({DB, _DBName} = State, Key) ->
 -spec get_name(DB::db()) -> nonempty_string().
 get_name({_DB, DBName}) ->
     DBName.
+
+%% @doc Checks for modules required for this DB backend. Returns true if no 
+%%      modules are missing, or else a list of missing modules
+-spec is_available() -> boolean() | [atom()].
+is_available() ->
+    case code:which(toke_drv) of
+        non_existing -> [toke_drv];
+        _ -> true
+    end.
 
 %% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
 -spec supports_feature(Feature::atom()) -> boolean().
