@@ -590,8 +590,8 @@ check_config() ->
     All_DBs = [db_ets, db_mnesia, db_toke],
     Current_DB = config:read(db_backend),
     
-    config:cfg_is_module(db_backend) and 
-    config:cfg_is_in(db_backend, All_DBs) andalso
+    config:cfg_is_module(db_backend) and
+    config:cfg_is_in(db_backend, All_DBs) and
     case Current_DB:is_available() of
         true -> 
             true;
@@ -604,16 +604,14 @@ check_config() ->
         true ->
             % ensure_recovery is enabled which means we must check if 
             % leases are enabled and the chosen DB supports recovery
-            case config:read(leases) of 
-                failed ->
-                    error_logger:error_msg("Ensure_recover enabled but option leases not defined " 
-                                ++ "(see scalaris.cfg and scalaris.local.cfg). ~n Leases must be defined and set to true.~n"),
-                    false;
+            case config:read(leases) of
                 true ->
                     true;
-                _ -> 
-                    error_logger:error_msg("Ensure_recover enabled but option leases set to false "
-                                ++ "(see scalaris.cfg and scalaris.local.cfg). ~n Leases must be enabled for recovery.~n"),
+                _ ->
+                    error_logger:error_msg(
+                      "Ensure_recover enabled but option leases not true "
+                      "(see scalaris.cfg and scalaris.local.cfg).~n"
+                      " Leases must be defined and set to true.~n"),
                     false
             end and
             case Current_DB:supports_feature(recover) of
@@ -621,15 +619,14 @@ check_config() ->
                    true;
                 _ ->
                     % get DBs which have recovery and are installed
-                    Rec_DBs = lists:filter(fun(DB) -> 
-                                                   DB:supports_feature(recover) andalso 
-                                                   (DB:is_available() == true) 
-                                           end, All_DBs),
-                    
-                    error_logger:error_msg("Ensure_recover enabled but selected DB backend (~p) does not "
-                                ++ "support recovery.~n Try one of the following: ~p "
-                                ++ "(see scalaris.cfg and scalaris.local.cfg).~n", 
-                                [Current_DB, Rec_DBs]),
+                    Rec_DBs = [DB || DB <- All_DBs,
+                                     DB:supports_feature(recover),
+                                     DB:is_available()],
+                    error_logger:error_msg(
+                      "Ensure_recover enabled but selected DB backend (~p) does not "
+                      "support recovery.~n Try one of the following: ~p "
+                      "(see scalaris.cfg and scalaris.local.cfg).~n",
+                      [Current_DB, Rec_DBs]),
                     false
             end;
         _ ->

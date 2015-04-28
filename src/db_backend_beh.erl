@@ -57,8 +57,8 @@
 -callback get_persisted_tables() -> [nonempty_string()].
 -callback get_name(db()) -> nonempty_string().
 -callback get_load(db()) -> non_neg_integer().
--callback is_available() -> boolean() | [atom()].
--callback supports_feature(atom()) -> boolean().
+-callback is_available() -> boolean() | [MissingModule::atom()].
+-callback supports_feature(Feature::atom()) -> boolean().
 
 -callback foldl(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 -callback foldl(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.

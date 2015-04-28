@@ -207,11 +207,8 @@ is_available() ->
 
 %% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
 -spec supports_feature(Feature::atom()) -> boolean().
-supports_feature(Feature) -> 
-    case Feature of
-        recover -> true;
-        _ -> false
-    end.
+supports_feature(recover) -> true;
+supports_feature(_) -> false.
 
 %% @doc Returns the current load (i.e. number of stored tuples) of the DB.
 -spec get_load(DB::db()) -> non_neg_integer().
