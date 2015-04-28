@@ -233,7 +233,8 @@ rf_wl_vers(X) -> {writelock(X), vers(X)}.
 
 -spec cc_set_rl(no_value_yet | {writelock(), version()}, prbr:write_filter(),
                 {txid_on_cseq:txid(), version()}) ->
-                       {boolean(), UI :: none}.
+                       {true, UI :: none} |
+                       {false, any()}.
 cc_set_rl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_set_rl({WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
@@ -257,7 +258,8 @@ rf_rl_wl_vers(X)          -> {readlock(X),
 
 -spec cc_set_wl({readlock, writelock(), version()}, prbr:write_filter(),
                 {txid_on_cseq:txid(), version()}) ->
-                       {boolean(), UI :: none}.
+                       {true, UI :: none} |
+                       {false, any()}.
 cc_set_wl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
@@ -324,7 +326,8 @@ rf_rl_vers(X) ->
 
 -spec cc_commit_read(no_value_yet | {readlock, version()}, prbr:write_filter(),
                 {txid_on_cseq:txid(), version()}) ->
-                       {boolean(), UI :: none}.
+                            {true, UI :: none} |
+                            {false, any()}.
 cc_commit_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_commit_read({_RL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
@@ -584,7 +587,8 @@ abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
                      | {readlock(), writelock(), version()},
                      prbr:write_filter(),
                      {txid_on_cseq:txid(), version(), NewVal :: any()}) ->
-                            {true, UI :: none}.
+                            {true, UI :: none} |
+                            {false, any()}.
 cc_abort_write(no_value_yet, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
     {false, none};
 cc_abort_write({WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
@@ -678,6 +682,7 @@ unset_readlock(Entry, TxId) ->
     %% delete all occurrences of TxId
     NewRL = [ X || X <- element(1, Entry), X =/= TxId ],
     setelement(1, Entry, NewRL).
+-spec reset_readlock(db_entry()) -> db_entry().
 reset_readlock(Entry) ->
     setelement(1, Entry, []).
 

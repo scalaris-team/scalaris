@@ -1,4 +1,4 @@
-%% @copyright 2012, 2013, 2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -276,34 +276,28 @@ tester_type_check_rbr(_Config) ->
            ]
           },
           {kv_on_cseq,
-           [ {commit_read, 5}, %% tested via feeder
+           [ {commit_read, 5},  %% tested via feeder
              {commit_write, 5}, %% tested via feeder
-             {abort_read, 5}, %% tested via feeder
-             {abort_write, 5} %% tested via feeder
-           ],
-           [ {cc_single_write, 3}, %% cannot create funs
-             {cc_set_rl, 3}, %% cannot create funs
-             {cc_set_wl, 3},  %% cannot create funs
-             {cc_commit_read, 3},  %% cannot create funs
-             {cc_commit_write, 3},  %% cannot create funs
-             {cc_abort_read, 3},  %% cannot create funs
-             {cc_abort_write, 3}  %% cannot create funs
-           ]},
+             {abort_read, 5},   %% tested via feeder
+             {abort_write, 5}], %% tested via feeder
+           []},
           {pr,
            [
            ],
            []},
           {prbr,
-           [ {on, 2},          %% sends messages
+           [ {init, 1},        %% needs to be in a pidgroup for db_name
+             {on, 2},          %% sends messages
              {get_load, 1},    %% needs valid tid()
-             {set_entry, 2}   %% needs valid tid()
+             {set_entry, 2},   %% needs valid tid()
+             {tab2list, 1},    %% needs valid tid()
+             {tab2list_raw_unittest, 1}    %% needs valid tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
              {msg_write_reply, 5}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
-             {get_entry, 2},        %% needs valid tid()
-             {tab2list, 1},    %% needs valid tid()
-             {tab2list_raw, 1} %% needs valid tid()
+             {get_entry, 2},       %% needs valid tid()
+             {tab2list_raw, 1}     %% needs valid tid()
             ]},
           {rbrcseq,
            [ {on, 2},          %% sends messages

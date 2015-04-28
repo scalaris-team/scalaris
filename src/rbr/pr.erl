@@ -1,4 +1,4 @@
-% @copyright 2014 Zuse Institute Berlin,
+% @copyright 2014-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,6 +42,12 @@
 -export_type([pr/0]).
 -endif.
 
+-type write_through_info() ::
+       { prbr:write_filter(),
+         UpdateInfo :: term(),
+         WriteValue :: term()
+       }.
+
 %% pr() has to be unique for this key system wide
 %% pr() has to be comparable with < and =<
 %% if the caller process may handle more than one request at a time for the
@@ -53,14 +59,8 @@
         {non_neg_integer(),         %% the actual round number
          any(),                     %% the clients identifier to make unique
          %% the used write_filter for write through and its parameters
-         none | prbr:write_filter() %% ...
+         none | write_through_info() %% ...
         }.
-
--type write_through_info() ::
-       { prbr:write_filter(),
-         UpdateInfo :: term(),
-         WriteValue :: term()
-       }.
 
 -spec new(non_neg_integer(), any()) -> pr().
 new(Counter, ProposerUID) -> {Counter, ProposerUID, none}.
