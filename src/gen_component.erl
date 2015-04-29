@@ -201,7 +201,13 @@ receive_state_if_alive(Pid, MsgTag, Timeout) when Timeout >= 0->
                     failed
             end
     end;
-receive_state_if_alive(_Pid, _MsgTag, _Timeout) -> failed.
+receive_state_if_alive(_Pid, MsgTag, _Timeout) ->
+    % one last try looking into the message box only
+    receive
+        {'$gen_component', MsgTag, State} -> State
+    after 0 ->
+        failed
+    end.
 
 -spec get_state(Pid::pid()) -> user_state() | failed.
 get_state(Pid) ->
