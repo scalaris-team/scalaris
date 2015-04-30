@@ -171,6 +171,7 @@
                end,
                Y;
             X ->
+               ?ASSERT2(not trace_mpath:infected(), 'noninfected_message_in_infected_process'),
                case gen_component:is_gen_component(self())
                    andalso ({current_function, {pid_groups, add, 3}}
                             =/=  process_info(self(), current_function)) of
