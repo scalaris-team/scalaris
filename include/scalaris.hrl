@@ -80,6 +80,10 @@
 -define(PDB_ERL, true). % erlang put and get (process dictionary)
 %-define(PDB_ETS, true). % may have performance issues with msg_delay
 
+%%%%%%%%%%%%%%%%%%%%%%
+
+-define(implies(A, B), (not (A)) orelse (B)).
+
 % for debugging:
 -ifdef(have_ctline_support).
 % allows the retrieval of the current function and line number a process is in
