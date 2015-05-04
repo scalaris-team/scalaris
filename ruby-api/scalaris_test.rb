@@ -407,7 +407,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
   # request that is too large.
   def testReqTooLarge()
       conn = Scalaris::TransactionSingleOp.new()
-      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      data = "0" * ($_TOO_LARGE_REQUEST_SIZE)
       key = "_ReqTooLarge"
       begin
         conn.write(@testTime.to_s + key, data)
@@ -651,7 +651,7 @@ class TestTransaction < Test::Unit::TestCase
   # request that is too large.
   def testReqTooLarge()
       conn = Scalaris::Transaction.new()
-      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      data = "0" * ($_TOO_LARGE_REQUEST_SIZE)
       key = "_ReqTooLarge"
       begin
         conn.write(@testTime.to_s + key, data)
@@ -1215,7 +1215,7 @@ class TestPubSub < Test::Unit::TestCase
   # request that is too large.
   def testReqTooLarge()
       conn = Scalaris::PubSub.new()
-      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      data = "0" * ($_TOO_LARGE_REQUEST_SIZE)
       key = "_ReqTooLarge"
       begin
         conn.publish(@testTime.to_s + key, data)
