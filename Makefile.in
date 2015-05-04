@@ -264,7 +264,7 @@ python-test: compile python
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON2) python-api/scalaris_test.py ) ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON2) python-api/scalaris_test.py -v ) ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
@@ -345,7 +345,7 @@ python3-test: compile python3
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON3) python3-api/scalaris_test.py ) ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" $(PYTHON3) python3-api/scalaris_test.py -v ) ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
@@ -387,7 +387,7 @@ ruby-test: compile
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_test.rb ) ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_test.rb -v ) ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
