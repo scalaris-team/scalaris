@@ -587,7 +587,7 @@ entry_key(E) -> element(1, E).
 
 -spec check_config() -> boolean().
 check_config() ->
-    All_DBs = [db_ets, db_mnesia, db_toke],
+    All_DBs = [db_ets, db_mnesia, db_toke, db_hanoidb],
     Current_DB = config:read(db_backend),
     
     config:cfg_is_module(db_backend) and
