@@ -25,8 +25,9 @@
 %%		-make sure this db_hanoidb.erl file is in src/ (right with db_ets.erl)
 %%		-rerun scalaris' configure with --enable-hanoidb
 %%			./configure --enable-hanoidb=/path/to/hanoidb
-%%		-rerun make to rebuild scalaris and tests
-%%			./make && ./make test
+%%		-rerun make to rebuild scalaris and run tests
+%%			./make
+%%			./make test
 %%		-enjoy
 %%		Two keys K and L are considered equal if they match, i.e. K =:= L
 %%		Made after v0.6.1 svn rev 5666.
@@ -188,9 +189,8 @@ get_load({DB, _DBName}) ->
     %% TODO: not really efficient (maybe store the load in the DB?)
 	hanoidb:fold(DB, fun (_K, _V, Load) -> Load + 1 end, 0).
 
-%% @doc Equivalent to hanoidb:fold(DB, Fun, Acc0).
-%%		Which @equiv hanoidb:fold_range(DB, Fun, Acc0, #key_range{from_key=<<>>, to_key=undefined}).
-%%      Returns a potentially larger-than-memory dataset. Use with care.
+%% @equiv hanoidb:fold_range(DB, Fun, Acc0, #key_range{from_key = <<>>, to_key = undefined})
+%% @doc Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(State, Fun, Acc) ->
     %hanoidb:fold(DB, fun (K, _V, AccIn) -> Fun(?OUT(K), AccIn) end, Acc0).
