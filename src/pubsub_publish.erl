@@ -35,7 +35,7 @@ publish(URL, Topic, Content) ->
 
 -spec publish_internal(URL::string(), Topic::string(), Content::string()) -> {ok, {response, Result::[term()]}} | {error, Reason::term()}.
 publish_internal(URL, Topic, Content) ->
-    case jsonrpc:call(URL, [], {call, "notify", [Topic, Content]}) of
+    case jsonrpc:call(URL, [{version, "HTTP/1.0"}], {call, "notify", [Topic, Content]}) of
         {error, Reason} = X ->
             log:log('warn', "error trying to publish ~p => ~p:~p",
                     [Topic, Content, Reason]),
