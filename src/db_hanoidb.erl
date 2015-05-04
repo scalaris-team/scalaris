@@ -14,23 +14,23 @@
 
 %% @author Pierre M.
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
-%% @doc	DB back-end using HanoiDB.
-%%		HanoiDB is a memory-cached disk backend.
-%%		As disks are large (TB) HanoiDB can hold data much larger than RAM (GB).
-%%		As disks persist data HanoiDB can be stoped and restarted without data loss.
-%%		It is a pure Erlang implementation of Google's LevelDB disk-backed K/V store.
-%%		See http://code.google.com/p/leveldb/ for background about storage levels.
-%%		How to use scalaris with this hanoidb backend:
-%%		-download https://github.com/krestenkrab/hanoidb and compile HanoiDB
-%%		-make sure this db_hanoidb.erl file is in src/ (right with db_ets.erl)
-%%		-rerun scalaris' configure with --enable-hanoidb
-%%			./configure --enable-hanoidb=/path/to/hanoidb
-%%		-rerun make to rebuild scalaris and run tests
-%%			./make
-%%			./make test
-%%		-enjoy
-%%		Two keys K and L are considered equal if they match, i.e. K =:= L
-%%		Made after v0.6.1 svn rev 5666.
+%% @doc    DB back-end using HanoiDB.
+%%         HanoiDB is a memory-cached disk backend.
+%%         As disks are large (TB) HanoiDB can hold data much larger than RAM (GB).
+%%         As disks persist data HanoiDB can be stoped and restarted without data loss.
+%%         It is a pure Erlang implementation of Google's LevelDB disk-backed K/V store.
+%%         See http://code.google.com/p/leveldb/ for background about storage levels.
+%%         How to use scalaris with this hanoidb backend:
+%%         -download https://github.com/krestenkrab/hanoidb and compile HanoiDB
+%%         -make sure this db_hanoidb.erl file is in src/ (right with db_ets.erl)
+%%         -rerun scalaris' configure with --enable-hanoidb
+%%             ./configure --enable-hanoidb=/path/to/hanoidb
+%%         -rerun make to rebuild scalaris and run tests
+%%             ./make
+%%             ./make test
+%%         -enjoy
+%%         Two keys K and L are considered equal if they match, i.e. K =:= L
+%%         Made after v0.6.1 svn rev 5666.
 %% @end
 -module(db_hanoidb).
 
@@ -63,19 +63,19 @@
 -export_type([db/0]).
 -endif.
 
--type hanoidb_config_option() ::	{compress, none | gzip | snappy | lz4}
-								| {page_size, pos_integer()}
-								| {read_buffer_size, pos_integer()}
-								| {write_buffer_size, pos_integer()}
-								| {merge_strategy, fast | predictable }
-								| {sync_strategy, none | sync | {seconds, pos_integer()}}
-								| {expiry_secs, non_neg_integer()}
-								| {spawn_opt, list()}.
+-type hanoidb_config_option() ::  {compress, none | gzip | snappy | lz4}
+                                | {page_size, pos_integer()}
+                                | {read_buffer_size, pos_integer()}
+                                | {write_buffer_size, pos_integer()}
+                                | {merge_strategy, fast | predictable }
+                                | {sync_strategy, none | sync | {seconds, pos_integer()}}
+                                | {expiry_secs, non_neg_integer()}
+                                | {spawn_opt, list()}.
 
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
-	new_db(DBName, []). % hanoidb's default options. May need tuning.
+    new_db(DBName, []). % hanoidb's default options. May need tuning.
 
 %% @doc Re-opens an existing-on-disk database.
 -spec open(DBName::nonempty_string()) -> db().
@@ -85,22 +85,22 @@ open(DBName) ->
 %% @doc Creates new DB handle named DBName with options.
 -spec new_db(DirName::string(), HanoiOptions::[hanoidb_config_option()]) -> db().
 new_db(DBName, HanoiOptions) ->
-	BaseDir = [config:read(db_directory), "/", atom_to_list(node())],
+    BaseDir = [config:read(db_directory), "/", atom_to_list(node())],
     _ = case file:make_dir(BaseDir) of
             ok -> ok;
             {error, eexist} -> ok;
             {error, Error0} -> erlang:exit({db_toke, 'cannot create dir', BaseDir, Error0})
-    end,
+        end,
     
     % HanoiDB stores not in a file but a dir store
     FullDBDir = lists:flatten([BaseDir, "/", DBName]),
     case hanoidb:open(FullDBDir, HanoiOptions) of 
-		{ok, Tree} ->	{Tree, DBName};
-		ignore ->	log:log(error, "[ Node ~w:db_hanoidb ] ~.0p", [self(), ignore]),
-                          erlang:error({hanoidb_failed, ignore});
-		{error, Error2} -> log:log(error, "[ Node ~w:db_hanoidb ] ~.0p", [self(), Error2]),
-                          erlang:error({hanoidb_failed, Error2})
-	end.
+        {ok, Tree} ->    {Tree, DBName};
+        ignore ->    log:log(error, "[ Node ~w:db_hanoidb ] ~.0p", [self(), ignore]),
+                     erlang:error({hanoidb_failed, ignore});
+        {error, Error2} -> log:log(error, "[ Node ~w:db_hanoidb ] ~.0p", [self(), Error2]),
+                           erlang:error({hanoidb_failed, Error2})
+    end.
 
 %% @doc Closes the DB named DBName keeping its data on disk.
 -spec close(DB::db()) -> true.
@@ -112,20 +112,20 @@ close({DB, _FileName}) ->
 -spec close_and_delete(DB::db()) -> true.
 close_and_delete({_DB, DBName} = State) ->
     close(State),
-	% A disk backend happens in some directory
-
+    % A disk backend happens in some directory
+    
     DirName = [config:read(db_directory), "/", atom_to_list(node()), "/", DBName],
     
     % Delete all DB files
     {ok, Files} = file:list_dir(DirName),
     lists:foreach(fun(FileName) ->
-                        FullFileName = lists:flatten([DirName, "/", FileName]),
-                        case file:delete(FullFileName) of
-                            ok -> ok;
-                            {error, Reason} ->
-                                log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
-                                        [self(), FileName, Reason])
-                        end
+                          FullFileName = lists:flatten([DirName, "/", FileName]),
+                          case file:delete(FullFileName) of
+                              ok -> ok;
+                              {error, Reason} ->
+                                  log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
+                                          [self(), FileName, Reason])
+                          end
                   end, Files),
     
     % Delete DB dir
@@ -139,16 +139,16 @@ close_and_delete({_DB, DBName} = State) ->
 %%      The key is expected to be the first element of Entry.
 -spec put(DB::db(), Entry::entry()) -> db().
 put({DB, _DBName} = State, Entry) ->
-	ok = hanoidb:put(DB, ?IN(element(1, Entry)), ?IN(Entry)	),
-	State.
+    ok = hanoidb:put(DB, ?IN(element(1, Entry)), ?IN(Entry)    ),
+    State.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
 -spec get(DB::db(), Key::key()) -> entry() | {}.
 get({DB, _DBName}, Key) ->
-	case hanoidb:get(DB, ?IN(Key)) of
-        not_found	-> {};
-        {ok, Entry}	-> ?OUT(Entry)
-	end.
+    case hanoidb:get(DB, ?IN(Key)) of
+        not_found    -> {};
+        {ok, Entry}    -> ?OUT(Entry)
+    end.
 
 %% @doc Deletes the tuple saved under Key and returns the new DB.
 %%      If such a tuple does not exists nothing is changed.
@@ -187,7 +187,7 @@ get_name({_DB, DBName}) ->
 -spec get_load(DB::db()) -> non_neg_integer().
 get_load({DB, _DBName}) ->
     %% TODO: not really efficient (maybe store the load in the DB?)
-	hanoidb:fold(DB, fun (_K, _V, Load) -> Load + 1 end, 0).
+    hanoidb:fold(DB, fun (_K, _V, Load) -> Load + 1 end, 0).
 
 %% @equiv hanoidb:fold_range(DB, Fun, Acc0, #key_range{from_key = <<>>, to_key = undefined})
 %% @doc Returns a potentially larger-than-memory dataset. Use with care.
@@ -199,9 +199,9 @@ foldl(State, Fun, Acc) ->
 %% @equiv foldl(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Interval::db_backend_beh:interval()) -> Acc1::A.
+            Interval::db_backend_beh:interval()) -> Acc1::A.
 foldl(State, Fun, Acc, Interval) ->
-	%hanoidb:fold_range(DB, Fun, Acc, #key_range{from_key=K1, to_key=K2}). % TODO check it is possible
+    %hanoidb:fold_range(DB, Fun, Acc, #key_range{from_key=K1, to_key=K2}). % TODO check it is possible
     foldl_helper(State, Fun, Acc, Interval, -1).
 
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
@@ -209,24 +209,24 @@ foldl(State, Fun, Acc, Interval) ->
 %%      stops as soon as MaxNum elements have been encountered.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+            Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(State, Fun, Acc, Interval, MaxNum) ->
     %% HINT
     %% Fun can only be applied in a second pass. It could do a delete (or other
     %% write op) but CAN HanoiDB handle writes whiles folding ? (TODO check YES?)
     %% Since we reversed the order while accumulating reverse it by using lists
     %% fold but "from the other side". TODO check this for HanoiDB
-	%hanoidb:fold_range(DB, Fun, Acc, #key_range{limit=N, from_key=K1, to_key=K2}) % TODO check it is possible
+    %hanoidb:fold_range(DB, Fun, Acc, #key_range{limit=N, from_key=K1, to_key=K2}) % TODO check it is possible
     foldl_helper(State, Fun, Acc, Interval, MaxNum).
 
 %% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
 %%          data is to be retrieved.
 -spec foldl_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
+                   Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
 foldl_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     Keys = get_all_keys(DB, Interval, MaxNum), % hopefully MaxNum caps it.
     lists:foldr(Fun, Acc, Keys). % db:foldL calls lists:foldR
-	% TODO May be hanoidb:fold_range is less RAM intensive : no need to keep all keys in RAM at once, but continuous folding instead.
+    % TODO May be hanoidb:fold_range is less RAM intensive : no need to keep all keys in RAM at once, but continuous folding instead.
 
 %% @doc makes a foldr over the whole dataset.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
@@ -237,7 +237,7 @@ foldr(State, Fun, Acc) ->
 %% @equiv foldr(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Interval::db_backend_beh:interval()) -> Acc1::A.
+            Interval::db_backend_beh:interval()) -> Acc1::A.
 foldr(State, Fun, Acc, Interval) ->
     foldr_helper(State, Fun, Acc, Interval, -1).
 
@@ -246,16 +246,16 @@ foldr(State, Fun, Acc, Interval) ->
 %%      stops as soon as MaxNum elements have been encountered.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+            Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldr(State, Fun, Acc, Interval, MaxNum) ->
     foldr_helper(State, Fun, Acc, Interval, MaxNum).
 
 %% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
 %%          data is to be retrieved.
 -spec foldr_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
+                   Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
 foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
-	% TODO evaluate hanoidb:fold_range(DB, Fun, Acc, #key_range{limit=N, from_key=K1, to_key=K2})
+    % TODO evaluate hanoidb:fold_range(DB, Fun, Acc, #key_range{limit=N, from_key=K1, to_key=K2})
     %% first only retrieve keys so we don't have to load the whole db into memory
     Keys = get_all_keys(DB, Interval, -1),
     CutData = case MaxNum of
@@ -271,25 +271,25 @@ foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
 %% @private get_all_keys/3 retrieves all keys in DB that fall into Interval but
 %%          not more than MaxNum. If MaxNum == -1 all Keys are retrieved. If
 %%          MaxNum is positive it starts from the left in term order.
--spec get_all_keys(pid(), db_backend_beh:interval(), -1 | non_neg_integer()) ->
-    [key()].
+-spec get_all_keys(pid(), db_backend_beh:interval(), -1 | non_neg_integer())
+        -> [key()].
 get_all_keys(DB, Interval, MaxNum) ->
-	% TODO evaluate converting scalaris:Intervals to hanoidb:ranges
-	% in order to leverage hanoidb:fold rather than get_all_keys+lists:fold.
-
+    % TODO evaluate converting scalaris:Intervals to hanoidb:ranges
+    % in order to leverage hanoidb:fold rather than get_all_keys+lists:fold.
+    
     Keys = hanoidb:fold(DB, fun(Key, _Entry, AccIn) -> [?OUT(Key) | AccIn] end, []),
     
     {_, In} = lists:foldl(fun 
                              (_, {0, _} = AccIn) ->
-						          AccIn;
-							(Key, {Max, KeyAcc} = AccIn) ->
-								case is_in(Interval, Key) of
-								    true ->
-										{Max - 1, [Key | KeyAcc]};
-									_ ->
-										AccIn
-								end
-				    		end, {MaxNum, []}, lists:sort(Keys)),
+                                  AccIn;
+                             (Key, {Max, KeyAcc} = AccIn) ->
+                                  case is_in(Interval, Key) of
+                                      true ->
+                                          {Max - 1, [Key | KeyAcc]};
+                                      _ ->
+                                          AccIn
+                                  end
+                          end, {MaxNum, []}, lists:sort(Keys)),
     In.
 
 is_in({Key}, OtherKey) -> Key =:= OtherKey;
@@ -298,7 +298,7 @@ is_in({'(', L, R, ')'}, Key) -> Key > L andalso Key < R;
 is_in({'(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key =:= R));
 is_in({'[', L, R, ')'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso Key < R;
 is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso
-                                          ((Key < R) orelse (Key =:= R)).
+                                    ((Key < R) orelse (Key =:= R)).
 
 %% @doc Returns a list of all objects in the table Table_name.
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
