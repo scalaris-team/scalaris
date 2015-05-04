@@ -40,3 +40,7 @@ all() ->
     ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
+
+-spec additional_ring_config() -> [].
+additional_ring_config() ->
+    [].
