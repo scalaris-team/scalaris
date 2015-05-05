@@ -77,7 +77,7 @@ behaviour_info(callbacks) ->
     [
         {new, 1}, {open, 1}, {close, 1}, {put, 2}, {get, 2}, {delete, 2},
         {get_persisted_tables, 0}, {get_name, 1}, {get_load, 1}, 
-        {supports_feature, 1}, {is_available, 0}
+        {supports_feature, 1}, {is_available, 0},
         {foldl, 3}, {foldl, 4}, {foldl, 5},
         {foldr, 3}, {foldr, 4}, {foldr, 5},
         {tab2list, 1}

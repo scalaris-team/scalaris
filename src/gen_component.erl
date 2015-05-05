@@ -77,8 +77,8 @@
           bp_msg()
         | {'$gen_component', sleep, pos_integer()}
         | {'$gen_component', about_to_kill, pos_integer(), pid()}
-        | {'$gen_component', get_state, pid()}
-        | {'$gen_component', get_component_state, pid()}
+        | {'$gen_component', get_state, pid(), Cookie::pos_integer()}
+        | {'$gen_component', get_component_state, pid(), Cookie::pos_integer()}
         | {'$gen_component', trace_mpath, trace_mpath:passed_state(),
            From::term(), To::term(), comm:message()}.
 
@@ -164,64 +164,86 @@ runnable(Pid) ->
         true -> true
     end.
 
--spec receive_state_if_alive(Pid::pid(),
-        MsgTag::get_state_response | get_component_state_response)
-            -> term() | failed.
-receive_state_if_alive(Pid, MsgTag) ->
+-spec receive_state_if_alive(
+        Pid::pid(), MsgTag::get_state_response | get_component_state_response,
+        Cookie::pos_integer()) -> term() | failed.
+receive_state_if_alive(Pid, MsgTag, Cookie) ->
     case erlang:is_process_alive(Pid) of
         true ->
             receive
-                {'$gen_component', MsgTag, State} -> State
-                after 100 ->
-                    receive_state_if_alive(Pid, MsgTag)
+                {'$gen_component', MsgTag, Cookie, State} ->
+                    State;
+                {'$gen_component', MsgTag, _OldCookie, _State} ->
+                    % remove unrelated/old incarnations of this message
+                    receive_state_if_alive(Pid, MsgTag, Cookie)
+            after 100 ->
+                receive_state_if_alive(Pid, MsgTag, Cookie)
             end;
         _ ->
             receive
                 {'$gen_component', MsgTag, State} -> State
-                after 0 ->
-                    failed
+            after 0 ->
+                failed
             end
     end.
 
--spec receive_state_if_alive(Pid::pid(),
-        MsgTag::get_state_response | get_component_state_response,
-        Timeout::non_neg_integer()) -> term() | failed.
-receive_state_if_alive(Pid, MsgTag, Timeout) when Timeout >= 0->
+-spec receive_state_if_alive(
+        Pid::pid(), MsgTag::get_state_response | get_component_state_response,
+        Cookie::pos_integer(), Timeout::non_neg_integer()) -> term() | failed.
+receive_state_if_alive(Pid, MsgTag, Cookie, Timeout) when Timeout >= 0->
     case erlang:is_process_alive(Pid) of
         true ->
             receive
-                {'$gen_component', MsgTag, State} -> State
-                after 100 ->
-                    receive_state_if_alive(Pid, MsgTag, Timeout - 100)
+                {'$gen_component', MsgTag, Cookie, State} ->
+                    State;
+                {'$gen_component', MsgTag, _OldCookie, _State} ->
+                    % remove unrelated/old incarnations of this message
+                    receive_state_if_alive(Pid, MsgTag, Cookie, Timeout)
+            after 100 ->
+                receive_state_if_alive(Pid, MsgTag, Cookie, Timeout - 100)
             end;
         _ ->
             receive
-                {'$gen_component', MsgTag, State} -> State
-                after 0 ->
-                    failed
+                {'$gen_component', MsgTag, Cookie, State} -> State
+            after 0 ->
+                failed
             end
     end;
-receive_state_if_alive(_Pid, _MsgTag, _Timeout) -> failed.
+receive_state_if_alive(_Pid, MsgTag, Cookie, _Timeout) ->
+    % one last try looking into the message box only
+    receive
+        {'$gen_component', MsgTag, Cookie, State} ->
+            State;
+        {'$gen_component', MsgTag, _OldCookie, _State} ->
+            % remove unrelated/old incarnations of this message
+            failed
+    after 0 ->
+        failed
+    end.
 
 -spec get_state(Pid::pid()) -> user_state() | failed.
 get_state(Pid) ->
-    Pid ! {'$gen_component', get_state, self()},
-    receive_state_if_alive(Pid, get_state_response).
+    Cookie = randoms:getRandomInt(),
+    Pid ! {'$gen_component', get_state, self(), Cookie},
+    receive_state_if_alive(Pid, get_state_response, Cookie).
 
 -spec get_state(Pid::pid(), Timeout::non_neg_integer()) -> user_state() | failed.
 get_state(Pid, Timeout) ->
-    Pid ! {'$gen_component', get_state, self()},
-    receive_state_if_alive(Pid, get_state_response, Timeout).
+    Cookie = randoms:getRandomInt(),
+    Pid ! {'$gen_component', get_state, self(), Cookie},
+    receive_state_if_alive(Pid, get_state_response, Cookie, Timeout).
 
 -spec get_component_state(Pid::pid()) -> gc_state().
 get_component_state(Pid) ->
-    Pid ! {'$gen_component', get_component_state, self()},
-    receive_state_if_alive(Pid, get_component_state_response).
+    Cookie = randoms:getRandomInt(),
+    Pid ! {'$gen_component', get_component_state, self(), Cookie},
+    receive_state_if_alive(Pid, get_component_state_response, Cookie).
 
 -spec get_component_state(pid(), Timeout::non_neg_integer()) -> gc_state() | failed.
 get_component_state(Pid, Timeout) ->
-    Pid ! {'$gen_component', get_component_state, self()},
-    receive_state_if_alive(Pid, get_component_state_response, Timeout).
+    Cookie = randoms:getRandomInt(),
+    Pid ! {'$gen_component', get_component_state, self(), Cookie},
+    receive_state_if_alive(Pid, get_component_state_response, Cookie, Timeout).
 
 %% @doc change the handler for handling messages
 -spec change_handler(user_state(), Handler::handler())
@@ -752,14 +774,14 @@ on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) -
     process_flag(priority, normal),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', get_state, Pid} = _Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', get_state, Pid, Cookie} = _Msg, UState, GCState) ->
     comm:send_local(
-      Pid, {'$gen_component', get_state_response, UState}),
+      Pid, {'$gen_component', get_state_response, Cookie, UState}),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', get_component_state, Pid} = _Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', get_component_state, Pid, Cookie} = _Msg, UState, GCState) ->
     comm:send_local(
-      Pid, {'$gen_component', get_component_state_response,
+      Pid, {'$gen_component', get_component_state_response, Cookie,
             {gc_mod(GCState), gc_hand(GCState), GCState}}),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
@@ -948,10 +970,10 @@ on_bp_req_in_bp(Msg, State,
         end,
     wait_for_bp_leave(Msg, NextState, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', get_component_state, Pid},
+                {'$gen_component', get_component_state, Pid, Cookie},
                 _IsFromQueue) ->
     comm:send_local(
-      Pid, {'$gen_component', get_component_state_response, State}),
+      Pid, {'$gen_component', get_component_state_response, Cookie, State}),
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
                 {'$gen_component', about_to_kill, Time, Pid} = SleepMsg,

@@ -364,7 +364,7 @@ class TestTransactionSingleOp(unittest.TestCase):
     # request that is too large.
     def testReqTooLarge(self):
         conn = TransactionSingleOp()
-        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        data = '0' * _TOO_LARGE_REQUEST_SIZE
         key = "_ReqTooLarge"
         try:
             conn.write(str(self._testTime) + key, data)
@@ -579,7 +579,7 @@ class TestTransaction(unittest.TestCase):
     # request that is too large.
     def testReqTooLarge(self):
         conn = Transaction()
-        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        data = '0' * _TOO_LARGE_REQUEST_SIZE
         key = "_ReqTooLarge"
         try:
             conn.write(str(self._testTime) + key, data)
@@ -873,7 +873,8 @@ class TestPubSub(unittest.TestCase):
             for content in contents:
                 if not content in notifications[topic]:
                     not_received.append(topic + ": " + content)
-                notifications[topic].remove(content)
+                else:
+                    notifications[topic].remove(content)
             if len(notifications[topic]) > 0:
                 unrelated_items.append("(" + topic + ": " + ", ".join(notifications[topic]) + ")")
             del notifications[topic]
@@ -1154,7 +1155,7 @@ class TestPubSub(unittest.TestCase):
     # request that is too large.
     def testReqTooLarge(self):
         conn = PubSub()
-        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        data = '0' * _TOO_LARGE_REQUEST_SIZE
         key = "_ReqTooLarge"
         try:
             conn.publish(str(self._testTime) + key, data)

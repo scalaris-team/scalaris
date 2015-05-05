@@ -114,8 +114,6 @@
                 end
         end()).
 
--define(implies(A, B), (not (A)) orelse (B)).
-
 -define(expect_message_timeout(MsgPattern, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->

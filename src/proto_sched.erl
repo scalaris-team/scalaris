@@ -277,11 +277,12 @@ register_callback(CallbackFun, OnX, TraceId) ->
     %% register the callback function
     LoggerPid = pid_groups:find_a(proto_sched),
     comm:send_local(LoggerPid, {register_callback, CallbackFun, OnX, TraceId, comm:this()}),
+    X = receive
+            ?SCALARIS_RECV({register_callback_reply, Result}, Result)
+        end,
     %% restore infection
     restore_infection(),
-    receive
-        ?SCALARIS_RECV({register_callback_reply, Result}, Result)
-    end.
+    X.
 
 -spec info_shorten_messages(Infos, CharsPerMsg::pos_integer()) -> Infos
         when is_subtype(Infos, [tuple()]).
