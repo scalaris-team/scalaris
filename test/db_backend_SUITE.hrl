@@ -181,12 +181,13 @@ scrub_data(Data) ->
     %% Entries should be unique
     SortFun = fun(A, B) -> ((element(1, A) < element(1, B)) orelse
                             (element(1, A) ?EQ element(1, B)))
-                           orelse
-                           (is_integer(element(1, A))
-                            andalso is_float(element(1, B))
+                            orelse
+                            (is_integer(most_inner_first(A))
+                            andalso is_float(most_inner_first(B))
                             andalso element(1, A) == element(1, B))
               end,
     lists:usort(SortFun, lists:reverse(Data)).
+
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(K, AIn) -> [?TEST_DB:get(DB, K) | AIn] end, []),
@@ -204,3 +205,11 @@ is_in({'(', L, R, ')'}, Key) -> Key > L andalso Key < R;
 is_in({'(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key ?EQ R));
 is_in({'[', L, R, ')'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso Key < R;
 is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso ((Key < R) orelse (Key ?EQ R)).
+
+%% traverse a nested structure build out of tuples and lists by choosing its first element
+%% repeatedly until the most inner element is reached.  
+most_inner_first({}) -> {};
+most_inner_first([]) -> [];
+most_inner_first([H|_T]) -> most_inner_first(H);
+most_inner_first(Tuple) when is_tuple(Tuple) -> most_inner_first(element(1, Tuple));
+most_inner_first(Element) -> Element.
