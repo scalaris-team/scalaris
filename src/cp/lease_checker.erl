@@ -165,10 +165,9 @@ get_dht_node_state(Pid, What) ->
 
 -spec get_all_leases() -> list(lease_list:lease_list()).
 get_all_leases() ->
-    GetLeases = fun(Pid) ->
-                        get_dht_node_state(Pid, lease_list)
-                end,
-    lists:filtermap(GetLeases, all_dht_nodes()).
+    % short for lists:filtermap/2
+    [ element(2, L) || Node <- all_dht_nodes(),
+                       (L = get_dht_node_state(Node, lease_list)) =/= false ].
 
 -spec all_dht_nodes() -> list(comm:mypid()).
 all_dht_nodes() ->
