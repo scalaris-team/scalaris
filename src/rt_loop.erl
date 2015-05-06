@@ -199,9 +199,10 @@ on_active({fd_notify, _Event, _DeadPid, _Reason}, State) ->
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
-   {_Neighbors, RT, _ERT} = State) ->
+   {_Neighbors, RT, ERT} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RT)},
+         {"ert_size", gb_trees:size(ERT)},
          {"rt (index, node):", ""} | ?RT:dump(RT)],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
