@@ -238,11 +238,21 @@ java-bench: compile java
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
 	( ./bin/scalarisctl -n "jbench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JAPI_NODE="jbench_boot jbench_node1 jbench_node2 jbench_node3" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
+	FAILED=$$? ; \
 	./bin/scalarisctl -n "jbench_boot" stop ; \
 	./bin/scalarisctl -n "jbench_node1" stop ; \
 	./bin/scalarisctl -n "jbench_node2" stop ; \
 	./bin/scalarisctl -n "jbench_node3" stop ; \
-	true
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/jbench_*@"`hostname -f`"/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 java-%:
 	ant -buildfile java-api/build.xml $*
@@ -293,11 +303,21 @@ python-bench: compile python
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
 	( ./bin/scalarisctl -n "pbench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON2) python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
+	FAILED=$$? ; \
 	./bin/scalarisctl -n "pbench_boot" stop ; \
 	./bin/scalarisctl -n "pbench_node1" stop ; \
 	./bin/scalarisctl -n "pbench_node2" stop ; \
 	./bin/scalarisctl -n "pbench_node3" stop ; \
-	true
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/pbench_*@"`hostname -f`"/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 python-doc-html:
 	cd python-api ; epydoc --config=epydoc.html.cfg ; FAILED=$$? ; cd .. ; \
@@ -374,11 +394,21 @@ python3-bench: compile python3
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
 	( ./bin/scalarisctl -n "p3bench_boot" dbg-check-ring 4 30 && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON3) python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
+	FAILED=$$? ; \
 	./bin/scalarisctl -n "p3bench_boot" stop ; \
 	./bin/scalarisctl -n "p3bench_node1" stop ; \
 	./bin/scalarisctl -n "p3bench_node2" stop ; \
 	./bin/scalarisctl -n "p3bench_node3" stop ; \
-	true
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/p3bench_*@"`hostname -f`"/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 ruby-test: compile
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
