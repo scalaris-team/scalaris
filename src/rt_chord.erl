@@ -265,10 +265,16 @@ stabilize(Neighbors, RT, Index, Node, RTLoop) ->
                 _ -> ok
             end,
             Changed = (Index =:= first_index() orelse
-                          (gb_trees:lookup(prev_index(Index), RT) =/= {value, Node})),
+                       (gb_trees:lookup(prev_index(Index), RT) =/= {value, {Node, RTLoop}})),
             {gb_trees:enter(Index, {Node, RTLoop}, RT), Changed};
-        _ ->
-            {RT, false}
+        false ->
+            %% there should be nothing shorter than succ
+            case intervals:in(node:id(Node), nodelist:succ_range(Neighbors)) of
+                %% ignore message
+                false -> {RT, false};
+                %% add succ to RT
+                true -> {gb_trees:enter(Index, {Node, RTLoop}, RT), true}
+            end
     end.
 %% userdevguide-end rt_chord:stabilize
 
@@ -494,15 +500,15 @@ next_hop(Neighbors, RT, Id) ->
             % check routing table:
             RTSize = get_size(RT),
             {NextHopId, NextHop1} =
-            case util:gb_trees_largest_smaller_than(Id, RT) of
-                {value, Key, Node} ->
-                    {Key, Node};
-                nil when RTSize =:= 0 ->
-                    Succ = nodelist:succ(Neighbors),
-                    {node:id(Succ), node:pidX(Succ)};
-                nil -> % forward to largest finger
-                    gb_trees:largest(RT)
-            end,
+                case util:gb_trees_largest_smaller_than(Id, RT) of
+                    {value, Key, Node} ->
+                        {Key, Node};
+                    nil when RTSize =:= 0 ->
+                        Succ = nodelist:succ(Neighbors),
+                        {node:id(Succ), node:pidX(Succ)};
+                    nil -> % forward to largest finger
+                        gb_trees:largest(RT)
+                end,
             % TODO: better create a separate gb_tree for the neighbourhood nodes (dht_node pids!) and always look there, too
             %       but beware to prefer rt_loop pids if an entry with the same Id is found!
             %       -> this is faster and more generic
