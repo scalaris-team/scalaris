@@ -27,10 +27,6 @@
 -endif.
 -endif.
 
--ifdef(reference_not_builtin).
--type reference() :: erlang:reference().
--endif.
-
 -ifdef(have_erlang_timestamp).
 -type erlang_timestamp() :: erlang:timestamp().
 -else.
