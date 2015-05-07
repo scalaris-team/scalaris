@@ -409,9 +409,13 @@ parse_type_({user_type, Line, TypeName, L}, Module, ParseState) ->
     parse_type_({type, Line, TypeName, L}, Module, ParseState);
 parse_type_({type, _Line, map, MapFields = [{type, _, map_field_assoc, _}| _]}, Module, ParseState) ->
     %% ct:pal("type assoc map ~p:~p~n~w~n~w~n~w~n", [Module, map, MapFields, erlang:get(current_module), _Line]),
-    Fields = [ {assoc_map_fields, FieldName, parse_type(Type, Module, ParseState)}
-               ||  {type, _, map_field_assoc, [{atom,_,FieldName}, Type]} <- MapFields],
-    {{type_assoc_map, Fields}, ParseState};
+    {Fields, NextParseState}
+        = lists:foldl(fun ({type, _, map_field_assoc, [{atom,_,FieldName}, Type]}, {FieldList, State}) ->
+                              {TheTypeSpec, NewParseState} = parse_type(Type, Module, State),
+                              {[{assoc_map_fields, FieldName, TheTypeSpec} | FieldList], NewParseState}
+                      end,
+                      {[], ParseState}, MapFields),
+    {{type_assoc_map, Fields}, NextParseState};
 parse_type_({type, _Line, TypeName, L}, Module, ParseState) ->
     % ct:pal("type1 ~p:~p~n~w~n~w~n~w~n", [Module, TypeName, L, erlang:get(current_module), _Line]),
     case tester_parse_state:is_known_type(Module, TypeName, length(L), ParseState) of
