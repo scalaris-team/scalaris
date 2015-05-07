@@ -103,7 +103,8 @@ new_db(DBName, HanoiOptions) ->
 %% @doc Closes the DB named DBName keeping its data on disk.
 -spec close(DB::db()) -> true.
 close({DB, _FileName}) ->
-    ok = hanoidb:close(DB).
+    ok = hanoidb:close(DB),
+    true.
     % hanoidb:stop(). Not needed.
 
 %% @doc Closes and deletes the DB named DBName
