@@ -193,11 +193,21 @@ bench: compile
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
 	echo "running bench:quorum_read(10, 5000)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
+	FAILED=$$? ; \
 	./bin/scalarisctl -n "ebench_boot" stop ; \
 	./bin/scalarisctl -n "ebench_node1" stop ; \
 	./bin/scalarisctl -n "ebench_node2" stop ; \
 	./bin/scalarisctl -n "ebench_node3" stop ; \
-	true
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/ebench_*@"`hostname -f`"/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 java:
 	ant -buildfile java-api/build.xml jar
