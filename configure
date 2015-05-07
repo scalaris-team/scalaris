@@ -4134,15 +4134,6 @@ else
 $as_echo "$as_me: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&6;}
 fi
 
-httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [httpc:set_option(max_sessions, 1)]), erlang:halt().' | tail -1`
-if test "${httpc_avail}" = "ok"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: httpc is available" >&5
-$as_echo "$as_me: httpc is available" >&6;}
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: httpc unavailable, using wrapper module" >&5
-$as_echo "$as_me: httpc unavailable, using wrapper module" >&6;};EMAKEFILECOMPILECOMPAT="{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."
-fi
-
 ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(ct_line,parse_transform,2)]), erlang:halt().' | tail -1`
 if test "${ct_line}" = "true"; then :
   EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ctline_support}"

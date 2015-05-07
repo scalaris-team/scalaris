@@ -83,4 +83,3 @@
   {i, "contrib/yaws/include"}
   @YAWS_OPTIONS@
  ]}.
-@EMAKEFILECOMPILECOMPAT@

@@ -303,11 +303,6 @@ AS_IF([test "${crypto_hash}" = "true"],
        AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
       [AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
 
-httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [[httpc:set_option(max_sessions, 1)]]), erlang:halt().' | tail -1`
-AS_IF([test "${httpc_avail}" = "ok"],
-      [AC_MSG_NOTICE([httpc is available])],
-      [AC_MSG_NOTICE([httpc unavailable, using wrapper module]);EMAKEFILECOMPILECOMPAT=["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]])
-
 ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(ct_line,parse_transform,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${ct_line}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ctline_support}"
