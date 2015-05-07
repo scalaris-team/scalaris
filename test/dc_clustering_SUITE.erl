@@ -35,9 +35,6 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
 init_per_testcase(Testcase, Config) ->
     % dc_clustering must be activated and a radius must exist
     EnableClustering = {dc_clustering_enable, true},
@@ -66,9 +63,6 @@ init_per_testcase(Testcase, Config) ->
 
     Config.
 
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node
 get_vivaldi_and_centroids(Gossip, Clustering) ->

@@ -70,8 +70,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    Config3 = unittest_helper:start_minimal_procs(Config2, [], true),
+    Config3 = unittest_helper:start_minimal_procs(Config, [], true),
     tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
@@ -84,7 +83,7 @@ end_per_suite(Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 

@@ -47,12 +47,6 @@ suite() ->
      {timetrap, {seconds, 200}}
     ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 comparison(_) ->

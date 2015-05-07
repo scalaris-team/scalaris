@@ -604,7 +604,6 @@ EMAKEFILECOMPILECOMPAT
 DIALYZER_FLAGS
 EDOCMACROS
 EMAKEFILEDEFINES
-CTHOOKS_FLAGS
 ERLANG_TOKE_FLAGS
 ERLANG_LIB_VER_toke
 ERLANG_LIB_DIR_toke
@@ -4145,22 +4144,6 @@ else
   { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
 $as_echo "$as_me: ct_line is not available" >&6;}
 fi
-
-"${ERL}" -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
-if test $? -eq 0 ; then :
-  CTHOOKS_FLAGS="-ct_hooks scalaris_cth"
-        EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_cthooks_support}"
-        EDOCMACROS="${EDOCMACROS}, {have_cthooks_support, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_cthooks_support"
-        { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is available" >&5
-$as_echo "$as_me: ct_hooks is available" >&6;}
-else
-  CTHOOKS_FLAGS=""
-        { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is not available" >&5
-$as_echo "$as_me: ct_hooks is not available" >&6;}
-fi
-
-
 
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5

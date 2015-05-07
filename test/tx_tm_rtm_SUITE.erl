@@ -38,11 +38,11 @@ all() ->
 suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
+    Config.
 
 end_per_suite(Config) ->
     unittest_helper:stop_ring(),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_testcase(TestCase, Config) ->
     %% stop ring from previous test case (may have run into a timeout)

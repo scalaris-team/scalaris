@@ -311,19 +311,6 @@ AS_IF([test "${ct_line}" = "true"],
        AC_MSG_NOTICE([ct_line is available])],
       [AC_MSG_NOTICE([ct_line is not available])])
 
-"${ERL}" -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
-AS_IF(
-       [test $? -eq 0 ],
-       [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"
-        EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_cthooks_support}"
-        EDOCMACROS="${EDOCMACROS}, {have_cthooks_support, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_cthooks_support"
-        AC_MSG_NOTICE([ct_hooks is available])],
-       [CTHOOKS_FLAGS=""
-        AC_MSG_NOTICE([ct_hooks is not available])])
-
-AC_SUBST(CTHOOKS_FLAGS)
-
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-callback init() -> ok.], [ok])],
        [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_callback_support}"

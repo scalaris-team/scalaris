@@ -98,8 +98,7 @@ rw_suite_runs(Desired) ->
     erlang:min(Desired, max_rw_tests_per_suite()).
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    Config3 = unittest_helper:start_minimal_procs(Config2, [], false),
+    Config3 = unittest_helper:start_minimal_procs(Config, [], false),
     tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     Config3.
@@ -108,7 +107,7 @@ end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 

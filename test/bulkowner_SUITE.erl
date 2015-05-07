@@ -31,13 +31,12 @@ all() -> [tester_count].
 suite() -> [ {timetrap, {seconds, 10}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-    Config2.
+    Config.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 tester_count(_Config) ->
     tester:test(?MODULE, count, 0, 1000),

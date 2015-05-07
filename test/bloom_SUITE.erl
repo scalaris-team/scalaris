@@ -46,12 +46,6 @@ suite() ->
      {timetrap, {seconds, 45}}
     ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_p_add_list(BF0Items::[?BLOOM:key()], Items::[?BLOOM:key()]) -> true.

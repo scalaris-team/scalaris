@@ -36,9 +36,8 @@ all() -> tests_avail().
 suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
-    Config1 = unittest_helper:init_per_suite(Config),
     %% need config here to get db path
-    Config2 = unittest_helper:start_minimal_procs(Config1, [], false),
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
 
     %% cleanup schema generated possibly in earlier failed run
     PWD = os:cmd(pwd),
@@ -69,7 +68,7 @@ end_per_suite(Config) ->
     file:delete(WorkingDir ++ "schema.DAT"),
 
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 rw_suite_runs(N) ->
     erlang:min(N, 200).

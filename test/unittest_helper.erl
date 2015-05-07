@@ -33,7 +33,6 @@
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_processes/0, kill_new_processes/1, kill_new_processes/2,
-         init_per_suite/1, end_per_suite/1,
          create_ct_all/1, create_ct_groups/2,
          init_per_group/2, end_per_group/2,
          get_ring_data/1, print_ring_data/0,
@@ -495,47 +494,6 @@ kill_new_processes(OldProcesses, Options) ->
             ct:pal("Killed processes: ~.0p~n", [Killed]);
         true -> ok
     end.
-
-%% @doc Generic init_per_suite for all unit tests. Prints current state
-%%      information and stores information about all running processes.
-%%      Also starts the crypto application needed for unit tests using the
-%%      tester.
--spec init_per_suite(kv_opts()) -> kv_opts().
--ifdef(have_cthooks_support).
-init_per_suite(Config) ->
-    Config.
--else.
-init_per_suite(Config) ->
-    Processes = get_processes(),
-    ct:pal("Starting unittest ~p~n", [ct:get_status()]),
-    randoms:start(),
-    [{processes, Processes} | Config].
--endif.
-
-%% @doc Generic end_per_suite for all unit tests. Tries to stop a scalaris ring
-%%      started with make_ring* (if there is one) and stops the inets and
-%%      crypto applications needed for some unit tests. Then gets the list of
-%%      processes stored in init_per_suite/1 and kills all but a selected few
-%%      of processes which are now running but haven't been running before.
-%%      Thus allows a clean start of succeeding test suites.
-%%      Prints information about the processes that have been killed.
--spec end_per_suite(Config::kv_opts()) -> ok.
--ifdef(have_cthooks_support).
-end_per_suite(_Config) ->
-    ok.
--else.
-end_per_suite(Config) ->
-    ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
-    stop_ring(),
-    % the following might still be running in case there was no ring:
-    error_logger:tty(false),
-    randoms:stop(),
-    error_logger:tty(true),
-    unittest_global_state:delete(),
-    {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
-    kill_new_processes(OldProcesses),
-    ok.
--endif.
 
 -type ct_group_props() ::
     [parallel | sequence | shuffle | {shuffle, {integer(), integer(), integer()}} |

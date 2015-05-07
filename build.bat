@@ -12,7 +12,6 @@ call "%~dp0"\bin\find_erlang.bat
 ::  {d, have_toke}
 ::  {d, tid_not_builtin}
 ::  {d, have_ctline_support}
-::  {d, have_cthooks_support}
 ::  {d, have_callback_support}
 ::  {d, with_crypto_hash}
 :: refer to configure.ac for the appropriate checks for necessity
@@ -25,7 +24,7 @@ if not exist Emakefile (
     for /f "tokens=1,* delims=&&&" %%a in (Emakefile.in) do (
         set "line=%%a"
         if defined line (
-            call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_cthooks_support}%%"
+            call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}%%"
             for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
         ) ELSE echo.
     )

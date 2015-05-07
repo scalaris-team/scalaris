@@ -53,12 +53,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [], true).
+    unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 

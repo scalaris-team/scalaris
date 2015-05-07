@@ -35,12 +35,6 @@ suite() ->
         {timetrap, {seconds, 30}}
     ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 % Test dc_centroids:distance/2
 %
 % This is the euclidian distance between two centroids

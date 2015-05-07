@@ -47,12 +47,11 @@ groups() ->
 suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [{rrd_timing_hist_size, 0}], false).
+    unittest_helper:start_minimal_procs(Config, [{rrd_timing_hist_size, 0}], false).
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_group(Group, Config) ->
     unittest_helper:init_per_group(Group, Config).

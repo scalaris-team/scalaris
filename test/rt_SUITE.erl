@@ -38,12 +38,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [], true).
+    unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 %% @doc Returns whether the default routing table from ?RT has chord-like keys.
 -spec default_rt_has_chord_keys() -> boolean().

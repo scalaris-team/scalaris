@@ -43,16 +43,7 @@ suite() ->
     ].
 
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
-
 init_per_testcase(TestCase, Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
     NeedsRing = [test_get_coordinate, test_select_reply_data],
     case lists:member(TestCase, NeedsRing) of
         true ->
@@ -61,9 +52,9 @@ init_per_testcase(TestCase, Config) ->
 
                                                    ]}]),
             unittest_helper:wait_for_stable_ring_deep(),
-            Config2;
+            Config;
         false ->
-            unittest_helper:start_minimal_procs(Config2, [], true)
+            unittest_helper:start_minimal_procs(Config, [], true)
     end.
 
 

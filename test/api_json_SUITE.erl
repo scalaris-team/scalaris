@@ -27,13 +27,12 @@ all()   -> [get_node_info, get_node_performance, get_service_info, get_service_p
 suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-    Config2.
+    Config.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 get_node_info(_Config) ->
      {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_node_info, []),

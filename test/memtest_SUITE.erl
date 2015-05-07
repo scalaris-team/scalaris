@@ -40,10 +40,10 @@ suite() -> [ {timetrap, {seconds, 300}} ].
 
 init_per_suite(Config) ->
     _ = code:ensure_loaded(gossip_load_default), % otherwise loaded too late
-    unittest_helper:init_per_suite(Config).
+    Config.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 init_per_group(Group, Config) ->
     ct:comment(io_lib:format("BEGIN ~p", [Group])),

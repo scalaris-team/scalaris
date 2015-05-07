@@ -49,12 +49,6 @@ all()   -> [ {group, proto_sched_ready},
 
 suite() -> [ {timetrap, {seconds, 200}} ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring

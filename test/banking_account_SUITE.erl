@@ -27,13 +27,12 @@ all()   -> [banking_account].
 suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-    Config2.
+    Config.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 money_transfer(A, B) ->
     TLog0 = api_tx:new_tlog(),

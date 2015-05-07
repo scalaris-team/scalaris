@@ -65,12 +65,6 @@ group(partition_tests) ->
 group(_) ->
     suite().
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).

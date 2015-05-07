@@ -141,33 +141,33 @@ contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 test-all: all_TESTS java-test python-test ruby-test interop-test
 
 test: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -ct_hooks scalaris_cth -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-skipped: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg @CTHOOKS_FLAGS@ -noshell | tee ct-skipped.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg -ct_hooks scalaris_cth -noshell | tee ct-skipped.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
 %_SUITE: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ @CTHOOKS_FLAGS@ -noshell | tee ct_$@.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	grep " 0 failed" ct_$@.log
 
 %_SUITE-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 %_TESTS: compile
 # use non standard ports to run a test group so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg @CTHOOKS_FLAGS@ -noshell | tee ct_$@.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
 test-vts: compile
-	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ @CTHOOKS_FLAGS@
+	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
 
 test-clean:
 	-rm -rf ct_run.*@* ct.log ct-skipped.log ct_*_SUITE.log index.html all_runs.html variables-*@* \

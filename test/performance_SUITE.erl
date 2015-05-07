@@ -89,12 +89,6 @@ end_per_group(GroupName, Config) ->
         _ -> ok
     end.
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 count() ->
     1000000.
 

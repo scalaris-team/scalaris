@@ -38,12 +38,11 @@ all() ->
 suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [], true).
+    unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 % TODO: add tests for simple node lists (the following tests only test functions with neighborhood structures)
 

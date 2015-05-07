@@ -35,14 +35,13 @@ suite() ->
     [{timetrap, {seconds, 40}}].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(2, [{config, [{log_path, PrivDir}]}]),
     comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port()),
-    Config2.
+    Config.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
+    Config.
 
 -spec make_groupname(Prefix::string(), Number::integer()) -> pid_groups:groupname().
 make_groupname(Prefix, Number) ->

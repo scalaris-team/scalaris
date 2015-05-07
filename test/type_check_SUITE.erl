@@ -45,12 +45,6 @@ all()   -> [
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config).
-
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         _ ->
