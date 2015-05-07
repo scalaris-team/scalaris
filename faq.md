@@ -65,7 +65,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 ### Minimum Requirements
 
-  * Erlang >= R13B01 (see [Known Issues](#known-issues) below)
+  * Erlang >= R14B04
 
 #### Optional requirements
 
@@ -189,15 +189,9 @@ No. Well, maybe.
   0. adapt the path to your Erlang installation in `firstnode.bat`, and `joining_node.bat`
   0. run `firstnode.bat` in the cmd window
 
-If you have Erlang < R13B04, you will need to adapt the `Emakefile` that `build.bat` generates if it doesn't exist.
-Replace every occurrence of
-{% highlight sh %}
-, {d, tid_not_builtin}
-{% endhighlight %}
-with these lines (note the first ","!) and try to compile again, using build.bat. It should work now.
-{% highlight sh %}
-, {d, type_forward_declarations_are_not_allowed}, {d, forward_or_recursive_types_are_not_allowed}
-{% endhighlight %}
+On certain older Erlang versions, you will need to adapt the \code{Emakefile}.
+Please refer to the \code{build.bat} and \code{configure.ac} for the available
+configuration parameters and their meaning.
 
 Note: we do not support Scalaris on Windows at the moment.
 
@@ -359,10 +353,6 @@ conversion from (falsely interpreted) strings to lists of integers. Use our `str
 Note: You can safely use `Scalaris.str_to_list()` for any integer list (even those with large integers which are already returned as valid lists). It will return the original value if it is not a string or unicode object.
 
 ## Known Issues
-
-### Publishing topics with Erlang R13B01 may fail
-
-The httpc_handler module of the R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang R13B02 - R14A.
 
 ### Configure claims that the Java client script may not work
 
