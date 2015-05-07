@@ -57,10 +57,8 @@
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 -export([bp_about_to_kill/1]).
 
--ifdef(with_export_type_support).
 -export_type([handler/0]).
 -export_type([bp_name/0]). %% for unittests
--endif.
 
 -type bp_name() :: atom().
 

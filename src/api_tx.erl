@@ -30,7 +30,6 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--ifdef(with_export_type_support).
 -export_type([request/0, request_on_key/0,
               request_enc/0, request_on_key_enc/0,
               read_request/0, read_random_from_list_request/0,
@@ -43,7 +42,6 @@
               write_result/0, commit_result/0]).
 -export_type([listop_result/0, numberop_result/0, testandset_result/0]).
 -export_type([client_key/0]).
--endif.
 
 -include("api_tx.hrl").
 

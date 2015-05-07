@@ -32,9 +32,7 @@
          dispatch_snapshot/1
         ]).
 
--ifdef(with_export_type_support).
 -export_type([message/0]).
--endif.
 
 -include("scalaris.hrl").
 -include("client_types.hrl").

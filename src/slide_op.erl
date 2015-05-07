@@ -49,9 +49,7 @@
 %-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 
--ifdef(with_export_type_support).
 -export_type([slide_op/0, id/0, phase/0, type/0, next_op/0]).
--endif.
 
 -type id() :: uid:global_uid().
 

@@ -37,10 +37,8 @@
 
 -type lease_list() :: #lease_list_t{}.
 
--ifdef(with_export_type_support).
 -export_type([lease_list/0]).
 -export_type([active_lease_t/0]).
--endif.
 
 -export([empty/0]).
 -export([update_lease_in_dht_node_state/4]).

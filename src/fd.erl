@@ -25,9 +25,7 @@
 -behaviour(gen_component).
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([cookie/0, reason/0]).
--endif.
 
 -export([subscribe/1, subscribe/2, subscribe_refcount/2, subscribe_pid/2,
          subscribe_pid/3]).

@@ -51,9 +51,7 @@
 -type(centroid() :: #centroid{}).
 -type(centroids() :: [centroid()]).
 
--ifdef(with_export_type_support).
 -export_type([centroid/0, centroids/0]).
--endif.
 
 % @doc Create a new centroid.
 -spec new(coordinate(), relative_size()) -> centroid().

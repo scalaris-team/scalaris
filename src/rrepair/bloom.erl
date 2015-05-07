@@ -52,9 +52,7 @@
 -opaque bloom_filter() :: #bloom{}.
 -type key() :: any().
 
--ifdef(with_export_type_support).
 -export_type([bloom_filter/0, key/0]).
--endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API

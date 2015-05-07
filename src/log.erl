@@ -26,9 +26,7 @@
 -export([pal/1, pal/2]).
 -export([check_config/0]).
 
--ifdef(with_export_type_support).
 -export_type([log_level/0]).
--endif.
 
 -type log_level() :: debug | info | warn | error | fatal.
 

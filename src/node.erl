@@ -30,9 +30,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--ifdef(with_export_type_support).
 -export_type([node_type/0]).
--endif.
 
 -record(node, {pid        = ?required(node, pid)        :: comm:mypid(),
                id         = ?required(node, id)         :: ?RT:key(),

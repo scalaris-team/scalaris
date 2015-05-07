@@ -34,9 +34,7 @@
 % only use inside the dht_node process:
 -export([on/2]).
 
--ifdef(with_export_type_support).
 -export_type([bulkowner_msg/0]).
--endif.
 
 -type bulkowner_req() ::
       {bulkowner, start,

@@ -28,9 +28,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([tcp_port/0]).
--endif.
 
 -export([send/3, this/0, is_valid/1, is_local/1, make_local/1,
          get_ip/1, get_port/1, report_send_error/4]).

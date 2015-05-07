@@ -55,12 +55,10 @@
 -export([drop_value/1]).
 -export([get_entry_version/1]).
 
--ifdef(with_export_type_support).
 -export_type([tlog/0, tlog_entry/0, tlog_entry_write/0]).
 -export_type([tlog_ext/0, tlog_entry_ext/0]).
 -export_type([tx_status/0, tx_op/0]).
 -export_type([snap_number/0]).
--endif.
 
 -type tx_status() :: ?ok | ?fail. % TODO: add 'undefined'?!
 -type tx_op()     :: ?read | ?write.

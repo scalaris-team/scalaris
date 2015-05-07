@@ -49,9 +49,7 @@
 -include("unittest.hrl").
 -include("tester.hrl").
 
--ifdef(with_export_type_support).
 -export_type([state/0]).
--endif.
 
 -record(parse_state,
         {type_infos        = gb_trees:empty() :: gb_trees:tree(type_name(), {var_list(), type_spec()}),

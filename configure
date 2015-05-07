@@ -4215,36 +4215,6 @@ $as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
    FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
 fi
 
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--export_type([mytype/0]). -type(mytype()::ok).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_export_type_support}"
-        EDOCMACROS="${EDOCMACROS}, {with_export_type_support, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_export_type_support"
-        { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
-$as_echo "$as_me: export_type is supported" >&6;}
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
-$as_echo "$as_me: export_type is not supported" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [crypto:start()]), erlang:halt().' | tail -1`
 if test "${crypto_start}" = "ok"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:start() is available" >&5

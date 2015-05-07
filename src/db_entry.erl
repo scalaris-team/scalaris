@@ -36,9 +36,7 @@
 % only for unit tests:
 -export([inc_version/1, dec_version/1]).
 
--ifdef(with_export_type_support).
 -export_type([entry/0, entry_ex/0, entry_empty/0]).
--endif.
 
 % note: do not make opaque so DB implementations can rely on an entry() being a
 % tuple as defined here

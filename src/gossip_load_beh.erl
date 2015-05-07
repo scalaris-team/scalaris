@@ -23,9 +23,7 @@
 -export([behaviour_info/1]).
 -endif.
 
--ifdef(with_export_type_support).
 -export_type([load/0]).
--endif.
 
 -type load() :: number().
 

@@ -40,9 +40,7 @@
 %% for testing
 -export([update_coordinate/5]).
 
--ifdef(with_export_type_support).
 -export_type([est_error/0, latency/0, network_coordinate/0]).
--endif.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

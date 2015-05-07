@@ -37,9 +37,7 @@
 -type hfs_fun() :: fun((binary()) -> non_neg_integer() | binary()).
 -opaque hfs()   :: {hfs_lhsp, Hf_count::pos_integer(), H1_fun::hfs_fun(), H2_fun::hfs_fun()}.
 
--ifdef(with_export_type_support).
 -export_type([hfs/0]).
--endif.
 
 -export([new/1, new/2, apply_val/2, apply_val/3, apply_val_rem/3]).
 -export([size/1]).

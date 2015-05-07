@@ -28,9 +28,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifdef(with_export_type_support).
 -export_type([result/0, options/0]).
--endif.
 
 -type result() :: { Min::non_neg_integer(), 
                     Max::non_neg_integer(),

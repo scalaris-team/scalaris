@@ -106,9 +106,7 @@
 -type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
 
 
--ifdef(with_export_type_support).
 -export_type([db/0, value/0, version/0, db_as_list/0]).
--endif.
 
 %%%%%%
 %%% whole DB management

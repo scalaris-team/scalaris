@@ -35,9 +35,7 @@
 % util
 -export([bound/3]).
 
--ifdef(with_export_type_support).
 -export_type([lb_info/0]).
--endif.
 
 -type load() :: unknown | number().
 

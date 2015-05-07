@@ -41,9 +41,7 @@
 -export([get_last_db_monitor_init/1]).
 -export([requests_balance/0]).
 
--ifdef(with_export_type_support).
 -export_type([dht_message/0, state/0]).
--endif.
 
 -record(lb_op, {id = ?required(id, lb_op)                           :: uid:global_uid(),
                 type = ?required(type, lb_op)                       :: slide_pred | slide_succ | jump,

@@ -24,9 +24,7 @@
 
 -export([match_any/2]).
 
--ifdef(with_export_type_support).
 -export_type([match_spec/0]).
--endif.
 
 -type match_variable() ::
     '$1' | '$2' | '$3' | '$4' | '$5' | '$6' | '$7' | '$8' | '$9'.

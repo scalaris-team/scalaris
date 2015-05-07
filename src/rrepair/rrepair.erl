@@ -57,9 +57,7 @@
 -export([start_link/1, init/1, on/2, check_config/0,
          select_sync_node/2]).
 
--ifdef(with_export_type_support).
 -export_type([session_id/0, session/0]).
--endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions

@@ -46,11 +46,9 @@
 %% functions for dht_node
 -export([get_my/2]).
 
--ifdef(with_export_type_support).
 -export_type([rtms/0]).
 -export_type([tx_item_id/0, paxos_id/0]).
 -export_type([tx_id/0]).
--endif.
 
 -type tx_id() :: {?tx_id, uid:global_uid()}.
 

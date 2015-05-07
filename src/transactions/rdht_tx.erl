@@ -35,9 +35,7 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--ifdef(with_export_type_support).
 -export_type([req_id/0, request_on_key/0, encoded_value/0]).
--endif.
 
 -type req_id() :: uid:global_uid().
 -type request_on_key() :: api_tx:request_on_key().

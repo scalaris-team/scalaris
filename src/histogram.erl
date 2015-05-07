@@ -37,9 +37,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--ifdef(with_export_type_support).
 -export_type([histogram/0, value/0]).
--endif.
 
 -type value() :: number().
 -type data_item() :: {value(), pos_integer()}.

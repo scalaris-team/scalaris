@@ -32,9 +32,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([histogram/0, base_key/0]).
--endif.
 
 -type key() :: ?RT:key().
 -type internal_value() :: histogram:value().

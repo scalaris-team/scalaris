@@ -48,9 +48,7 @@
           open | commit | abort %% status
         }.
 
--ifdef(with_export_type_support).
 -export_type([txid/0]).
--endif.
 
 -spec read(txid(), comm:erl_local_pid()) -> ok.
 read(Key, ReplyTo) ->

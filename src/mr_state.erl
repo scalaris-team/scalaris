@@ -50,10 +50,8 @@
 %% for ?required macro
 -include("record_helpers.hrl").
 
--ifdef(with_export_type_support).
 -export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0,
               job_description/0]).
--endif.
 
 -type(erl_fun() :: {map, erlanon, fun((Arg::{client_key(), term()}) ->
                                           Res::[{client_key(), term()}])}

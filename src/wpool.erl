@@ -42,9 +42,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([job/0]).
--endif.
 
 -type(mr_job() :: {mr_state:fun_term(),
                    Data::db_ets:db(), Interval::intervals:interval()}).

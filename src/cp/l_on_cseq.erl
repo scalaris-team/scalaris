@@ -83,9 +83,7 @@
 
 -export([add_first_lease_to_db/2]).
 
--ifdef(with_export_type_support).
 -export_type([lease_t/0, lease_id/0]).
--endif.
 
 %% filters and checks for rbr_cseq operations
 %% consistency

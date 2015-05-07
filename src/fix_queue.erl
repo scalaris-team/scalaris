@@ -22,9 +22,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([fix_queue/1]).
--endif.
 
 -export([new/1, add/2, add_unique_head/4, map/2, remove/3,
          length/1, max_length/1, queue/1]).

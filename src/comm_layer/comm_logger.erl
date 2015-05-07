@@ -32,9 +32,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--ifdef(with_export_type_support).
 -export_type([stat_tree/0]).
--endif.
 
 -type stat_tree() :: gb_trees:tree(Tag::atom(), {Size::non_neg_integer(), Count::pos_integer()}).
 -record(state, {start    :: erlang_timestamp(),

@@ -56,11 +56,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0,
               mt_bucket/0]).
 -export_type([mt_iter/0, mt_config_params/0]).
--endif.
 
 -type mt_node_key()     :: non_neg_integer().
 -type mt_bucket_entry() :: {?RT:key()} | {?RT:key(), any()} | {?RT:key(), any(), any()}. % add more, if needed

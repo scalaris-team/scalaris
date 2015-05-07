@@ -23,11 +23,9 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--ifdef(with_export_type_support).
 -export_type([rrd/0, data_type/0,
               gauge_type/0, counter_type/0, timing_type/0, event_type/1,
               timeseries_type/0, internal_time/0, timespan/0]).
--endif.
 
 % external API with transparent time handling
 -export([create/3,

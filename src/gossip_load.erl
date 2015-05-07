@@ -62,11 +62,9 @@
          tester_create_load_data_list/1, is_histogram/1,
          tester_create_histogram_size/1, init_feeder/1, get_values_best_feeder/1]).
 
--ifdef(with_export_type_support).
 -export_type([state/0, histogram/0, histogram_size/0, bucket/0]). %% for config gossip_load_*.erl
 -export_type([avg/0, avg_kr/0, min/0, max/0]). %% for config gossip_load_*.erl
 -export_type([load_info/0, load_info_other/0, merged/0]).
--endif.
 
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).

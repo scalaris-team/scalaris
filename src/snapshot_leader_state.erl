@@ -25,9 +25,7 @@
          set_number/2, add_snapshot/2, add_interval/2, add_error_interval/2,
          start_progress/1, stop_progress/1]).
 
--ifdef(with_export_type_support).
 -export_type([state/0]).
--endif.
 
 %-define(TRACE(X, Y), io:format(X, Y)).
 -define(TRACE(_X, _Y), ok).

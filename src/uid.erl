@@ -20,9 +20,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--ifdef(with_export_type_support).
 -export_type([global_uid/0]).
--endif.
 
 -export([get_pids_uid/0, get_global_uid/0,
          is_my_old_uid/1, is_old_uid/2,

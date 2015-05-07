@@ -29,9 +29,7 @@
 
 -export([is_first/1, is_alive/1, is_alive_no_slide/1, is_alive_fully_joined/1]).
 
--ifdef(with_export_type_support).
 -export_type([message/0]).
--endif.
 
 -type(database_message() ::
       {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |

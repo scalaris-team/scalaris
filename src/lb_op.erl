@@ -26,9 +26,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--ifdef(with_export_type_support).
 -export_type([lb_op/0, id/0]).
--endif.
 
 -type id() :: any().
 

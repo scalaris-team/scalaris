@@ -22,9 +22,7 @@
 -export([new/0, new/3, get_number/1, is_in_progress/1, get_leaders/1,
          set_number/2, add_leader/2, start_progress/1, stop_progress/1]).
 
--ifdef(with_export_type_support).
 -export_type([snapshot_state/0]).
--endif.
 
 -type(snapshot_state() :: {SnapNo::non_neg_integer(), InProgress::boolean(), Leaders::[comm:mypid()]}).
 

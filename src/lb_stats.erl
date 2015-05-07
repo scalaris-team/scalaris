@@ -38,9 +38,7 @@
 %% config checked by lb_active
 -export([check_config/0]).
 
--ifdef(with_export_type_support).
 -export_type([load/0]).
--endif.
 
 -type load() :: number().
 

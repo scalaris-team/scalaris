@@ -25,9 +25,7 @@
 -export([behaviour_info/1]).
 -endif.
 
--ifdef(with_export_type_support).
 -export_type([exch_data/0, round_status/0, instance/0]).
--endif.
 
 %% cb: callback
 -type cb_state() :: any().

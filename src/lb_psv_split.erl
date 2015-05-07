@@ -32,9 +32,7 @@
 -behaviour(lb_psv_beh).
 -include("lb_psv_beh.hrl").
 
--ifdef(with_export_type_support).
 -export_type([custom_message/0]).
--endif.
 
 -export([my_sort_fun/2]).
 

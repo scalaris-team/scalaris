@@ -58,9 +58,7 @@
 
 %% for testing
 -export([select_data_feeder/1]).
--ifdef(with_export_type_support).
 -export_type([data/0, state/0]).
--endif.
 
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process},
                                                                       {?quiet}, {channel, prio}, {no_keep_alive}])).

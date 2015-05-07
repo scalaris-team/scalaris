@@ -17,9 +17,7 @@
 %% @end
 %% @version $Id$
 
--ifdef(with_export_type_support).
 -export_type([state/0, custom_message/0]).
--endif.
 
 -export([init_first/0, init/3, trigger_action/1, handle_custom_message/2,
          trigger_interval/0,

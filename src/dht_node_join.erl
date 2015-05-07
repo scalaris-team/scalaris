@@ -49,9 +49,7 @@
 % for join_leave_SUITE:
 -export([reject_join_response/4]).
 
--ifdef(with_export_type_support).
 -export_type([join_state/0, join_message/0, connection/0]).
--endif.
 
 -include("scalaris.hrl").
 

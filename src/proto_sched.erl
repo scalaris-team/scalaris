@@ -140,11 +140,9 @@
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Src::anypid(), Dest::anypid(), comm:message()}.
 
--ifdef(with_export_type_support).
 -export_type([logger/0]).
 -export_type([passed_state/0]).
 -export_type([callback_on_msg/0]).
--endif.
 
 -type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
 -type delay_queue_key()  :: {Dest :: comm:mypid()}.

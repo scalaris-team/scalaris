@@ -23,9 +23,8 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([time_utc/0]).
--endif.
+
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
          logged_exec/1,

@@ -21,9 +21,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--ifdef(with_export_type_support).
 -export_type([msg_queue/0]).
--endif.
 
 -export([new/0, is_empty/1, add/2, send/1]).
 

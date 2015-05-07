@@ -50,12 +50,10 @@
 %% only during recover
 -export([tab2list/1]).
 
--ifdef(with_export_type_support).
 -export_type([message/0]).
 -export_type([state/0]).
 -export_type([read_filter/0]).
 -export_type([write_filter/0]).
--endif.
 
 %% read_filter(custom_data() | no_value_yet) -> read_info()
 -type read_filter() :: fun((term()) -> term()).

@@ -55,10 +55,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifdef(with_export_type_support).
 -export_type([method/0, request/0,
               db_chunk_kv/0, db_chunk_kvv/0]).
--endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
 -type method()         :: trivial | shash | bloom | merkle_tree | art.% | iblt.

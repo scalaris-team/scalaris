@@ -34,9 +34,7 @@
          lookup/2]).
 -export([merkle_leaf_hf/2]).
 
--ifdef(with_export_type_support).
 -export_type([art/0, config/0]).
--endif.
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).

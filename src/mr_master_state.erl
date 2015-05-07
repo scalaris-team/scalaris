@@ -33,9 +33,7 @@
 
 -type state() :: #state{}.
 
--ifdef(with_export_type_support).
 -export_type([state/0]).
--endif.
 
 -export([new/3
         , get/2

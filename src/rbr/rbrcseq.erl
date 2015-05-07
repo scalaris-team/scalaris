@@ -69,9 +69,7 @@
 
 -type check_next_step() :: fun((term(), term()) -> term()).
 
--ifdef(with_export_type_support).
 -export_type([check_next_step/0]).
--endif.
 
 %% quorum read protocol for consensus sequence
 %%

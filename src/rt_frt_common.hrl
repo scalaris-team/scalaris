@@ -81,9 +81,8 @@
     }).
 
 -type(rt_entry() :: #rt_entry{}).
--ifdef(with_export_type_support).
+
 -export_type([rt_entry/0]).
--endif.
 
 -type rt_t_tree() :: gb_trees:tree(NodeId::key(), rt_entry()).
 -record(rt_t, {

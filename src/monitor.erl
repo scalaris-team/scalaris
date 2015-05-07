@@ -47,9 +47,7 @@
 % for monitor_perf:
 -export([web_debug_info_merge_values/2]).
 
--ifdef(with_export_type_support).
 -export_type([key/0, table_index/0]).
--endif.
 
 -type key() :: atom().
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.

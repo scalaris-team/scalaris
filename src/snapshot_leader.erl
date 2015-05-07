@@ -40,9 +40,7 @@
 
 -type message() :: init_message() | result_message().
 
--ifdef(with_export_type_support).
 -export_type([result_message/0]).
--endif.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.

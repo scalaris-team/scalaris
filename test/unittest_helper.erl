@@ -47,9 +47,7 @@
          build_interval/2,
          db_entry_not_null/1, scrub_data/1]).
 
--ifdef(with_export_type_support).
 -export_type([process_info/0, kv_opts/0, ring_data/1]).
--endif.
 
 -include("scalaris.hrl").
 -include("client_types.hrl").

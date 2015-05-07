@@ -30,10 +30,8 @@
          read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3,
          req_list_commit_each/1]).
 
--ifdef(with_export_type_support).
 -export_type([value/0, request/0,
               read_result/0, write_result/0, commit_result/0, result/0]).
--endif.
 
 -include("scalaris.hrl").
 -include("client_types.hrl").

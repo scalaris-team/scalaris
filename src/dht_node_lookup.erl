@@ -27,9 +27,7 @@
 
 -export([envelope/2]).
 
--ifdef(with_export_type_support).
 -export_type([data/0]).
--endif.
 
 -type enveloped_message() :: {pos_integer(), f, comm:message()}.
 

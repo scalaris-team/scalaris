@@ -53,9 +53,7 @@
 -export([on_init/2]).
 -export([check_config/0]).
 
--ifdef(with_export_type_support).
 -export_type([tx_id/0]).
--endif.
 
 
 %% TM on kv_on_cseq

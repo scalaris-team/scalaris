@@ -327,14 +327,6 @@ if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
 fi
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([[-export_type([mytype/0]). -type(mytype()::ok).]], [ok])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_export_type_support}"
-        EDOCMACROS="${EDOCMACROS}, {with_export_type_support, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_export_type_support"
-        AC_MSG_NOTICE([export_type is supported])],
-       [AC_MSG_NOTICE([export_type is not supported])])
-
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],

@@ -19,9 +19,7 @@
 
 -include("client_types.hrl").
 
--ifdef(with_export_type_support).
 -export_type([key/0, rt/0, custom_message/0, external_rt/0]).
--endif.
 
 -export([empty_ext/1, init/1,
          hash_key/1, get_random_node_id/0, next_hop/2,

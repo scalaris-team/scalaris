@@ -56,9 +56,7 @@
          delete_mr_master_state/2]).
 
 
--ifdef(with_export_type_support).
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
--endif.
 
 -type db_selector() :: kv |
                        txid_1 | txid_2 | txid_3 | txid_4 |

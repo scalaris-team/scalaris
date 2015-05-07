@@ -55,9 +55,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([neighborhood/0, snodelist/0, non_empty_snodelist/0]).
--endif.
 
 -type(snodelist() :: [node:node_type()]). % (sorted) node list
 -type(non_empty_snodelist() :: [node:node_type(),...]). % non-empty (sorted) node list

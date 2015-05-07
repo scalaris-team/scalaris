@@ -52,9 +52,7 @@
          % unit tests:
          unittest_create_state/2]).
 
--ifdef(with_export_type_support).
 -export_type([state/0, reason/0]).
--endif.
 
 -type reason() :: {slide_finished, pred | succ | none} | % a slide finished
                   {graceful_leave, pred | succ, Node::node:node_type()} | % the given node is about to leave

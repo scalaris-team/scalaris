@@ -40,9 +40,7 @@
 -export([start_link/1]).
 -export([check_config/0]).
 
--ifdef(with_export_type_support).
 -export_type([req_id/0]).
--endif.
 
 -type req_id() :: {rdht_tx:req_id(), pid(), any()}.
 

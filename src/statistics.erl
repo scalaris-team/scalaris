@@ -27,9 +27,7 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
 -export_type([ring/0, ring_element/0]).
--endif.
 
 -type ring_element() :: {ok, Details::node_details:node_details()} | {failed, comm:mypid()}.
 -type ring() :: [ring_element()].

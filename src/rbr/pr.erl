@@ -38,9 +38,7 @@
 %% entry creation.
 %%-export([smallest_round/1]).
 
--ifdef(with_export_type_support).
 -export_type([pr/0]).
--endif.
 
 -type write_through_info() ::
        { prbr:write_filter(),

@@ -45,9 +45,7 @@
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
 -type entry() :: db_backend_beh:entry().
 
--ifdef(with_export_type_support).
 -export_type([db/0]).
--endif.
 
 -export([traverse_table_and_show/1]).
 

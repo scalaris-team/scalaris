@@ -32,9 +32,7 @@
          get_neighb/1, get_rt/1, set_rt/2,
          rm_send_update/5]).
 
--ifdef(with_export_type_support).
 -export_type([state_active/0]).
--endif.
 
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state

@@ -51,10 +51,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifdef(with_export_type_support).
 -export_type([operation/0, options/0, kvv_list/0]).
 -export_type([stats/0]).
--endif.
 
 -type option()   :: {feedback_request, comm:mypid()} |
                     {send_stats, comm:mypid()} | %send stats to pid after completion

@@ -25,9 +25,7 @@
 
 -behaviour(pdb_beh).
 
--ifdef(with_export_type_support).
 -export_type([tableid/0]).
--endif.
 
 -export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
