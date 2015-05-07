@@ -39,8 +39,8 @@
 -type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}, BenchPid::pid() | ok, IgnoreBenchTimeout::boolean()}.
 -type message() ::
     {bench} |
-    {bench_result, Time::erlang_timestamp(), TimeInMs::non_neg_integer()} |
-    {bench_timeout, Time::erlang_timestamp(), BenchPid::pid()} |
+    {bench_result, Time::erlang:timestamp(), TimeInMs::non_neg_integer()} |
+    {bench_timeout, Time::erlang:timestamp(), BenchPid::pid()} |
     {collect_system_stats} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |

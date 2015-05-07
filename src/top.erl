@@ -33,7 +33,7 @@
 -type state() :: { pdb:tableid(),
                    false | all | pid, %% sampling: no, all or a single pid
                    false | all | pid, %% output: no, all, or a single pid
-                   erlang_timestamp(), %% last output
+                   erlang:timestamp(), %% last output
                    non_neg_integer(), %% # of measures
                    non_neg_integer(), %% sort by
                    no_exclude | pid()

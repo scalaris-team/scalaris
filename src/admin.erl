@@ -279,7 +279,7 @@ number_of_nodes() ->
 % messages in total. get_dump/0 returns a map from message-tag to
 % message-count and message-size and a timestamp when the measurement
 % was started.
--spec get_dump() -> {Received::comm_logger:stat_tree(), Sent::comm_logger:stat_tree(), erlang_timestamp()}.
+-spec get_dump() -> {Received::comm_logger:stat_tree(), Sent::comm_logger:stat_tree(), erlang:timestamp()}.
 get_dump() ->
     Servers = util:get_proc_in_vms(admin_server),
     _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})

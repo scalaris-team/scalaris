@@ -303,17 +303,6 @@ AS_IF([test "${crypto_hash}" = "true"],
        AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
       [AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
 
-erlang_timestamp_avail=`"${ERL}" -noshell -eval \
-  '{ok, {_Module, [[{abstract_code, {_AbstVersion, AbstractCode}}]]}} =
-       beam_lib:chunks(code:where_is_file("erlang.beam"), [[abstract_code]]),
-   Res = lists:any(fun({attribute,_,Type,{timestamp,_,[[]]}}) when Type =:= type orelse Type =:= opaque -> true;
-                      (_) -> false end, AbstractCode),
-   io:format("~p~n", [[Res]]), erlang:halt().' | tail -1`
-AS_IF([test "${erlang_timestamp_avail}" = "true"],
-      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_timestamp}"
-       AC_MSG_NOTICE([erlang:timestamp() type is available])],
-      [AC_MSG_NOTICE([the type erlang:timestamp() is not available])])
-
 httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [[httpc:set_option(max_sessions, 1)]]), erlang:halt().' | tail -1`
 AS_IF([test "${httpc_avail}" = "ok"],
       [AC_MSG_NOTICE([httpc is available])],

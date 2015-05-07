@@ -33,7 +33,7 @@
     {Owner::comm:erl_local_pid(),
      RemotePid::comm:mypid(),
      Token::{gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()},
-     Start::erlang_timestamp() | unknown,
+     Start::erlang:timestamp() | unknown,
      Count::non_neg_integer(),
      Latencies::[gossip_vivaldi:latency()]}.
 

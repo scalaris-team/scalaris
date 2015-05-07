@@ -31,7 +31,7 @@
 -record(state,
         {load_pid             :: pid() | ok,
          bench_owner   = ok   :: comm:mypid() | ok,
-         bench_start   = ok   :: erlang_timestamp() | ok,
+         bench_start   = ok   :: erlang:timestamp() | ok,
          bench_threads = 0    :: ThreadsLeft::non_neg_integer(),
          bench_data    = null :: {N::non_neg_integer(), Mean::float(), M2::float(),
                                   Min::non_neg_integer(), Max::non_neg_integer(),

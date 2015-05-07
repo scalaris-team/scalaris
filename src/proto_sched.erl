@@ -159,7 +159,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), reference(), erlang_timestamp()},
+          | {delivered, comm:mypid(), reference(), erlang:timestamp()},
          to_be_cleaned           = ?required(state, to_be_cleaned)
          :: false | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)

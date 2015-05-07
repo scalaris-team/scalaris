@@ -34,7 +34,7 @@
      TargetLoad::pos_integer(), Direction::forward | backward, SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type state() :: [{DB::db_dht:db(), Range::intervals:interval(), Expires::erlang_timestamp(),
+-type state() :: [{DB::db_dht:db(), Range::intervals:interval(), Expires::erlang:timestamp(),
                    Key::get_split_key, Val::{?RT:key(), TakenLoad::non_neg_integer()}}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

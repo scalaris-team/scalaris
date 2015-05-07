@@ -804,12 +804,12 @@ app_check_running(App) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @doc convert os:timestamp() to microsecs
 % See http://erlang.org/pipermail/erlang-questions/2008-December/040368.html
--spec timestamp2us(erlang_timestamp()) -> us_timestamp().
+-spec timestamp2us(erlang:timestamp()) -> us_timestamp().
 timestamp2us({MegaSecs, Secs, MicroSecs}) ->
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 % @doc convert microsecs to os:timestamp()
--spec us2timestamp(us_timestamp()) -> erlang_timestamp().
+-spec us2timestamp(us_timestamp()) -> erlang:timestamp().
 us2timestamp(Time) ->
     MicroSecs = Time rem 1000000,
     Time2 = (Time - MicroSecs) div 1000000,
@@ -817,7 +817,7 @@ us2timestamp(Time) ->
     MegaSecs = (Time2 - Secs) div 1000000,
     {MegaSecs, Secs, MicroSecs}.
 
--spec time_plus_us(Time::erlang_timestamp(), Delta_MicroSeconds::non_neg_integer()) -> erlang_timestamp().
+-spec time_plus_us(Time::erlang:timestamp(), Delta_MicroSeconds::non_neg_integer()) -> erlang:timestamp().
 time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     MicroSecs1 = MicroSecs + Delta,
     NewMicroSecs = MicroSecs1 rem 1000000,
@@ -827,11 +827,11 @@ time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, NewMicroSecs}.
 
--spec time_plus_ms(Time::erlang_timestamp(), Delta_MilliSeconds::non_neg_integer()) -> erlang_timestamp().
+-spec time_plus_ms(Time::erlang:timestamp(), Delta_MilliSeconds::non_neg_integer()) -> erlang:timestamp().
 time_plus_ms(Time, Delta) ->
     time_plus_us(Time, Delta * 1000).
 
--spec time_plus_s(Time::erlang_timestamp(), Delta_Seconds::non_neg_integer()) -> erlang_timestamp().
+-spec time_plus_s(Time::erlang:timestamp(), Delta_Seconds::non_neg_integer()) -> erlang:timestamp().
 time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     Secs1 = Secs + Delta,
     NewSecs = Secs1 rem 1000000,
@@ -839,11 +839,11 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
 
--spec readable_utc_time_feeder({0..1000, 0..1000, 0..1000}) -> {erlang_timestamp()}.
+-spec readable_utc_time_feeder({0..1000, 0..1000, 0..1000}) -> {erlang:timestamp()}.
 readable_utc_time_feeder({A, B, C}) ->
     {{A, B, C}}.
 
--spec readable_utc_time(erlang_timestamp()) -> tuple().
+-spec readable_utc_time(erlang:timestamp()) -> tuple().
 readable_utc_time(TimeTriple) ->
     DateTime = calendar:now_to_universal_time(TimeTriple),
     erlang:append_element(DateTime, element(3, TimeTriple)).
@@ -1403,7 +1403,7 @@ sets_map(Fun, Set) ->
 %% Interval-Epsilon microseconds back into the past.
 
 -spec rrd_combine_timing_slots(DB :: rrd:rrd(),
-                               CurrentTS :: erlang_timestamp(),
+                               CurrentTS :: erlang:timestamp(),
                                Interval :: non_neg_integer()) ->
     {Sum :: number(), SquaresSum :: number(), Count :: non_neg_integer(),
      Min :: number(), Max :: number()} | undefined.
@@ -1411,7 +1411,7 @@ rrd_combine_timing_slots(DB, CurrentTS, Interval) ->
     rrd_combine_timing_slots(DB, CurrentTS, Interval, 0). % Epsilon = 0ms
 
 -spec rrd_combine_timing_slots(DB :: rrd:rrd(),
-                               CurrentTS :: erlang_timestamp(),
+                               CurrentTS :: erlang:timestamp(),
                                Interval :: non_neg_integer(),
                                Epsilon :: non_neg_integer()) ->
     {Sum :: number(), SquaresSum :: number(), Count :: non_neg_integer(),
@@ -1434,13 +1434,13 @@ rrd_combine_timing_slots(DB, CurrentTS, Interval, Epsilon) ->
 %% @doc This function does the same as rrd_combine_timing_slots, but for RRDs of type
 %% gauge. It sums up slots until enough slots have been read.
 -spec rrd_combine_gauge_slots(DB :: rrd:rrd(),
-                               CurrentTS :: erlang_timestamp(),
+                               CurrentTS :: erlang:timestamp(),
                                Interval :: non_neg_integer()) -> Value :: number() | undefined.
 rrd_combine_gauge_slots(DB, CurrentTS, Interval) ->
     rrd_combine_gauge_slots(DB, CurrentTS, Interval, 0). % Epsilon = 0ms
 
 -spec rrd_combine_gauge_slots(DB :: rrd:rrd(),
-                               CurrentTS :: erlang_timestamp(),
+                               CurrentTS :: erlang:timestamp(),
                                Interval :: non_neg_integer(),
                                Epsilon :: non_neg_integer()) -> Value :: number() | undefined.
 rrd_combine_gauge_slots(DB, CurrentTS, Interval, Epsilon) ->
@@ -1452,7 +1452,7 @@ rrd_combine_gauge_slots(DB, CurrentTS, Interval, Epsilon) ->
 %% into a single accumulator value. The amount of slots is determined by Interval and
 %% Epsilon: it reads as many slots as needed to cover the last Interval - Epsilon us.
 -spec rrd_combine_slots(DB :: rrd:rrd(),
-                        CurrentTS :: erlang_timestamp(),
+                        CurrentTS :: erlang:timestamp(),
                         Interval :: non_neg_integer(),
                         Epsilon :: non_neg_integer(),
                         InitialValue :: fun((rrd:data_type()) -> Acc),

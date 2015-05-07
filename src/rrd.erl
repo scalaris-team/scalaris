@@ -56,7 +56,7 @@
                            {histogram_rt, Size::non_neg_integer(), BaseKey::histogram_rt:base_key()} |
                            {timing | timing_with_hist, us | ms | s | count | percent}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
--type time() :: erlang_timestamp().
+-type time() :: erlang:timestamp().
 -type internal_time() :: non_neg_integer(). % default: micro seconds since Epoch
 -type timespan() :: pos_integer().
 -type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).

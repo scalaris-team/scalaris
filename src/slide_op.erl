@@ -87,8 +87,8 @@
          jump_target_id    = null                           :: ?RT:key() | null, % ID to jump to in case of a jump operation which is preceeded by a slide to leave
          tag               = ?required(slide_op, tag)       :: any(),
          source_pid        = null              :: comm:mypid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
-         time_last_send    = never             :: erlang_timestamp() | never,
-         time_next_warn    = never             :: erlang_timestamp() | never,
+         time_last_send    = never             :: erlang:timestamp() | never,
+         time_next_warn    = never             :: erlang:timestamp() | never,
          send_errors       = 0                 :: non_neg_integer(),
          phase             = null              :: phase(),
          setup_at_other    = false             :: boolean(),
@@ -445,21 +445,21 @@ is_incremental(#slide_op{next_op={leave, continue}}) -> true;
 is_incremental(_) -> false.
 
 %% @doc Returns the time of the last send operation.
--spec get_time_last_send(SlideOp::slide_op()) -> erlang_timestamp() | never.
+-spec get_time_last_send(SlideOp::slide_op()) -> erlang:timestamp() | never.
 get_time_last_send(#slide_op{time_last_send = X}) -> X.
 
 %% @doc Returns the time the next warning should be emitted if no further send
 %%      operation occurs.
--spec get_time_next_warn(SlideOp::slide_op()) -> erlang_timestamp() | never.
+-spec get_time_next_warn(SlideOp::slide_op()) -> erlang:timestamp() | never.
 get_time_next_warn(#slide_op{time_next_warn = X}) -> X.
 
 %% @doc Sets the time of the last send operation.
--spec set_time_last_send(SlideOp::slide_op(), erlang_timestamp()) -> slide_op().
+-spec set_time_last_send(SlideOp::slide_op(), erlang:timestamp()) -> slide_op().
 set_time_last_send(SlideOp, X) -> SlideOp#slide_op{time_last_send = X}.
 
 %% @doc Sets the time the next warning should be emitted if no further send
 %%      operation occurs.
--spec set_time_next_warn(SlideOp::slide_op(), erlang_timestamp()) -> slide_op().
+-spec set_time_next_warn(SlideOp::slide_op(), erlang:timestamp()) -> slide_op().
 set_time_next_warn(SlideOp, X) -> SlideOp#slide_op{time_next_warn = X}.
 
 %% @doc Returns the number of send errors from messages with shepherd.

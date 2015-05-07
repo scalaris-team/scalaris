@@ -159,16 +159,16 @@ timing_perf() ->
 %% @doc Converts a time (either a tuple as returned by erlang:now/0 or a number
 %%      representing the number of microseconds since epoch) to the number of
 %%      microseconds since epoch.
--spec time2us(erlang_timestamp() | rrd:internal_time()) -> rrd:internal_time().
+-spec time2us(erlang:timestamp() | rrd:internal_time()) -> rrd:internal_time().
 time2us({_, _, _} = Time) ->
     util:timestamp2us(Time);
 time2us(Time) ->
     Time.
 
 -spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::1..10, Type::rrd:timeseries_type(),
-                     StartTime::erlang_timestamp() | rrd:internal_time(),
+                     StartTime::erlang:timestamp() | rrd:internal_time(),
                      Offsets::[non_neg_integer(),...],
-                     Times::[erlang_timestamp() | rrd:internal_time(),...]) -> true.
+                     Times::[erlang:timestamp() | rrd:internal_time(),...]) -> true.
 prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
     R = rrd:create(SlotLength, Count, Type, StartTime),
     StartTime_us = time2us(StartTime),
@@ -181,7 +181,7 @@ prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
     _ = [?equals(rrd:get_value_by_offset(R, Offset), undefined) || Offset <- Offsets],
     true.
 
--type rrd_data() :: [{erlang_timestamp() | rrd:internal_time(), number()},...].
+-type rrd_data() :: [{erlang:timestamp() | rrd:internal_time(), number()},...].
 -type rrd_data_us() :: [{rrd:internal_time(), number()},...].
 
 tester_empty_rrd(_Config) ->
@@ -215,9 +215,9 @@ merge_conseq_data([X | TD], Type, Result) ->
     merge_conseq_data(TD, Type, [X | Result]).
 
 -spec prop_counter_gauge_rrd(SlotLength::rrd:timespan(), Count::1..10,
-                             StartTime::erlang_timestamp() | rrd:internal_time(),
+                             StartTime::erlang:timestamp() | rrd:internal_time(),
                              Data::rrd_data(), Offsets::[non_neg_integer(),...],
-                             Times::[erlang_timestamp() | rrd:internal_time(),...],
+                             Times::[erlang:timestamp() | rrd:internal_time(),...],
                              Type::gauge | counter) -> true.
 prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, _Offsets, _Times, Type) ->
     R0 = rrd:create(SlotLength, Count, Type, StartTime),
@@ -258,9 +258,9 @@ prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, _Offsets, _Times, Typ
     true.
 
 -spec prop_counter_rrd(SlotLength::rrd:timespan(), Count::1..10,
-                       StartTime::erlang_timestamp() | rrd:internal_time(),
+                       StartTime::erlang:timestamp() | rrd:internal_time(),
                        Data::rrd_data(), Offsets::[non_neg_integer(),...],
-                       Times::[erlang_timestamp() | rrd:internal_time(),...]) -> true.
+                       Times::[erlang:timestamp() | rrd:internal_time(),...]) -> true.
 prop_counter_rrd(SlotLength, Count, StartTime, Data, Offsets, Times) ->
     prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times, counter).
 
@@ -270,9 +270,9 @@ tester_counter_rrd(_Config) ->
     tester:test(?MODULE, prop_counter_rrd, 6, 5000, [{threads, 2}]).
 
 -spec prop_gauge_rrd(SlotLength::rrd:timespan(), Count::1..10,
-                       StartTime::erlang_timestamp() | rrd:internal_time(),
+                       StartTime::erlang:timestamp() | rrd:internal_time(),
                        Data::rrd_data(), Offsets::[non_neg_integer(),...],
-                       Times::[erlang_timestamp() | rrd:internal_time(),...]) -> true.
+                       Times::[erlang:timestamp() | rrd:internal_time(),...]) -> true.
 prop_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times) ->
     prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times, gauge).
 

@@ -72,7 +72,7 @@
      LocalListenPort         :: comm_server:tcp_port(),
      Channel                 :: comm:channel(),
      Socket                  :: inet:socket() | notconnected,
-     StartTime               :: erlang_timestamp(),
+     StartTime               :: erlang:timestamp(),
      SentMsgCount            :: non_neg_integer(),
      ReceivedMsgCount        :: non_neg_integer(),
      MsgQueue                :: msg_queue(),
@@ -648,7 +648,7 @@ socket(State)                  -> element(5, State).
 -spec set_socket(state(), inet:socket() | notconnected) -> state().
 set_socket(State, Val)         -> setelement(5, State, Val).
 
--spec started(state()) -> erlang_timestamp().
+-spec started(state()) -> erlang:timestamp().
 started(State)                 -> element(6, State).
 
 -spec s_msg_count(state()) -> non_neg_integer().

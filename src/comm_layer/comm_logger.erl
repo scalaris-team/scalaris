@@ -35,7 +35,7 @@
 -export_type([stat_tree/0]).
 
 -type stat_tree() :: gb_trees:tree(Tag::atom(), {Size::non_neg_integer(), Count::pos_integer()}).
--record(state, {start    :: erlang_timestamp(),
+-record(state, {start    :: erlang:timestamp(),
                 received :: stat_tree(),
                 sent     :: stat_tree()}).
 
@@ -62,7 +62,7 @@ log(SendRcv, Tag, Size) ->
 %% Function: dump() -> {gb_tree:gb_trees(), {Date, Time}}
 %% Description: gets the logging state
 %%--------------------------------------------------------------------
--spec dump() -> {Received::stat_tree(), Sent::stat_tree(), erlang_timestamp()}.
+-spec dump() -> {Received::stat_tree(), Sent::stat_tree(), erlang:timestamp()}.
 dump() ->
     gen_server:call(?MODULE, {dump}).
 
@@ -91,7 +91,7 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 -spec handle_call({dump}, any(), #state{})
-        -> {reply, {Received::stat_tree(), Sent::stat_tree(), erlang_timestamp()}, #state{}}.
+        -> {reply, {Received::stat_tree(), Sent::stat_tree(), erlang:timestamp()}, #state{}}.
 handle_call({dump}, _From, State) ->
     Reply = {State#state.received, State#state.sent, State#state.start},
     {reply, Reply, State};

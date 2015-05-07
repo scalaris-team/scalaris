@@ -358,7 +358,7 @@ init(null) ->
     {ets:new(monitor, [ordered_set, protected]),
      init_apitx_reqlist_rrd(os:timestamp())}.
 
--spec init_apitx_reqlist_rrd(Time::erlang_timestamp() | rrd:internal_time()) -> rrd:rrd().
+-spec init_apitx_reqlist_rrd(Time::erlang:timestamp() | rrd:internal_time()) -> rrd:rrd().
 init_apitx_reqlist_rrd(Time) ->
     % 10s monitoring interval, only keep newest in the client process
     rrd:create(10 * 1000000, 1, {timing_with_hist, ms}, Time).

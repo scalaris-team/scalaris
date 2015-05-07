@@ -4134,21 +4134,6 @@ else
 $as_echo "$as_me: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&6;}
 fi
 
-erlang_timestamp_avail=`"${ERL}" -noshell -eval \
-  '{ok, {_Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}} =
-       beam_lib:chunks(code:where_is_file("erlang.beam"), [abstract_code]),
-   Res = lists:any(fun({attribute,_,Type,{timestamp,_,[]}}) when Type =:= type orelse Type =:= opaque -> true;
-                      (_) -> false end, AbstractCode),
-   io:format("~p~n", [Res]), erlang:halt().' | tail -1`
-if test "${erlang_timestamp_avail}" = "true"; then :
-  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_timestamp}"
-       { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() type is available" >&5
-$as_echo "$as_me: erlang:timestamp() type is available" >&6;}
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: the type erlang:timestamp() is not available" >&5
-$as_echo "$as_me: the type erlang:timestamp() is not available" >&6;}
-fi
-
 httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [httpc:set_option(max_sessions, 1)]), erlang:halt().' | tail -1`
 if test "${httpc_avail}" = "ok"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: httpc is available" >&5

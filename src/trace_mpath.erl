@@ -67,7 +67,7 @@
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
 
--type time()         :: erlang_timestamp() | non_neg_integer().
+-type time()         :: erlang:timestamp() | non_neg_integer().
 -type logger()       :: io_format                       %% | ctpal
                       | {log_collector, comm:mypid()}
                       | {proto_sched, comm:mypid()}.

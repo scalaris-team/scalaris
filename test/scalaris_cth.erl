@@ -31,7 +31,7 @@
 
 -record(state, { processes = [] :: [unittest_helper:process_info()] | undefined,
                  suite          :: atom() | undefined,
-                 tc_start = []  :: [{comm:erl_local_pid(), erlang_timestamp()}] | []
+                 tc_start = []  :: [{comm:erl_local_pid(), erlang:timestamp()}] | []
                }).
 -type state() :: #state{} | {ok, #state{}}. % the latter for erlang =< R14B03
 -type id() :: atom().

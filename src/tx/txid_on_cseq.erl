@@ -44,7 +44,7 @@
         { txid(),
           comm:mypid(),         %% client
           [client_key()],       %% involved keys
-          erlang_timestamp(),   %% creation time
+          erlang:timestamp(),   %% creation time
           open | commit | abort %% status
         }.
 
