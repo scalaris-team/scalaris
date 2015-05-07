@@ -269,27 +269,6 @@ AS_IF([test "x$TOKEPREFIX" != xno],
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
-       [AC_MSG_NOTICE([tid() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, tid_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {tid_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dtid_not_builtin"
-        AC_MSG_NOTICE([tid() is not built-in])])
-
-etstid_avail=`"${ERL}" -noshell -eval \
-  '{ok, {_Module, [[{abstract_code, {_AbstVersion, AbstractCode}}]]}} =
-       beam_lib:chunks(code:where_is_file("ets.beam"), [[abstract_code]]),
-   Res = lists:any(fun({attribute,_,Type,{tid,_,[[]]}}) when Type =:= type orelse Type =:= opaque -> true;
-                      (_) -> false end, AbstractCode),
-   io:format("~p~n", [[Res]]), erlang:halt().' | tail -1`
-AS_IF([test "${etstid_avail}" = "true"],
-      [AC_MSG_NOTICE([ets:tid/0 is available])],
-      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, etstid_not_available}"
-       EDOCMACROS="${EDOCMACROS}, {etstid_not_available, true}"
-       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Detstid_not_available"
-       AC_MSG_NOTICE([ets:tid/0 is not available])])
-
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],

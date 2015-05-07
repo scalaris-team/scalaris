@@ -328,7 +328,7 @@ sup_pause_childs(SupPid) ->
                   Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
     ok.
 
--spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[tid() | atom()]} | [tid() | atom()].
+-spec get_tables_of(pid()) -> {MNesia::[atom()], Ets::[ets:tid() | atom()]} | [ets:tid() | atom()].
 get_tables_of(Pid)->
     case config:read(db_backend) of
         db_mnesia ->
@@ -338,7 +338,7 @@ get_tables_of(Pid)->
             util:ets_tables_of(Pid)
     end.
 
--spec delete_tables(pid(), {MNesia::[atom()], Ets::[tid() | atom()]} | [tid() | atom()] ) -> ok.
+-spec delete_tables(pid(), {MNesia::[atom()], Ets::[ets:tid() | atom()]} | [ets:tid() | atom()] ) -> ok.
 delete_tables(Pid, Db) ->
     case config:read(db_backend) of
         db_mnesia ->

@@ -591,7 +591,7 @@ subscr_delta_close_table(_Tag) ->
 
 %% @doc Check that the table storing changed keys exists and create it if
 %%      necessary.
--spec subscr_delta_check_table(State::db()) -> tid() | atom().
+-spec subscr_delta_check_table(State::db()) -> ets:tid() | atom().
 subscr_delta_check_table(_State) ->
     DeltaDB = case erlang:get('$delta_tab') of
         undefined ->

@@ -18,11 +18,4 @@
 %% @end
 %% @version $Id$
 
--ifdef(tid_not_builtin).
--type tid() :: ets:tid().
--else.
-% Erlang 17.0 has tid() as a builtin type but allows overriding it:
--ifndef(etstid_not_available).
--type tid() :: ets:tid().
--endif.
--endif.
+% add type defs if required...

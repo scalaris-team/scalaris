@@ -53,7 +53,7 @@
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.
 
--type state() :: {Table::tid() | atom(), ApiTxReqList::rrd:rrd()}.
+-type state() :: {Table::ets:tid() | atom(), ApiTxReqList::rrd:rrd()}.
 -type message() ::
     {report_rrd, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {report_single, Process::atom(), Key::key(),
@@ -274,14 +274,14 @@ on({web_debug_info, Requestor}, {Table, _ApiTxReqList} = State) ->
     comm:send_local(Requestor, {web_debug_info_reply, [{"last 5 records per key:", ""} | GroupedLast5]}),
     State.
 
--spec get_rrd(Table::tid() | atom(), TableIndex::table_index()) -> rrd:rrd() | undefined.
+-spec get_rrd(Table::ets:tid() | atom(), TableIndex::table_index()) -> rrd:rrd() | undefined.
 get_rrd(Table, TableIndex) ->
     case ets:lookup(Table, TableIndex) of
         [{TableIndex, X}] -> X;
         [] -> undefined
     end.
 
--spec get_all_keys(Table::tid() | atom()) -> [table_index()].
+-spec get_all_keys(Table::ets:tid() | atom()) -> [table_index()].
 get_all_keys(Table) ->
     lists:usort(ets:select(Table, [{ {'$1', '$2'},
                                      [],     % guard
@@ -289,7 +289,7 @@ get_all_keys(Table) ->
                                   ])).
 
 % @doc Reduces the rrd() data to N time slots (the key _must_ exist in the table!).
--spec get_last_n(Table::tid() | atom(), Key::table_index(), N::pos_integer())
+-spec get_last_n(Table::ets:tid() | atom(), Key::table_index(), N::pos_integer())
         -> Value::rrd:rrd().
 get_last_n(Table, Key, N) ->
     [{Key, Data}] = ets:lookup(Table, Key),

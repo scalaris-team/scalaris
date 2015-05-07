@@ -29,7 +29,7 @@
 -export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
 
--type tableid() :: tid() | atom().
+-type tableid() :: ets:tid() | atom().
 
 -spec new(TableName::atom(),
           [set | ordered_set | bag | duplicate_bag |

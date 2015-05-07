@@ -75,7 +75,7 @@
           {RM_State    :: ?RM:state(),
            HasLeft     :: boolean(),
            % subscribers to node change events, i.e. node ID changes:
-           SubscrTable :: tid()}.
+           SubscrTable :: ets:tid()}.
 
 % accepted messages of an initialized rm_loop process
 -type(message() ::
@@ -224,7 +224,7 @@ init_first() ->
 
 %% @doc Initializes the rm_loop state.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
-           Succ::node:node_type(), OldSubscrTable::null | tid()) -> state().
+           Succ::node:node_type(), OldSubscrTable::null | ets:tid()) -> state().
 init(Me, Pred, Succ, OldSubscrTable) ->
     % do not wait for the first trigger to arrive here
     % -> execute trigger action immediately
@@ -500,14 +500,14 @@ update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid) ->
 %% @doc Inform the dht_node of a new neighborhood.
 -spec call_subscribers(OldNeighbors::nodelist:neighborhood(),
         NewNeighbors::nodelist:neighborhood(), Reason::reason(),
-        SubscrTable::tid()) -> ok.
+        SubscrTable::ets:tid()) -> ok.
 call_subscribers(OldNeighborhood, NewNeighborhood, Reason, SubscrTable) ->
     call_subscribers_iter(OldNeighborhood, NewNeighborhood, Reason, SubscrTable,
                           ets:first(SubscrTable)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
 -spec call_subscribers_iter(OldNeighbors::nodelist:neighborhood(),
-        NewNeighbors::nodelist:neighborhood(), Reason::reason(), SubscrTable::tid(),
+        NewNeighbors::nodelist:neighborhood(), Reason::reason(), SubscrTable::ets:tid(),
         CurrentKey::{Pid::pid() | null, Tag::any()} | '$end_of_table') -> ok.
 call_subscribers_iter(_OldNeighborhood, _NewNeighborhood, _Reason,
                       _SubscrTable, '$end_of_table') ->
@@ -526,7 +526,7 @@ call_subscribers_iter(OldNeighborhood, NewNeighborhood, Reason, SubscrTable, Cur
         NewNeighbors::nodelist:neighborhood(), Reason::reason(),
         {{Pid::pid() | null, Tag::any()}, FilterFun::subscriber_filter_fun(),
          ExecFun::subscriber_exec_fun(), MaxCalls::pos_integer() | inf},
-        SubscrTable::tid()) -> ok.
+        SubscrTable::ets:tid()) -> ok.
 call_subscribers_check(OldNeighborhood, NewNeighborhood, Reason,
         {{Pid, Tag}, FilterFun, ExecFun, MaxCalls}, SubscrTable) ->
     case FilterFun(OldNeighborhood, NewNeighborhood, Reason) of

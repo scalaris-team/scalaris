@@ -282,16 +282,16 @@ tester_type_check_rbr(_Config) ->
           {prbr,
            [ {init, 1},        %% needs to be in a pidgroup for db_name
              {on, 2},          %% sends messages
-             {get_load, 1},    %% needs valid tid()
-             {set_entry, 2},   %% needs valid tid()
-             {tab2list, 1},    %% needs valid tid()
-             {tab2list_raw_unittest, 1}    %% needs valid tid()
+             {get_load, 1},    %% needs valid ets:tid()
+             {set_entry, 2},   %% needs valid ets:tid()
+             {tab2list, 1},    %% needs valid ets:tid()
+             {tab2list_raw_unittest, 1}    %% needs valid ets:tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
              {msg_write_reply, 5}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
-             {get_entry, 2},       %% needs valid tid()
-             {tab2list_raw, 1}     %% needs valid tid()
+             {get_entry, 2},       %% needs valid ets:tid()
+             {tab2list_raw, 1}     %% needs valid ets:tid()
             ]},
           {rbrcseq,
            [ {on, 2},          %% sends messages
@@ -304,8 +304,8 @@ tester_type_check_rbr(_Config) ->
              {qwrite_fast, 9}  %% needs funs as input
            ],
            [ {inform_client, 2}, %% cannot create valid envelopes
-             {get_entry, 2},     %% needs valid tid()
-             {set_entry, 2},     %% needs valid tid()
+             {get_entry, 2},     %% needs valid ets:tid()
+             {set_entry, 2},     %% needs valid ets:tid()
              {add_read_reply, 6},%% needs client_value matching db_type
              {add_write_reply, 3}%% needs valid entry()
            ]

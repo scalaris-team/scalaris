@@ -33,7 +33,7 @@
 -include("scalaris.hrl").
 
 -type(state() :: {SnapNo::non_neg_integer(), InProgress::boolean(),
-                  Snapshots::tid() | atom(), Interval::intervals:interval(),
+                  Snapshots::ets:tid() | atom(), Interval::intervals:interval(),
                   ErrorInterval::intervals:interval(), Client::comm:mypid() | false}).
 
 % constructors

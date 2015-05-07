@@ -155,7 +155,7 @@ wait_for_process_to_die(Pid) when is_pid(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 
 %% @doc Waits for the given ets table to disappear.
--spec wait_for_ets_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
+-spec wait_for_ets_table_to_disappear(Pid::pid(), ets:tid() | atom()) -> ok.
 wait_for_ets_table_to_disappear(Pid, Table) ->
     wait_for(fun() ->
                      case ets:info(Table, owner) of
@@ -165,7 +165,7 @@ wait_for_ets_table_to_disappear(Pid, Table) ->
                      end
              end).
 
--spec ets_tables_of(pid()) -> [tid() | atom()].
+-spec ets_tables_of(pid()) -> [ets:tid() | atom()].
 ets_tables_of(Pid) ->
     Tabs = ets:all(),
     [ Tab || Tab <- Tabs, ets:info(Tab, owner) =:= Pid ].
