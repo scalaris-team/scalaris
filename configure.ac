@@ -298,35 +298,6 @@ AS_IF([test "${etstid_avail}" = "true"],
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Detstid_not_available"
        AC_MSG_NOTICE([ets:tid/0 is not available])])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
-       [RECURSIVETYPESALLOWED=""
-        RECURSIVETYPESALLOWED_EDOC=""
-        RECURSIVETYPESALLOWED_DIALYZER=""
-        AC_MSG_NOTICE([recursive types are supported])],
-       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"
-        RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"
-        RECURSIVETYPESALLOWED_DIALYZER=" -Drecursive_types_are_not_allowed"
-        AC_MSG_NOTICE([recursive types are not supported])])
-
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).], [ok])],
-       [TYPEFORWARDDECLARATIONS=""
-        TYPEFORWARDDECLARATIONS_EDOC=""
-        TYPEFORWARDDECLARATIONS_DIALYZER=""
-        AC_MSG_NOTICE([type forward declarations are supported])],
-       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"
-        TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"
-        TYPEFORWARDDECLARATIONS_DIALYZER=" -Dtype_forward_declarations_are_not_allowed"
-        AC_MSG_NOTICE([type forward declarations are not supported])])
-
-if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
-   AC_MSG_NOTICE([forward declarations or recursive types are not allowed])
-   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
-   FORWARDORRECURSIVE_EDOC=", {forward_or_recursive_types_are_not_allowed, true}"
-   FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
-fi
-
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],
@@ -424,9 +395,9 @@ AS_IF([test "${crypto_hash}" = "true"],
 #
 ###########################################################
 
-EMAKEFILEDEFINES="${EMAKEFILEDEFINES}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}"
-EDOCMACROS="${EDOCMACROS#, }${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}"
-DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${YAWS_OPTIONS_DIALYZER}"
+EMAKEFILEDEFINES="${EMAKEFILEDEFINES}"
+EDOCMACROS="${EDOCMACROS#, }"
+DIALYZER_FLAGS="${DIALYZER_FLAGS## }${YAWS_OPTIONS_DIALYZER}"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(EDOCMACROS)

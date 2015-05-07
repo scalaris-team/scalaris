@@ -88,30 +88,6 @@
                         comm_server:tcp_port(),
                         erl_local_pid_plain()}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--ifdef(forward_or_recursive_types_are_not_allowed).
-% define 3 levels of recursion manually:
--define(GROUP_MESSAGE(MSG), {?send_to_group_member | ?send_to_registered_proc, atom(), MSG}).
--type group_message() ::
-        ?GROUP_MESSAGE(message()) |
-        ?GROUP_MESSAGE(?GROUP_MESSAGE(message())) |
-        ?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(message()))).
--type group_message4() ::
-        ?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(message())))).
-% envelopes:
--type erl_local_pid_with_reply_as() ::
-        {erl_local_pid_plain(), e, pos_integer(), envelope()}
-      | {{erl_local_pid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}
-      | {{{erl_local_pid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}
-      | {{{{erl_local_pid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}.
--type mypid_with_reply_as() ::
-        {mypid_plain(), e, pos_integer(), envelope()}
-      | {{mypid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}
-      | {{{mypid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}
-      | {{{{mypid_plain(), e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}, e, pos_integer(), envelope()}.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--else.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type group_message() :: {?send_to_group_member | ?send_to_registered_proc, atom(), message() | group_message()}.
 % envelopes:
 -type erl_local_pid_with_reply_as() ::
@@ -120,8 +96,6 @@
 -type mypid_with_reply_as() ::
         {mypid_plain(),         e, pos_integer(), envelope()}
       | {mypid_with_reply_as(), e, pos_integer(), envelope()}.
--endif.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_reply_as().
 -type mypid()         :: mypid_plain() | mypid_with_reply_as().
@@ -356,11 +330,7 @@ get_plain_pid(Pid) ->
 
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_server process.
--ifdef(forward_or_recursive_types_are_not_allowed).
--spec pack_group_member(message() | group_message(), send_options()) -> {message() | group_message() | group_message4(), send_options()}.
--else.
 -spec pack_group_member(message() | group_message(), send_options()) -> {message() | group_message(), send_options()}.
--endif.
 pack_group_member(Msg, [] = Opts)                      -> {Msg, Opts};
 pack_group_member(Msg, [{shepherd, _Shepherd}] = Opts) -> {Msg, Opts};
 pack_group_member(Msg, Opts)                           ->

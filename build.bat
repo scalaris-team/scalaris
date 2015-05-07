@@ -11,9 +11,6 @@ call "%~dp0"\bin\find_erlang.bat
 :: depending on your config, you might need to add one or more of the following options:
 ::  {d, have_toke}
 ::  {d, tid_not_builtin}
-::  {d, recursive_types_are_not_allowed}
-::  {d, type_forward_declarations_are_not_allowed}
-::  {d, forward_or_recursive_types_are_not_allowed}
 ::  {d, have_ctline_support}
 ::  {d, have_cthooks_support}
 ::  {d, have_callback_support}

@@ -99,19 +99,11 @@
      EmbeddedMsg::comm:message()}
 .
 
--ifdef(forward_or_recursive_types_are_not_allowed).
--type move_message() ::
-    move_message1() |
-    {move, check_for_timeouts} |
-    {move, {send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {timeouts, Timeouts::non_neg_integer()}} |
-    {move, {send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, MoveFullId::slide_op:id()}.
--else.
 -type move_message() ::
     move_message1() |
     {move, check_for_timeouts} |
     {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {timeouts, Timeouts::non_neg_integer()}} |
     {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, MoveFullId::slide_op:id()}.
--endif.
 
 -spec send_trigger() -> ok.
 send_trigger() ->

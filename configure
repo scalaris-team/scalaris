@@ -4141,80 +4141,6 @@ else
 $as_echo "$as_me: ets:tid/0 is not available" >&6;}
 fi
 
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::{ok, mytype()} | ok).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  RECURSIVETYPESALLOWED=""
-        RECURSIVETYPESALLOWED_EDOC=""
-        RECURSIVETYPESALLOWED_DIALYZER=""
-        { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are supported" >&5
-$as_echo "$as_me: recursive types are supported" >&6;}
-else
-  RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"
-        RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"
-        RECURSIVETYPESALLOWED_DIALYZER=" -Drecursive_types_are_not_allowed"
-        { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are not supported" >&5
-$as_echo "$as_me: recursive types are not supported" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  TYPEFORWARDDECLARATIONS=""
-        TYPEFORWARDDECLARATIONS_EDOC=""
-        TYPEFORWARDDECLARATIONS_DIALYZER=""
-        { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
-$as_echo "$as_me: type forward declarations are supported" >&6;}
-else
-  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"
-        TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"
-        TYPEFORWARDDECLARATIONS_DIALYZER=" -Dtype_forward_declarations_are_not_allowed"
-        { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
-$as_echo "$as_me: type forward declarations are not supported" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
-$as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
-   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
-   FORWARDORRECURSIVE_EDOC=", {forward_or_recursive_types_are_not_allowed, true}"
-   FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
-fi
-
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [crypto:start()]), erlang:halt().' | tail -1`
 if test "${crypto_start}" = "ok"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:start() is available" >&5
@@ -4370,9 +4296,9 @@ fi
 #
 ###########################################################
 
-EMAKEFILEDEFINES="${EMAKEFILEDEFINES}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}"
-EDOCMACROS="${EDOCMACROS#, }${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}"
-DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${YAWS_OPTIONS_DIALYZER}"
+EMAKEFILEDEFINES="${EMAKEFILEDEFINES}"
+EDOCMACROS="${EDOCMACROS#, }"
+DIALYZER_FLAGS="${DIALYZER_FLAGS## }${YAWS_OPTIONS_DIALYZER}"
 
 
 

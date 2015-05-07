@@ -64,61 +64,6 @@
 
 -type(var_list() :: list(atom())).
 
--ifdef(forward_or_recursive_types_are_not_allowed).
--type(record_field_type() ::
-      {typed_record_field, atom(), any()}
-    | {untyped_record_field, atom()}
-    | {field_type, Name::atom(), Type::any()}
-     ).
-
--type(type_spec() ::
-      {'fun', any(), any()}
-    | {'union_fun', [{'fun', any(), any()}]}
-    | {product, [any()]}
-    | {tuple, [any()]}
-    | {tuple, {typedef, tester, test_any}}
-    | {list, any()}
-    | {nonempty_list, any()}
-    | {range, {integer, integer()}, {integer, integer()}}
-    | {union, [any()]}
-    | {record, atom(), atom()}
-    | nonempty_string
-    | integer
-    | pos_integer
-    | neg_integer
-    | non_neg_integer
-    | bool
-    | binary
-    | iolist
-    | node
-    | pid
-    | port
-    | reference
-    | none
-    | no_return
-    | {typedef, module(), atom()}
-    | atom
-    | float
-    | nil
-    | {atom, atom()}
-    | {integer, integer()}
-    | {typedef, module(), atom(), list({var, integer(), atom()})}
-    | {var, atom()}
-    | {var_type, list(atom()), type_spec()}
-    | {builtin_type, builtin_type()}
-    | {builtin_type, array_array, ValueType::any()}
-    | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
-    | {builtin_type, queue_queue, ValueType::any()}
-    | {builtin_type, gb_sets_set, ValueType::any()}
-    | {builtin_type, gb_trees_tree, KeyType::any(), ValueType::any()}
-    | {builtin_type, gb_trees_iter, KeyType::type_spec(), ValueType::type_spec()}
-    | {builtin_type, sets_set, ValueType::any()}
-    | {record, [record_field_type()]} % TODO: is this still used?
-    | {record, module(), Name::atom()}
-    | {record, module(), Name::atom(), FieldTypes::[any()]}
-    | record_field_type()
-     ).
--else.
 -type(record_field_type() ::
       {typed_record_field, atom(), type_spec()}
     | {untyped_record_field, atom()}
@@ -172,6 +117,5 @@
     | {record, module(), Name::atom(), FieldTypes::[type_spec()]}
     | record_field_type()
      ).
--endif.
 
 -type(test_fun_type() :: {'fun', type_spec(), type_spec()}).

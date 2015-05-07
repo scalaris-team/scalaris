@@ -35,11 +35,7 @@
      ]).
 
 -type attribute_type() :: {atom(), string()}.
--ifdef(forward_or_recursive_types_are_not_allowed).
--type html_type() :: {atom(), [attribute_type()], term() | [term()]}.
--else.
 -type html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
--endif.
 
 % countries for which icons are available in the docroot/icons directory:
 -define(COUNTRIES, ["aa", "au", "br", "ch", "cz", "edu", "fr", "hk", "il",

@@ -239,11 +239,7 @@
 -type state() :: #state{}.
 
 % accepted messages of gossip behaviour module
--ifdef(forward_or_recursive_types_are_not_allowed).
--type send_error() :: {send_error, _Pid::comm:mypid(), Msg::comm:message(), Reason::atom()}.
--else.
 -type send_error() :: {send_error, _Pid::comm:mypid(), Msg::message(), Reason::atom()}.
--endif.
 
 -type bh_message() ::
     {activate_gossip, Neighbors::nodelist:neighborhood()} |

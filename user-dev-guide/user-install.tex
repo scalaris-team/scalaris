@@ -98,15 +98,9 @@ nodes. It seems to work but we make no guarantees.
 \end{itemize}
 
 \code{build.bat} will generate a \code{Emakefile} if there is none yet.
-If you have Erlang $<$ R13B04, you will need to adapt the \code{Emakefile}.
-There will be empty lines in the first three blocks ending with
-``\code{ ]\}.}'': add the following to these lines and try to compile again.
-It should work now.
-
-\begin{lstlisting}[language=erlang]
-, {d, type_forward_declarations_are_not_allowed}
-, {d, forward_or_recursive_types_are_not_allowed}
-\end{lstlisting}
+On certain older Erlang versions, you will need to adapt the \code{Emakefile}.
+Please refer to the \code{build.bat} and \code{configure.ac} for the available
+configuration parameters and their meaning.
 
 For the most recent description please see the FAQ at
 \url{http://code.google.com/p/scalaris/wiki/FAQ}.
