@@ -167,6 +167,19 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
     ])
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
+# split erlang erts version:
+set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
+ERTS_MAJOR=$1
+ERTS_MINOR=$2
+ERTS_MAINT=${3:-0}
+
+# require Erlang >= R14B04, i.e. ERTS >= 5.8.5
+AS_IF([test $ERTS_MAJOR -gt 5 -o \
+       '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 8 ')' -o \
+       '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 8 -a $ERTS_MAINT -ge 5 ')'],
+      [],
+      [AC_MSG_FAILURE([Erlang >= R14B04 required])])
+
 AC_PATH_PROG(EPMD, epmd, [$FALSE], "$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin")
 
 AS_IF([test "x$COMPILE_NATIVE" != xno], [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, native"])
@@ -387,12 +400,6 @@ AC_RUN_IFELSE(
 ###########################################################
 YAWS_OPTIONS=
 HAVE_ERLANG_SENDFILE=false
-
-# split erlang ets version:
-set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
-ERTS_MAJOR=$1
-ERTS_MINOR=$2
-ERTS_MAINT=${3:-0}
 
 AC_MSG_CHECKING([for file:sendfile/5])
 file_sendfile=`"${ERL}" -noshell -eval 'code:ensure_loaded(file), io:format("~p~n",[[erlang:function_exported(file,sendfile,5)]]), erlang:halt().' | tail -1`

@@ -2543,6 +2543,24 @@ $as_echo "$erlang_cv_erts_ver" >&6; }
 ERLANG_ERTS_VER=$erlang_cv_erts_ver
 
 
+# split erlang erts version:
+set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
+ERTS_MAJOR=$1
+ERTS_MINOR=$2
+ERTS_MAINT=${3:-0}
+
+# require Erlang >= R14B04, i.e. ERTS >= 5.8.5
+if test $ERTS_MAJOR -gt 5 -o \
+       '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 8 ')' -o \
+       '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 8 -a $ERTS_MAINT -ge 5 ')'; then :
+
+else
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Erlang >= R14B04 required
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
 # Extract the first word of "epmd", so it can be a program name with args.
 set dummy epmd; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -4339,12 +4357,6 @@ fi
 ###########################################################
 YAWS_OPTIONS=
 HAVE_ERLANG_SENDFILE=false
-
-# split erlang ets version:
-set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
-ERTS_MAJOR=$1
-ERTS_MINOR=$2
-ERTS_MAINT=${3:-0}
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for file:sendfile/5" >&5
 $as_echo_n "checking for file:sendfile/5... " >&6; }
