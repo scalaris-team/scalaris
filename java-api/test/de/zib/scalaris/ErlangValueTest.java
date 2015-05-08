@@ -19,6 +19,7 @@ import static org.junit.Assert.*;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
+import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Unit tests for {@link ErlangValue}.
@@ -703,9 +705,104 @@ public class ErlangValueTest {
             assertEquals(map.get("d"), actual.getD());
             assertEquals(map.get("e"), actual.getE());
             assertEquals(map.get("f"), actual.getF());
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
+        }
+    }
+
+    /**
+     * Compares two erlang values which represent JSON tuples.
+     *
+     * The order of the JSON objects' properties does not matter.
+     *
+     * @param expected
+     * @param actual
+     */
+    private final void compareScalarisJSON(final ErlangValue expected,
+            final ErlangValue actual) {
+        compareScalarisJSON(expected.value(), actual.value(), actual.toString());
+    }
+
+    /**
+     * Compares the two erlang object assuming they are both JSON tuples.
+     *
+     * @param expected
+     * @param actual
+     */
+    private final void compareScalarisJSON(final OtpErlangObject expected,
+            final OtpErlangObject actual, final String actualOriginal) {
+        // verify: tuples with arity 2 and "struct" as the first element
+        final OtpErlangTuple expectedT = (OtpErlangTuple) expected;
+        assert (expectedT.arity() == 2);
+        String msg = "Checking '" + actual + "' in " + actualOriginal;
+        assertTrue(msg, actual instanceof OtpErlangTuple);
+        final OtpErlangTuple actualT = (OtpErlangTuple) actual;
+        assertTrue(msg, actualT.arity() == 2);
+        assert (expectedT.elementAt(0).equals("struct"));
+        assertEquals("Checking '" + actualT.elementAt(0) + "' in "
+                + actualOriginal, CommonErlangObjects.structAtom, actualT.elementAt(0));
+
+        // verify: second element in the struct-tuple is a list of properties
+        // ({Key, Value} tuples with string keys)
+        final OtpErlangList expectedPropsL = (OtpErlangList) expectedT
+                .elementAt(1);
+        msg = "Checking '" + actualT.elementAt(1) + "' in " + actualOriginal;
+        assertTrue(msg, actualT.elementAt(1) instanceof OtpErlangList);
+        final OtpErlangList actualPropsL = (OtpErlangList) actualT.elementAt(1);
+        assertEquals(msg, expectedPropsL.arity(), actualPropsL.arity());
+        final HashMap<String, OtpErlangObject> actualProperties = new HashMap<String, OtpErlangObject>(
+                actualPropsL.arity());
+        // put the actual object's properties into a hash map for quick access
+        // while on it, verify the types, too
+        for (int i = 0; i < actualPropsL.arity(); ++i) {
+            final OtpErlangObject element = actualPropsL.elementAt(i);
+            msg = "Checking '" + element + "' in " + actualOriginal;
+            assertTrue(msg, element instanceof OtpErlangTuple);
+            final OtpErlangTuple actualPropT = (OtpErlangTuple) element;
+            assertTrue(msg, actualPropT.arity() == 2);
+
+            final OtpErlangObject actualPropKey = actualPropT.elementAt(0);
+            final OtpErlangObject actualPropVal = actualPropT.elementAt(1);
+            assertTrue("Checking property '" + actualPropKey + "' in "
+                    + actualOriginal, actualPropKey instanceof OtpErlangString);
+            actualProperties.put(
+                    ((OtpErlangString) actualPropKey).stringValue(),
+                    actualPropVal);
+        }
+
+        // verify: all properties from expected exist in actual and no more
+        for (int i = 0; i < expectedPropsL.arity(); ++i) {
+            final OtpErlangTuple expectedPropT = (OtpErlangTuple) expectedPropsL
+                    .elementAt(i);
+            assert (expectedPropT.arity() == 2);
+            final String expectedPropKey = ((OtpErlangString) expectedPropT
+                    .elementAt(0)).stringValue();
+            final OtpErlangObject expectedPropVal = expectedPropT.elementAt(1);
+            assertTrue("Checking property '" + expectedPropKey + "' in "
+                    + actualOriginal,
+                    actualProperties.containsKey(expectedPropKey));
+            final OtpErlangObject actualPropVal = actualProperties
+                    .get(expectedPropKey);
+            if (actualPropVal instanceof OtpErlangTuple) {
+                final OtpErlangTuple expectedPropValT = (OtpErlangTuple) expectedPropVal;
+                final OtpErlangTuple actualPropValT = (OtpErlangTuple) actualPropVal;
+                if ((expectedPropValT.arity() == 2)
+                        && (actualPropValT.arity() == 2)
+                        && expectedPropValT.elementAt(0).equals(CommonErlangObjects.arrayAtom)
+                        && actualPropValT.elementAt(0).equals(CommonErlangObjects.arrayAtom)
+                        && (expectedPropValT.elementAt(1) instanceof OtpErlangList)
+                        && (actualPropValT.elementAt(1) instanceof OtpErlangList)) {
+                    // these lists must be equal including their order
+                    assertEquals("Checking '" + actualPropValT.elementAt(1) + "' in " + actualOriginal,
+                            actualPropValT.elementAt(1), actualPropValT.elementAt(1));
+                } else {
+                    compareScalarisJSON(expectedPropVal, actualPropVal,
+                            actualOriginal);
+                }
+            } else {
+                assertEquals("Checking value of property '" + expectedPropKey
+                        + "' in " + actualOriginal, expectedPropVal,
+                        actualPropVal);
+            }
         }
     }
 
@@ -738,9 +835,7 @@ public class ErlangValueTest {
             assertEquals(bean1.getD(), actual.getD());
             assertEquals(bean1.getE(), actual.getE(), 0.0);
             assertEquals(bean1.getF(), actual.getF());
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
         }
     }
 
@@ -790,7 +885,7 @@ public class ErlangValueTest {
     public final void testJsonValueBean2a() throws Exception {
         final Random random = new Random();
 
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 5000; ++i) {
             final Map<String, Object> map = new LinkedHashMap<String, Object>(7);
             map.put("a2", random.nextBoolean());
             map.put("b2", random.nextInt());
@@ -827,9 +922,7 @@ public class ErlangValueTest {
             assertEquals(bean1.get("e"), bean1_act.getE());
             assertEquals(bean1.get("f"), bean1_act.getF());
             compareMap(map2, actual.getI2());
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
         }
     }
 
@@ -845,7 +938,7 @@ public class ErlangValueTest {
     public final void testJsonValueBean2b() throws Exception {
         final Random random = new Random();
 
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 5000; ++i) {
             final JSONBeanTest2 bean2 = new JSONBeanTest2();
             bean2.setA2(random.nextBoolean());
             bean2.setB2(random.nextInt());
@@ -882,9 +975,7 @@ public class ErlangValueTest {
             assertEquals(bean1.getE(), bean1_act.getE(), 0.0);
             assertEquals(bean1.getF(), bean1_act.getF());
             compareMap(map2, actual.getI2());
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
         }
     }
 
@@ -914,7 +1005,7 @@ public class ErlangValueTest {
     public final void testJsonValueBean3a() throws Exception {
         final Random random = new Random();
 
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 5000; ++i) {
             final Map<String, Object> map = new LinkedHashMap<String, Object>(7);
             final Map<String, Object> bean1a = new LinkedHashMap<String, Object>(6);
             bean1a.put("a", random.nextBoolean());
@@ -961,9 +1052,7 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).get("e"), actual_b3.get(key).getE());
                 assertEquals(map1.get(key).get("f"), actual_b3.get(key).getF());
             }
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
         }
     }
 
@@ -1026,9 +1115,7 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).getE(), actual_b3.get(key).getE(), 0.0);
                 assertEquals(map1.get(key).getF(), actual_b3.get(key).getF());
             }
-            final ErlangValue value2 = new ErlangValue(actual);
-            assertEquals(value, value2);
-            assertEquals(value2, value);
+            compareScalarisJSON(value, new ErlangValue(actual));
         }
     }
 }
