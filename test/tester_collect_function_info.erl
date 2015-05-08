@@ -231,8 +231,6 @@ parse_type({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
 parse_type({type, _Line, term, []}, _Module, ParseState) ->
     {{typedef, tester, test_any, []}, ParseState};
-parse_type({type, _Line, tid, []}, _Module, ParseState) ->
-    {tid, ParseState};
 parse_type({ann_type, _Line, [{var, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
 parse_type({ann_type, _Line, [{var, _Line, _Varname}, Type]}, Module, ParseState) ->
