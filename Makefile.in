@@ -160,10 +160,7 @@ test-skipped: compile
 	grep " 0 failed" ct.log
 
 %_TESTS: compile
-# use non standard ports to run a test group so it can be executed
-# in parallel to a full test suite run or a locally running default
-# scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
 test-vts: compile
