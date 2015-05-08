@@ -234,7 +234,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %dir %{_docdir}/scalaris
 %{_docdir}/scalaris/AUTHORS
-%{_docdir}/scalaris/README
+%{_docdir}/scalaris/README.md
 %{_docdir}/scalaris/LICENSE
 %{_docdir}/scalaris/ChangeLog
 %{_bindir}/scalarisctl
