@@ -164,7 +164,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
 
 -spec print_proto_sched_stats() -> ok.
 print_proto_sched_stats() ->
-    case proto_sched:get_infos(default) of
+    case proto_sched:get_infos() of
         [] ->
             % proto_sched or its stats do not exist anymore -> print collected stats
             case unittest_global_state:lookup(proto_sched_stats) of
