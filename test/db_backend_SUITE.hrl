@@ -186,7 +186,10 @@ scrub_data(Data) ->
                             andalso is_float(most_inner_first(B))
                             andalso element(1, A) == element(1, B))
               end,
-    lists:usort(SortFun, lists:reverse(Data)).
+    SortedData = lists:usort(SortFun, lists:reverse(Data)),
+
+    %% Value '$end_of_table' is not allowed as DB key
+    lists:filter(fun(E) -> element(1, E) =/= '$end_of_table' end, SortedData). 
 
 
 check_db(DB, ExpData, Note) ->
