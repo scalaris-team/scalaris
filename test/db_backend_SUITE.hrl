@@ -174,7 +174,7 @@ write_scrubbed_to_db(DB, Data) ->
     DB1 = lists:foldl(
             fun(Entry, DBAcc) ->
                 ?TEST_DB:put(DBAcc, Entry)
-            end, DB, Data),
+            end, DB, ScrubbedData),
     {DB1, ScrubbedData}.
 
 scrub_data(Data) ->
@@ -189,8 +189,8 @@ scrub_data(Data) ->
     SortedData = lists:usort(SortFun, lists:reverse(Data)),
 
     %% Value '$end_of_table' is not allowed as DB key
-    lists:filter(fun(E) -> element(1, E) =/= '$end_of_table' end, SortedData). 
-
+    [E || E <- SortedData, 
+                    element(1, E) =/= '$end_of_table'].
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(K, AIn) -> [?TEST_DB:get(DB, K) | AIn] end, []),
