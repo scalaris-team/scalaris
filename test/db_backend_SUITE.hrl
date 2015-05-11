@@ -182,8 +182,8 @@ scrub_data(Data) ->
     SortFun = fun(A, B) -> ((element(1, A) < element(1, B)) orelse
                             (element(1, A) ?EQ element(1, B)))
                             orelse
-                            (is_integer(most_inner_first(A))
-                            andalso is_float(most_inner_first(B))
+                            (is_integer(element(1, A))
+                            andalso is_float(element(1, B))
                             andalso element(1, A) == element(1, B))
               end,
     SortedData = lists:usort(SortFun, lists:reverse(Data)),
@@ -199,7 +199,7 @@ check_db(DB, ExpData, Note) ->
 
 compare_lists(List1, List2, Note) ->
     ?equals_w_note(length(List1), length(List2), "length of lists " ++ Note),
-    ?equals_w_note(scrub_data(List1), scrub_data(List2), "content of lists " ++
+    ?compare_w_note(fun eq_lenient/2, scrub_data(List1), scrub_data(List2), "content of lists " ++
                    Note).
 
 is_in({Key}, OtherKey) -> Key ?EQ OtherKey;
@@ -209,10 +209,15 @@ is_in({'(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key ?EQ R));
 is_in({'[', L, R, ')'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso Key < R;
 is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso ((Key < R) orelse (Key ?EQ R)).
 
-%% traverse a nested structure build out of tuples and lists by choosing its first element
-%% repeatedly until the most inner element is reached.  
-most_inner_first({}) -> {};
-most_inner_first([]) -> [];
-most_inner_first([H|_T]) -> most_inner_first(H);
-most_inner_first(Tuple) when is_tuple(Tuple) -> most_inner_first(element(1, Tuple));
-most_inner_first(Element) -> Element.
+%% Test two lists L1 and L2 for equality while taking into consideration that elements E1, E2 might be
+%% out of order iff E1 == E2 but E1 =/= E2 (eg. {0.0} and {0})
+eq_lenient(L1, L2) -> eq_lenient(L1, [], L2).
+
+eq_lenient([], [], []) -> true;
+eq_lenient([H1|L1], [], [H2|L2]) when H1 ?EQ H2 -> 
+    eq_lenient(L1, [], L2);
+eq_lenient([H1|L1], Pref, [H2|L2]) when H1 ?EQ H2 -> 
+    eq_lenient(L1, [], lists:append(Pref, L2));
+eq_lenient([H1|L1], Pref, [H2|L2]) when element(1, H1) == element(1, H2) -> 
+    eq_lenient([H1|L1], [H2|Pref], L2);
+eq_lenient(_L1, _Pref, _L2) -> false.
