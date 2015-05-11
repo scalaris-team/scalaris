@@ -31,7 +31,6 @@
   "src/cp/*",
   "src/json/*",
   "src/paxos/*",
-  "src/pubsub/*",
   "src/rbr/*",
   "src/rrepair/*",
   "src/simulation/*",

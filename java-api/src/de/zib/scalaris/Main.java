@@ -19,8 +19,6 @@ import java.lang.management.ManagementFactory;
 import java.text.DecimalFormat;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.List;
-
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.MBeanRegistrationException;
 import javax.management.MBeanServer;
@@ -84,11 +82,6 @@ public class Main {
      *                                              re-creating an item the
      *                                              version before the delete can
      *                                              re-appear.
-     *  -p,--publish <topic> <message>              publish a new message for the
-     *                                              given topic
-     *  -s,--subscribe <topic> <url>                subscribe to a topic
-     *  -u,--unsubscribe <topic> <url>              unsubscribe from a topic
-     *  -g,--getsubscribers <topic>                 get subscribers of a topic
      *  -jmx,--jmxservice <node>                    starts a service exposing
      *                                              Scalaris monitoring values
      *                                              via JMX
@@ -204,71 +197,6 @@ public class Main {
             } catch (final KeyChangedException e) {
                 printException("testAndSet failed with key changed (current value: " + e.getOldValue().toString() + ")", e, verbose);
             }
-        } else if (line.hasOption("p")) { // publish
-            final String[] optionValues = line.getOptionValues("publish");
-            checkArguments(optionValues, 2, options, "p");
-            final String topic = optionValues[0];
-            final String content = optionValues[1];
-            if (content == null) {
-                // parsing methods of commons.cli only checks the first argument :(
-                printException("Parsing failed", new ParseException("missing content for option p"), verbose);
-            }
-            try {
-                final PubSub sc = new PubSub();
-                sc.publish(topic, content);
-                System.out.println("publish(" + topic + ", " + content + "): ok");
-            } catch (final ConnectionException e) {
-                printException("publish failed with connection error", e, verbose);
-            } catch (final UnknownException e) {
-                printException("publish failed with unknown", e, verbose);
-            }
-        } else if (line.hasOption("s")) { // subscribe
-            final String[] optionValues = line.getOptionValues("subscribe");
-            checkArguments(optionValues, 2, options, "s");
-            final String topic = optionValues[0];
-            final String url = optionValues[1];
-            try {
-                final PubSub sc = new PubSub();
-                sc.subscribe(topic, url);
-                System.out.println("subscribe(" + topic + ", " + url + "): ok");
-            } catch (final ConnectionException e) {
-                printException("subscribe failed with connection error", e, verbose);
-            } catch (final AbortException e) {
-                printException("write failed with abort", e, verbose);
-            } catch (final UnknownException e) {
-                printException("subscribe failed with unknown", e, verbose);
-            }
-        } else if (line.hasOption("u")) { // unsubscribe
-            final String[] optionValues = line.getOptionValues("unsubscribe");
-            checkArguments(optionValues, 2, options, "u");
-            final String topic = optionValues[0];
-            final String url = optionValues[1];
-            try {
-                final PubSub sc = new PubSub();
-                sc.unsubscribe(topic, url);
-                System.out.println("unsubscribe(" + topic + ", " + url + "): ok");
-            } catch (final ConnectionException e) {
-                printException("unsubscribe failed with connection error", e, verbose);
-            } catch (final NotFoundException e) {
-                printException("unsubscribe failed with not found", e, verbose);
-            } catch (final AbortException e) {
-                printException("write failed with abort", e, verbose);
-            } catch (final UnknownException e) {
-                printException("unsubscribe failed with unknown", e, verbose);
-            }
-        } else if (line.hasOption("g")) { // getsubscribers
-            final String topic = line.getOptionValue("getsubscribers");
-            checkArguments(topic, options, "g");
-            try {
-                final PubSub sc = new PubSub();
-                final List<String> subscribers = sc.getSubscribers(topic).stringListValue();
-                System.out.println("getSubscribers(" + topic + ") == "
-                        + subscribers);
-            } catch (final ConnectionException e) {
-                printException("getSubscribers failed with connection error", e, verbose);
-            } catch (final UnknownException e) {
-                printException("getSubscribers failed with unknown error", e, verbose);
-            }
         } else if (line.hasOption("d")) { // delete
             final String[] optionValues = line.getOptionValues("delete");
             checkArguments(optionValues, 1, options, "d");
@@ -367,18 +295,10 @@ public class Main {
                         return 10;
                     } else if (option.getLongOpt().equals("delete")) {
                         return 11;
-                    } else if (option.getLongOpt().equals("publish")) {
-                        return 12;
-                    } else if (option.getLongOpt().equals("subscribe")) {
-                        return 13;
-                    } else if (option.getLongOpt().equals("unsubscribe")) {
-                        return 14;
-                    } else if (option.getLongOpt().equals("getsubscribers")) {
-                        return 15;
                     } else if (option.getLongOpt().equals("jmxservice")) {
-                        return 16;
+                        return 12;
                     } else {
-                        return 17;
+                        return 13;
                     }
                 }
 
@@ -476,30 +396,6 @@ public class Main {
         test_and_set.setArgs(3);
         test_and_set.setOptionalArg(true);
         group.addOption(test_and_set);
-
-        final Option publish = new Option("p", "publish", true, "publish a new message for the given topic");
-        publish.setArgName("topic> <message");
-        publish.setArgs(2);
-        publish.setOptionalArg(true);
-        group.addOption(publish);
-
-        final Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic");
-        subscribe.setArgName("topic> <url");
-        subscribe.setArgs(2);
-        subscribe.setOptionalArg(true);
-        group.addOption(subscribe);
-
-        final Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic");
-        unsubscribe.setArgName("topic> <url");
-        unsubscribe.setArgs(2);
-        unsubscribe.setOptionalArg(true);
-        group.addOption(unsubscribe);
-
-        final Option getSubscribers = new Option("g", "getsubscribers", true, "get subscribers of a topic");
-        getSubscribers.setArgName("topic");
-        getSubscribers.setArgs(1);
-        getSubscribers.setOptionalArg(true);
-        group.addOption(getSubscribers);
 
         final Option delete = new Option("d", "delete", true,
                 "delete an item (default timeout: 2000ms)\n" +

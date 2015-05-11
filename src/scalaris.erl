@@ -41,7 +41,6 @@ start() ->
     _ = code:ensure_loaded(api_dht),
     _ = code:ensure_loaded(api_dht_raw),
     _ = code:ensure_loaded(api_monitor),
-    _ = code:ensure_loaded(api_pubsub),
     _ = code:ensure_loaded(api_rdht),
     _ = code:ensure_loaded(api_tx),
     _ = code:ensure_loaded(api_vm),

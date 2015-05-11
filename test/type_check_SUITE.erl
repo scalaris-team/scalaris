@@ -76,7 +76,6 @@ tester_type_check_api(_Config) ->
              {delete_and_cleanup_timer,2} %% cannot create reference()
            ]},
           {api_monitor, [], []},
-          {api_pubsub, [], []},
           {api_rdht, [], [ {delete_collect_results, 3} ]}, %% receives
           {api_tx,
            [ {get_system_snapshot, 0} %% receives msgs

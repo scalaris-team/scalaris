@@ -31,7 +31,6 @@ start_link() ->
     _ = api_json:module_info(),
     _ = api_json_dht_raw:module_info(),
     _ = api_json_monitor:module_info(),
-    _ = api_json_pubsub:module_info(),
     _ = api_json_rdht:module_info(),
     _ = api_json_tx:module_info(),
     Id = io_lib:format("yaws@~p", [node()]),

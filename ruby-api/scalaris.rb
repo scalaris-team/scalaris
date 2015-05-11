@@ -369,62 +369,6 @@ module Scalaris
       end
       raise UnknownError.new(result)
     end
-    
-    # Processes the result of a publish operation.
-    # Raises the appropriate exception if the operation failed.
-    # 
-    # results: {'status': 'ok'}
-    def self.process_result_publish(result)
-      if result == {'status' => 'ok'}
-        return nil
-      end
-      raise UnknownError.new(result)
-    end
-    
-    # Processes the result of a subscribe operation.
-    # Raises the appropriate exception if the operation failed.
-    # 
-    # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-    def self.process_result_subscribe(result)
-      process_result_commit(result)
-    end
-    
-    # Processes the result of a unsubscribe operation.
-    # Raises the appropriate exception if the operation failed.
-    #  
-    # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}
-    def self.process_result_unsubscribe(result)
-      if result == {'status' => 'ok'}
-        return nil
-      elsif result.is_a?(Hash) and result.has_key?('status')
-        if result['status'] == 'fail' and result.has_key?('reason')
-          if result.length == 2
-            if result['reason'] == 'timeout'
-              raise TimeoutError.new(result)
-            elsif result['reason'] == 'not_found'
-              raise NotFoundError.new(result)
-            end
-          elsif result.length == 3 and result['reason'] == 'abort' and result.has_key?('keys')
-            raise AbortError.new(result, result['keys'])
-          end
-        end
-      end
-      raise UnknownError.new(result)
-    end
-    
-    # Processes the result of a get_subscribers operation.
-    # Returns the list of subscribers on success.
-    # Raises the appropriate exception if the operation failed.
-    # 
-    # results: [urls=str()]
-    def self.process_result_get_subscribers(result)
-      if result.is_a?(Array)
-        return result
-      end
-      raise UnknownError.new(result)
-    end
 
     # Processes the result of a delete operation.
     # Returns an Array of
@@ -925,49 +869,6 @@ module Scalaris
     def add_commit()
       raise RuntimeError.new('No commit allowed in TransactionSingleOp.req_list()!')
     end
-  end
-
-  # Publish and subscribe methods accessing Scalaris' pubsub system
-  class PubSub
-    # Create a new object using the given connection.
-    def initialize(conn = JSONConnection.new())
-      @conn = conn
-    end
-    
-    # Publishes content under topic.
-    def publish(topic, content)
-      # note: do NOT encode the content, this is not decoded on the erlang side!
-      # (only strings are allowed anyway)
-      # content = @conn.class.encode_value(content)
-      result = @conn.call(:publish, [topic, content])
-      @conn.class.process_result_publish(result)
-    end
-    
-    # Subscribes url for topic.
-    def subscribe(topic, url)
-      # note: do NOT encode the URL, this is not decoded on the erlang side!
-      # (only strings are allowed anyway)
-      # url = @conn.class.encode_value(url)
-      result = @conn.call(:subscribe, [topic, url])
-      @conn.class.process_result_subscribe(result)
-    end
-    
-    # Unsubscribes url from topic.
-    def unsubscribe(topic, url)
-      # note: do NOT encode the URL, this is not decoded on the erlang side!
-      # (only strings are allowed anyway)
-      # url = @conn.class.encode_value(url)
-      result = @conn.call(:unsubscribe, [topic, url])
-      @conn.class.process_result_unsubscribe(result)
-    end
-    
-    # Gets the list of all subscribers to topic.
-    def get_subscribers(topic)
-      result = @conn.call(:get_subscribers, [topic])
-      @conn.class.process_result_get_subscribers(result)
-    end
-    
-    include InternalScalarisNopClose
   end
 
   # Non-transactional operations on the replicated DHT of Scalaris

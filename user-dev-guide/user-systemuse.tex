@@ -42,8 +42,6 @@ calls is shown in Section~\sieheref{sec.api.json}.
     \multirow{3}{2cm}{Transaction\\Layer}
       & \code{api_tx}          & \code{Transaction},          & \code{tx.yaws}      & \code{Transaction},        \\
       &                        & \code{TransactionSingleOp}   &                     & \code{TransactionSingleOp} \\
-    %\cmidrule(lr){2-5}
-      & \code{api_pubsub}      & \code{PubSub}                & \code{pubsub.yaws}  & \code{PubSub}              \\
     \cmidrule(lr){1-5}
     \multirow{2}{2cm}{Replication\\Layer}
       & \code{api_rdht}        & \code{ReplicatedDHT}         & \code{rdht.yaws}    & \code{ReplicatedDHT}       \\
@@ -292,62 +290,6 @@ Java:   & \code{Transaction.req_list(RequestList)}\\
 JSON:   & \code{tx.yaws/req_list(RequestList)}, \code{req_list(TLog, RequestList)}\\
 Python: & \code{Transaction.req_list(RequestList)}\\
 Ruby:   & \code{Transaction.req_list(RequestList)}
-\end{tabular}
-
-\subsubsection{Transaction Layer (Pub/Sub)}
-Scalaris implements a simple Publish/Subscribe system. Subscribers can
-subscribe URLs for some topic. If an event is published to that topic, a
-JSON-RPC is send to that URL, i.e. a JSON object of the following form:
-\begin{lstlisting}[language=java]
-{
- "method": "notify",
- "params": [<topic>, <content>],
- "id"    : <number>
-}
-\end{lstlisting}
-
-\paragraph{Publish}
-Publishes an event under a given topic.
-
-\begin{tabular}{lp{14cm}}
-Erlang  & \code{api_pubsub:publish(Topic, Content)}\\
-Java:   & \code{PubSub.publish(Topic, Content)}\\
-JSON:   & \code{pubsub.yaws/publish(Topic, Content)}\\
-Python: & \code{PubSub.publish(Topic, Content)}\\
-Ruby:   & \code{PubSub.publish(Topic, Content)}
-\end{tabular}
-
-\paragraph{Subscribe}
-Subscribes a URL for a topic.
-
-\begin{tabular}{lp{14cm}}
-Erlang  & \code{api_pubsub:subscribe(Topic, URL)}\\
-Java:   & \code{PubSub.subscribe(Topic, URL)}\\
-JSON:   & \code{pubsub.yaws/subscribe(Topic, URL)}\\
-Python: & \code{PubSub.subscribe(Topic, URL)}\\
-Ruby:   & \code{PubSub.subscribe(Topic, URL)}
-\end{tabular}
-
-\paragraph{Unsubscribe}
-Subscribes a URL from a topic.
-
-\begin{tabular}{lp{14cm}}
-Erlang  & \code{api_pubsub:unsubscribe(Topic, URL)}\\
-Java:   & \code{PubSub.unsubscribe(Topic, URL)}\\
-JSON:   & \code{pubsub.yaws/unsubscribe(Topic, URL)}\\
-Python: & \code{PubSub.unsubscribe(Topic, URL)}\\
-Ruby:   & \code{PubSub.unsubscribe(Topic, URL)}
-\end{tabular}
-
-\paragraph{Get Subscribers}
-Gets a list of subscribed URLs for a given topic.
-
-\begin{tabular}{lp{14cm}}
-Erlang  & \code{api_pubsub:get_subscribers(Topic)}\\
-Java:   & \code{PubSub.getSubscribers(Topic)}\\
-JSON:   & \code{pubsub.yaws/get_subscribers(Topic)}\\
-Python: & \code{PubSub.get_subscribers(Topic)}\\
-Ruby:   & \code{PubSub.get_subscribers(Topic)}
 \end{tabular}
 
 \subsubsection{Replication Layer}
@@ -748,29 +690,6 @@ supported (the given result is the \code{<result_object>} mentioned above):
 {"status": "ok" or "timeout",
  "value": [{"key": <key>, "value": <json_value>, "version": <version>}]}
 \end{lstlisting}
-  \item[] \hspace{-1.7em}publish/subscribe - \code{<URL>/api/pubsub.yaws}:
-  \item \code{publish(Topic, Content)} - publish \code{Content} to \code{Topic} (\code{<key>}), result:
-\begin{lstlisting}[language=java]
-{"status": "ok"}
-\end{lstlisting}
-  \item \code{subscribe(Topic, URL)} - subscribe \code{URL} to \code{Topic} (\code{<key>}), result:
-\begin{lstlisting}[language=java]
-{"status": "ok"} or
-{"status": "fail", "reason": "timeout" or "abort"}
-\end{lstlisting}
-  \item \code{unsubscribe(Topic, URL)} - unsubscribe \code{URL} from \code{Topic} (\code{<key>}), result:
-\begin{lstlisting}[language=java]
-{"status": "ok"} or
-{"status": "fail", "reason": "timeout" or "abort" or "not_found"}
-\end{lstlisting}
-  \item \code{get_subscribers(Topic)} - get subscribers of \code{Topic} (\code{<key>}), result:
-\begin{lstlisting}[language=java]
-[<urls>]
-\end{lstlisting}
-%  \item \code{notify(Topic, Value)} - process a notify which came from a publish, result:
-% \begin{lstlisting}[language=java]
-% "ok"
-% \end{lstlisting}
   \item[] \hspace{-1.7em}monitor - \code{<URL>/api/monitor.yaws}:
   \item \code{get_node_info()} - gets some information about the node, result:
 \begin{lstlisting}[language=java]
@@ -960,7 +879,6 @@ classes:
 \begin{itemize}
 \item \code{TransactionSingleOp} provides methods for reading and writing values.
 \item \code{Transaction} provides methods for reading and writing values in transactions.
-\item \code{PubSub} provides methods for a simple topic-based pub/sub implementation on top of \scalaris{}.
 \item \code{ReplicatedDHT} provides low-level methods for accessing the replicated DHT of \scalaris{}.
 \end{itemize}
 
@@ -987,8 +905,7 @@ sets up the Java environment:
 \lstinputlisting[language={}]{scalaris-client-java.out}
 
 \code{read}, \code{write}, \code{delete} and similar operations can be used to read, write
-and delete from/to the overlay, respectively. \code{getsubscribers},
-\code{publish}, and \code{subscribe} are the PubSub functions. The others
+and delete from/to the overlay, respectively. The others
 provide debugging and testing functionality.
 
 \begin{lstlisting}[language=]
@@ -1397,5 +1314,3 @@ won.
 Note that in a real system, operations in \lstinline|api_tx:req_list(Tlog, List)| should be grouped together with a trailing \lstinline|{commit}| as
 far as possible. The individual separation of all reads, writes and commits
 was done here on purpose to study the transactional behaviour.
-
-% \section{PubSub}
