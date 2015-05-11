@@ -476,6 +476,7 @@ on({rejoin, Id, Options, {get_move_state_response, MoveState}}, State) ->
     comm:send_local(self(), {join, start}),
     JoinOptions = [{move_state, MoveState} | Options],
     IdVersion = node:id_version(dht_node_state:get(State, node)),
+    dht_node_state:delete_for_rejoin(State), % clean up state!
     dht_node_join:join_as_other(Id, IdVersion+1, JoinOptions).
 
 %% userdevguide-begin dht_node:start

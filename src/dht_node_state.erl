@@ -27,6 +27,7 @@
 -define(TRACE_MR_SLIDE(X,Y), ?TRACE(X, Y)).
 
 -export([new/3, new_on_recover/12,
+         delete_for_rejoin/1,
          get/2,
          dump/1,
          set_rt/2, set_rm/2, set_db/2, set_lease_list/2,
@@ -163,6 +164,28 @@ new_on_recover(RT, RMState,
            mr_state = orddict:new(),
            mr_master_state = orddict:new()
           }.
+
+%% @doc Clean up tables before rejoining with a new state.
+-spec delete_for_rejoin(state()) -> ok.
+delete_for_rejoin(
+  #state{db = DB, prbr_kv_db=PRBRState,
+         txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
+         lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4}) ->
+    % note: rm_state is transferred (ref. move_state in rm_loop)
+    % TODO: transfer snapshot state / data?!
+    % TODO: transfer MR state / data?!
+    db_dht:close_and_delete(DB),
+    prbr:close_and_delete(PRBRState),
+    prbr:close_and_delete(TxIdDB1),
+    prbr:close_and_delete(TxIdDB2),
+    prbr:close_and_delete(TxIdDB3),
+    prbr:close_and_delete(TxIdDB4),
+    prbr:close_and_delete(LeaseDB1),
+    prbr:close_and_delete(LeaseDB2),
+    prbr:close_and_delete(LeaseDB3),
+    prbr:close_and_delete(LeaseDB4),
+    
+    ok.
 
 %% @doc Gets the given property from the dht_node state.
 %%      Allowed keys include:
