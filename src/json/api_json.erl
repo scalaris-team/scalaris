@@ -44,19 +44,11 @@ handler(add_on_nr, [Key, ToAdd])         -> api_json_tx:add_on_nr(Key, ToAdd);
 handler(test_and_set, [Key, OldV, NewV]) -> api_json_tx:test_and_set(Key, OldV, NewV);
 handler(req_list_commit_each, [Param])   -> api_json_tx:req_list_commit_each(Param);
 
-handler(publish, [Topic, Content])       -> api_json_pubsub:publish(Topic, Content);
-handler(subscribe, [Topic, URL])         -> api_json_pubsub:subscribe(Topic, URL);
-handler(unsubscribe, [Topic, URL])       -> api_json_pubsub:unsubscribe(Topic, URL);
-handler(get_subscribers, [Topic])        -> api_json_pubsub:get_subscribers(Topic);
-
 handler(get_node_info, [])               -> api_json_monitor:get_node_info();
 handler(get_node_performance, [])        -> api_json_monitor:get_node_performance();
 handler(get_service_info, [])            -> api_json_monitor:get_service_info();
 handler(get_service_performance, [])     -> api_json_monitor:get_service_performance();
 
-handler(notify, [Topic, Value]) ->
-    io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
-    "ok";
 
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~s:~p(~p)~n", [?MODULE, AnyOp, AnyParams]),

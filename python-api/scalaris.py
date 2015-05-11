@@ -231,61 +231,6 @@ class JSONConnection(object):
                     raise KeyChangedError(result, JSONConnection.decode_value(result['value']))
         raise UnknownError(result)
 
-    # results: {'status': 'ok'}
-    @staticmethod
-    def process_result_publish(result):
-        """
-        Processes the result of a publish operation.
-        Raises the appropriate exception if the operation failed.
-        """
-        if result == {'status': 'ok'}:
-            return None
-        raise UnknownError(result)
-
-    # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-    @staticmethod
-    def process_result_subscribe(result):
-        """
-        Processes the result of a subscribe operation.
-        Raises the appropriate exception if the operation failed.
-        """
-        JSONConnection.process_result_commit(result)
-
-    # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'abort', 'keys': <list>} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
-    @staticmethod
-    def process_result_unsubscribe(result):
-        """
-        Processes the result of a unsubscribe operation.
-        Raises the appropriate exception if the operation failed.
-        """
-        if result == {'status': 'ok'}:
-            return None
-        elif isinstance(result, dict) and 'status' in result:
-            if result['status'] == 'fail' and 'reason' in result:
-                if len(result) == 2:
-                    if result['reason'] == 'timeout':
-                        raise TimeoutError(result)
-                    elif result['reason'] == 'not_found':
-                        raise NotFoundError(result)
-                elif len(result) == 3 and result['reason'] == 'abort' and 'keys' in result:
-                    raise AbortError(result, result['keys'])
-        raise UnknownError(result)
-
-    # results: [urls=str()]
-    @staticmethod
-    def process_result_get_subscribers(result):
-        """
-        Processes the result of a get_subscribers operation.
-        Returns the list of subscribers on success.
-        Raises the appropriate exception if the operation failed.
-        """
-        if isinstance(result, list):
-            return result
-        raise UnknownError(result)
-
     # results: {'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']} or
     #          {'failure': 'timeout', 'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']}
     @staticmethod
@@ -1284,71 +1229,6 @@ class _JSONReqListTransactionSingleOp(_JSONReqList):
         """
         raise RuntimeError("No commit allowed in TransactionSingleOp.req_list()!")
 
-class PubSub(object):
-    """
-    Publish and subscribe methods accessing scalaris' pubsub system
-    """
-
-    def __init__(self, conn = None):
-        """
-        Create a new object using the given connection.
-        """
-        if conn is None:
-            conn = JSONConnection()
-        self._conn = conn
-
-    def publish(self, topic, content):
-        """
-        Publishes content under topic.
-        """
-        # note: do NOT encode the content, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # content = self._conn.encode_value(content)
-        result = self._conn.callp('/api/pubsub.yaws', 'publish', [topic, content])
-        self._conn.process_result_publish(result)
-
-    def subscribe(self, topic, url):
-        """
-        Subscribes url for topic.
-        """
-        # note: do NOT encode the URL, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # url = self._conn.encode_value(url)
-        result = self._conn.callp('/api/pubsub.yaws', 'subscribe', [topic, url])
-        self._conn.process_result_subscribe(result)
-
-    def unsubscribe(self, topic, url):
-        """
-        Unsubscribes url from topic.
-        """
-        # note: do NOT encode the URL, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # url = self._conn.encode_value(url)
-        result = self._conn.callp('/api/pubsub.yaws', 'unsubscribe', [topic, url])
-        self._conn.process_result_unsubscribe(result)
-
-    def get_subscribers(self, topic):
-        """
-        Gets the list of all subscribers to topic.
-        """
-        result = self._conn.callp('/api/pubsub.yaws', 'get_subscribers', [topic])
-        return self._conn.process_result_get_subscribers(result)
-
-    def nop(self, value):
-        """
-        No operation (may be used for measuring the JSON overhead).
-        """
-        value = self._conn.encode_value(value)
-        result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
-        self._conn.process_result_nop(result)
-
-    def close_connection(self):
-        """
-        Close the connection to scalaris
-        (it will automatically be re-opened on the next request).
-        """
-        self._conn.close()
-
 class ReplicatedDHT(object):
     """
     Non-transactional operations on the replicated DHT of scalaris
@@ -1538,7 +1418,7 @@ class ScalarisVM(object):
         No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
-        result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
+        result = self._conn.callp('/api/vm.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
 
     def close_connection(self):
