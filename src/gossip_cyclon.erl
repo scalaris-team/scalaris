@@ -54,7 +54,7 @@
          rm_send_changes/5]).
 
 % API
--export([get_subset_rand/1, get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
+-export([get_subset_rand/1, get_subset_rand/2, get_subset_rand/3]).
 
 %% for testing
 -export([select_data_feeder/1]).
@@ -163,24 +163,21 @@ check_config() ->
 %%      requesting process.
 -spec get_subset_rand(N::pos_integer()) -> ok.
 get_subset_rand(N) ->
+    get_subset_rand(N, self()).
+
+%% @doc Same as get_subset_rand/1 but sends the reply back to the given Pid.
+-spec get_subset_rand(N::pos_integer(), Pid::comm:erl_local_pid()) -> ok.
+get_subset_rand(N, SourcePid) ->
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {cb_msg, instance(), {get_subset_rand, N, self()}}).
+    comm:send_local(Pid, {cb_msg, instance(), {get_subset_rand, N, SourcePid}}).
 
-
-%% @doc Same as get_subset_rand/1, but the request is delayed with a delay equal
-%%      to the gossip_cyclon_interval config parameter.
--spec get_subset_rand_next_interval(N::pos_integer()) -> ok.
-get_subset_rand_next_interval(N) ->
-    get_subset_rand_next_interval(N, self()).
-
-
-%% @doc Same as get_subset_rand_next_interval/1 but sends the reply back to the
-%%      given Pid.
--spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> ok.
-get_subset_rand_next_interval(N, SourcePid) ->
+%% @doc Same as get_subset_rand/2 but adds the given delay using msg_delay.
+-spec get_subset_rand(N::pos_integer(), Pid::comm:erl_local_pid(),
+                      Delay::non_neg_integer()) -> ok.
+get_subset_rand(N, SourcePid, Delay) ->
     Pid = pid_groups:get_my(gossip),
-    msg_delay:send_local(trigger_interval() div 1000, Pid,
-                          {cb_msg, instance(), {get_subset_rand, N, SourcePid}}).
+    msg_delay:send_local(Delay, Pid,
+                         {cb_msg, instance(), {get_subset_rand, N, SourcePid}}).
 
 
 
