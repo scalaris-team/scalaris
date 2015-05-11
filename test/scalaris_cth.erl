@@ -164,7 +164,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
 
 -spec print_proto_sched_stats() -> ok.
 print_proto_sched_stats() ->
-    case proto_sched:get_infos() of
+    try proto_sched:get_infos() of
         [] ->
             % proto_sched or its stats do not exist anymore -> print collected stats
             case unittest_global_state:lookup(proto_sched_stats) of
@@ -174,6 +174,13 @@ print_proto_sched_stats() ->
             end;
         Stats ->
             ct:pal("Proto scheduler stats: ~.2p", [Stats])
+    catch _:_ ->
+              % pid_groups not available (anymore)? -> check whether we recorded some:
+              case unittest_global_state:lookup(proto_sched_stats) of
+                  failed -> ok;
+                  Stats -> ct:pal("Proto scheduler stats (collected): ~.2p",
+                                  [Stats])
+              end
     end.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
