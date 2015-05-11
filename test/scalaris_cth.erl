@@ -130,11 +130,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
             end,
-            catch unittest_helper:print_proto_sched_stats(now),
-            case unittest_global_state:lookup(proto_sched_stats) of
-                failed -> ok;
-                Stats -> ct:pal("Proto scheduler stats2: ~.2p", [Stats])
-            end,
+            print_proto_sched_stats(),
             catch tester_global_state:log_last_calls(),
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)
@@ -152,10 +148,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             ok;
         {fail, _Reason} ->
             TimeTrapTime_ms = 0,
-            case unittest_global_state:lookup(proto_sched_stats) of
-                failed -> ok;
-                Stats -> ct:pal("Proto scheduler stats: ~.2p", [Stats])
-            end;
+            print_proto_sched_stats();
         _ ->
             TimeTrapTime_ms = 0,
             ok
@@ -168,6 +161,20 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
            "End ~p:~p -> ~.0p (after ~fs)",
            [State#state.suite, TC, Return, TCTime_ms / 1000]),
     {Return, State#state{tc_start = NewTcStart} }.
+
+-spec print_proto_sched_stats() -> ok.
+print_proto_sched_stats() ->
+    case proto_sched:get_infos(default) of
+        [] ->
+            % proto_sched or its stats do not exist anymore -> print collected stats
+            case unittest_global_state:lookup(proto_sched_stats) of
+                failed -> ok;
+                Stats -> ct:pal("Proto scheduler stats (collected): ~.2p",
+                                [Stats])
+            end;
+        Stats ->
+            ct:pal("Proto scheduler stats: ~.2p", [Stats])
+    end.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
 %% post_end_per_group and post_end_per_testcase if the suite, group or test case failed.
