@@ -798,6 +798,13 @@ install: install-erlang
 install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHON2INSTALL@ @ENABLEPYTHON3INSTALL@
 
 Makefile: Makefile.in
-	@echo "Makefile is outdated. please run ./configure"
-	@echo "call configure with all parameters from your previous configure run"
-	@exit 1 
+	@echo
+	@echo "Makefile is outdated. Please run './configure'."
+	@if [ -f ./config.status ]; then \
+	   if [ "" != "`./config.status --config`" ]; then \
+	     echo "For the parameters you used last time you may call"; \
+	     echo "'./configure `./config.status --config|sed -e "s/'//g"`'."; \
+	fi fi
+	@echo
+	@exit 1
+
