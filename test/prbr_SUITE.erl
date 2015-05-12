@@ -280,12 +280,14 @@ tester_type_check_rbr(_Config) ->
            ],
            []},
           {prbr,
-           [ {init, 1},        %% needs to be in a pidgroup for db_name
-             {on, 2},          %% sends messages
-             {get_load, 1},    %% needs valid ets:tid()
-             {set_entry, 2},   %% needs valid ets:tid()
-             {tab2list, 1},    %% needs valid ets:tid()
-             {tab2list_raw_unittest, 1}    %% needs valid ets:tid()
+           [ {init, 1},             %% needs to be in a pidgroup for db_name
+             {close, 1},            %% needs valid ets:tid()
+             {close_and_delete, 1}, %% needs valid ets:tid()
+             {on, 2},               %% sends messages
+             {get_load, 1},         %% needs valid ets:tid()
+             {set_entry, 2},        %% needs valid ets:tid()
+             {tab2list, 1},         %% needs valid ets:tid()
+             {tab2list_raw_unittest, 1} %% needs valid ets:tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
              {msg_write_reply, 5}, %% sends messages
