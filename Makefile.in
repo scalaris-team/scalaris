@@ -148,7 +148,9 @@ test-skipped: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg -ct_hooks scalaris_cth -noshell | tee ct-skipped.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
-%_SUITE: compile
+SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
+
+${SUITES}: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
@@ -156,7 +158,6 @@ test-skipped: compile
 	grep " 0 failed" ct_$@.log
 
 # define targets for single test cases of the form <test-suite>:<test-case>:
-SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
 define TEST_CASE_TARGET
 $(1)\:%: compile
 # use non standard ports to run a single SUITE's test case so it can be executed
