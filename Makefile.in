@@ -155,6 +155,18 @@ test-skipped: compile
 	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	grep " 0 failed" ct_$@.log
 
+# define targets for single test cases of the form <test-suite>:<test-case>:
+SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
+define TEST_CASE_TARGET
+$(1)\:%: compile
+# use non standard ports to run a single SUITE's test case so it can be executed
+# in parallel to a full test suite run or a locally running default
+# scalaris session.
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 /usr/lib64/erlang/bin/ct_run $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
+	grep " 0 failed" ct_$(1).$$*.log
+endef
+$(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
+
 %_SUITE-with-cover: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
