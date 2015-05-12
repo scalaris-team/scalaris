@@ -771,7 +771,7 @@ on_init({?register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
         false ->
             on(Msg, State)
     end;
-on({update_snapno, SnapNo}, State) ->
+on_init({update_snapno, SnapNo}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     state_set_local_snapno(State, SnapNo);
