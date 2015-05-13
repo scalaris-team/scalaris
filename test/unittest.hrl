@@ -27,17 +27,6 @@
 -define(ct_fail(Format, Data),
         % if possible, do not use a function to silence dialyzer warnings about
         % functions with no return
-        case erlang:whereis(ct_test_ring) of
-            undefined -> ok;
-            _         ->
-                case config:read(no_print_ring_data) of
-                    true -> ok;
-                    _ ->
-                        unittest_helper:print_ring_data()
-                end,
-                ct:pal("Proto scheduler stats: ~.2p",
-                       [unittest_global_state:lookup(proto_sched_stats)])
-        end,
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
 -define(assert(Boolean),
