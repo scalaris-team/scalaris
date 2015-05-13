@@ -241,6 +241,7 @@ stop_ring() ->
 stop_ring(Pid) ->
     try
         begin
+            ct:pal("unittest_helper:stop_ring start."),
             error_logger:tty(false),
             error_logger:delete_report_handler(error_logger_log4erl_h),
             log:set_log_level(none),
