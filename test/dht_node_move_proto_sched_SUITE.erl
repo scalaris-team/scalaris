@@ -42,7 +42,7 @@ all() ->
      {group, jump_slide}
     ].
 
-suite() -> [ {timetrap, {seconds, 300}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 -spec additional_ring_config() -> [{stabilization_interval_base, 100000},...].
 additional_ring_config() ->

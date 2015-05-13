@@ -39,7 +39,7 @@ all() ->
      {group, jump_slide}
     ].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 30}} ].
 
 -spec additional_ring_config() -> [].
 additional_ring_config() ->
