@@ -34,8 +34,6 @@ suite() ->
     ].
 
 init_per_testcase(_TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     [{stop_ring, true} | Config].
 
 -spec prop_make_ring_with_ids(IDs::[?RT:key(),...]) -> true.

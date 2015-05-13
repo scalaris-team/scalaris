@@ -72,8 +72,6 @@ end_per_group(_GroupName, Config) ->
     Config.
 
 init_per_testcase(_TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     % for unit tests without a ring, we need to be in a pid_group:
     case proplists:get_value(name, proplists:get_value(tc_group_properties, Config, []), none) of
         without_ring -> pid_groups:join_as("ct_tests", ?MODULE);

@@ -36,8 +36,6 @@ all()   -> [
 suite() -> [ {timetrap, {seconds, 400}} ].
 
 init_per_testcase(TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     case TestCase of
         rbr_concurrency_kv ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),

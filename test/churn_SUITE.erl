@@ -60,8 +60,6 @@ init_per_testcase(TestCase, Config) ->
         transactions_3_failures_4_nodes_networksplit_write ->
             {skip, "ring maint. cannot handle network split yet - see issue 59"};
         _ ->
-            % stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(
               ?RT:get_replica_keys(?RT:hash_key("0")),

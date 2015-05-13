@@ -41,7 +41,6 @@ init_per_testcase(Testcase, Config) ->
     ClusterRadius = {dc_clustering_radius, 1000.0},
     case Testcase of
         single_node ->
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(1, [{config, [
                             {log_path, PrivDir}
@@ -50,7 +49,6 @@ init_per_testcase(Testcase, Config) ->
                         ]}]),
             timer:sleep(500);
         two_nodes ->
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(2, [{config, [
                             {log_path, PrivDir}

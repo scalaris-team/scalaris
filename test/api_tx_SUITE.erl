@@ -75,8 +75,6 @@ all()   -> [
 suite() -> [ {timetrap, {seconds, 200}} ].
 
 init_per_testcase(TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring
             ok;

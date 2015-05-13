@@ -38,8 +38,6 @@ all() ->
 suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_testcase(TestCase, Config) ->
-    %% stop ring from previous test case (may have run into a timeout)
-    unittest_helper:stop_ring(),
     case lists:member(TestCase, [tm_crash, tp_crash, all_tp_crash]) of
         true ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),

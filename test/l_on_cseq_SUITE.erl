@@ -90,8 +90,6 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     case TestCase of
         test_garbage_collector ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
