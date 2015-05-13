@@ -45,19 +45,12 @@ all()   -> [
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
-init_per_testcase(TestCase, Config) ->
-    case TestCase of
-        _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
-            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
+init_per_testcase(_TestCase, Config) ->
+    %% stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    Config.
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+    [{stop_ring, true} | Config].
 
 tester_type_check_api(_Config) ->
     Count = 500,

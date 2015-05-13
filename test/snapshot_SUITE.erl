@@ -79,11 +79,7 @@ init_per_testcase(_TestCase, Config) ->
         without_ring -> pid_groups:join_as("ct_tests", ?MODULE);
         _ -> ok
     end,
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 -define(KEY(Key), ?RT:hash_key(Key)).
 -define(VALUE(Val), rdht_tx:encode_value(Val)).

@@ -107,11 +107,10 @@ end_per_group(Group, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_per_testcase(_TestCase, Config) ->
-    Config.
+    [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:stop_ring(),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

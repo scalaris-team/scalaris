@@ -50,25 +50,22 @@ all()   -> [ {group, proto_sched_ready},
 suite() -> [ {timetrap, {seconds, 200}} ].
 
 init_per_testcase(TestCase, Config) ->
+    %% stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring
-            Config;
+            ok;
         tester_encode_decode -> %% this case does not need a ring
-            Config;
+            ok;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
             timer:sleep(1000),
             ?ASSERT(ok =:= unittest_helper:check_ring_size_fully_joined(4)),
             unittest_helper:wait_for_stable_ring_deep(),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+            ok
+    end,
+    [{stop_ring, true} | Config].
 
 -spec proto_sched_fun(start | stop) -> ok.
 proto_sched_fun(start) ->

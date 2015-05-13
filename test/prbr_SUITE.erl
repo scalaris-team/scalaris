@@ -36,19 +36,17 @@ all()   -> [
 suite() -> [ {timetrap, {seconds, 400}} ].
 
 init_per_testcase(TestCase, Config) ->
+    %% stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
     case TestCase of
         rbr_concurrency_kv ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(3, 14),
             unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}]}]),
             %% necessary for the consistency check:
             unittest_helper:check_ring_size_fully_joined(Size),
-            Config;
+            ok;
         rbr_concurrency_leases ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = 1, %% larger rings not supported by leases yet,
             %% Size = randoms:rand_uniform(2, 14),
@@ -56,29 +54,22 @@ init_per_testcase(TestCase, Config) ->
                                                        {leases, true}]}]),
             %% necessary for the consistency check:
             unittest_helper:check_ring_size_fully_joined(Size),
-            Config;
+            ok;
         rbr_consistency ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
                                                [{config, [{log_path, PrivDir}]}]),
             %% necessary for the consistency check:
             unittest_helper:check_ring_size_fully_joined(4),
 
-            Config;
+            ok;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(1, 9),
             unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}]}]),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+            ok
+    end,
+    [{stop_ring, true} | Config].
 
 %% TODO: unittest for: retrigger on read works
 %% TODO: unittest for: retrigger on write works

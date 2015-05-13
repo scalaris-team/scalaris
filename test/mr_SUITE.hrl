@@ -39,11 +39,7 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
     Pid = erlang:spawn(fun add_data/0),
     util:wait_for_process_to_die(Pid),
-    Config.
-
-end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
+    [{stop_ring, true} | Config].
 
 test_sane_result(_Config) ->
     ?proto_sched2(setup, 1),

@@ -61,11 +61,7 @@ init_per_testcase(_TestCase, Config) ->
        }]),
     api_vm:add_nodes(?NO_OF_NODES-1),
     unittest_helper:wait_for_stable_ring_deep(),
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

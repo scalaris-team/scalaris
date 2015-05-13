@@ -57,11 +57,10 @@ init_per_testcase(Testcase, Config) ->
                             , EnableClustering
                             , ClusterRadius
                         ]}]),
-            timer:sleep(500);
-        _Else -> ok
+            timer:sleep(500)
     end,
 
-    Config.
+    [{stop_ring, true} | Config].
 
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node

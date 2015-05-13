@@ -153,6 +153,10 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             TimeTrapTime_ms = 0,
             ok
     end,
+    case proplists:get_value(stop_ring, Config, false) of
+        true  -> unittest_helper:stop_ring();
+        false -> ok
+    end,
     TCTime_ms = case Start of
                     failed -> TimeTrapTime_ms;
                     _      -> timer:now_diff(os:timestamp(), Start) / 1000

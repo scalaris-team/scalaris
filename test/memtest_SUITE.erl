@@ -74,7 +74,7 @@ init_per_testcase(_TestCase, Config) ->
 
 end_per_testcase(_TestCase, Config) ->
     ct:pal("Memory after test:~n~p~n", [erlang:memory()]),
-    unittest_helper:stop_ring(),
+    unittest_helper:stop_ring(), % note: we do not use scalaris_cth's stop_ring!
     garbage_collect_all(),
     ct:pal("Memory after unittest_helper:stop_ring/0:~n~p~n", [erlang:memory()]),
     Config.

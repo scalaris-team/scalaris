@@ -123,11 +123,7 @@ init_per_testcase(_TestCase, Config) ->
     util:wait_for_process_to_die(Pid),
     % wait a bit for the rm-processes to settle
     timer:sleep(500),
-    Config.
-
-end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
+    [{stop_ring, true} | Config].
 
 %% @doc Sets tighter timeouts for slides
 -spec move_config_parameters() -> unittest_helper:kv_opts().

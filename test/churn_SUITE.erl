@@ -67,13 +67,9 @@ init_per_testcase(TestCase, Config) ->
               ?RT:get_replica_keys(?RT:hash_key("0")),
               [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
-            Config
+            [{stop_ring, true} | Config]
 %%             {skip, "temporarily"}
     end.
-
-end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
 
 transactions_1_failure_4_nodes_read(_) ->
     transactions_X_failures_4_nodes_read(1, ok, ok).
