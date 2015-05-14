@@ -1,3 +1,9 @@
+# for previewing
+baseurl: http://mxm.github.io/scalaris
+
+# for production change baseurl to an empty string
+#baseurl:
+
 repository: https://github.com/scalaris-team/scalaris
 kramdown:
   toc_levels: "2,3"

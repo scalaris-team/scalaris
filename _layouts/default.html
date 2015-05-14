@@ -9,9 +9,9 @@
 
     <title>{{ page.title }}</title>
 
-    <link href="/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/css/custom.css" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+    <link href="{{ site.baseurl }}/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ site.baseurl }}/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ site.baseurl }}/images/favicon.ico">
 </head>
 
 <body>
@@ -23,6 +23,6 @@
 
   {% include footer.html %}
 
-  <script src="/js/bootstrap_custom.min.js"></script>
+  <script src="{{ site.baseurl }}/js/bootstrap_custom.min.js"></script>
 </body>
 </html>

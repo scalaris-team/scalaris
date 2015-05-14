@@ -7,7 +7,7 @@ layout: default
     <ul class="list-unstyled">
     {% for post in site.posts %}
     <li>
-    <a href="{{ post.url }}">{{ post.title }}</a>
+    <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a>
     <p>{{ post.excerpt }}</p>
     </li>
     {% endfor %}
