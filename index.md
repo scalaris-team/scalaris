@@ -22,5 +22,3 @@ Documentation / Download / Discussion:
 * [Downloads](http://sourceforge.net/projects/scalaris/files/)
 * [Prebuild Packages](http://download.opensuse.org/repositories/home:/scalaris/)
 * [Mailing list](http://groups.google.com/group/scalaris)
-
-<br><br><br><br><br><br><br><br><br><br><br>
