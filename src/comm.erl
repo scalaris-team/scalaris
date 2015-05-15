@@ -185,7 +185,7 @@ send(Pid, Msg, Options) ->
                end
         end).
 -else.
--define(SEND_LOCAL_CHECK_PID(Pid, Msg), ok).
+-define(SEND_LOCAL_CHECK_PID(Pid, Msg, Options), ok).
 -endif.
 
 %% @doc Sends a message to a local process given by its local pid
