@@ -1,8 +1,8 @@
 # for previewing
-baseurl: http://mxm.github.io/scalaris
+# baseurl: http://mxm.github.io/scalaris
 
 # for production change baseurl to an empty string
-#baseurl:
+baseurl:
 
 repository: https://github.com/scalaris-team/scalaris
 kramdown:
