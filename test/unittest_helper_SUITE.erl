@@ -36,6 +36,9 @@ suite() ->
 init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 -spec prop_make_ring_with_ids(IDs::[?RT:key(),...]) -> true.
 prop_make_ring_with_ids(IDs) ->
     UniqueIDs = lists:usort(IDs),

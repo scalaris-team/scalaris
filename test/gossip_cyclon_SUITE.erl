@@ -61,6 +61,9 @@ init_per_testcase(_TestCase, Config) ->
     pid_groups:join_as(Group, gossip_cyclon_tester),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Testcases

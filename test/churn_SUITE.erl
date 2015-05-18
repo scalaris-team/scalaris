@@ -69,6 +69,9 @@ init_per_testcase(TestCase, Config) ->
 %%             {skip, "temporarily"}
     end.
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 transactions_1_failure_4_nodes_read(_) ->
     transactions_X_failures_4_nodes_read(1, ok, ok).
 

@@ -60,7 +60,7 @@ init_per_testcase(TestCase, Config) ->
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 test_get_coordinate(_Config) ->
     pid_groups:join_as(pid_groups:group_with(gossip), ?MODULE),

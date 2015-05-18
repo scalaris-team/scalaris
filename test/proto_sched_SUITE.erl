@@ -87,6 +87,9 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 basic_empty_sched(_Config) ->
     %% an empty thread should be a valid run
     proto_sched:thread_num(1),

@@ -60,6 +60,9 @@ init_per_testcase(_TestCase, Config) ->
                                                        {leases, true}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % crash recovery test

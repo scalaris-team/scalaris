@@ -53,6 +53,9 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 test_consistent_send(_Config) ->
     Self = self(),
     Ev = dht_node_lookup:envelope(3, {unittest_consistent_send, Self, '_'}),

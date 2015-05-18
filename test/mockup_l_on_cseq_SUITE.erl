@@ -67,6 +67,9 @@ init_per_testcase(_TestCase, Config) ->
     {ok, _} = mockup_l_on_cseq:start_link(),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

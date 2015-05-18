@@ -117,8 +117,8 @@ init_per_testcase(_TestCase, Config) ->
     pid_groups:join_as("ct_tests", ?MODULE),
     Config.
 
-end_per_testcase(_TestCase, Config) ->
-    Config.
+end_per_testcase(_TestCase, _Config) ->
+    ok.
 
 -define(db_equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope

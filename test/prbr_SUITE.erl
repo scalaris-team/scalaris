@@ -69,6 +69,9 @@ init_per_testcase(TestCase, Config) ->
     end,
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 %% TODO: unittest for: retrigger on read works
 %% TODO: unittest for: retrigger on write works
 

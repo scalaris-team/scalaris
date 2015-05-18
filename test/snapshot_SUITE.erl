@@ -79,6 +79,9 @@ init_per_testcase(_TestCase, Config) ->
     end,
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 -define(KEY(Key), ?RT:hash_key(Key)).
 -define(VALUE(Val), rdht_tx:encode_value(Val)).
 

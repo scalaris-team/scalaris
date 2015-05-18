@@ -39,6 +39,9 @@ init_per_testcase(_TestCase, Config) ->
     util:wait_for_process_to_die(Pid),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 test_sane_result(_Config) ->
     ?proto_sched2(setup, 1),
     ?proto_sched(start),

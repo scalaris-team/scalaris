@@ -36,6 +36,9 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 join_parameters_list() ->
     [{move_wait_for_reply_timeout, 300},
      {move_send_msg_retries, 3},

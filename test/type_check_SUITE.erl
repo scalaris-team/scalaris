@@ -50,6 +50,9 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 tester_type_check_api(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),

@@ -54,6 +54,9 @@ init_per_testcase(_TestCase, Config) ->
                                             {leases, true}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 test_consistent_send(_Config) ->
     Ev = dht_node_lookup:envelope(3, {unittest_consistent_send, self(), '_'}),
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"),

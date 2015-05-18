@@ -76,6 +76,9 @@ init_per_testcase(_TestCase, Config) ->
                                             {leases, true}]}]),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 tester_type_check_slide_leases(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),

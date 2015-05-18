@@ -60,6 +60,9 @@ init_per_testcase(Testcase, Config) ->
 
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node
 get_vivaldi_and_centroids(Gossip, Clustering) ->

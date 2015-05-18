@@ -123,6 +123,9 @@ init_per_testcase(_TestCase, Config) ->
     timer:sleep(500),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 %% @doc Sets tighter timeouts for slides
 -spec move_config_parameters() -> unittest_helper:kv_opts().
 move_config_parameters() ->

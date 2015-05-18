@@ -63,6 +63,9 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Testcases

@@ -87,6 +87,9 @@ init_per_testcase(TestCase, Config) ->
     end,
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 tester_type_check_rm_leases(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),

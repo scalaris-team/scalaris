@@ -87,6 +87,9 @@ init_per_testcase(TestCase, Config) ->
     end,
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 -spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
 adapt_tx_runs(N) -> N.
 

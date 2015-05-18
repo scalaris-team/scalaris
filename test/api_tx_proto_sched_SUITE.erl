@@ -65,6 +65,9 @@ init_per_testcase(TestCase, Config) ->
     end,
     [{stop_ring, true} | Config].
 
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
 -spec proto_sched_fun(start | stop) -> ok.
 proto_sched_fun(start) ->
     %% ct:pal("Starting proto scheduler"),
