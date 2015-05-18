@@ -188,11 +188,7 @@ scrub_data(Data) ->
                             andalso is_float(element(1, B))
                             andalso element(1, A) == element(1, B))
               end,
-    SortedData = lists:usort(SortFun, lists:reverse(Data)),
-
-    %% Value '$end_of_table' is not allowed as DB key
-    [E || E <- SortedData, 
-                    element(1, E) =/= '$end_of_table'].
+    lists:usort(SortFun, lists:reverse(Data)).
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(K, AIn) -> [?TEST_DB:get(DB, K) | AIn] end, []),
