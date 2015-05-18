@@ -38,6 +38,7 @@
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
+-export([foldl_unordered/3]).
 -export([tab2list/1]).
 
 -type db() :: ets:tab().
@@ -245,6 +246,14 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
            [Start, End, MaxNum]),
     foldr_iter(DB, Fun, Fun(Start, Acc), {'[', End, ets:prev(DB, Start), ']'}, MaxNum -
           1).
+
+%% @doc Works similar to foldl/3 but uses ets:foldl instead of our own implementation. 
+%% The order in which will be iterated over is unspecified, but using this fuction
+%% might be faster than foldl/3 if it does not matter.
+-spec foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+foldl_unordered(DB, Fun, Acc) ->
+    ets:foldl(Fun, Acc, DB).
+
 
 %% @doc Returns a list of all objects in the table Table_name.
 -spec tab2list(Table_name::db()) -> [Entries::entry()].

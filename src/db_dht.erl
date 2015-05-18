@@ -40,7 +40,7 @@
 %% whole DB management
 -export([new/1, close/1]).
 -export([get_load/1, get_load/2]).
--export([get_data/1]).
+-export([get_data/1, get_data/3]).
 
 %% raw whole db_entry operations
 -export([get_entry/2, set_entry/2, set_entry/4]).
@@ -155,8 +155,20 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
 %% @doc Returns all (including empty, but not null) DB entries.
 -spec get_data(DB::db()) -> db_as_list().
 get_data(State) ->
-    element(2, get_chunk(State, ?MINUS_INFINITY, intervals:all(), all)).
+    get_data(State, fun(_) -> true end, fun(E) -> E end).
 
+-spec get_data(DB::db(), 
+               FilterFun::fun((db_entry:entry()) -> boolean()),
+               ValueFun::fun((db_entry:entry()) -> V)) 
+        -> [V].
+get_data({DB, _Subscr, _Snap}, FilterFun, ValueFun) ->
+    FoldlFun = fun(Entry, Acc) ->
+                       case FilterFun(Entry) of
+                            true -> [ValueFun(Entry) | Acc];
+                            _  -> Acc
+                       end
+               end,
+    ?DB:foldl_unordered(DB, FoldlFun, []).
 
 %%%%%%
 %%% raw whole db_entry operations

@@ -249,6 +249,16 @@ on({get_entries, Source_PID, FilterFun, ValFun}, State) ->
     comm:send_local(Source_PID, {get_entries_response, Entries}),
     State;
 
+on({get_data, Source_PID}, State) ->
+    Data = db_dht:get_data(dht_node_state:get(State, db)),
+    comm:send_local(Source_PID, {get_data_response, Data}),
+    State;
+
+on({get_data, Source_PID, FilterFun, ValueFun}, State) ->
+    Data = db_dht:get_data(dht_node_state:get(State, db), FilterFun, ValueFun),
+    comm:send_local(Source_PID, {get_data_response, Data}),
+    State;
+
 on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
     Chunk = db_dht:get_chunk(dht_node_state:get(State, db),
                              dht_node_state:get(State, pred_id),

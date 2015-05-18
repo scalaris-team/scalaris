@@ -53,6 +53,7 @@
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
+-export([foldl_unordered/3]).
 -export([tab2list/1]).
 
 -type db() :: {DB::pid(), FileName::nonempty_string()}.
@@ -266,6 +267,14 @@ foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     %% see HINT in foldl/5
     %% now retrieve actual data
     lists:foldl(Fun, Acc, CutData). 
+
+%% @doc Works similar to foldl/3 but uses hanoidb:fold instead of our own implementation. 
+%% The order in which will be iterated over is unspecified, but using this fuction
+%% might be faster than foldl/3 if it does not matter.
+-spec foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+foldl_unordered({DB, _DBName}, Fun, Acc) ->
+    hanoidb:fold(DB, fun (K, Entry, AccIn) -> Fun(?OUT(Entry), AccIn) end, Acc).
+
 
 %% @private get_all_keys/3 retrieves all keys in DB that fall into Interval but
 %%          not more than MaxNum. If MaxNum == -1 all Keys are retrieved. If

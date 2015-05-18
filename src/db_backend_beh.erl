@@ -66,6 +66,8 @@
 -callback foldr(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
 -callback foldr(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 
+-callback foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+
 -callback tab2list(Table_name::db()) -> [Entries::entry()].
 -else.
 
@@ -78,6 +80,7 @@ behaviour_info(callbacks) ->
         {supports_feature, 1}, {is_available, 0},
         {foldl, 3}, {foldl, 4}, {foldl, 5},
         {foldr, 3}, {foldr, 4}, {foldr, 5},
+        {foldl_unordered, 3},
         {tab2list, 1}
     ];
 behaviour_info(_Other) ->

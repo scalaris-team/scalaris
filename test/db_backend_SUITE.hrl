@@ -113,12 +113,14 @@ prop_foldl(Data, Interval, MaxNum) ->
                             [],
                             Interval,
                             MaxNum),
+    UnorderedFold = ?TEST_DB:foldl_unordered(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     %% we expect all data from fold to be in reversed order because of list
     %% accumulation. we need to reverse ScrubbedData, ExpInInterval and
     %% ExpInIntervalCounted.
     compare_lists(ScrubbedData, AllFold, "test_foldl1"),
     compare_lists(ExpInInterval, IntervalFold, "test_foldl2"),
     compare_lists(ExpInIntervalCounted, IntervalCountFold, "test_foldl3"),
+    compare_lists(ScrubbedData, UnorderedFold, "test_foldl4"),
     ?TEST_DB:?CLOSE(DB1),
     true.
 

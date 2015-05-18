@@ -39,6 +39,7 @@
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
+-export([foldl_unordered/3]).
 -export([tab2list/1]).
 
 -type db() :: atom().
@@ -338,6 +339,20 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
            [Start, End, MaxNum]),
   {atomic, Previous} = mnesia:transaction(fun()-> mnesia:prev(DB, Start) end),
     foldr_iter(DB, Fun, Fun(Start, Acc), {'[', End, Previous, ']'}, MaxNum - 1).
+
+%% @doc Works similar to foldl/3 but uses mnesia:foldl instead of our own implementation. 
+%% The order in which will be iterated over is unspecified, but using this fuction
+%% might be faster than foldl/3 if it does not matter.
+-spec foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+foldl_unordered(DB, Fun, Acc) ->
+    % Entry = {db, key, value}
+    FoldlFun = fun(Entry, AccIn) -> Fun(element(3, Entry), AccIn) end, 
+    
+    {atomic, Result}  = mnesia:transaction(fun() -> 
+                                                mnesia:foldl(FoldlFun, Acc, DB) 
+                                           end),
+    Result.
+
 
 -spec tab2list(Table_name::db()) -> [Entries::entry()].
 tab2list(Table_name) ->
