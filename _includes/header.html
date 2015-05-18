@@ -1,25 +1,29 @@
-<div id="header">
-<img id="headerlogo" src="{{ root }}/images/scalaris-logo.png">
-<h1>Scalaris &mdash; A Distributed Transactional Key-Value Store</h1>
-</div>
-<div id="navigationbar">
-<ul>
-  <li class="{% if page.overview %}current{% endif %}">
-    <a href="/">Home</a>
-  </li>
-  <li class="{% if page.url contains '/releases' %}current{% endif %}">
-    <a href="/releases.html">Releases</a>
-  </li>
-  <li class="{% if page.url contains '/faq' %}current{% endif %}">
-    <a href="/faq.html">FAQ</a>
-  </li>
-  <li class="{% if page.url contains '/blog' %}current{% endif %}">
-    <a href="/blog/">Blog</a>
-  </li>
-  <li>
-    <a href="{{ site.repository }}">GitHub</a>
-  </li>
-</ul>
-</div>
-<div class="content">
+<div class="container">
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="{{ site.baseurl }}/">
+          <img src="{{ site.baseurl }}/images/scalaris-logo.png">
+        </a>
+      </div>
 
+      <!-- Collect the nav links, forms, and other content for toggling -->
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        <ul class="nav navbar-nav">
+          <li><a href="{{ site.baseurl }}/releases.html">Releases</a></li>
+          <li><a href="{{ site.baseurl }}/faq.html">FAQ</a></li>
+          <li><a href="{{ site.baseurl }}/blog/">Blog</a></li>
+        </ul>
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="{{ site.repository }}">GitHub</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</div>

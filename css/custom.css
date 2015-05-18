@@ -1,0 +1,46 @@
+body {
+    margin-top: 20px;
+}
+
+.navbar-brand {
+    padding: 0;
+}
+
+.footer {
+    position:relative;
+    top:0;
+    left:0;
+    background-color:#F6F6F6;
+    padding-top:20px;
+    padding-bottom:20px;
+    padding-left: 15px;
+    height:190px;
+    margin-top: 30px;
+    border-radius: 4px;
+}
+
+.footerelem {
+    position:relative;
+    float:left;
+    padding-right:15px;
+}
+
+
+.footerpic {
+    position:relative;
+    float:left;
+    background-color:#FFF;
+    width:80px;
+    height:80px;
+    border-radius:40px;
+    line-height:80px;
+    text-align:center;
+    margin:9px;
+    margin-top:22px;
+}
+
+.footerpic img {
+    max-height:70px;
+    max-width:70px;
+    vertical-align: middle;
+}

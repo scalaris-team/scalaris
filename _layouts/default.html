@@ -1,11 +1,28 @@
-{% include top.html %}
+<!DOCTYPE html>
+<html lang="en">
 
-<body class="wrap">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="Jekyll v{{ jekyll.version }}">
+
+    <title>{{ page.title }}</title>
+
+    <link href="{{ site.baseurl }}/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ site.baseurl }}/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ site.baseurl }}/images/favicon.ico">
+</head>
+
+<body>
   {% include header.html %}
 
-  {{ content }}
+  <div class="container" role="main">
+    {{ content }}
+  </div>
 
   {% include footer.html %}
-  {% include funding.html %}
+
+  <script src="{{ site.baseurl }}/js/bootstrap_custom.min.js"></script>
 </body>
 </html>

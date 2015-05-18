@@ -1,9 +1,15 @@
 ---
-title: Scalaris &mdash; Blog
-root: ..
+title: Scalaris - FAQ
 layout: default
 ---
 
-### No blog articles yet.
-<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br>
+<p>
+    <ul class="list-unstyled">
+    {% for post in site.posts %}
+    <li>
+    <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a>
+    <p>{{ post.excerpt }}</p>
+    </li>
+    {% endfor %}
+    </ul>
+</p>
