@@ -46,19 +46,19 @@ init_per_suite(Config) ->
     file:delete(WorkingDir ++ "schema.DAT"),
 
     ok = db_mnesia:start(),
-    tester:register_type_checker({typedef, db_backend_beh, key}, db_backend_beh, tester_is_valid_db_key),
-    tester:register_value_creator({typedef, db_backend_beh, key}, db_backend_beh, tester_create_db_key, 1),
+    tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
+    tester:register_value_creator({typedef, db_backend_beh, key, []}, db_backend_beh, tester_create_db_key, 1),
 
-    tester:register_type_checker({typedef, db_backend_beh, entry}, db_backend_beh, tester_is_valid_db_entry),
-    tester:register_value_creator({typedef, db_backend_beh, entry}, db_backend_beh, tester_create_db_entry, 1),
+    tester:register_type_checker({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_is_valid_db_entry),
+    tester:register_value_creator({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_create_db_entry, 1),
     Config2.
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, db_backend_beh, key}),
-    tester:unregister_value_creator({typedef, db_backend_beh, key}),
+    tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
+    tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
 
-    tester:unregister_type_checker({typedef, db_backend_beh, entry}),
-    tester:unregister_value_creator({typedef, db_backend_beh, entry}),
+    tester:unregister_type_checker({typedef, db_backend_beh, entry, []}),
+    tester:unregister_value_creator({typedef, db_backend_beh, entry, []}),
 
     application:stop(mnesia),
     %% cleanup schema generated in this run
