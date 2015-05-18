@@ -41,17 +41,11 @@ suite() -> [ {timetrap, {seconds, 15}} ].
 init_per_suite(Config) ->
     tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
     tester:register_value_creator({typedef, db_backend_beh, key, []}, db_backend_beh, tester_create_db_key, 1),
-
-    tester:register_type_checker({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_is_valid_db_entry),
-    tester:register_value_creator({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_create_db_entry, 1),
     Config.
 
 end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
     tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
-
-    tester:unregister_type_checker({typedef, db_backend_beh, entry, []}),
-    tester:unregister_value_creator({typedef, db_backend_beh, entry, []}),
     Config.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).

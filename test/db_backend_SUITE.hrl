@@ -32,10 +32,10 @@
 
 tests_avail() ->
     [tester_put,
-    tester_get,
-    tester_delete,
-    tester_foldl,
-    tester_foldr].
+     tester_get,
+     tester_delete,
+     tester_foldl,
+     tester_foldr].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test put/2 of available backends
