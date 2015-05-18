@@ -55,7 +55,8 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 %% @doc Initializes the cyclon cache retrieval "trigger" (un-infected).
 -spec init_first() -> ok.
 init_first() ->
-    gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
+    gossip_cyclon:get_subset_rand(1, comm:reply_as(self(), 2, {rm, '_'}),
+                                  config:read(tman_cyclon_interval)),
     ok.
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
@@ -64,7 +65,7 @@ init_first() ->
 init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
-    gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
+    gossip_cyclon:get_subset_rand(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     % start by using all available nodes reported by cyclon
     RandViewSize = config:read(gossip_cyclon_cache_size),
     {Neighborhood, RandViewSize, [], true}.
@@ -81,6 +82,10 @@ unittest_create_state(Neighbors) ->
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 % got empty cyclon cache
+handle_custom_message({rm, once, {cy_cache, [] = NewCache}}, State) ->
+    % loop with msg_delay until a non-empty cache is received
+    gossip_cyclon:get_subset_rand(1, comm:reply_as(self(), 3, {rm, once, '_'}), 0),
+    add_cyclon_cache(NewCache, State);
 handle_custom_message({rm, once, {cy_cache, NewCache}}, State) ->
     add_cyclon_cache(NewCache, State);
 
@@ -89,8 +94,8 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
     NewState = add_cyclon_cache(NewCache, State),
     NewRandViewSize = element(2, element(2, NewState)),
     % trigger new cyclon cache request
-    gossip_cyclon:get_subset_rand_next_interval(NewRandViewSize,
-                                         comm:reply_as(self(), 2, {rm, '_'})),
+    gossip_cyclon:get_subset_rand(NewRandViewSize, comm:reply_as(self(), 2, {rm, '_'}),
+                                  config:read(tman_cyclon_interval)),
     NewState;
 
 % got shuffle request
@@ -405,6 +410,9 @@ check_config() ->
 
     config:cfg_is_integer(gossip_cyclon_cache_size) and
     config:cfg_is_greater_than(gossip_cyclon_cache_size, 2) and
+
+    config:cfg_is_integer(tman_cyclon_interval) and
+    config:cfg_is_greater_than(tman_cyclon_interval, 0) and
 
     config:cfg_is_integer(succ_list_length) and
     config:cfg_is_greater_than_equal(succ_list_length, 1) and

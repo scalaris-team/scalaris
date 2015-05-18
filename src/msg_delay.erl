@@ -36,8 +36,8 @@
 -behaviour(gen_component).
 
 %% public interface for delayed messages
--export([send_local/3,
-         send_local_as_client/3]).
+-export([send_local/3, send_local/4,
+         send_local_as_client/3, send_local_as_client/4]).
 
 %% public interface for self trigger messages using msg_delay
 -export([send_trigger/2]).
@@ -47,7 +47,8 @@
 
 % accepted messages of the msg_delay process
 -type message() ::
-    {msg_delay_req, Seconds::pos_integer(), Dest::comm:erl_local_pid(), Msg::comm:message()} |
+    {msg_delay_req, Seconds::pos_integer(), Dest::comm:erl_local_pid(),
+     Msg::comm:message(), comm:send_local_options()} |
     {msg_delay_periodic}.
 
 % internal state
@@ -57,19 +58,32 @@
                            Dest::comm:erl_local_pid(),
                            Msg::comm:message()) -> ok.
 send_local_as_client(Seconds, Dest, Msg) ->
+    send_local_as_client(Seconds, Dest, Msg, []).
+
+-spec send_local_as_client(Seconds::non_neg_integer(),
+                           Dest::comm:erl_local_pid(),
+                           Msg::comm:message(), comm:send_local_options())
+        -> ok.
+send_local_as_client(Seconds, Dest, Msg, Options) ->
     Delayer = pid_groups:pid_of("clients_group", msg_delay),
     %% TODO: if infected with proto_sched logging, immediately log msg
     %% to proto_sched for the 'delayed' messages pool (which is not
     %% implemented yet) and do *not* deliver to msg_delay process.
-    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
+    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg, Options}).
 
--spec send_local(Seconds::non_neg_integer(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
+-spec send_local(Seconds::non_neg_integer(), Dest::comm:erl_local_pid(),
+                 Msg::comm:message()) -> ok.
 send_local(Seconds, Dest, Msg) ->
+    send_local(Seconds, Dest, Msg, []).
+
+-spec send_local(Seconds::non_neg_integer(), Dest::comm:erl_local_pid(),
+                 Msg::comm:message(), comm:send_local_options()) -> ok.
+send_local(Seconds, Dest, Msg, Options) ->
     Delayer = pid_groups:find_a(msg_delay),
     %% TODO: if infected with proto_sched logging, immediately deliver
     %% to proto_sched for the 'delayed' messages pool (which is not
     %% implemented yet) and do *not* deliver to msg_delay process.
-    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
+    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg, Options}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
@@ -103,7 +117,7 @@ init([]) ->
     _State = {TimeTable, _Round = 0}.
 
 -spec on(message(), state()) -> state().
-on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
+on({msg_delay_req, Seconds, Dest, Msg, Options} = _FullMsg,
    {TimeTable, Counter} = State) ->
     ?TRACE("msg_delay:on(~.0p, ~.0p)~n", [_FullMsg, State]),
     Future = trunc(Counter + Seconds),
@@ -113,9 +127,9 @@ on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
            end,
     case pdb:get(Future, TimeTable) of
         undefined ->
-            pdb:set({Future, [{Dest, EMsg}]}, TimeTable);
+            pdb:set({Future, [{Dest, EMsg, Options}]}, TimeTable);
         {_, MsgQueue} ->
-            pdb:set({Future, [{Dest, EMsg} | MsgQueue]}, TimeTable)
+            pdb:set({Future, [{Dest, EMsg, Options} | MsgQueue]}, TimeTable)
     end,
     State;
 
@@ -144,13 +158,13 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
                                   ok;
                               _ ->
                                   trace_mpath:start(PState),
-                                  comm:send_local(Dest, OrigMsg),
+                                  comm:send_local(Dest, OrigMsg, Options),
                                   trace_mpath:stop()
                           end;
                       _ ->
                           ?DBG_ASSERT2(not trace_mpath:infected(), infected_with_uninfected_msg),
-                          comm:send_local(Dest, Msg)
-                  end || {Dest, Msg} <- MsgQueue ]
+                          comm:send_local(Dest, Msg, Options)
+                  end || {Dest, Msg, Options} <- MsgQueue ]
     end,
     _ = comm:send_local_after(1000, self(), Trigger),
     {TimeTable, Counter + 1};

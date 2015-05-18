@@ -30,10 +30,10 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
+-export([new/1, new/2, open/1, close/1, close_and_delete/1, put/2, get/2, delete/2]).
 %% db info
 -export([get_persisted_tables/0, get_name/1, get_load/1, 
-          is_available/0, supports_feature/1]).
+         is_available/0, supports_feature/1]).
 
 %% iteration
 -export([foldl/3, foldl/4, foldl/5]).
@@ -72,6 +72,11 @@ open(_DBName) ->
 %% @doc Closes and deletes the DB named DBName
 -spec close(DBName::db()) -> true.
 close(DBName) ->
+    ets:delete(DBName).
+
+%% @doc Closes and deletes the DB named DBName
+-spec close_and_delete(DBName::db()) -> true.
+close_and_delete(DBName) ->
     ets:delete(DBName).
 
 %% @doc Saves arbitrary tuple Entry or list of tuples Entries

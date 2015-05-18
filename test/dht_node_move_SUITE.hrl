@@ -104,8 +104,6 @@ init_per_group(Group, Config) ->
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
-    % stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     GroupConfig = proplists:get_value(tc_group_properties, Config, []),
     {move_config, MoveConf} = lists:keyfind(move_config, 1, GroupConfig),
@@ -123,11 +121,7 @@ init_per_testcase(_TestCase, Config) ->
     util:wait_for_process_to_die(Pid),
     % wait a bit for the rm-processes to settle
     timer:sleep(500),
-    Config.
-
-end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
+    [{stop_ring, true} | Config].
 
 %% @doc Sets tighter timeouts for slides
 -spec move_config_parameters() -> unittest_helper:kv_opts().

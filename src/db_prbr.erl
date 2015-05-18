@@ -41,7 +41,7 @@
 %% whole DB management
 -export([check_config/0]).
 -export([new/1, open/1]).
--export([close/1]).
+-export([close/1, close_and_delete/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
 
@@ -94,18 +94,29 @@ open(DBName) ->
   SubscrName = ?DB:get_name(DB) ++ ":subscribers",
   {DB, db_ets:new(SubscrName), {false, 0, 0}}.
 
+%% @doc Closes the given DB (it may be recoverable using open/1 depending on
+%%      the DB back-end).
+-spec close(db()) -> true.
+close(State) ->
+    close(State, close).
+
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
--spec close(db()) -> true.
-close({KVStore, Subscribers, {SnapDB, _LLC, _SLC}} = State) ->
+-spec close_and_delete(db()) -> true.
+close_and_delete(State) ->
+    close(State, close_and_delete).
+
+%% @doc Helper for close/1 and close_and_delete/1.
+-spec close(db(), CloseFn::close | close_and_delete) -> true.
+close({KVStore, Subscribers, {SnapDB, _LLC, _SLC}} = State, CloseFn) ->
     _ = call_subscribers(State, close_db),
-    ?DB:close(KVStore),
-    db_ets:close(Subscribers),
+    ?DB:CloseFn(KVStore),
+    db_ets:CloseFn(Subscribers),
     case SnapDB of
         false ->
             ok;
         ETSTable ->
-            ?DB:close(ETSTable)
+            ?DB:CloseFn(ETSTable)
     end.
 
 %% @doc Returns the number of stored keys.

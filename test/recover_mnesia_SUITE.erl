@@ -89,12 +89,6 @@ end_per_group(Group, Config) ->
     ok = file:delete(WorkingDir ++ "schema.DAT"),
     unittest_helper:end_per_group(Group, Config).
 
-init_per_testcase(_TestCase, Config) ->
-  Config.
-
-end_per_testcase(_TestCase, _Config) ->
-  ok.
-
 rw_suite_runs(N) ->
   erlang:min(N, 200).
 

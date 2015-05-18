@@ -116,26 +116,15 @@ pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
 %% @doc Called after each test case.
 -spec post_end_per_testcase(TestcaseName::atom(), Config::unittest_helper:kv_opts(), Return, CTHState::state())
         -> {Return, NewCTHState::state()}
-    when is_subtype(Return, unittest_helper:kv_opts() | {fail, Reason::term()} | {skip, Reason::term()} | {timetrap_timeout, integer()} | term()).
+    when is_subtype(Return, unittest_helper:kv_opts() | {fail, Reason::term()} |
+                        {error, Reason::term()} | {testcase_aborted, Reason::term()} |
+                        {skip, Reason::term()} | {timetrap_timeout, integer()}).
 post_end_per_testcase(TC, Config, Return, {ok, State}) ->
     post_end_per_testcase(TC, Config, Return, State);
 post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
-    {Start, NewTcStart} =  case lists:keytake(self(), 1, State#state.tc_start) of
-                               {value, {_, Val}, List} -> {Val, List};
-                               false -> { failed, State#state.tc_start }
-                           end,
     case Return of
         {timetrap_timeout, TimeTrapTime_ms} ->
-            case (catch config:read(no_print_ring_data)) of
-                true -> ok;
-                _ -> unittest_helper:print_ring_data()
-            end,
-            catch unittest_helper:print_proto_sched_stats(now),
-            case unittest_global_state:lookup(proto_sched_stats) of
-                failed -> ok;
-                Stats -> ct:pal("Proto scheduler stats2: ~.2p", [Stats])
-            end,
-            catch tester_global_state:log_last_calls(),
+            print_debug_data(),
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)
             catch
@@ -152,14 +141,27 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             ok;
         {fail, _Reason} ->
             TimeTrapTime_ms = 0,
-            case unittest_global_state:lookup(proto_sched_stats) of
-                failed -> ok;
-                Stats -> ct:pal("Proto scheduler stats: ~.2p", [Stats])
-            end;
+            print_debug_data();
+        {error, _} ->
+            % from thrown exceptions or ct:fail/*
+            TimeTrapTime_ms = 0,
+            print_debug_data();
+        {testcase_aborted, _} ->
+            % e.g. from an exception in a gen_component (Reason = exception_throw)
+            TimeTrapTime_ms = 0,
+            print_debug_data();
         _ ->
             TimeTrapTime_ms = 0,
             ok
     end,
+    case proplists:get_value(stop_ring, Config, false) of
+        true  -> unittest_helper:stop_ring();
+        false -> ok
+    end,
+    {Start, NewTcStart} =  case lists:keytake(self(), 1, State#state.tc_start) of
+                               {value, {_, Val}, List} -> {Val, List};
+                               false -> { failed, State#state.tc_start }
+                           end,
     TCTime_ms = case Start of
                     failed -> TimeTrapTime_ms;
                     _      -> timer:now_diff(os:timestamp(), Start) / 1000
@@ -168,6 +170,33 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
            "End ~p:~p -> ~.0p (after ~fs)",
            [State#state.suite, TC, Return, TCTime_ms / 1000]),
     {Return, State#state{tc_start = NewTcStart} }.
+
+-spec print_debug_data() -> ok.
+print_debug_data() ->
+    case (catch config:read(no_print_ring_data)) of
+        true -> ok;
+        _ -> unittest_helper:print_ring_data()
+    end,
+    try proto_sched:get_infos() of
+        [] ->
+            % proto_sched or its stats do not exist anymore -> print collected stats
+            case unittest_global_state:lookup(proto_sched_stats) of
+                failed -> ok;
+                Stats -> ct:pal("Proto scheduler stats (collected): ~.2p",
+                                [Stats])
+            end;
+        Stats ->
+            ct:pal("Proto scheduler stats: ~.2p", [Stats])
+    catch _:_ ->
+              % pid_groups not available (anymore)? -> check whether we recorded some:
+              case unittest_global_state:lookup(proto_sched_stats) of
+                  failed -> ok;
+                  Stats -> ct:pal("Proto scheduler stats (collected): ~.2p",
+                                  [Stats])
+              end
+    end,
+    catch tester_global_state:log_last_calls(),
+    ok.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
 %% post_end_per_group and post_end_per_testcase if the suite, group or test case failed.

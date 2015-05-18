@@ -33,7 +33,7 @@
 %%% prbr to support a generic, embeddable on-handler trigger.
 
 %%% functions for module where embedded into
--export([on/2, init/1]).
+-export([on/2, init/1, close/1, close_and_delete/1]).
 -export([check_config/0]).
 -export([noop_read_filter/1]).  %% See rbrcseq for explanation.
 -export([noop_write_filter/3]). %% See rbrcseq for explanation.
@@ -124,6 +124,16 @@ noop_write_filter(_, _, X) -> X.
 %% initialize: return initial state.
 -spec init(atom()) -> state().
 init(DBName) -> ?PDB:new(DBName).
+
+%% @doc Closes the given DB (it may be recoverable using open/1 depending on
+%%      the DB back-end).
+-spec close(state()) -> true.
+close(State) -> ?PDB:close(State).
+
+%% @doc Closes the given DB and deletes all contents (this DB can thus not be
+%%      re-opened using open/1).
+-spec close_and_delete(state()) -> true.
+close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
 on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->

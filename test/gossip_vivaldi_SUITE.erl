@@ -52,7 +52,7 @@ init_per_testcase(TestCase, Config) ->
 
                                                    ]}]),
             unittest_helper:wait_for_stable_ring_deep(),
-            Config;
+            [{stop_ring, true} | Config];
         false ->
             unittest_helper:start_minimal_procs(Config, [], true)
     end.
@@ -60,7 +60,6 @@ init_per_testcase(TestCase, Config) ->
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    unittest_helper:stop_ring(),
     Config.
 
 test_get_coordinate(_Config) ->

@@ -59,12 +59,7 @@ init_per_testcase(_TestCase, Config) ->
     monitor:proc_set_value(gossip_cyclon, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
     Group = pid_groups:group_with(gossip),
     pid_groups:join_as(Group, gossip_cyclon_tester),
-    Config.
-
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

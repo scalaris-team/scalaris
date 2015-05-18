@@ -34,13 +34,7 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
-    % stop ring from previous test case (it may have run into a timeout)
-    unittest_helper:stop_ring(),
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 join_parameters_list() ->
     [{move_wait_for_reply_timeout, 300},

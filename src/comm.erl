@@ -34,7 +34,7 @@
 -include("scalaris.hrl").
 
 %% Sending messages
--export([send/2, send/3, send_local/2, send_local_after/3,
+-export([send/2, send/3, send_local/2, send_local/3, send_local_after/3,
          forward_to_group_member/2, forward_to_registered_proc/2]).
 
 %% Pid manipulation
@@ -55,7 +55,7 @@
               mypid/0, mypid_plain/0,
               erl_local_pid/0, erl_local_pid_plain/0,
               erl_local_pid_with_reply_as/0,
-              send_options/0, channel/0]).
+              send_options/0, send_local_options/0, channel/0]).
 
 -type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
 
@@ -107,6 +107,8 @@
                          {channel, channel()} | {?quiet} |
                          {no_keep_alive}].
 
+-type send_local_options() :: [{?quiet}].
+
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
 send(Pid, Msg) -> send(Pid, Msg, []).
@@ -153,14 +155,18 @@ send(Pid, Msg, Options) ->
     ok.
 
 -ifdef(enable_debug).
--define(SEND_LOCAL_CHECK_PID(Pid, Msg),
+-define(SEND_LOCAL_CHECK_PID(Pid, Msg, Options),
         if is_atom(Pid) ->
                case whereis(Pid) of
                    undefined ->
-                       log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
-                                   "drop message ~.0p due to ~p",
-                               [self(), pid_groups:my_pidname(), RealPid,
-                                RealMsg, local_target_not_alive]);
+                       case lists:member({?quiet}, Options) of
+                           false ->
+                               log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
+                                       "drop message ~.0p due to ~p",
+                                       [self(), pid_groups:my_pidname(), RealPid,
+                                        RealMsg, local_target_not_alive]);
+                           _ -> ok
+                       end;
                    _ -> ok
                end;
            is_pid(Pid) ->
@@ -168,24 +174,35 @@ send(Pid, Msg, Options) ->
                         erlang:process_info(Pid, priority) =/= {priority, low} of
                    true -> ok;
                    false ->
-                       log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
-                                   "drop message ~.0p due to ~p",
-                               [self(), pid_groups:my_pidname(), RealPid,
-                                RealMsg, local_target_not_alive])
+                       case lists:member({?quiet}, Options) of
+                           false ->
+                               log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
+                                       "drop message ~.0p due to ~p",
+                                       [self(), pid_groups:my_pidname(), RealPid,
+                                        RealMsg, local_target_not_alive]);
+                           _ -> ok
+                       end
                end
         end).
 -else.
--define(SEND_LOCAL_CHECK_PID(Pid, Msg), ok).
+-define(SEND_LOCAL_CHECK_PID(Pid, Msg, Options), ok).
 -endif.
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()).
 -spec send_local(erl_local_pid(), message() | group_message()) -> ok.
 send_local(Pid, Msg) ->
+    send_local(Pid, Msg, []).
+
+%% @doc Sends a message to a local process given by its local pid
+%%      (as returned by self()).
+-spec send_local(erl_local_pid(), message() | group_message(),
+                 send_local_options()) -> ok.
+send_local(Pid, Msg, Options) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     _ = case erlang:get(trace_mpath) of
             undefined ->
-                ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg),
+                ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg, Options),
                 RealPid ! RealMsg;
             Logger ->
                 RealNumericPid = case is_atom(RealPid) of
@@ -199,7 +216,7 @@ send_local(Pid, Msg) ->
                     true ->
                         LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                            Logger, self(), RealPid, RealMsg),
-                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg),
+                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg, Options),
                         RealPid ! LogEpidemicMsg
                 end
         end,

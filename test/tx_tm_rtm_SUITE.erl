@@ -37,16 +37,7 @@ all() ->
 
 suite() -> [{timetrap, {seconds, 120}}].
 
-init_per_suite(Config) ->
-    Config.
-
-end_per_suite(Config) ->
-    unittest_helper:stop_ring(),
-    Config.
-
 init_per_testcase(TestCase, Config) ->
-    %% stop ring from previous test case (may have run into a timeout)
-    unittest_helper:stop_ring(),
     case lists:member(TestCase, [tm_crash, tp_crash, all_tp_crash]) of
         true ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -66,11 +57,7 @@ init_per_testcase(TestCase, Config) ->
                  {log_path, PrivDir}]}]),
             ok
     end,
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 causes() -> [readlock, writelock, versiondec, versioninc, none].
 

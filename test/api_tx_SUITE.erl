@@ -77,20 +77,15 @@ suite() -> [ {timetrap, {seconds, 200}} ].
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring
-            Config;
+            ok;
         tester_encode_decode -> %% this case does not need a ring
-            Config;
+            ok;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+            ok
+    end,
+    [{stop_ring, true} | Config].
 
 -spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
 adapt_tx_runs(N) -> N.

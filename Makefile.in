@@ -148,12 +148,25 @@ test-skipped: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg -ct_hooks scalaris_cth -noshell | tee ct-skipped.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
-%_SUITE: compile
+SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
+
+${SUITES}: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
 	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	grep " 0 failed" ct_$@.log
+
+# define targets for single test cases of the form <test-suite>:<test-case>:
+define TEST_CASE_TARGET
+$(1)\:%: compile
+# use non standard ports to run a single SUITE's test case so it can be executed
+# in parallel to a full test suite run or a locally running default
+# scalaris session.
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
+	grep " 0 failed" ct_$(1).$$*.log
+endef
+$(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 
 %_SUITE-with-cover: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct.log ; \
@@ -798,6 +811,13 @@ install: install-erlang
 install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHON2INSTALL@ @ENABLEPYTHON3INSTALL@
 
 Makefile: Makefile.in
-	@echo "Makefile is outdated. please run ./configure"
-	@echo "call configure with all parameters from your previous configure run"
-	@exit 1 
+	@echo
+	@echo "Makefile is outdated. Please run './configure'."
+	@if [ -f ./config.status ]; then \
+	   if [ "" != "`./config.status --config`" ]; then \
+	     echo "For the parameters you used last time you may call"; \
+	     echo "'./configure `./config.status --config|sed -e "s/'//g"`'."; \
+	fi fi
+	@echo
+	@exit 1
+

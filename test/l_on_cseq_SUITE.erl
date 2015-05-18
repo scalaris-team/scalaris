@@ -92,26 +92,19 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         test_garbage_collector ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
                                                     {leases, true}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
-            Config;
+            ok;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
                                                     {leases, true}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+            ok
+    end,
+    [{stop_ring, true} | Config].
 
 tester_type_check_l_on_cseq(_Config) ->
     Count = 500,

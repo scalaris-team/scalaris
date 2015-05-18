@@ -34,12 +34,7 @@ suite() ->
     ].
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+    [{stop_ring, true} | Config].
 
 -spec prop_make_ring_with_ids(IDs::[?RT:key(),...]) -> true.
 prop_make_ring_with_ids(IDs) ->

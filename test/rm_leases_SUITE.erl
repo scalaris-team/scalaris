@@ -73,26 +73,19 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         test_network_partition ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Ids = unittest_helper:get_evenly_spaced_keys(8),
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
-            Config;
+            ok;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Ids = unittest_helper:get_evenly_spaced_keys(4),
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
-            Config
-    end.
-
-end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
-    Config.
+            ok
+    end,
+    [{stop_ring, true} | Config].
 
 tester_type_check_rm_leases(_Config) ->
     Count = 500,

@@ -1,4 +1,4 @@
-% @copyright 2009-2014 Zuse Institute Berlin,
+% @copyright 2009-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -771,6 +771,10 @@ on_init({?register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
         false ->
             on(Msg, State)
     end;
+on_init({update_snapno, SnapNo}, State) ->
+    %% only in tx_tm not in rtm processes!
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
+    state_set_local_snapno(State, SnapNo);
 on_init({crash, Pid, Reason, Cookie}, State) ->
     %% only in tx_tm
     handle_crash(Pid, Reason, Cookie, State, on_init).

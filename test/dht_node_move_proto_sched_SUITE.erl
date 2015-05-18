@@ -42,14 +42,16 @@ all() ->
      {group, jump_slide}
     ].
 
-suite() -> [ {timetrap, {seconds, 300}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 -spec additional_ring_config() -> [{stabilization_interval_base, 100000},...].
 additional_ring_config() ->
     % increase ring stabilisation interval since proto_sched infections get
     % lost if rm subscriptions are triggered instead of continuing due to our
     % direct (and infected) messages!
-    [{stabilization_interval_base, 100000}].
+    [{stabilization_interval_base, 100000}, % ms
+     {tman_cyclon_interval, 100} % s
+    ].
 
 -spec proto_sched_fun(start | stop) -> ok.
 proto_sched_fun(start) ->
