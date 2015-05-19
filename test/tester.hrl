@@ -95,7 +95,6 @@
     | reference
     | none
     | no_return
-    | {typedef, module(), atom()}
     | atom
     | float
     | nil

@@ -81,8 +81,8 @@ do_sort(L) ->
     lists:sort(L).
 
 test_sort(_Config) ->
-    tester:register_type_checker({typedef, tester_SUITE, sorted_list}, tester_SUITE, is_sorted_list),
-    tester:register_value_creator({typedef, tester_SUITE, sorted_list}, tester_SUITE, create_sorted_list, 2),
+    tester:register_type_checker({typedef, tester_SUITE, sorted_list, []}, tester_SUITE, is_sorted_list),
+    tester:register_value_creator({typedef, tester_SUITE, sorted_list, []}, tester_SUITE, create_sorted_list, 2),
     tester:test(?MODULE, do_sort, 1, 25, []),
-    tester:unregister_type_checker({typedef, tester_SUITE, sorted_list}),
-    tester:unregister_value_creator({typedef, tester_SUITE, sorted_list}).
+    tester:unregister_type_checker({typedef, tester_SUITE, sorted_list, []}),
+    tester:unregister_value_creator({typedef, tester_SUITE, sorted_list, []}).

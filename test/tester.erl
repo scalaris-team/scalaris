@@ -438,20 +438,20 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec register_type_checker({typedef, module(), atom()}, module(), atom()) ->
+-spec register_type_checker(type_spec(), module(), atom()) ->
                                    true.
 register_type_checker(Type, Module, Function) ->
     tester_global_state:register_type_checker(Type, Module, Function).
 
--spec unregister_type_checker({typedef, module(), atom()}) -> true | ok.
+-spec unregister_type_checker(type_spec()) -> true | ok.
 unregister_type_checker(Type) ->
     tester_global_state:unregister_type_checker(Type).
 
--spec register_value_creator({typedef, module(), atom()}, module(), atom(), non_neg_integer()) -> true.
+-spec register_value_creator(type_spec(), module(), atom(), non_neg_integer()) -> true.
 register_value_creator(Type, Module, Function, Arity) ->
     tester_global_state:register_value_creator(Type, Module, Function, Arity).
 
--spec unregister_value_creator({typedef, module(), atom()}) -> true | ok.
+-spec unregister_value_creator(type_spec()) -> true | ok.
 unregister_value_creator(Type) ->
     tester_global_state:unregister_value_creator(Type).
 
