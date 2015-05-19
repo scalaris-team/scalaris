@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%% @doc    Test suite for the mathlib module.
+%% @doc    Test suite for the dc_centroids module.
 %% @end
 %% @version $Id$
 
