@@ -103,6 +103,23 @@ prop_foldl(Data, Interval, MaxNum) ->
     ExpInInterval = [El || El <- ScrubbedData,
                            is_in(Interval, element(1, El))],
     ExpInIntervalCounted = lists:sublist(ExpInInterval, MaxNum),
+    %% We have certain combination of keys (e.g. {0} and {0.0}]) which are returned
+    %% in an unspecified order by certain DBs (lets call that a sequenze). If MaxNum
+    %% is set to a value which would split such a sequenz the test might fail because
+    %% the DBs returns unexpected keys. In such case all remaining elements of the sequenze
+    %% are added as well (which effectivly increases MaxNum).
+    ExpInIntervalCountedTailed =
+        case MaxNum >= length(ExpInInterval) orelse MaxNum == 0 of
+            true ->
+                ExpInIntervalCounted;
+            _ ->
+                Tail = lists:takewhile(fun(E) ->
+                                            element(1, lists:last(ExpInIntervalCounted)) ==
+                                            element(1, E)
+                                       end, lists:nthtail(MaxNum, ExpInInterval)),
+                lists:append(ExpInIntervalCounted, Tail)
+        end,
+
     AllFold = ?TEST_DB:foldl(DB1, fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldl(DB1,
                                  fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
@@ -112,19 +129,20 @@ prop_foldl(Data, Interval, MaxNum) ->
                             fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                             [],
                             Interval,
-                            MaxNum),
+                            length(ExpInIntervalCountedTailed)),
     UnorderedFold = ?TEST_DB:foldl_unordered(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     %% we expect all data from fold to be in reversed order because of list
     %% accumulation. we need to reverse ScrubbedData, ExpInInterval and
     %% ExpInIntervalCounted.
     compare_lists(ScrubbedData, AllFold, "test_foldl1"),
     compare_lists(ExpInInterval, IntervalFold, "test_foldl2"),
-    compare_lists(ExpInIntervalCounted, IntervalCountFold, "test_foldl3"),
+    compare_lists(ExpInIntervalCountedTailed, IntervalCountFold, "test_foldl3"),
     compare_lists(ScrubbedData, UnorderedFold, "test_foldl4"),
     ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_foldl(_Config) ->
+    prop_foldl([{0.0,{{},[0.0],-3},[],one,{}}, {0,[{}]}], all, 1),
     prop_foldl([{0.0}, {0}, {0.0}], {'(', {'*'}, {0}, ']'}, 4),
     prop_foldl([{foo}, {"bar"}, {42},{-1},{{"foobar"}},{{{0.3820862051907793}}},{0.39125416350624936}], all, 2),
     prop_foldl([{42},{-1},{{{0.3820862051907793}}},{0.39125416350624936}], all, 2),
@@ -141,12 +159,26 @@ prop_foldr(Data, Interval, MaxNum) ->
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
     ExpInInterval = [El || El <- ScrubbedData,
                            is_in(Interval, element(1, El))],
-    ExpInIntervalCounted = case MaxNum >= length(ExpInInterval) of
-                               true ->
-                                   ExpInInterval;
-                               _ ->
-                                   lists:nthtail(length(ExpInInterval) - MaxNum, ExpInInterval)
-                           end,
+    ExpInIntervalCounted =
+        case MaxNum >= length(ExpInInterval) of
+            true ->
+                ExpInInterval;
+            _ ->
+                EndIndex = length(ExpInInterval) - MaxNum,
+                Counted = lists:nthtail(EndIndex, ExpInInterval),
+                %% The same reason as for prop_foldl, but instead of adding, drop
+                %% all elements of the splitted sequence.
+                case MaxNum == 0 of
+                    true ->
+                        Counted;
+                    _ ->
+                        lists:dropwhile(fun(E) ->
+                                element(1, lists:nth(EndIndex, ExpInInterval)) ==
+                                element(1, E)
+                        end, Counted)
+                end
+        end,
+
     AllFold = ?TEST_DB:foldr(DB1, fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldr(DB1,
                                  fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
@@ -156,7 +188,7 @@ prop_foldr(Data, Interval, MaxNum) ->
                             fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                             [],
                             Interval,
-                            MaxNum),
+                            length(ExpInIntervalCounted)),
     %% ct:pal("ExpInInterval: ~p~nIntervalFold: ~p~nInterval: ~p~n", [ExpInInterval,
     %%                                                  IntervalFold, Interval]),
     compare_lists(ScrubbedData, AllFold, "test_foldr1"),
@@ -166,6 +198,7 @@ prop_foldr(Data, Interval, MaxNum) ->
     true.
 
 tester_foldr(_Config) ->
+    prop_foldr([{{0.0},[],[],42,42,[],one,{}},{{0},[{}]}], all, 1),
     tester:test(?MODULE, prop_foldr, 3, rw_suite_runs(10000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
