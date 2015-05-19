@@ -50,6 +50,12 @@ groups() ->
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_group(recover_data_group = Group, Config) ->
     unittest_helper:init_per_group(Group, Config);
 init_per_group(remove_node = Group, Config) ->

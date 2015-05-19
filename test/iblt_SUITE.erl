@@ -44,6 +44,12 @@ suite() ->
      {timetrap, {seconds, 30}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_insert(10..100, ?RT:key(), client_version()) -> true.

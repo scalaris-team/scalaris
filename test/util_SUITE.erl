@@ -47,6 +47,13 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+
 min_max(_Config) ->
     ?equals(util:min(1, 2), 1),
     ?equals(util:min(2, 1), 1),

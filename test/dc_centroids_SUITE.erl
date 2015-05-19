@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%% @doc    Test suite for the mathlib module.
+%% @doc    Test suite for the dc_centroids module.
 %% @end
 %% @version $Id$
 
@@ -34,6 +34,12 @@ suite() ->
     [
         {timetrap, {seconds, 30}}
     ].
+
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
 
 % Test dc_centroids:distance/2
 %

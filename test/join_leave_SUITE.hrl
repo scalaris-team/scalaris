@@ -21,6 +21,12 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_group(graceful_leave_load, _Config) ->
     % TODO: occasionally the bench server (as a Scalaris client) hangs because
     %       it connected to the node being shut down

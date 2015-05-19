@@ -34,6 +34,12 @@ suite() ->
      {ct_hooks, [scalaris_cth]}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
     
 test_timeout(_Config) ->
     unittest_helper:make_ring(4),

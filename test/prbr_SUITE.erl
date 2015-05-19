@@ -35,6 +35,12 @@ all()   -> [
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         rbr_concurrency_kv ->

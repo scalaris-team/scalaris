@@ -198,11 +198,11 @@ send_local(Pid, Msg) ->
 %%      (as returned by self()).
 -spec send_local(erl_local_pid(), message() | group_message(),
                  send_local_options()) -> ok.
-send_local(Pid, Msg, Options) ->
+send_local(Pid, Msg, _Options) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     _ = case erlang:get(trace_mpath) of
             undefined ->
-                ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg, Options),
+                ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg, _Options),
                 RealPid ! RealMsg;
             Logger ->
                 RealNumericPid = case is_atom(RealPid) of
@@ -216,7 +216,7 @@ send_local(Pid, Msg, Options) ->
                     true ->
                         LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                            Logger, self(), RealPid, RealMsg),
-                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg, Options),
+                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg, _Options),
                         RealPid ! LogEpidemicMsg
                 end
         end,

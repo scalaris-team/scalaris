@@ -42,6 +42,11 @@ suite() ->
      {timetrap, {seconds, 10}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
 
 init_per_testcase(TestCase, Config) ->
     NeedsRing = [test_get_coordinate, test_select_reply_data],

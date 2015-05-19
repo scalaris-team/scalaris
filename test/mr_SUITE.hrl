@@ -29,6 +29,12 @@
 tests_avail() ->
     [test_sane_result]. %%, test_error_on_kill].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(_TestCase, Config) ->
     %% make new ring
     unittest_helper:make_ring(2),

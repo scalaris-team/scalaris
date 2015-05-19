@@ -38,6 +38,13 @@ suite() ->
         {timetrap, {seconds, 30}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+
 %% helper functions
 -spec in(X::any(), List::[any()]) -> boolean().
 in(X, List) ->

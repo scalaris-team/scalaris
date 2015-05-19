@@ -35,6 +35,12 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(Testcase, Config) ->
     % dc_clustering must be activated and a radius must exist
     EnableClustering = {dc_clustering_enable, true},
