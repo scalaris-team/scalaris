@@ -91,7 +91,7 @@ get_lease_list() ->
     end.
 
 -spec set_message_filter(F::fun((comm:message()) -> boolean()),
-                         Owner::comm:mypid()) -> ok.
+                         Owner::pid()) -> ok.
 set_message_filter(F, Owner) ->
     comm:send_local(get_mock_pid(), {set_message_filter, F, Owner, self()}),
     receive

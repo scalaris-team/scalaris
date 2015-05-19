@@ -180,7 +180,7 @@ joiner_helper(Current, Target) ->
     joiner_helper(Current+1, Target).
 
 synchronous_join(TargetSize) ->
-    api_vm:add_nodes(1),
+    _ = api_vm:add_nodes(1),
     log:log("wait for ring size ~w", [TargetSize]),
     lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for ring to stabilize in sync. join"),

@@ -237,7 +237,7 @@ test_network_partition(_Config) ->
     DHTNodePid = hd(DHTNodes),
 
     % stop odd nodes
-    [lease_helper:intercept_lease_renew(Node) || {_Id, Node} <- OddNodes],
+    _ = [lease_helper:intercept_lease_renew(Node) || {_Id, Node} <- OddNodes],
     lease_helper:wait_for_number_of_valid_active_leases(4),
 
     RMLeasesPid = pid_groups:pid_of(pid_groups:group_of(DHTNodePid), rm_leases),
@@ -308,7 +308,7 @@ joiner_helper(Current, Target) ->
     joiner_helper(Current+1, Target).
 
 synchronous_join(TargetSize) ->
-    api_vm:add_nodes(1),
+    _ = api_vm:add_nodes(1),
     check_ring_state(TargetSize).
 
 check_ring_state(TargetSize) ->
@@ -325,7 +325,7 @@ check_ring_state(TargetSize) ->
 synchronous_kill(Current, Current) ->
     ok;
 synchronous_kill(Current, _TargetSize) ->
-    api_vm:kill_nodes(1),
+    _ = api_vm:kill_nodes(1),
     ct:pal("wait for ring size"),
     lease_helper:wait_for_ring_size(Current - 1),
     ct:pal("wait for correct ring"),
@@ -343,7 +343,7 @@ synchronous_add(Current, Current) ->
     ok;
 synchronous_add(Current, _TargetSize) ->
     ct:pal("================================== adding node ========================"),
-    api_vm:add_nodes(1),
+    _ = api_vm:add_nodes(1),
     ct:pal("wait for ring size"),
     lease_helper:wait_for_ring_size(Current + 1),
     ct:pal("wait for correct ring"),
