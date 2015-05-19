@@ -8,4 +8,4 @@ Instructions can be found in the [Users and Developers Guide](https://github.com
 
 Additional information, including download links for rpm-packages, can
 be found on the project homepage:
-http://scalaris.googlecode.com/
+http://scalaris.zib.de/
