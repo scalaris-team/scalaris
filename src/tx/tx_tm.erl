@@ -292,11 +292,11 @@ start_link(DHTNodeGroup, tx_tm_new) ->
 -spec init([]) -> state() | {'$gen_component', [{on_handler, gen_component:handler()},...],
                              state()}.
 init([]) ->
-    Role = pid_groups:my_pidname(),
+    _Role = pid_groups:my_pidname(),
     ?TRACE("tx_tm:init for instance: ~p ~p~n",
-           [pid_groups:my_groupname(), Role]),
+           [pid_groups:my_groupname(), _Role]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_" ++ atom_to_list(Role)),
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_" ++ atom_to_list(_Role)),
     %%Table = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     Table = pdb:new(?MODULE, [set]),

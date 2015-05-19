@@ -352,7 +352,7 @@ rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours, _Reason) ->
 
 %% @doc Message handler during the startup of the gossip module.
 -spec on_inactive(Msg::message(), State::state()) -> state().
-on_inactive({activate_gossip, Neighbors}=Msg, State) ->
+on_inactive({activate_gossip, Neighbors}, State) ->
     MyRange = nodelist:node_range(Neighbors),
     State1 = state_set(status, init, State),
 
