@@ -76,6 +76,12 @@ suite() ->
 groups() ->
     [{with_config, [sequence], [next_hop_no_neighbors, next_hop_with_neighbors]}].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_group(GroupName, Config) ->
     case GroupName of
         with_config ->

@@ -46,6 +46,12 @@ suite() ->
      {timetrap, {seconds, 45}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_p_add_list(BF0Items::[?BLOOM:key()], Items::[?BLOOM:key()]) -> true.

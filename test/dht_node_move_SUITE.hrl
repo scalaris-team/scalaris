@@ -98,6 +98,12 @@ groups() ->
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
         [].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_group(Group, Config) ->
     unittest_helper:init_per_group(Group, Config).
 

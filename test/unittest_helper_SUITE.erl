@@ -33,6 +33,12 @@ suite() ->
      {timetrap, {seconds, 30}}
     ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 

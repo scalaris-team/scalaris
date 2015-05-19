@@ -36,6 +36,13 @@ suite() -> [ {timetrap, {seconds, 30}} ].
 
 -define(EPSILON, 1.0e-8 * ?RT:n()).
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+
 -spec prop_add_keys(BaseKey::?RT:key(), Size::1..50, Values::[?RT:key(),...]) -> true.
 prop_add_keys(BaseKey, Size, Values0) ->
     H = histogram_rt:create(Size, BaseKey),

@@ -37,6 +37,12 @@ all() ->
 
 suite() -> [{timetrap, {seconds, 120}}].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(TestCase, Config) ->
     case lists:member(TestCase, [tm_crash, tp_crash, all_tp_crash]) of
         true ->

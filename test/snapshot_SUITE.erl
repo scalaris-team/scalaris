@@ -61,6 +61,12 @@ groups() ->
 
 suite() -> [ {timetrap, {seconds, 45}} ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
 init_per_group(without_ring, Config) ->
     unittest_helper:start_minimal_procs(Config, [], false);
 init_per_group(_GroupName, Config) ->

@@ -47,6 +47,12 @@ groups() ->
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(Config) ->
+    ok.
+
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
