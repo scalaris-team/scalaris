@@ -36,7 +36,7 @@ all() ->
      {group, tester_tests}
     ].
 
-suite() -> [ {timetrap, {seconds, 15}} ].
+suite() -> [ {timetrap, {seconds, 20}} ].
 
 init_per_suite(Config) ->
     tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
