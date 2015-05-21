@@ -30,7 +30,7 @@
 
 -type(node_type() :: predspred | pred | node | succ).
 
--type(node_tuple() :: {node_type(), node_type(), node_type(), node_type()}).
+-type(node_tuple() :: {node:node_type(), node:node_type(), node:node_type(), node:node_type()}).
 
 -type(targetid_fun() :: fun((node_tuple()) -> ?RT:key())).
 
@@ -728,6 +728,7 @@ selector_to_idx(pred) -> 2;
 selector_to_idx(node) -> 3;
 selector_to_idx(succ) -> 4.
 
+-spec get_node_details(DhtNode::pid() | comm:mypid()) -> {node:node_type(), node:node_type(), node:node_type()}.
 get_node_details(DhtNode) ->
     comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
     trace_mpath:thread_yield(),
@@ -739,7 +740,7 @@ get_node_details(DhtNode) ->
                            Succ = node_details:get(NodeDetails, succ),
                            {Pred, Node, Succ}
                        end)
-        end.
+    end.
 
 -spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
 get_predspred_pred_node_succ(DhtNode) ->
@@ -1072,7 +1073,7 @@ prop_jump_slide(TargetKey) ->
     perform_jump(JumpingNode, TargetKey, InvalidTarget),
     true.
 
--spec perform_jump(JumpingNode::comm:erl_local_pid(), ?RT:key(), InvalidTarget::boolean()) -> ok.
+-spec perform_jump(JumpingNode::pid(), ?RT:key(), InvalidTarget::boolean()) -> true.
 perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     %% get neighborhood to check if jump will be a slide
     comm:send_local(JumpingNode, {get_state, comm:this(), neighbors}),

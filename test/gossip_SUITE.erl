@@ -158,7 +158,7 @@ test_request_histogram2(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a Msg to the gossip process
--spec send2gossip(Msg::comm:message(), Delay::non_neg_integer()) -> reference().
+-spec send2gossip(Msg::comm:message(), Delay::non_neg_integer()) -> ok.
 send2gossip(Msg, Delay) ->
     Group = pid_groups:group_with(gossip),
     Pid = pid_groups:pid_of(Group, gossip),

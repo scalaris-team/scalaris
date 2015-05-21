@@ -349,7 +349,7 @@ build_tree(Interval, ToAdd, Distribution) ->
 
 -spec build_tree(I, Config, ToAdd, Distribution) -> Tree when
     is_subtype(I,            intervals:interval()),
-    is_subtype(Config,       merkle_tree:mt_config()),
+    is_subtype(Config,       merkle_tree:mt_config_params()),
     is_subtype(ToAdd,        non_neg_integer()),
     is_subtype(Distribution, db_generator:distribution()),
     is_subtype(Tree,         merkle_tree:merkle_tree()).
