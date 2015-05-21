@@ -811,8 +811,8 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
     Old = db_dht:get_entry(DB2, db_entry:get_key(UpdateElement)),
     UpdatedElement = db_entry:set_value(UpdateElement, UpdateVal, db_entry:get_version(UpdateElement) + 1),
 
-    case element(1, Old) of
-        false -> % element does not exist, i.e. was a null entry, -> cannot update
+    case db_entry:is_null(Old) of
+        true -> % element does not exist, i.e. was a null entry, -> cannot update
             DB5 = DB2;
         _ ->
             DB3 = db_dht:record_changes(DB2, ChangesInterval),
@@ -1188,7 +1188,7 @@ prop_changed_keys_add_data(Data, ChangesInterval) ->
     UniqueData = lists:usort(fun(A, B) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
-    _ = [check_entry_in_changes(DB3, ChangesInterval, E, {false, db_entry:new(db_entry:get_key(E))}, "add_data_2")
+    _ = [check_entry_in_changes(DB3, ChangesInterval, E, db_entry:new(db_entry:get_key(E)), "add_data_2")
            || E <- UniqueData],
 
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "add_data_3"),
