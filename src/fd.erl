@@ -317,6 +317,9 @@ on({report_crash, [_|_] = LocalPids, Reason}, State) ->
     Msg = {report_crash, LocalPids, Reason},
     % don't create new hbs processes!
     _ = [comm:send_local(HBS, Msg) || HBS <- State],
+    State;
+on({del_all_subscriptions, _Subscribers} = Msg, State) ->
+    _ = [comm:send_local(HBS, Msg) || HBS <- State],
     State.
 
 %%% Internal functions
