@@ -95,7 +95,8 @@ update_rcv_data2(State, SlideOp, {continue}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prepare_send_delta1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           ReplyPid::comm:erl_local_pid())
-        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, Reason::unkown_lease, State::dht_node_state:state(), SlideOp1::slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
     %log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
@@ -141,7 +142,7 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
             log:log("unknown lease in prepare_send_delta1~n"),
             log:log("~p:~p~n", [ActiveLease, PassiveLeaseList]),
             log:log("~p~n", [Interval]),
-            error
+            {abort, unkown_lease, State, OldSlideOp}
     end.
 
 
@@ -198,7 +199,7 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
                         NextOpMsg, EmbeddedMsg::{continue})
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
-finish_delta_ack2(State, SlideOp, NextOpMsg, _Msg) ->
+finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
     % notify neighbor on successful handover
     %log:log("finish_delta_ack2 ~p~n", [_Msg]),
     % notify succ
@@ -211,8 +212,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, _Msg) ->
             {ok, State1, SlideOp, NextOpMsg};
         error ->
             log:log("error in finish_delta_ack2"),
-            % @todo
-            error
+            {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
