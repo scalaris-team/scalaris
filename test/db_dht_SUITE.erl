@@ -1439,9 +1439,9 @@ check_entry(DB, Key, ExpDBEntry, ExpRead, _ExpExists, Note) ->
     ?equals_w_note(db_dht:read(DB, Key), ExpRead, Note).
 
 % note: use manageable values for ReadLock!
--spec create_db_entry(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
+-spec create_db_entry(Key::?RT:key(), Value::db_dht:value(), WriteLock::false | client_version(),
                       ReadLock::0..1000, Version::client_version()) -> db_entry:entry();
-                     (Key::?RT:key(), Value::empty_val, WriteLock::boolean(),
+                     (Key::?RT:key(), Value::empty_val, WriteLock::false,
                       ReadLock::0..1000, Version::-1) -> db_entry:entry().
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->
     E1 = if Value =:= empty_val andalso Version =:= -1 -> db_entry:new(Key);
