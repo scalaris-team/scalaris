@@ -516,7 +516,7 @@ test_tx_snapshot_slide_interleave(_) ->
     %% make sure process above gets some excution time
     timer:sleep(100),
     ct:pal("adding node to provoke slide"),
-    api_vm:add_nodes(1),
+    {[_], []} = api_vm:add_nodes(1),
     ct:pal("wating for fully joined ring...~n~p",
            [unittest_helper:check_ring_size_fully_joined(2)]),
     ct:pal("removing breakpoint ~p", [gen_component:bp_del(Pid, snap_bp)]),

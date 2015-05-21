@@ -948,7 +948,8 @@ req_list_parallelism(_Config) ->
     ReadReqsPart = [{read, lists:flatten(io_lib:format("articles:count:~B", [X]))}
                      || X <- lists:seq(1, Partitions)],
 
-    api_tx:req_list_commit_each(WriteReqsPart),
+    X = lists:duplicate(Partitions, {ok}),
+    X = api_tx:req_list_commit_each(WriteReqsPart),
     {ok} = api_tx:write("articles:count", 200 * Partitions),
 
     Iters = 500,

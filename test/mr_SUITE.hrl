@@ -70,7 +70,7 @@ test_error_on_kill(_Config) ->
                        end),
     KillPid = spawn_link(fun() ->
                                  ?proto_sched(start),
-                                 api_vm:kill_nodes(1),
+                                 [_] = api_vm:kill_nodes(1),
                                  ?proto_sched(stop)
                          end),
     ?proto_sched2(cleanup, [MrPid, KillPid]),
@@ -91,7 +91,8 @@ get_wc_job_erl() ->
      []}.
 
 add_data() ->
-    [api_tx:write(Key, {Key, Value}) || {Key, Value} <- ?DATA],
+    X = lists:duplicate(length(?DATA), {ok}),
+    X = [api_tx:write(Key, {Key, Value}) || {Key, Value} <- ?DATA],
     ok.
 
 check_results(Results) ->
@@ -111,4 +112,5 @@ check_results(Results) ->
             length(Results)),
     Zipped = lists:zip(lists:sort(Expected),
                        lists:sort(Results)),
-    [?equals(X, Y) || {X, Y} <- Zipped].
+    _ = [?equals(X, Y) || {X, Y} <- Zipped],
+    ok.

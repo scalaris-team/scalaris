@@ -693,7 +693,7 @@ succ(predspred) -> pred;
 succ(pred)      -> node;
 succ(node)      -> succ.
 
--spec generate_slide_variation(slide_config_record()) -> [slide_config_record()].
+-spec generate_slide_variation(slide_config_record()) -> [slide_config_record(),...].
 generate_slide_variation(SlideConf) ->
     SlideWith = ?IIF(SlideConf#slideconf.slide_with =:= succ, pred, succ),
     Node =

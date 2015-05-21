@@ -65,7 +65,7 @@ init_per_testcase(_TestCase, Config) ->
                  {gossip_log_level_error, error}
                 ]
        }]),
-    api_vm:add_nodes(?NO_OF_NODES-1),
+    {_, []} = api_vm:add_nodes(?NO_OF_NODES - 1),
     unittest_helper:wait_for_stable_ring_deep(),
     [{stop_ring, true} | Config].
 

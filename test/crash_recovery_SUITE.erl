@@ -152,7 +152,7 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
 
     % stop all nodes
     ct:pal("cr: stop all nodes"),
-    [lease_helper:intercept_lease_renew(Node) || Node <- DHTNodes],
+    _ = [lease_helper:intercept_lease_renew(Node) || Node <- DHTNodes],
     lease_helper:wait_for_number_of_valid_active_leases(0),
     [gen_component:bp_del(Node, block_trigger) || Node <- DHTNodes],
 
@@ -227,7 +227,7 @@ change_owner_pids(DHTNodes) ->
 change_owner_pid(Pid, State, DBName, _PRBRName) ->
     LeaseDB = dht_node_state:get_prbr_state(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
-    [ 
+    _ = [ 
       prbr:set_entry({Key, 
                       {ReadRound, ReadClientId, ReadWriteFilter}, 
                       {WriteRound, WriteClientId, WriteWriteFilter}, 
@@ -244,7 +244,7 @@ change_owner_pid(Pid, State, DBName, _PRBRName) ->
 reset_read_and_write_rounds(State, DBName, _PRBRName) ->
     LeaseDB = dht_node_state:get_prbr_state(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
-    [ 
+    _ = [ 
       prbr:set_entry({Key, 
                       {ReadRound, ReadClientId, ReadWriteFilter}, 
                       {WriteRound, WriteClientId, WriteWriteFilter}, 

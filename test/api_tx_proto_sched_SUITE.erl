@@ -105,7 +105,7 @@ concurrent_2(_Config) ->
     %% let two increments run concurrently
 
     %% initialize a key
-    api_tx:write("a", 0),
+    {ok} = api_tx:write("a", 0),
 
     Iterations = 6,
     Threads = 2,

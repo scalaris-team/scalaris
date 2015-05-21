@@ -43,7 +43,7 @@ init_per_suite(Config) ->
     PWD = os:cmd(pwd),
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-    file:delete(WorkingDir ++ "schema.DAT"),
+    _ = file:delete(WorkingDir ++ "schema.DAT"),
 
     ok = db_mnesia:start(),
     tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
@@ -54,12 +54,12 @@ end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
     tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
 
-    application:stop(mnesia),
+    _ = application:stop(mnesia),
     %% cleanup schema generated in this run
     PWD = os:cmd(pwd),
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-    file:delete(WorkingDir ++ "schema.DAT"),
+    _ = file:delete(WorkingDir ++ "schema.DAT"),
 
     unittest_helper:stop_minimal_procs(Config),
     Config.

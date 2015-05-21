@@ -415,7 +415,7 @@ basic_bench_increment(_Config) ->
     %% let run a short bench:increment with proto_sched
     proto_sched:thread_num(1),
     proto_sched:thread_begin(),
-    bench:increment(2,2),
+    {ok, _} = bench:increment(2,2),
     proto_sched:thread_end(),
     proto_sched:wait_for_end(),
     _ = proto_sched:get_infos(),
@@ -429,7 +429,7 @@ basic_start_bench_and_kill_it(_Config) ->
     %% processes. (Similarily done in dht_node_move_SUITE).
     BenchPid = spawn(fun() ->
                           proto_sched:thread_begin(),
-                          bench:increment(10,1000),
+                          {ok, _} = bench:increment(10,1000),
                           %% will be killed by steering thread
                           util:do_throw(bench_was_to_fast)
           end),
@@ -445,46 +445,46 @@ basic_start_bench_and_kill_it(_Config) ->
 test_kv_on_cseq_read(_Config) ->
     util:for_to(1, 100, fun kv_on_cseq_read/1).
 
-kv_on_cseq_read(_I) ->
+kv_on_cseq_read(I) ->
     %% read key with one thread
-    kv_on_cseq:write("a", _I),
-    proto_sched:thread_num(1, _I),
-    proto_sched:thread_begin(_I),
-    kv_on_cseq:read("a"),
-    proto_sched:thread_end(_I),
+    {ok} = kv_on_cseq:write("a", I),
+    proto_sched:thread_num(1, I),
+    proto_sched:thread_begin(I),
+    {ok, I} = kv_on_cseq:read("a"),
+    proto_sched:thread_end(I),
     ?ASSERT(not proto_sched:infected()),
-    proto_sched:wait_for_end(_I),
-    _Infos = proto_sched:get_infos(_I),
-    unittest_helper:print_proto_sched_stats(at_end_if_failed, _I),
-    proto_sched:cleanup(_I).
+    proto_sched:wait_for_end(I),
+    _Infos = proto_sched:get_infos(I),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, I),
+    proto_sched:cleanup(I).
 
 test_kv_on_cseq_read_2(_Config) ->
     util:for_to(1, 100, fun kv_on_cseq_read_2/1).
 
-kv_on_cseq_read_2(_I) ->
+kv_on_cseq_read_2(I) ->
     %% concurrently try to read the same key with two threads
-    kv_on_cseq:write("a", _I),
+    {ok} = kv_on_cseq:write("a", I),
     Pid = self(),
     spawn(fun() ->
-                  proto_sched:thread_begin(_I),
-                  kv_on_cseq:read("a"),
-                  proto_sched:thread_end(_I),
+                  proto_sched:thread_begin(I),
+                  {ok, I} = kv_on_cseq:read("a"),
+                  proto_sched:thread_end(I),
                   Pid ! ok
           end),
     spawn(fun() ->
-                  proto_sched:thread_begin(_I),
-                  kv_on_cseq:read("a"),
-                  proto_sched:thread_end(_I),
+                  proto_sched:thread_begin(I),
+                  {ok, I} = kv_on_cseq:read("a"),
+                  proto_sched:thread_end(I),
                   Pid ! ok
           end),
-    proto_sched:thread_num(2, _I),
+    proto_sched:thread_num(2, I),
     ?ASSERT(not proto_sched:infected()),
     receive ok -> ok end,
     receive ok -> ok end,
-    proto_sched:wait_for_end(_I),
-    _Infos = proto_sched:get_infos(_I),
-    unittest_helper:print_proto_sched_stats(at_end_if_failed, _I),
-    proto_sched:cleanup(_I).
+    proto_sched:wait_for_end(I),
+    _Infos = proto_sched:get_infos(I),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, I),
+    proto_sched:cleanup(I).
 
 test_kv_on_cseq_write(_Config) ->
     util:for_to(1, 100, fun kv_on_cseq_write/1).
@@ -494,7 +494,7 @@ kv_on_cseq_write(_I) ->
     proto_sched:thread_num(1, _I),
     proto_sched:thread_begin(_I),
     ?TRACE("Thread1 start write", []),
-    kv_on_cseq:write("a", _I),
+    {ok} = kv_on_cseq:write("a", _I),
     ?TRACE("Thread1 finished write", []),
     proto_sched:thread_end(_I),
     proto_sched:wait_for_end(_I),
@@ -512,7 +512,7 @@ kv_on_cseq_write_2(_I) ->
     spawn(fun() ->
                   proto_sched:thread_begin(_I),
                   ?TRACE("Thread1 start write ~p", [_I]),
-                  kv_on_cseq:write("a", 7),
+                  {ok} = kv_on_cseq:write("a", 7),
                   ?TRACE("Thread1 finished write ~p", [_I]),
                   proto_sched:thread_end(_I),
                   Pid ! ok
@@ -520,7 +520,7 @@ kv_on_cseq_write_2(_I) ->
     spawn(fun() ->
                   proto_sched:thread_begin(_I),
                   ?TRACE("Thread2 start write ~p", [_I]),
-                  kv_on_cseq:write("a", 8),
+                  {ok} = kv_on_cseq:write("a", 8),
                   ?TRACE("Thread2 finished write ~p", [_I]),
                   proto_sched:thread_end(_I),
                   Pid ! ok

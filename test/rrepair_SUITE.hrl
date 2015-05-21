@@ -164,7 +164,8 @@ mpath(Config) ->
     FType = proplists:get_value(ftype, Config),
     TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
+    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
+                                                 {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -185,9 +186,12 @@ mpath(Config) ->
                    {{_FIP,_FPort,_FPid}, _FName},
                    {{_TIP,_TPort,_TPid}, _TName},
                    _Msg, _LocalOrGlobal} <- A],
-    ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])),
-    ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
-    %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [rr_eval_admin:get_bandwidth(A)])),
+    ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt",
+                         io_lib:fwrite("~.0p\n", [B])),
+    ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt",
+                         io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
+    %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt",
+    %                     io_lib:fwrite("~.0p\n", [rr_eval_admin:get_bandwidth(A)])),
     ok.
 
 simple(Config) ->
@@ -218,7 +222,8 @@ dest(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
+    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
+                                                 {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -263,7 +268,8 @@ dest_empty_node(Config) ->
     P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
+    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
+                                                 {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
                                                    {fprob, 100},
                                                    {distribution, uniform},
@@ -340,7 +346,7 @@ session_ttl(Config) ->
     RRConf = lists:keyreplace(rr_gc_interval, 1, RRConf1, {rr_gc_interval, erlang:round(TTL div 2)}),
 
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, RRConf),
+    _ = build_symmetric_ring(NodeCount, Config, RRConf),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 90},
                                                    {distribution, uniform}]),
@@ -386,7 +392,7 @@ asymmetric_ring(Config) ->
     Key3 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {3,4}),
     Key4 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7,8}),
     NodeKeys = [Key1, Key2, Key3, Key4],
-    build_ring(NodeKeys, Config, RRConf),
+    _ = build_ring(NodeKeys, Config, RRConf),
 
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 90},

@@ -73,7 +73,7 @@ test_join(_Config) ->
     ok.
 
 test_leave(_Config) ->
-    api_vm:shutdown_nodes(1),
+    [_] = api_vm:shutdown_nodes(1),
     {[AddedNode], _} = api_vm:add_nodes(1),
     unittest_helper:check_ring_size_fully_joined(2),
     unittest_helper:wait_for_stable_ring_deep(),
