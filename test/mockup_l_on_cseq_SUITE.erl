@@ -96,18 +96,16 @@ test_merge(_Config) ->
         {merge, success, _L2, _L1} -> ok
     end,
     % no renews during merge!
-    ?assert(0 =:= mockup_l_on_cseq:get_renewal_counter()),
+    ?equals(mockup_l_on_cseq:get_renewal_counter(), 0),
     % check L1
-    case l_on_cseq:read(l_on_cseq:get_id(L1)) of
-        {ok, L1_} -> ?assert(L1_ =:= prbr_bottom);
-        {fail, not_found} -> ?assert(false)
-    end,
+    ?equals(l_on_cseq:read(l_on_cseq:get_id(L1)), {ok, prbr_bottom}),
     % check L2
     case l_on_cseq:read(l_on_cseq:get_id(L2)) of
         {ok, L2_} ->
-            ?assert(l_on_cseq:get_range(L2_) =:= intervals:union(l_on_cseq:get_range(L1),
-                                                                 l_on_cseq:get_range(L2)));
-        {fail, not_found} -> ?assert(false)
+            ?equals(l_on_cseq:get_range(L2_),
+                    intervals:union(l_on_cseq:get_range(L1),
+                                    l_on_cseq:get_range(L2)));
+        {fail, not_found} -> ?ct_fail("{fail, not_found}", [])
     end,
     true.
 
@@ -150,26 +148,26 @@ test_split(_Config) ->
     % check L1
     case l_on_cseq:read(l_on_cseq:get_id(L1)) of
         {ok, L1_} ->
-            ?assert(l_on_cseq:get_range(L1_) =:= R1),
-            ?assert(l_on_cseq:get_aux(L1_) =:= empty),
+            ?equals(l_on_cseq:get_range(L1_), R1),
+            ?equals(l_on_cseq:get_aux(L1_), empty),
             true;
         {fail, not_found} ->
-            ?assert(false)
+            ?ct_fail("{fail, not_found}", [])
     end,
     % check L2
     case l_on_cseq:read(l_on_cseq:get_id(L2)) of
         {ok, L2_} ->
-            ?assert(l_on_cseq:get_range(L2_) =:= R2),
-            ?assert(l_on_cseq:get_aux(L2_) =:= empty),
+            ?equals(l_on_cseq:get_range(L2_), R2),
+            ?equals(l_on_cseq:get_aux(L2_), empty),
             true;
         {fail, not_found} ->
-            ?assert(false)
+            ?ct_fail("{fail, not_found}", [])
     end,
     LeaseList = mockup_l_on_cseq:get_lease_list(),
     ActiveLease = lease_list:get_active_lease(LeaseList),
     [PassiveLease] = lease_list:get_passive_leases(LeaseList),
-    ?assert(l_on_cseq:get_id(ActiveLease) =:= l_on_cseq:get_id(L2)),
-    ?assert(l_on_cseq:get_id(PassiveLease) =:= l_on_cseq:get_id(L1)),
+    ?equals(l_on_cseq:get_id(ActiveLease), l_on_cseq:get_id(L2)),
+    ?equals(l_on_cseq:get_id(PassiveLease), l_on_cseq:get_id(L1)),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -212,18 +210,19 @@ test_merge_with_renewal_at(_Config, Step, FirstOrSecond) ->
         {merge, success, _L2, _L1} -> ok
     end,
     % no renews during merge!
-    ?assert(1 =:= mockup_l_on_cseq:get_renewal_counter()),
+    ?equals(mockup_l_on_cseq:get_renewal_counter(), 1),
     % check L1
     case l_on_cseq:read(l_on_cseq:get_id(L1)) of
-        {ok, L1_} -> ?assert(L1_ =:= prbr_bottom);
-        {fail, not_found} -> ?assert(false)
+        {ok, L1_} -> ?equals(L1_, prbr_bottom);
+        {fail, not_found} -> ?ct_fail("{fail, not_found}", [])
     end,
     % check L2
     case l_on_cseq:read(l_on_cseq:get_id(L2)) of
         {ok, L2_} ->
-            ?assert(l_on_cseq:get_range(L2_) =:= intervals:union(l_on_cseq:get_range(L1),
-                                                                 l_on_cseq:get_range(L2)));
-        {fail, not_found} -> ?assert(false)
+            ?equals(l_on_cseq:get_range(L2_),
+                    intervals:union(l_on_cseq:get_range(L1),
+                                    l_on_cseq:get_range(L2)));
+        {fail, not_found} -> ?ct_fail("{fail, not_found}", [])
     end,
     true.
 
