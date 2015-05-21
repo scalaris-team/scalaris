@@ -63,13 +63,13 @@ init_per_group(remove_node = Group, Config) ->
 init_per_group(Group, Config) ->
     %% stop ring and clean repository from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    application:stop(mnesia),
+    _ = application:stop(mnesia),
     %% need config to get db path
     Config2 = unittest_helper:start_minimal_procs(Config, [], false),
     PWD = os:cmd(pwd),
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
                      "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
-    file:delete(WorkingDir ++ "schema.DAT"),
+    _ = file:delete(WorkingDir ++ "schema.DAT"),
     unittest_helper:stop_minimal_procs(Config2),
     
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -90,7 +90,7 @@ end_per_group(Group, Config) ->
                      "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     Tabs = lists:delete(schema, mnesia:system_info(tables)),
     unittest_helper:stop_ring(),
-    application:stop(mnesia),
+    _ = application:stop(mnesia),
     [ok = file:delete(WorkingDir ++ atom_to_list(X)++".DCD")||X<-Tabs],
     ok = file:delete(WorkingDir ++ "schema.DAT"),
     unittest_helper:end_per_group(Group, Config).
@@ -153,9 +153,9 @@ remove_node(_Config) ->
   _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
   util:wait_for(fun admin:check_leases/0),
   % check data integrity
-  [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
+  _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
   % add node to reform ring_size() node ring
-  admin:add_nodes(1),
+  _ = admin:add_nodes(1),
   timer:sleep(3000),
   unittest_helper:check_ring_size_fully_joined(ring_size()),
   true.
