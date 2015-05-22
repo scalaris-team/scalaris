@@ -730,16 +730,16 @@ selector_to_idx(succ) -> 4.
 
 -spec get_node_details(DhtNode::pid() | comm:mypid()) -> {node:node_type(), node:node_type(), node:node_type()}.
 get_node_details(DhtNode) ->
-    comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
+    erlang:list_to_tuple(get_node_details(DhtNode, [pred, node, succ])).
+
+-spec get_node_details(DhtNode::pid() | comm:mypid(), Which::[node | pred | succ,...])
+        -> [node:node_type(),...].
+get_node_details(DhtNode, Which) ->
+    comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), Which}),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_node_details_response, NodeDetails},
-                       begin
-                           Node = node_details:get(NodeDetails, node),
-                           Pred = node_details:get(NodeDetails, pred),
-                           Succ = node_details:get(NodeDetails, succ),
-                           {Pred, Node, Succ}
-                       end)
+                       [node_details:get(NodeDetails, X) || X <- Which])
     end.
 
 -spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
@@ -1090,7 +1090,9 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     ct:pal("SlidePred: ~p SlideSucc: ~p", [SlidePred, SlideSucc]),
 
     %% start jump
-    ct:pal("Node ~p jumping to ~p", [JumpingNode, TargetKey]),
+    Ring = lists:sort(fun(A, B) -> node:id(A) =< node:id(B) end,
+                      [hd(get_node_details(DhtNode, [node])) || DhtNode <- pid_groups:find_all(dht_node)]),
+    ct:pal("Ring: ~.7p~nNode ~p jumping to~n             ~p", [Ring, JumpingNode, TargetKey]),
     ?proto_sched(start),
     comm:send_local(JumpingNode, {move, start_jump, TargetKey, prop_jump_slide, comm:this()}),
     timer:sleep(10),
