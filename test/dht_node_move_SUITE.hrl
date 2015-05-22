@@ -1095,7 +1095,6 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     ct:pal("Ring: ~.7p~nNode ~p jumping to~n             ~p", [Ring, JumpingNode, TargetKey]),
     ?proto_sched(start),
     comm:send_local(JumpingNode, {move, start_jump, TargetKey, prop_jump_slide, comm:this()}),
-    timer:sleep(10),
     trace_mpath:thread_yield(),
     Result = fun() ->
                 receive
@@ -1107,6 +1106,7 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     %% check result
     if Result =:= wrong_pred_succ_node ->
             ct:pal("Retrying because of wrong_pred_succ_node"),
+            timer:sleep(10),
             perform_jump(JumpingNode, TargetKey, InvalidTarget);
        InvalidTarget ->
             ?equals(Result, ok),
