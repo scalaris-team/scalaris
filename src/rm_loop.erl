@@ -33,6 +33,12 @@
 %%                [self(), Reason, nodelist:to_list(get_neighbors(NewState))]);
 %%             _    -> ok
 %%         end).
+%% -define(TRACE_STATE(OldState, NewState, Reason),
+%%         case element(1, OldState) =/= element(1, NewState) of
+%%             true -> trace_mpath:log_info(self(), {rm_changed, Reason,
+%%                                                   nodelist:to_list(get_neighbors(NewState))});
+%%             _    -> ok
+%%         end).
 -define(TRACE_STATE(OldState, NewState, Reason), ok).
 
 -export([send_trigger/0, init_first/0, init/4, on/2,
