@@ -122,7 +122,7 @@
 
 %% report messages from other modules
 -export([start/2]).
--export([log_send/5]).
+-export([log_send/5, log_info/3]).
 -export([epidemic_reply_msg/4]).
 
 %% gen_component behaviour
@@ -135,6 +135,8 @@
 -type send_event()   :: {log_send, Time::'_', trace_id(),
                          Source::anypid(), Dest::anypid(), comm:message(),
                          local | global}.
+-type info_event()   :: {log_info, Time::'_', trace_id(),
+                         Source::anypid(), Info::comm:message()}.
 
 -type passed_state() :: {trace_id(), logger()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
@@ -169,7 +171,8 @@
          num_delivered_msgs      = ?required(state, num_delivered_msgs)
          :: non_neg_integer(),
          delivered_msgs          = ?required(state, delivered_msgs)
-         :: [send_event()], %% delivered messages in reverse order
+         :: [{Source::anypid(), Dest::anypid(), comm:message(), local | global} |
+             {Source::anypid(), info, comm:message()}], %% delivered messages (and infos) in reverse order
          nums_chosen_from        = ?required(state, nums_chosen_from)
          :: [pos_integer()], %% #possibilities for each delivered msg in reverse order
          callback_on_send        = ?required(state, callback_on_send)
@@ -359,7 +362,19 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     end,
     ok.
 
--spec send_log_msg(passed_state(), comm:mypid(), send_event() | comm:message()) -> ok.
+-spec log_info(passed_state(), anypid(), comm:message()) -> ok.
+log_info(PState, FromPid, Info) ->
+    case passed_state_logger(PState) of
+        {proto_sched, LoggerPid} ->
+            TraceId = passed_state_trace_id(PState),
+            send_log_msg(
+              PState,
+              LoggerPid,
+              {log_info, '_', TraceId, FromPid, Info})
+    end,
+    ok.
+
+-spec send_log_msg(passed_state(), comm:mypid(), send_event() | info_event() | comm:message()) -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
     clear_infection(),
@@ -378,7 +393,7 @@ init(_Arg) ->
     msg_delay:send_trigger(1, {check_slow_handler_trigger}),
     [].
 
--spec on(send_event() | comm:message(), state()) -> state().
+-spec on(send_event() | info_event() | comm:message(), state()) -> state().
 on({thread_begin, TraceId, Client}, State) ->
     ?TRACE("proto_sched:on({thread_begin, ~p, ~p})", [TraceId, Client]),
     ?DBG_ASSERT2(not infected(), infected_in_on_handler),
@@ -456,6 +471,30 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% of a scheduled piece of code) new arbitrary messages
             %% can be added to the schedule
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry})
+    end;
+
+on({log_info, _Time, TraceId, From, Info}, State) ->
+    ?TRACE("proto_sched:on({log_info ... ~.0p (~.0p): ~.0p})",
+           [From, pid_groups:group_and_name_of(From), Info]),
+    FromGPid = comm:make_global(From),
+    ?DBG_ASSERT2(not infected(), infected_in_on_handler),
+    TmpEntry = case lists:keyfind(TraceId, 1, State) of
+                   false -> new(TraceId);
+                   {TraceId, OldTrace} -> OldTrace
+               end,
+    NewEntry =
+        TmpEntry#state{delivered_msgs
+                           = [ {From, info, Info} | TmpEntry#state.delivered_msgs] },
+    case TmpEntry#state.status of
+        new ->
+            %% still waiting for all threads to join
+            lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
+        {delivered, FromGPid, _Ref, _DeliverTime} ->
+            %% only From is allowed to enqueue infos
+            %% only when delivered or to_be_cleaned (during execution
+            %% of a scheduled piece of code) new arbitrary infos
+            %% can be added to the schedule
+            lists:keystore(TraceId, 1, State, {TraceId, NewEntry})
     end;
 
 on({start_deliver, TraceId}, State) ->

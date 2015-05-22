@@ -755,7 +755,8 @@ log_info(PState, FromPid, Info) ->
                     send_log_msg(PState, LoggerPid,
                                  {on_handler_done, TraceId, Tag,
                                   element(1, normalize_pidinfo(FromPid))});
-                _ -> ok
+                _ ->
+                    proto_sched:log_info(PState, FromPid, Info)
             end
     end,
     ok.
