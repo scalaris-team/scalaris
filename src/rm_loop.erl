@@ -27,13 +27,13 @@
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 -define(TRACE1(Msg, State),
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p~n", [self(), Msg, State])).
-%% -define(TRACE_STATE(OldState, NewState),
+%% -define(TRACE_STATE(OldState, NewState, Reason),
 %%         case element(1, OldState) =/= element(1, NewState) of
-%%             true -> log:pal("[ ~.0p ]~n  new Neighbors: ~.0p~n",
-%%                [self(), nodelist:to_list(get_neighbors(NewState))]);
+%%             true -> log:pal("[ ~.0p ] ~p~n  new Neighbors: ~.0p~n",
+%%                [self(), Reason, nodelist:to_list(get_neighbors(NewState))]);
 %%             _    -> ok
 %%         end).
--define(TRACE_STATE(OldState, NewState), ok).
+-define(TRACE_STATE(OldState, NewState, Reason), ok).
 
 -export([send_trigger/0, init_first/0, init/4, on/2,
          leave/0, update_id/1,
@@ -237,7 +237,7 @@ init(Me, Pred, Succ, OldSubscrTable) ->
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
     NewState = {RM_State, false, SubscrTable},
-    ?TRACE_STATE({null, null, null}, NewState),
+    ?TRACE_STATE({null, null, null}, NewState, init),
     NewState.
 
 %% @doc Creates a state() object for a unit test.
@@ -387,7 +387,7 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
             call_subscribers(OldNeighborhood, NewNeighborhood, Reason, SubscrTable),
             update_failuredetector(OldNeighborhood, NewNeighborhood, null),
             NewState = {NewRM_State, HasLeft, SubscrTable},
-            ?TRACE_STATE(_OldState, NewState),
+            ?TRACE_STATE(RM_State, NewState, Reason),
             NewState
     end.
 
@@ -466,7 +466,7 @@ update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid)
     call_subscribers(OldNeighborhood, NewNeighborhood, Reason, SubscrTable),
     update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid),
     NewState = {NewRM_State, HasLeft, SubscrTable},
-    ?TRACE_STATE(_OldState, NewState),
+    ?TRACE_STATE(_OldState, NewState, Reason),
     NewState.
 
 % @doc Subscribe all PIDs in the neighborhood with the failuredetector.
