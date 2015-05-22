@@ -263,13 +263,13 @@ new_pred(State, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
 %%     trigger_update(OldNeighborhood, [], [NewPred]),
     % we trust NewPred to be alive -> integrate node:
-    {{unknown}, update_nodes(State, [NewPred], [], null)}.
+    {{node_discovery}, update_nodes(State, [NewPred], [], null)}.
 
 -spec new_succ(State::state(), NewSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 new_succ(State, NewSucc) ->
     % similar to new_pred/2
-    {{unknown}, update_nodes(State, [NewSucc], [], null)}.
+    {{node_discovery}, update_nodes(State, [NewSucc], [], null)}.
 
 %% @doc Removes the given predecessor as a result from a graceful leave only!
 -spec remove_pred(State::state(), OldPred::node:node_type(),

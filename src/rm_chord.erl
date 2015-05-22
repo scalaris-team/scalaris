@@ -147,14 +147,14 @@ trigger_action({Neighborhood} = State) ->
 new_pred({OldNeighborhood}, NewPred) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewPred,
                                         predListLength(), succListLength()),
-    {{unknown}, {NewNeighborhood}}.
+    {{node_discovery}, {NewNeighborhood}}.
 
 -spec new_succ(State::state(), NewSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 new_succ({OldNeighborhood}, NewSucc) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewSucc,
                                         predListLength(), succListLength()),
-    {{unknown}, {NewNeighborhood}}.
+    {{node_discovery}, {NewNeighborhood}}.
 
 %% @doc Removes the given predecessor as a result from a graceful leave only!
 -spec remove_pred(State::state(), OldPred::node:node_type(),
