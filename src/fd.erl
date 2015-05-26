@@ -39,7 +39,7 @@
 %% debug purposes
 -export([subscriptions/0]).
 
--type cookie() :: {pid(), '$fd_nil'} | any().
+-type cookie() :: '$fd_nil' | any().
 -type reason() :: 'DOWN' | noconnection | term().
 -type state() :: [HBPid::pid()]. % a list of all hbs processes launched by this fd
 
@@ -51,7 +51,7 @@
 -spec subscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid()) ->
     ok.
 subscribe_pid(GlobalPids, Subscriber) ->
-    subscribe_pid(GlobalPids, Subscriber, {self(), '$fd_nil'}).
+    subscribe_pid(GlobalPids, Subscriber, '$fd_nil').
 
 %% @doc Generate a failure detector for the Subscriber pid and cookie on the Monitored pids
 %% (Subscribers can be self(), pid() or an envelop as created by
@@ -71,7 +71,7 @@ subscribe_pid(Pid, Subscriber, Cookie) ->
 -spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
 subscribe([]) -> ok;
 subscribe(GlobalPids) ->
-    subscribe(GlobalPids, {self(), '$fd_nil'}).
+    subscribe(GlobalPids, '$fd_nil').
 
 %% @doc Generates a failure detector for the calling process and cookie on the
 %%      given pid.
@@ -119,7 +119,7 @@ subscribe_single_refcount(FD, GlobalPid, Cookie) ->
 -spec unsubscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid()) ->
     ok.
 unsubscribe_pid(GlobalPids, Subscriber) ->
-    unsubscribe_pid(GlobalPids, Subscriber, {self(), '$fd_nil'}).
+    unsubscribe_pid(GlobalPids, Subscriber, '$fd_nil').
 
 %% @doc Deletes the failure detector for the given pid, subscriber and cookie.
 -spec unsubscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid(),
@@ -137,7 +137,7 @@ unsubscribe_pid(Pid, Subscriber, Cookie) ->
 -spec unsubscribe(comm:mypid() | [comm:mypid()]) -> ok.
 unsubscribe([])-> ok;
 unsubscribe(GlobalPids)->
-    unsubscribe(GlobalPids, {self(), '$fd_nil'}).
+    unsubscribe(GlobalPids, '$fd_nil').
 
 %% @doc Deletes the failure detector for the given pid and cookie.
 -spec unsubscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.

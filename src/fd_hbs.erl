@@ -333,7 +333,7 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
         _ -> ok
     end,
     _ = [ case Cookie of
-              {_, '$fd_nil'} ->
+              '$fd_nil' ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X)]),
                   comm:send_local(X, {crash, WatchedPid, Reason});
