@@ -38,7 +38,7 @@
 % add source information to debug routing damaged messages
 -define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
 -define(HOPS_FROM_DATA(Data), element(2, Data)).
--type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
+-type data() :: {Source::c)mm:mypid(), Hops::non_neg_integer()}.
 -else.
 -define(HOPS_TO_DATA(Hops), Hops).
 -define(HOPS_FROM_DATA(Data), Data).
@@ -105,7 +105,8 @@ init([]) ->
 %%      'activate_rt' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_rt, Neighbors::nodelist:neighborhood()}, state_inactive())
-                    -> {'$gen_component', [{on_handler, Handler::gen_component:handler()},...], State::state_active()}.
+                    -> {'$gen_component', [{on_handler, Handler::gen_component:handler()},...],
+                        State::state_active()}.
 on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     comm:send_local(self(), {periodic_rt_rebuild}),
@@ -270,12 +271,22 @@ lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
         true ->
             % TODO: use lookup_fin
             comm:send_local(pid_groups:get_my(dht_node),
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops), WrappedMsg});
         false ->
             %% next_hop and nodelist:succ(Neighbors) return different nodes if
             %% key is in the interval of the succ.
             NextHop = case ?RT:next_hop(Neighbors, ERT, Key) of
-                          succ -> node:pidX(nodelist:succ(Neighbors));
+                          succ ->
+                              Succ = nodelist:succ(Neighbors),
+                              SuccId = node:id(Succ),
+                              %% prefer Pid from ERT
+                              %% (hoping it to be a rt_loop rather than a dht_node pid)
+                              case gb_trees:lookup(SuccId, ERT) of
+                                  {value, Pid} ->
+                                      Pid;
+                                  none ->
+                                      node:pidX(nodelist:succ(Neighbors))
+                              end;
                           Pid -> Pid
                       end,
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
