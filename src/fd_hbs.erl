@@ -332,15 +332,11 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
             end;
         _ -> ok
     end,
-    _ = [ case Cookie of
-              '$fd_nil' ->
-                  log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
-                            [comm:this(), X, pid_groups:group_and_name_of(X)]),
-                  comm:send_local(X, {crash, WatchedPid, Reason});
-              _ ->
-                  log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
-                            [comm:this(), X, pid_groups:group_and_name_of(X), Cookie]),
-                  comm:send_local(X, {crash, WatchedPid, Reason, Cookie})
+    This = comm:this(),
+    _ = [ begin
+              log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
+                      [This, X, pid_groups:group_and_name_of(X), Cookie]),
+              comm:send_local(X, {crash, WatchedPid, Cookie, Reason})
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids

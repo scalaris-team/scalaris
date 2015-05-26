@@ -1529,7 +1529,7 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
 crashed_node(MyState, _DeadPid, jump, _Cookie) ->
     MyState; % failure detectors are reused after jump
 crashed_node(MyState, _DeadPid, _Reason, {move, MoveFullId} = _Cookie) ->
-    ?TRACE1({crash, _DeadPid, _Reason, _Cookie}, MyState),
+    ?TRACE1({crash, _DeadPid, _Cookie, _Reason}, MyState),
     WorkerFun =
         fun(SlideOp, State) ->
                 abort_slide(State, SlideOp, target_down, false, crash)
