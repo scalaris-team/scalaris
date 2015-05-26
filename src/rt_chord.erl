@@ -288,6 +288,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
     OldSucc = nodelist:succ(OldNeighbors),
     NewSucc = nodelist:succ(NewNeighbors),
     NewNodeId = nodelist:nodeid(NewNeighbors),
+    Neighbors = nodelist:succs(NewNeighbors) ++ nodelist:preds(NewNeighbors),
     % only re-build if a new successor occurs or the new node ID is not between
     % Pred and Succ any more (which should not happen since this must come from
     % a slide!)
@@ -297,14 +298,14 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
         true ->
             NewRT = gb_trees:map(
                       fun(_K, {Node, RTLoop}) ->
-                              case node:same_process(Node, NewPred) of
-                                  true  ->
-                                      {node:newer(Node, NewPred), RTLoop};
-                                  false ->
-                                      case node:same_process(Node, NewSucc) of
-                                          true  -> {node:newer(Node, NewSucc), RTLoop};
-                                          false -> {Node, RTLoop}
-                                      end
+                              % check neighbors for newer version of the node
+                              case lists:dropwhile(
+                                     fun(NodeNH) ->
+                                             not node:same_process(Node, NodeNH)
+                                     end, Neighbors)
+                              of
+                                  [] -> {Node, RTLoop};
+                                  [H | _] -> {node:newer(Node, H), RTLoop}
                               end
                       end, OldRT),
             {ok, NewRT};
@@ -313,6 +314,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
             {trigger_rebuild, empty(NewNeighbors)}
     end.
 %% userdevguide-end rt_chord:update
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finger calculation
@@ -494,37 +496,22 @@ next_hop(State, Id) ->
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true ->
-            %% TODO: find succ in rt and use
             succ;
         false ->
             % check routing table:
             RTSize = get_size(RT),
-            {NextHopId, NextHop1} =
+            NextHop1 =
                 case util:gb_trees_largest_smaller_than(Id, RT) of
-                    {value, Key, Node} ->
-                        {Key, Node};
+                    {value, _Key, Node} ->
+                        Node;
                     nil when RTSize =:= 0 ->
                         Succ = nodelist:succ(Neighbors),
-                        {node:id(Succ), node:pidX(Succ)};
+                        node:pidX(Succ);
                     nil -> % forward to largest finger
-                        gb_trees:largest(RT)
+                        {_Key, Node} = gb_trees:largest(RT),
+                        Node
                 end,
-            % TODO: better create a separate gb_tree for the neighbourhood nodes (dht_node pids!) and always look there, too
-            %       but beware to prefer rt_loop pids if an entry with the same Id is found!
-            %       -> this is faster and more generic
-            %       -> remove rt_size_use_neighbors config parameter
-            %       -> need to update neighbourhood gb_tree when neigbours change!
-            % check neighborhood:
-            case RTSize < config:read(rt_size_use_neighbors) of
-                false ->
-                    NextHop1;
-                _     ->
-                    % create a fake LastFound node:node_type() for largest_smaller_than
-                    % (only Id is used in largest_smaller_than)
-                    BestSoFar = node:new(NextHop1, NextHopId, 0),
-                    NextHop2 = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
-                    node:pidX(NextHop2)
-            end
+                NextHop1
     end.
 %% userdevguide-end rt_chord:next_hop
 
@@ -533,12 +520,13 @@ next_hop(Neighbors, RT, Id) ->
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, Neighbors) ->
     Id = nodelist:nodeid(Neighbors),
-    Pred = nodelist:pred(Neighbors),
-    Succ = nodelist:succ(Neighbors),
-    % always include the pred and succ in the external representation
-    % note: we are subscribed at the RM for changes to whole neighborhood
-    Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
-                          gb_trees:enter(node:id(Pred), node:pidX(Pred), gb_trees:empty())),
+    %% include whole neighbourhood external routing table (ert)
+    %% note: we are subscribed at the RM for changes to whole neighborhood
+    Preds = nodelist:preds(Neighbors),
+    Succs = nodelist:succs(Neighbors),
+    Tree = lists:foldl(fun(Node, Tree) ->
+                                gb_trees:enter(node:id(Node), node:pidX(Node), Tree)
+                        end, gb_trees:empty(), Preds ++ Succs),
     ERT = util:gb_trees_foldl(fun (_Key, {Node, RTLoop}, Acc) ->
                                  % only store the ring id and the according node structure
                                  case node:id(Node) =:= Id of
@@ -546,8 +534,6 @@ export_rt_to_dht_node(RT, Neighbors) ->
                                      false -> gb_trees:enter(node:id(Node), RTLoop, Acc)
                                  end
                         end, Tree, RT),
-    log:log(debug, "MyId: ~p.~nPred: ~p.~nSucc: ~p.~nRT: ~.2p.~nERT: ~.2p",
-            [Id, Pred, Succ, gb_trees:to_list(RT), gb_trees:to_list(ERT)]),
     ERT.
 %% userdevguide-end rt_chord:export_rt_to_dht_node
 

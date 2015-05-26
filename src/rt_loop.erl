@@ -278,14 +278,10 @@ lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
             NextHop = case ?RT:next_hop(Neighbors, ERT, Key) of
                           succ ->
                               Succ = nodelist:succ(Neighbors),
-                              SuccId = node:id(Succ),
-                              %% prefer Pid from ERT
-                              %% (hoping it to be a rt_loop rather than a dht_node pid)
-                              case gb_trees:lookup(SuccId, ERT) of
-                                  {value, Pid} ->
-                                      Pid;
-                                  none ->
-                                      node:pidX(nodelist:succ(Neighbors))
+                              %% get succ pid from ERT if possible
+                              case gb_trees:lookup(node:id(Succ), ERT) of
+                                  {value, Pid} -> Pid;
+                                  none -> node:pidX(Succ)
                               end;
                           Pid -> Pid
                       end,
