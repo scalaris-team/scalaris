@@ -86,7 +86,7 @@ start_link(ServiceGroup, RemotePid) ->
                              [%% {wait_for_init}, %% when using protected ets table
                               {pid_groups_join_as, ServiceGroup, Name}]).
 
--spec init(pid() | comm:mypid()) -> state().
+-spec init(comm:mypid()) -> state().
 init(RemotePid) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
     LocalSubscriberTab = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
@@ -109,17 +109,17 @@ init(RemotePid) ->
               LocalSubscriberTab, MonitorTab).
 
 -spec on(comm:message(), state()) -> state() | kill.
-on({add_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
+on({add_subscriber, Subscriber, WatchedPid} = _Msg, State) ->
     ?TRACE("fd_hbs add_subscriber ~.0p~n", [_Msg]),
     %% register subscriber locally
-    S1 = state_add_entry(State, {Subscriber, WatchedPid, Cookie}),
+    S1 = state_add_entry(State, {Subscriber, WatchedPid}),
     %% add watched pid remotely, if not already watched
     _S2 = state_add_watched_pid(S1, WatchedPid);
 
-on({del_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
+on({del_subscriber, Subscriber, WatchedPid} = _Msg, State) ->
     ?TRACE("fd_hbs del_subscriber ~.0p~n", [_Msg]),
     %% unregister subscriber locally
-    {Changed, S1} = state_del_entry(State, {Subscriber, WatchedPid, Cookie}),
+    {Changed, S1} = state_del_entry(State, {Subscriber, WatchedPid}),
     %% delete watched pid remotely, if no longer needed
     case Changed of
         deleted -> _S2 = state_del_watched_pid(S1, WatchedPid, Subscriber);
@@ -334,18 +334,17 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
     end,
     This = comm:this(),
     _ = [ begin
-              log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
-                      [This, X, pid_groups:group_and_name_of(X), Cookie]),
-              comm:send_local(X, {crash, WatchedPid, Cookie, Reason})
+              log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
+                      [This, X, pid_groups:group_and_name_of(comm:get_plain_pid(X))]),
+              comm:send_local(X, {crash, WatchedPid, Reason})
           end
-          || {X, Cookie} <- Subscriptions ],
+          || X <- Subscriptions ],
     %% delete from remote_pids
     NewRemPids = lists:keydelete(WatchedPid, 1, RemPids),
     S1 = state_set_rem_pids(State, NewRemPids),
     %% delete subscription entries with this pid
-    lists:foldl(fun({Sub, Cook}, StAgg) ->
-                        {_, Res} =
-                            state_del_entry(StAgg, {Sub, WatchedPid, Cook}),
+    lists:foldl(fun(Sub, StAgg) ->
+                        {_, Res} = state_del_entry(StAgg, {Sub, WatchedPid}),
                         Res
                 end,
                 S1, Subscriptions).
@@ -425,84 +424,62 @@ state_get_monitor_tab(State)        -> element(6, State).
 %% -spec state_set_monitor_tab(state(), pdb:tableid()) -> state().
 %% state_set_monitor_tab(State, Val)   -> setelement(6, State, Val).
 
--spec state_add_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> state().
-state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
+-spec state_add_entry(state(), {comm:erl_local_pid(), comm:mypid()}) -> state().
+state_add_entry(State, {_Subscriber, _WatchedPid} = X) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
     %% better performance.
     Table = state_get_table(State),
-    Entry = pdb:get({Subscriber, WatchedPid}, Table),
-    case Entry of
+    case pdb:get(X, Table) of
         undefined ->
-            pdb:set({{Subscriber, WatchedPid}, [Cookie], 1}, Table);
-        Entry ->
-            EntryWithCookie =
-                setelement(2, Entry, [Cookie | element(2, Entry)]),
-            NewEntry =
-                setelement(3, EntryWithCookie, 1 + element(3, EntryWithCookie)),
-            pdb:set(NewEntry, Table)
+            pdb:set({X, 1}, Table);
+        {X, Count} ->
+            pdb:set({X, Count + 1}, Table)
     end,
     State.
 
--spec state_del_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> {deleted | unchanged, state()}.
-state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
+-spec state_del_entry(state(), {comm:erl_local_pid(), comm:mypid()})
+        -> {deleted | unchanged, state()}.
+state_del_entry(State, {_Subscriber, _WatchedPid} = X) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
     %% better performance.
     Table = state_get_table(State),
-    case pdb:get({Subscriber, WatchedPid}, Table) of
+    case pdb:get(X, Table) of
         undefined ->
             ?TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(
                "got unsubscribe for not registered subscription ~.0p, "
                "Subscriber ~.0p, Watching group and name: ~.0p.~n",
-               [{unsubscribe, Subscriber, WatchedPid, Cookie},
-                pid_groups:group_and_name_of(Subscriber),
-                pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
+               [{unsubscribe, _Subscriber, _WatchedPid},
+                pid_groups:group_and_name_of(comm:get_plain_pid(_Subscriber)),
+                pid_groups:group_and_name_of(comm:get_plain_pid(comm:make_local(_WatchedPid)))]),
             {unchanged, State};
-        Entry ->
-            %% delete cookie
-            Cookies = element(2, Entry),
-            Changed =
-                case util:lists_take(Cookie, Cookies) of
-                    false ->
-                        log:log(warn,
-                                "got unsubscribe with non existing cookie ~p~n",
-                                [Cookie]),
-                        NewEntry = Entry,
-                        unchanged;
-                    NewCookies ->
-                        EntryWithoutCookie = setelement(2, Entry, NewCookies),
-                        NewEntry =
-                            setelement(3, EntryWithoutCookie,
-                                       element(3, EntryWithoutCookie) - 1),
-                        deleted
-                end,
-            case element(3, NewEntry) of
-                0 -> pdb:delete(element(1, Entry), Table);
-                _ -> pdb:set(NewEntry, Table)
-            end,
-            {Changed, State}
+        {X, 1} ->
+            pdb:delete(X, Table),
+            {deleted, State};
+        {X, Count} when Count > 1 ->
+            pdb:set({X, Count - 1}, Table),
+            {unchanged, State}
     end.
 
--spec state_get_subscriptions(state(), comm:mypid()) -> [{pid(), fd:cookie()}].
+-spec state_get_subscriptions(state(), comm:mypid()) -> [comm:erl_local_pid()].
 state_get_subscriptions(State, SearchedPid) ->
     Table = state_get_table(State),
     Entries = pdb:tab2list(Table),
-    Res = [ [ {Subscriber, Cookie} || Cookie <- Cookies ]
-            || {{Subscriber, WatchedPid}, Cookies, _Num} <- Entries,
-               %% pdb:tab2list may contain unrelated entries, but <- lets
-               %% only pass structurally matching entries here without an
-               %% assignment exception.
-               SearchedPid =:= WatchedPid],
-    lists:flatten(Res).
+    _Res = [ Subscriber
+             || {{Subscriber, WatchedPid}, _Num} <- Entries,
+                %% pdb:tab2list may contain unrelated entries, but <- lets
+                %% only pass structurally matching entries here without an
+                %% assignment exception.
+                SearchedPid =:= WatchedPid].
 
--spec state_del_all_subscriptions(state(), [pid()]) -> state().
+-spec state_del_all_subscriptions(state(), [comm:erl_local_pid()]) -> state().
 state_del_all_subscriptions(State, SubscriberPids) ->
     Table = state_get_table(State),
     Set = gb_sets:from_list(SubscriberPids),
     Entries = pdb:tab2list(Table),
     lists:foldl(
-      fun({Key = {Subscriber, WatchedPid}, _Cookies, _Num}, StateX) ->
+      fun({Key = {Subscriber, WatchedPid}, _Num}, StateX) ->
               case gb_sets:is_member(Subscriber, Set) of
                   true ->
                       %% unregister subscriber locally
@@ -539,7 +516,7 @@ state_add_watched_pid(State, WatchedPid) ->
               State, [rempid_inc(rempid_new(WatchedPid)) | RemPids])
     end.
 
--spec state_del_watched_pid(state(), comm:mypid(), pid()) -> state().
+-spec state_del_watched_pid(state(), comm:mypid(), comm:erl_local_pid()) -> state().
 state_del_watched_pid(State, WatchedPid, Subscriber) ->
     %% del watched pid remotely, if not longer necessary
     RemPids = state_get_rem_pids(State),
@@ -558,7 +535,9 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
             state_set_rem_pids(State, [NewEntry | RestRemPids]);
         false -> log:log(warn,
                          "req. from ~p (~p) to delete non watched pid ~p.~n",
-                        [Subscriber, pid_groups:group_and_name_of(Subscriber),
+                        [Subscriber,
+                         pid_groups:group_and_name_of(
+                           comm:get_plain_pid(Subscriber)),
                          WatchedPid]),
                  State
     end.

@@ -84,7 +84,7 @@
     misc_message() |
     snapshot_message() |
     {zombie, Node::node:node_type()} |
-    {crash, DeadPid::comm:mypid(), Cookie::'$fd_nil' | tuple(), Reason::fd:reason()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
     {leave, SourcePid::comm:erl_local_pid() | null} |
     {rejoin, IdVersion::non_neg_integer(), JoinOptions::[tuple()],
       {get_move_state_response, MoveState::[tuple()]}}.
@@ -457,11 +457,7 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
 
-% failure detector, dead node cache
-on({crash, DeadPid, Cookie, Reason}, State) when is_tuple(Cookie) andalso
-                                                     element(1, Cookie) =:= move->
-    dht_node_move:crashed_node(State, DeadPid, Reason, Cookie);
-on({crash, DeadPid, _Cookie = '$fd_nil', Reason}, State) ->
+on({crash, DeadPid, Reason}, State) ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:crashed_node(RMState, DeadPid, Reason),
     % TODO: integrate crash handler for join

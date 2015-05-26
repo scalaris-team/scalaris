@@ -34,7 +34,7 @@
 
 % accepted messages of the mgmt_server process
 -type(message() ::
-    {crash, PID::comm:mypid(), Cookie::'$fd_nil', Reason::fd:reason()} |
+    {crash, PID::comm:mypid(), Reason::fd:reason()} |
     {get_list, SourcePid::comm:mypid()} |
     {get_list_length, SourcePid::comm:mypid()} |
     {register, Node::node:node_type()}).
@@ -70,14 +70,14 @@ node_list(UseShepherd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({crash, PID, _Cookie = '$fd_nil', jump}, Nodes) ->
+on({crash, PID, jump}, Nodes) ->
     % subscribe again (subscription was removed at fd)
     fd:subscribe(self(), [PID]),
     Nodes;
-on({crash, PID, _Cookie = '$fd_nil', leave}, Nodes) ->
+on({crash, PID, leave}, Nodes) ->
     % graceful leave - do not add as zombie candidate!
     gb_trees:delete_any(PID, Nodes);
-on({crash, PID, _Cookie = '$fd_nil', _Reason}, Nodes) ->
+on({crash, PID, _Reason}, Nodes) ->
     case gb_trees:lookup(PID, Nodes) of
         {value, Node} -> dn_cache:add_zombie_candidate(Node),
                          gb_trees:delete(PID, Nodes);

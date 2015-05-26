@@ -617,12 +617,12 @@ on({update_snapno, SnapNo}, State) ->
     state_set_local_snapno(State, SnapNo);
 
 %% failure detector events
-on({crash, Pid, Cookie, Reason}, State) ->
+on({fd, Cookie, {crash, Pid, Reason}}, State) ->
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     handle_crash(Pid, Reason, Cookie, State, on);
-%% on({crash, _Pid, _Cookie, _Reason},
+%% on({fd, _Cookie, {crash, _Pid, _Reason}}
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
 %%     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
 %%     %% @todo should we take over, if the TM failed?
@@ -775,7 +775,7 @@ on_init({update_snapno, SnapNo}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     state_set_local_snapno(State, SnapNo);
-on_init({crash, Pid, Cookie, Reason}, State) ->
+on_init({fd, Cookie, {crash, Pid, Reason}}, State) ->
     %% only in tx_tm
     handle_crash(Pid, Reason, Cookie, State, on_init).
 
@@ -1064,9 +1064,12 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
               RTMPid = {InPid},
               case get_rtmpid(Entry) of
                   RTMPid  -> ok;
-                  unknown -> fd:subscribe_refcount(self(), [InPid], tx_tm_rtm_fd_cookie);
-                  {XPid}  -> fd:unsubscribe_refcount(self(), [XPid], tx_tm_rtm_fd_cookie),
-                             fd:subscribe_refcount(self(), [InPid], tx_tm_rtm_fd_cookie)
+                  unknown -> fd:subscribe_refcount(
+                               comm:reply_as(self(), 3, {fd, tx_tm_rtm, '_'}),
+                               [InPid]);
+                  {XPid}  -> Self = comm:reply_as(self(), 3, {fd, tx_tm_rtm, '_'}),
+                             fd:unsubscribe_refcount(Self, [XPid]),
+                             fd:subscribe_refcount(Self, [InPid])
               end,
               rtm_entry_new(InKey, RTMPid, get_nth(Entry), {InAccPid});
           _ -> Entry
@@ -1129,12 +1132,14 @@ state_set_local_snapno(State, No) -> setelement(7, State, No).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
-    fd:subscribe_refcount(self(), [Pid], {self(), state_get_role(State)}),
+    Self = comm:reply_as(self(), 3, {fd, state_get_role(State), '_'}),
+    fd:subscribe_refcount(Self, [Pid]),
     State.
 
 -spec state_unsubscribe(state(), comm:mypid()) -> state().
 state_unsubscribe(State, Pid) ->
-    fd:unsubscribe_refcount(self(), [Pid], {self(), state_get_role(State)}),
+    Self = comm:reply_as(self(), 3, {fd, state_get_role(State), '_'}),
+    fd:unsubscribe_refcount(Self, [Pid]),
     State.
 
 -spec get_failed_keys(tx_state(), state()) -> [client_key()].
@@ -1154,14 +1159,16 @@ get_failed_keys(TxState, State) ->
                   length(Result), '=/=', NumAbort}),
     Result.
 
--spec handle_crash(pid(), Reason::fd:reason(), Cookie::fd:cookie(), state(), on | on_init)
+-spec handle_crash(pid(), Reason::fd:reason(), Cookie::tx_tm_rtm | pid_groups:pidname(),
+                   state(), on | on_init)
                   -> state() |
                      {'$gen_component',
                       [{on_handler, fun((comm:message(), state()) -> state())}],
                       state()}.
 handle_crash(Pid, jump, Cookie, State, _Handler) ->
     % subscribe again (subscription was removed at fd)
-    fd:subscribe_refcount(self(), [Pid], Cookie),
+    Self = comm:reply_as(self(), 3, {fd, Cookie, '_'}),
+    fd:subscribe_refcount(Self, [Pid]),
     State;
 handle_crash(Pid, _Reason, _Cookie, State, Handler) ->
     %% tm: update rtms

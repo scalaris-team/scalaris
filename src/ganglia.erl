@@ -30,6 +30,9 @@
 -define(TRACE(X,Y), ok).
 %define(TRACE(X,Y), io:format(X, Y)).
 
+-define(FD_SUBSCR_PID(AggId),
+        comm:reply_as(self(), 3, {fd, AggId, '_'})).
+
 -type load_aggregation() :: {AggId :: non_neg_integer(),
                              Pending :: non_neg_integer(),
                              Load :: non_neg_integer()}.
@@ -74,7 +77,7 @@ on({ganglia_periodic}, State) ->
 on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     ?TRACE("~p: ~p~n", [AggId, Msg]),
     % all went well, we no longer need the failure detector
-    fd:unsubscribe(self(), [PID], {ganglia, AggId}),
+    fd:unsubscribe(?FD_SUBSCR_PID(AggId), [PID]),
     {get_node_details_response, [{load, Load}]} = Msg,
     CurAggId = get_agg_id(State),
     if
@@ -89,11 +92,11 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %% @doc handler for messages from failure detector
 %%     if a node crashes before sending out the load data
 %%     we ignore its load information
-on({crash, PID, Cookie, jump}, State) ->
+on({fd, AggId, {crash, PID, jump}}, State) ->
     % subscribe again (subscription was removed at fd)
-    fd:subscribe(self(), [PID], Cookie),
+    fd:subscribe(?FD_SUBSCR_PID(AggId), [PID]),
     State;
-on({crash, _PID, {ganglia, AggId}, _Reason}, State) ->
+on({fd, AggId, {crash, _PID, _Reason}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
     if
@@ -137,7 +140,7 @@ send_dht_node_metrics(State) ->
     lists:foreach(fun (PID) ->
                           GlobalPID = comm:make_global(PID),
                           %% Let the failure detector inform ganglia about crashes of this DHT node
-                          fd:subscribe(self(), [GlobalPID], {ganglia, AggId}),
+                          fd:subscribe(?FD_SUBSCR_PID(AggId), [GlobalPID]),
                           Envelope = comm:reply_as(comm:this(), 4,
                                                    {ganglia_dht_load_aggregation, GlobalPID, AggId , '_'}),
                           comm:send_local(PID, {get_node_details, Envelope, [load]})

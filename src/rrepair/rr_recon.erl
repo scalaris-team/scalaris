@@ -199,7 +199,7 @@
     {resolve, {get_chunk_response, {intervals:interval(), db_chunk_kvv()}}} |
     % internal
     {shutdown, exit_reason()} |
-    {crash, DeadPid::comm:mypid(), Cookie::'$fd_nil', Reason::fd:reason()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
     {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}
     .
 
@@ -556,7 +556,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
               end,
     build_struct(DBList, MySyncI, RestI, State);
 
-on({crash, _Pid, _Cookie = '$fd_nil', _Reason} = _Msg, State) ->
+on({crash, _Pid, _Reason} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     shutdown(recon_node_crash, State);
 
