@@ -74,7 +74,7 @@ on({ganglia_periodic}, State) ->
 on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     ?TRACE("~p: ~p~n", [AggId, Msg]),
     % all went well, we no longer need the failure detector
-    fd:unsubscribe(PID, {ganglia, AggId}),
+    fd:unsubscribe(self(), [PID], {ganglia, AggId}),
     {get_node_details_response, [{load, Load}]} = Msg,
     CurAggId = get_agg_id(State),
     if
@@ -91,7 +91,7 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %%     we ignore its load information
 on({crash, PID, Cookie, jump}, State) ->
     % subscribe again (subscription was removed at fd)
-    fd:subscribe(PID, Cookie),
+    fd:subscribe(self(), [PID], Cookie),
     State;
 on({crash, _PID, {ganglia, AggId}, _Reason}, State) ->
     ?TRACE("Node failed~n",[]),
@@ -137,7 +137,7 @@ send_dht_node_metrics(State) ->
     lists:foreach(fun (PID) ->
                           GlobalPID = comm:make_global(PID),
                           %% Let the failure detector inform ganglia about crashes of this DHT node
-                          fd:subscribe(GlobalPID, {ganglia, AggId}),
+                          fd:subscribe(self(), [GlobalPID], {ganglia, AggId}),
                           Envelope = comm:reply_as(comm:this(), 4,
                                                    {ganglia_dht_load_aggregation, GlobalPID, AggId , '_'}),
                           comm:send_local(PID, {get_node_details, Envelope, [load]})

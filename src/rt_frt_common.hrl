@@ -525,7 +525,7 @@ add_fd(#rt_t{} = RT) ->
     % Filter the source node from the Pids, as we don't need an FD for that node. If the
     % source node crashes (which is the process calling this function), we are done
     % for.
-    fd:subscribe(filter_source_pid(RT, NewPids)).
+    fd:subscribe(self(), filter_source_pid(RT, NewPids)).
 
 %% @doc Update subscriptions
 -spec update_fd(OldRT :: rt(), NewRT :: rt()) -> ok.
@@ -533,7 +533,7 @@ update_fd(OldRT, OldRT) -> ok;
 update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
     OldPids = filter_source_pid(OldRT, to_pid_list(OldRT)),
     NewPids = filter_source_pid(NewRT, to_pid_list(NewRT)),
-    fd:update_subscriptions(OldPids, NewPids).
+    fd:update_subscriptions(self(), OldPids, NewPids).
 
 %% userdevguide-end rt_frtchord:check
 

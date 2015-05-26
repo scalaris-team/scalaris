@@ -156,10 +156,10 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     %% io:format("~p~n", [ServerList]),
     Before = os:timestamp(),
     _ = [comm:send(Server, Message) || Server <- ServerList],
-    fd:subscribe(ServerList),
+    fd:subscribe(self(), ServerList),
     ?IIF(Print, io:format("Collecting results... ~n"), ok),
     Statistics = collect(length(ServerList), [], Print),
-    fd:unsubscribe(ServerList),
+    fd:unsubscribe(self(), ServerList),
     ?IIF(Print, io:format("stats: ~p ~n", [Statistics]), ok),
     {MinTP, MeanTP, MaxTP} = lists:foldl(
                                fun (Stats, {Min, Mean, Max}) ->
@@ -249,7 +249,7 @@ collect(Length, L, Print) ->
         ?SCALARIS_RECV({crash, Pid, _Cookie = '$fd_nil', jump}, %% ->
            begin
                % subscribe again (subscription was removed at fd)
-               fd:subscribe(Pid),
+               fd:subscribe(self(), [Pid]),
                collect(Length, L, Print)
            end);
         ?SCALARIS_RECV({crash, Pid, _Cookie = '$fd_nil', _Reason}, %% ->

@@ -72,7 +72,7 @@ node_list(UseShepherd) ->
 -spec on(message(), state()) -> state().
 on({crash, PID, _Cookie = '$fd_nil', jump}, Nodes) ->
     % subscribe again (subscription was removed at fd)
-    fd:subscribe(PID),
+    fd:subscribe(self(), [PID]),
     Nodes;
 on({crash, PID, _Cookie = '$fd_nil', leave}, Nodes) ->
     % graceful leave - do not add as zombie candidate!
@@ -94,7 +94,7 @@ on({get_list_length, SourcePid}, Nodes) ->
 
 on({register, Node}, Nodes) ->
     NodePid = node:pidX(Node),
-    fd:subscribe(NodePid),
+    fd:subscribe(self(), [NodePid]),
     gb_trees:enter(NodePid, Node, Nodes);
 
 % dead-node-cache reported dead node to be alive again

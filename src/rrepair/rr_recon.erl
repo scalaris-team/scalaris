@@ -230,7 +230,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
         false ->
             case RMethod of
                 art -> ok; % legacy (no integrated trivial sync yet)
-                _   -> fd:subscribe(DestRRPid)
+                _   -> fd:subscribe(self(), [DestRRPid])
             end,
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
@@ -264,7 +264,7 @@ on({start_recon, RMethod, Params} = _Msg,
                                   sig_size = SigSize, ver_size = VSize} = Params,
             Params1 = Params#trivial_recon_struct{db_chunk = <<>>},
             ?DBG_ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestRRPid),
+            fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
                 decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
@@ -277,7 +277,7 @@ on({start_recon, RMethod, Params} = _Msg,
                                 db_chunk = DBChunk, sig_size = SigSize} = Params,
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestRRPid),
+            fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_set for faster access checks
             DBChunkSet =
                 shash_decompress_kv_list(DBChunk, [], SigSize),
@@ -294,7 +294,7 @@ on({start_recon, RMethod, Params} = _Msg,
                                 p1e = P1E} = Params,
             Params1 = Params#bloom_recon_struct{bf_bin = <<>>},
             ?DBG_ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestRRPid),
+            fd:subscribe(self(), [DestRRPid]),
             ?DBG_ASSERT(Misc =:= []),
             FP = bloom_fp(BFCount, P1E),
             BF = bloom:new_bin(BFBin, ?REP_HFS:new(bloom:calc_HF_numEx(BFCount, FP)), BFCount),
@@ -305,7 +305,7 @@ on({start_recon, RMethod, Params} = _Msg,
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestRRPid),
+            fd:subscribe(self(), [DestRRPid]),
             Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation;
@@ -965,9 +965,9 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
     case Initiator orelse (not intervals:is_empty(SyncI)) of
         true ->
             case RMethod of
-                trivial -> fd:unsubscribe(DestRR);
-                bloom   -> fd:unsubscribe(DestRR);
-                merkle_tree -> fd:unsubscribe(DestRR);
+                trivial -> fd:unsubscribe(self(), [DestRR]);
+                bloom   -> fd:unsubscribe(self(), [DestRR]);
+                merkle_tree -> fd:unsubscribe(self(), [DestRR]);
                 _ -> ok
             end;
         false -> ok

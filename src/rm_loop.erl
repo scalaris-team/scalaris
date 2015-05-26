@@ -480,7 +480,7 @@ update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid)
 set_failuredetector(Neighborhood) ->
     [_ | View] = nodelist:to_list(Neighborhood),
     NewPids = [node:pidX(Node) || Node <- View],
-    fd:subscribe(NewPids).
+    fd:subscribe(self(), NewPids).
 
 % @doc Check if change of failuredetector is necessary and subscribe the new
 %%     nodes' pids.
@@ -500,7 +500,7 @@ update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid) ->
                                   not node:same_process(Node, CrashedPid)],
     NewPids = [node:pidX(Node) || Node <- NewView,
                                   not node:same_process(Node, nodelist:node(NewNeighborhood))],
-    fd:update_subscriptions(OldPids, NewPids),
+    fd:update_subscriptions(self(), OldPids, NewPids),
     ok.
 
 %% @doc Inform the dht_node of a new neighborhood.

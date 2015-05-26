@@ -423,7 +423,7 @@ check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD) ->
         true ->
             NewPids = to_pid_list(NewRT),
             OldPids = to_pid_list(OldRT),
-            fd:update_subscriptions(OldPids, NewPids);
+            fd:update_subscriptions(self(), OldPids, NewPids);
         _ -> ok
     end.
 %% userdevguide-end rt_chord:check

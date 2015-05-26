@@ -575,13 +575,13 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
     case Command of
         {abort, Reason, OrigType} ->
             ?IIF(FdSubscribed,
-                 fd:unsubscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+                 fd:unsubscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId}),
                  ok),
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
                         OrigType, Reason, MsgTag =/= nomsg);
         {ok, {join, 'send'} = NewType} -> % similar to {slide, pred, 'send'}
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             SlideOp =
                 if UseIncrSlides orelse OtherMTE =/= unknown->
@@ -606,7 +606,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, {slide, pred, 'send'} = NewType} ->
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             case MsgTag of
                 nomsg -> % first inform other node:
@@ -633,7 +633,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, {join, 'rcv'}} -> % similar to {slide, succ, 'rcv'}
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, Tag, SourcePid, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideOp1 = slide_op:set_setup_at_other(SlideOp), % we received a join_response before
@@ -647,7 +647,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, {jump, 'send'} = NewType} -> % similar to {ok, {slide, succ, 'send'}}
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),            
             LeaveTargetId = node:id(nodelist:pred(Neighbors)),
             CurTargetId =
@@ -666,7 +666,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, {leave, 'send'} = NewType} -> % similar to {ok, {slide, succ, 'send'}}
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             % the successor may have send a wrong (final) target ID - use the correct one here
             RealTargetId = node:id(nodelist:pred(Neighbors)),
@@ -686,7 +686,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, {slide, succ, 'send'} = NewType} ->
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             case MsgTag of
                 nomsg -> % first inform other node:
@@ -714,7 +714,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
                                NewType =:= {leave, 'rcv'} orelse
                                NewType =:= {slide, succ, 'rcv'} ->
             ?IIF(FdSubscribed, ok,
-                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
+                 fd:subscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId})),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
@@ -729,7 +729,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
             end;
         {ok, move_done} ->
             ?IIF(FdSubscribed,
-                 fd:unsubscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+                 fd:unsubscribe(self(), [node:pidX(TargetNode)], {move, MoveFullId}),
                  ok),
             notify_source_pid(SourcePid, {move, result, Tag, ok}),
             case MsgTag of
@@ -934,7 +934,7 @@ send_delta_ack(SlideOp, NextOp) ->
 finish_slide(State, SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
     MoveFullId = slide_op:get_id(SlideOp),
-    fd:unsubscribe([Pid], {move, MoveFullId}),
+    fd:unsubscribe(self(), [Pid], {move, MoveFullId}),
     case slide_op:is_jump(SlideOp) of
         true -> ok; %% notify later when join at other node is complete
         _ -> notify_source_pid(slide_op:get_source_pid(SlideOp),
@@ -996,7 +996,7 @@ finish_delta2B(State, SlideOp, Type, NewTargetId) ->
     SlideOpNode = slide_op:get_node(SlideOp),
     TargetNodePid = node:pidX(SlideOpNode), % the pid should be the same as TargetNode!
     % unsubscribe old slide from fd:
-    fd:unsubscribe([TargetNodePid], {move, MoveFullId}),
+    fd:unsubscribe(self(), [TargetNodePid], {move, MoveFullId}),
     NewMoveFullId = uid:get_global_uid(),
     case node:same_process(TargetNode, SlideOpNode) of
         true ->
@@ -1011,7 +1011,7 @@ finish_delta2B(State, SlideOp, Type, NewTargetId) ->
                     % continued slide with pred/succ, receive data
                     % -> reserve slide_op with pred/succ
                     % note: we are already subscribed to TargetNode but with the old MoveID
-                    fd:subscribe([TargetNodePid], {move, NewMoveFullId}),
+                    fd:subscribe(self(), [TargetNodePid], {move, NewMoveFullId}),
                     NextSlideOp =
                         slide_op:new_slide(
                           NewMoveFullId, NewType, NewTargetId, Tag,
@@ -1195,7 +1195,7 @@ finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
     end;
 finish_delta_ack2B(State, SlideOp, {MyNextOpType, NewSlideId, MyNode,
                                    TargetNode, TargetId, Tag, SourcePid}) ->
-    fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
+    fd:unsubscribe(self(), [node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
     % Always prefer the other node's next_op over ours as it is almost
     % set up. Unless our scheduled op is a leave operation which needs
     % to be favoured.
@@ -1483,7 +1483,7 @@ abort_slide(State, SlideOp, Reason, NotifyNode, MoveMsgTag) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
     Node = slide_op:get_node(SlideOp),
     Id = slide_op:get_id(SlideOp),
-    fd:unsubscribe([node:pidX(Node)], {move, Id}),
+    fd:unsubscribe(self(), [node:pidX(Node)], {move, Id}),
     State3 = dht_node_state:set_slide(State2, PredOrSucc, null),
     State4 = dht_node_state:slide_stop_record(State3, slide_op:get_interval(SlideOp), false),
     abort_slide(State4, Node, Id, slide_op:get_phase(SlideOp),

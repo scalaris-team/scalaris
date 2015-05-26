@@ -1064,9 +1064,9 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
               RTMPid = {InPid},
               case get_rtmpid(Entry) of
                   RTMPid  -> ok;
-                  unknown -> fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie);
-                  {XPid}  -> fd:unsubscribe_refcount(XPid, tx_tm_rtm_fd_cookie),
-                             fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie)
+                  unknown -> fd:subscribe_refcount(self(), [InPid], tx_tm_rtm_fd_cookie);
+                  {XPid}  -> fd:unsubscribe_refcount(self(), [XPid], tx_tm_rtm_fd_cookie),
+                             fd:subscribe_refcount(self(), [InPid], tx_tm_rtm_fd_cookie)
               end,
               rtm_entry_new(InKey, RTMPid, get_nth(Entry), {InAccPid});
           _ -> Entry
@@ -1129,12 +1129,12 @@ state_set_local_snapno(State, No) -> setelement(7, State, No).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
-    fd:subscribe_refcount(Pid, {self(), state_get_role(State)}),
+    fd:subscribe_refcount(self(), [Pid], {self(), state_get_role(State)}),
     State.
 
 -spec state_unsubscribe(state(), comm:mypid()) -> state().
 state_unsubscribe(State, Pid) ->
-    fd:unsubscribe_refcount(Pid, {self(), state_get_role(State)}),
+    fd:unsubscribe_refcount(self(), [Pid], {self(), state_get_role(State)}),
     State.
 
 -spec get_failed_keys(tx_state(), state()) -> [client_key()].
@@ -1161,7 +1161,7 @@ get_failed_keys(TxState, State) ->
                       state()}.
 handle_crash(Pid, jump, Cookie, State, _Handler) ->
     % subscribe again (subscription was removed at fd)
-    fd:subscribe_refcount(Pid, Cookie),
+    fd:subscribe_refcount(self(), [Pid], Cookie),
     State;
 handle_crash(Pid, _Reason, _Cookie, State, Handler) ->
     %% tm: update rtms
