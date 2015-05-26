@@ -44,7 +44,7 @@
                    {ganglia_periodic} |
                    {ganglia_dht_load_aggregation, DHTNode :: pid(), AggId :: non_neg_integer(), message()} |
                    {ganglia_vivaldi_confidence, pid(), message()} |
-                   {crash, PID::comm:mypid(), _Cookie::{ganglia, AggId::non_neg_integer()}, Reason::fd:reason()}.
+                   {fd_notify, fd:event(), PID::comm:mypid(), _Cookie::{ganglia, AggId::non_neg_integer()}, Reason::fd:reason()}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
@@ -92,11 +92,11 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %% @doc handler for messages from failure detector
 %%     if a node crashes before sending out the load data
 %%     we ignore its load information
-on({fd, AggId, {crash, PID, jump}}, State) ->
+on({fd, AggId, {fd_notify, crash, PID, jump}}, State) ->
     % subscribe again (subscription was removed at fd)
     fd:subscribe(?FD_SUBSCR_PID(AggId), [PID]),
     State;
-on({fd, AggId, {crash, _PID, _Reason}}, State) ->
+on({fd, AggId, {fd_notify, crash, _PID, _Reason}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
     if
@@ -106,6 +106,8 @@ on({fd, AggId, {crash, _PID, _Reason}}, State) ->
         true ->
             State
     end;
+on({fd, _AggId, {fd_notify, _Event, _PID, jump}}, State) ->
+    State;
 
 %% @doc handler for messages from the vivaldi process
 %%     reporting its confidence

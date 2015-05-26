@@ -617,12 +617,12 @@ on({update_snapno, SnapNo}, State) ->
     state_set_local_snapno(State, SnapNo);
 
 %% failure detector events
-on({fd, Cookie, {crash, Pid, Reason}}, State) ->
+on({fd, Cookie, {fd_notify, crash, Pid, Reason}}, State) ->
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     handle_crash(Pid, Reason, Cookie, State, on);
-%% on({fd, _Cookie, {crash, _Pid, _Reason}}
+%% on({fd, _Cookie, {fd_notify, crash, _Pid, _Reason}}
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
 %%     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
 %%     %% @todo should we take over, if the TM failed?
@@ -634,6 +634,8 @@ on({fd, Cookie, {crash, Pid, Reason}}, State) ->
 %%     %%   on({tx_tm_rtm_propose_yourself, Tid}, XState)
 %%     %%                        end, State, listwithalltids),
 %%     State;
+on({fd, _Cookie, {fd_notify, _Event, _Pid, _Reason}}, State) ->
+    State;
 
 on({new_node_id, Id}, State) ->
     %% only in tx_tm not in rtm processes!
@@ -775,9 +777,11 @@ on_init({update_snapno, SnapNo}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     state_set_local_snapno(State, SnapNo);
-on_init({fd, Cookie, {crash, Pid, Reason}}, State) ->
+on_init({fd, Cookie, {fd_notify, crash, Pid, Reason}}, State) ->
     %% only in tx_tm
-    handle_crash(Pid, Reason, Cookie, State, on_init).
+    handle_crash(Pid, Reason, Cookie, State, on_init);
+on_init({fd, _Cookie, {fd_notify, _Event, _Pid, _Reason}}, State) ->
+    State.
 
 %% functions for periodic RTM updates
 -spec rtm_update_trigger(rtms()) -> ok.

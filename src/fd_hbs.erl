@@ -261,16 +261,16 @@ on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     report_crashed_remote_pid(State, WatchedPid, Reason, warn);
 
-on({report_crashed, WatchedPids, Reason}, State) ->
-    ?TRACE("fd_hbs report crashed ~p~n", [WatchedPids]),
+on({fd_notify, Event, WatchedPids, Data}, State) ->
+    ?TRACE("fd_hbs: fd_notify ~p for pids ~.2p with data ~.2p~n",
+           [Event, WatchedPids, Data]),
     lists:foldl(fun(WatchedPid, StateX) ->
-                        report_crashed_remote_pid(StateX, WatchedPid, Reason,
-                                                  nowarn)
+                        fd_notify(StateX, Event, WatchedPid, Data)
                 end, State, WatchedPids);
 
-on({report_crash, LocalPids, Reason}, State) when is_list(LocalPids) ->
-    ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
-           [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
+on({report, crash, LocalPids, Reason}, State) ->
+    ?TRACE("fd_hbs: report crash for pids ~.2p with reason ~.2p~n",
+           [LocalPids, Reason]),
     % similar to 'DOWN' report below
     {WatchedPids, State1} =
         lists:foldl(
@@ -284,9 +284,23 @@ on({report_crash, LocalPids, Reason}, State) when is_list(LocalPids) ->
           end, {[], State}, LocalPids),
     %% send crash report to remote end.
     comm:send(state_get_rem_hbs(State),
-              {report_crashed, WatchedPids, Reason},
+              {fd_notify, crash, WatchedPids, Reason},
               ?SEND_OPTIONS),
     State1;
+
+on({report, Event, LocalPids, Data}, State) ->
+    ?TRACE("fd_hbs: report ~p for pids ~.2p with data ~.2p~n",
+           [Event, LocalPids, Data]),
+    % similar to 'DOWN' report below
+    WatchedPids =
+        [GlobalPid || LocalPid <- LocalPids,
+                      state_has_monitor(State,
+                                        GlobalPid = comm:make_global(LocalPid))],
+    %% send event to remote end.
+    comm:send(state_get_rem_hbs(State),
+              {fd_notify, Event, WatchedPids, Data},
+              ?SEND_OPTIONS),
+    State;
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
@@ -336,7 +350,7 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
     _ = [ begin
               log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                       [This, X, pid_groups:group_and_name_of(comm:get_plain_pid(X))]),
-              comm:send_local(X, {crash, WatchedPid, Reason})
+              comm:send_local(X, {fd_notify, crash, WatchedPid, Reason})
           end
           || X <- Subscriptions ],
     %% delete from remote_pids
@@ -348,6 +362,26 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
                         Res
                 end,
                 S1, Subscriptions).
+
+%% @doc Reports a crashed connection to local subscribers.
+%% @private
+-spec fd_notify(state(), Event::crash | atom(), Pid::comm:mypid(),
+                Data::term()) -> state().
+fd_notify(State, crash, WatchedPid, Reason) ->
+    report_crashed_remote_pid(State, WatchedPid, Reason, nowarn);
+fd_notify(State, Event, WatchedPid, Data) ->
+    %% inform all local subscribers
+    Subscriptions = state_get_subscriptions(State, WatchedPid),
+    ?TRACE("~p found subs: ~p~n", [self(), Subscriptions]),
+    % note: in contrast to report_crashed_remote_pid, do not warn if no subscribers exist
+    This = comm:this(),
+    _ = [ begin
+              log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
+                      [This, X, pid_groups:group_and_name_of(comm:get_plain_pid(X))]),
+              comm:send_local(X, {fd_notify, Event, WatchedPid, Data})
+          end
+          || X <- Subscriptions ],
+    State.
 
 %% @doc Reports a crashed connection to local subscribers.
 %% @private
@@ -572,6 +606,12 @@ state_del_monitor(State, WatchedPid) ->
                     true
             end,
     {Found, State}.
+
+-spec state_has_monitor(state(), comm:mypid()) -> boolean().
+state_has_monitor(State, WatchedPid) ->
+    Table = state_get_monitor_tab(State),
+    MonKey = {'$monitor', WatchedPid},
+    pdb:get(MonKey, Table) =/= undefined.
 
 -spec rempid_new(comm:mypid()) -> rempid().
 rempid_new(Pid) ->

@@ -103,7 +103,7 @@
 
 -type move_message() ::
     move_message1() |
-    {move, {crash, DeadPid::comm:mypid(), Reason::fd:reason()}} |
+    {move, {fd_notify, fd:event(), DeadPid::comm:mypid(), Reason::fd:reason()}} |
     {move, check_for_timeouts} |
     {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {timeouts, Timeouts::non_neg_integer()}} |
     {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, MoveFullId::slide_op:id()}.
@@ -332,15 +332,17 @@ process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, My
                        (is_tuple(Operation) andalso element(1, Operation) =:= finish_delta_ack2));
 
 % failure detector reported dead node
-process_move_msg({move, _MoveFullId, {crash, _DeadPid, jump}} = _Msg, MyState) ->
+process_move_msg({move, _MoveFullId, {fd_notify, crash, _DeadPid, jump}} = _Msg, MyState) ->
     MyState; % failure detectors are reused after jump
-process_move_msg({move, MoveFullId, {crash, _DeadPid, _Reason}} = _Msg, MyState) ->
+process_move_msg({move, MoveFullId, {fd_notify, crash, _DeadPid, _Reason}} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, State) ->
                 abort_slide(State, SlideOp, target_down, false, crash)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, all, crashed_node, false).
+    safe_operation(WorkerFun, MyState, MoveFullId, all, crashed_node, false);
+process_move_msg({move, _MoveFullId, {fd_notify, _Event, _DeadPid, _Reason}} = _Msg, MyState) ->
+    MyState.
 
 % misc.
 
@@ -1129,10 +1131,10 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
           TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null})
         -> dht_node_state:state().
 finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
-    fd:report_my_crash(leave),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    fd:report(crash, sup:sup_get_all_children(SupDhtNode), leave),
     State1 = finish_slide(State, SlideOp),
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-    SupDhtNode = pid_groups:get_my(sup_dht_node),
     comm:send_local(pid_groups:find_a(service_per_vm),
                     {delete_node, SupDhtNode, SupDhtNodeId}),
     % note: we will be killed soon but need to be removed from the supervisor first
@@ -1140,7 +1142,8 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     State1;
 finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     NewId = slide_op:get_jump_target_id(SlideOp),
-    fd:report_my_crash(jump),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    fd:report(crash, sup:sup_get_all_children(SupDhtNode), jump),
     State1 = finish_slide(State, SlideOp),
 
     %% Rejoin at NewId but keep processes

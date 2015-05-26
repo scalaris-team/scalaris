@@ -25,12 +25,12 @@
 -behaviour(gen_component).
 -include("scalaris.hrl").
 
--export_type([reason/0]).
+-export_type([reason/0, event/0]).
 
 -export([subscribe/2, subscribe_refcount/2]).
 -export([unsubscribe/2, unsubscribe_refcount/2]).
 -export([update_subscriptions/3]).
--export([report_my_crash/1]).
+-export([report/3]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
@@ -38,6 +38,7 @@
 -export([subscriptions/0]).
 
 -type reason() :: 'DOWN' | noconnection | term().
+-type event() :: crash | atom().
 -type state() :: [HBPid::pid()]. % a list of all hbs processes launched by this fd
 
 -define(SEND_OPTIONS, [{channel, prio}]).
@@ -132,18 +133,9 @@ update_subscriptions(Subscriber, OldPids, NewPids) ->
 
 %% @doc Reports the calling process' group as being shut down due to a graceful
 %%      leave operation.
--spec report_my_crash(Reason::reason()) -> ok.
-report_my_crash(Reason) ->
-    case pid_groups:get_my(sup_dht_node) of
-        failed ->
-            log:log(error, "[ FD ] call to report_my_crash(~p) from ~p "
-                           "outside a valid dht_node group!", [Reason, self()]);
-        DhtNodeSupPid ->
-            FD = my_fd_pid(),
-            comm:send_local(FD, {report_crash,
-                                 sup:sup_get_all_children(DhtNodeSupPid),
-                                 Reason})
-    end.
+-spec report(Event::event(), LocalPids::[pid()], Data::term()) -> ok.
+report(Event, LocalPids, Data) ->
+    comm:send_local(my_fd_pid(), {report, Event, LocalPids, Data}).
 
 %% gen_component functions
 %% @doc Starts the failure detector server
@@ -232,12 +224,9 @@ on({crashed, WatchedPid, _Warn} = Msg, State) ->
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 
-on({report_crash, [], _Reason}, State) ->
-    State;
-on({report_crash, [_|_] = LocalPids, Reason}, State) ->
-    ?TRACE("FD: report_crash ~p with reason ~p~n", [LocalPids, Reason]),
-    ?DBG_ASSERT([] =:= [X || X <- LocalPids, not is_pid(X)]),
-    Msg = {report_crash, LocalPids, Reason},
+on({report, _Event, _LocalPids, _Data} = Msg, State) ->
+    ?TRACE("FD: report ~p for pids ~.2p with data ~.2p~n",
+           [_Event, _LocalPids, _Data]),
     % don't create new hbs processes!
     _ = [comm:send_local(HBS, Msg) || HBS <- State],
     State;

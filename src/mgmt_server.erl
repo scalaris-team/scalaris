@@ -34,7 +34,7 @@
 
 % accepted messages of the mgmt_server process
 -type(message() ::
-    {crash, PID::comm:mypid(), Reason::fd:reason()} |
+    {fd_notify, fd:event(), PID::comm:mypid(), Reason::fd:reason()} |
     {get_list, SourcePid::comm:mypid()} |
     {get_list_length, SourcePid::comm:mypid()} |
     {register, Node::node:node_type()}).
@@ -70,19 +70,21 @@ node_list(UseShepherd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({crash, PID, jump}, Nodes) ->
+on({fd_notify, crash, PID, jump}, Nodes) ->
     % subscribe again (subscription was removed at fd)
     fd:subscribe(self(), [PID]),
     Nodes;
-on({crash, PID, leave}, Nodes) ->
+on({fd_notify, crash, PID, leave}, Nodes) ->
     % graceful leave - do not add as zombie candidate!
     gb_trees:delete_any(PID, Nodes);
-on({crash, PID, _Reason}, Nodes) ->
+on({fd_notify, crash, PID, _Reason}, Nodes) ->
     case gb_trees:lookup(PID, Nodes) of
         {value, Node} -> dn_cache:add_zombie_candidate(Node),
                          gb_trees:delete(PID, Nodes);
         none          -> Nodes
     end;
+on({fd_notify, _Event, _PID, _Reason}, Nodes) ->
+    Nodes;
 
 on({get_list, SourcePid}, Nodes) ->
     comm:send(SourcePid, {get_list_response, gb_trees:keys(Nodes)}),
