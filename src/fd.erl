@@ -104,7 +104,7 @@ subscribe_refcount(GlobalPids, Cookie) when is_list(GlobalPids) ->
 subscribe_refcount(GlobalPid, Cookie) ->
     subscribe_single_refcount(my_fd_pid(), GlobalPid, Cookie).
 
--spec subscribe_single_refcount(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
+-spec subscribe_single_refcount(FD::pid(), comm:mypid(), cookie()) -> ok.
 subscribe_single_refcount(FD, GlobalPid, Cookie) ->
     Key = {'$fd_subscribe', GlobalPid, Cookie},
     OldCount = case erlang:get(Key) of
