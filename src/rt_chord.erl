@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([next_hop/3]).
+-export([next_hop/3, check_tmp/5, check_tmp/6]).
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
@@ -395,51 +395,55 @@ handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
     State;
 handle_custom_message({rt_get_node_response, Index, Node, RTLoop}, State) ->
     OldRT = rt_loop:get_rt(State),
+    OldERT = rt_loop:get_ert(State),
     Neighbors = rt_loop:get_neighb(State),
-    case stabilize(Neighbors, OldRT, Index, Node, RTLoop) of
+    NewERT = case stabilize(Neighbors, OldRT, Index, Node, RTLoop) of
         {NewRT, true} ->
-            check_do_update(OldRT, NewRT, rt_loop:get_neighb(State), true);
-        {NewRT, false} -> ok
+            check_do_update(OldRT, NewRT, OldERT, rt_loop:get_neighb(State), true);
+        {NewRT, false} -> ok, OldERT
     end,
-    rt_loop:set_rt(State, NewRT);
+    rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 handle_custom_message(_Message, _State) ->
     unknown_event.
 %% userdevguide-end rt_chord:handle_custom_message
 
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
+check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check4).
+
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check5).
+
 %% userdevguide-begin rt_chord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(OldRT, OldRT, _Neighbors, _ReportToFD) ->
-    ok;
-check(OldRT, NewRT, Neighbors, ReportToFD) ->
-    check_do_update(OldRT, NewRT, Neighbors, ReportToFD).
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, OldRT, OldERT, _Neighbors, _ReportToFD) ->
+    OldERT;
+check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+    check_do_update(OldRT, NewRT, OldERT, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
-%%      Note: the external routing table also changes if the Pred or Succ
-%%      change.
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
-    case nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) andalso
-             nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) andalso
-             OldRT =:= NewRT of
-        true -> ok;
-        _ -> check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD)
+%%      Note: the external routing table also changes if the neighborhood changes.
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+            OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
+    case OldNeighbors =:= NewNeighbors andalso OldRT =:= NewRT of
+        true -> OldERT;
+        _ -> check_do_update(OldRT, NewRT, OldERT, NewNeighbors, ReportToFD)
     end.
 
 %% @doc Helper for check/4 and check/5.
--spec check_do_update(OldRT::rt(), NewRT::rt(), NewNeighbors::nodelist:neighborhood(),
-                      ReportToFD::boolean()) -> ok.
-check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD) ->
-    Pid = pid_groups:get_my(dht_node),
-    RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
-    case Pid of
-        failed -> ok;
-        _      -> comm:send_local(Pid, {rt_update, RT_ext})
-    end,
+-spec check_do_update(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+                      NewNeighbors::nodelist:neighborhood(),
+                      ReportToFD::boolean()) -> ERT::external_rt().
+check_do_update(OldRT, NewRT, OldERT, NewNeighbors, ReportToFD) ->
     % update failure detector:
     case ReportToFD of
         true ->
@@ -447,6 +451,14 @@ check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD) ->
             OldPids = to_pid_list(OldRT),
             fd:update_subscriptions(self(), OldPids, NewPids);
         _ -> ok
+    end,
+    Pid = pid_groups:get_my(dht_node),
+    case Pid of
+        failed -> OldERT;
+        _      ->
+            NewERT = export_rt_to_dht_node(NewRT, NewNeighbors),
+            comm:send_local(Pid, {rt_update, NewERT}),
+            NewERT
     end.
 %% userdevguide-end rt_chord:check
 

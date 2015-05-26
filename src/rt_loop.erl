@@ -29,7 +29,7 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
          check_config/0,
-         get_neighb/1, get_rt/1, set_rt/2,
+         get_neighb/1, get_rt/1, set_rt/2, get_ert/1, set_ert/2,
          rm_neighbor_change/3, rm_send_update/5]).
 
 -export_type([state_active/0]).
@@ -48,7 +48,8 @@
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
 -opaque(state_active() :: {Neighbors    :: nodelist:neighborhood(),
-                           RTState      :: ?RT:rt()}).
+                           RT           :: ?RT:rt(),
+                           ERT          :: ?RT:external_rt()}).
 -type(state_inactive() :: {inactive,
                            MessageQueue::msg_queue:msg_queue()}).
 %% -type(state() :: state_active() | state_inactive()).
@@ -113,7 +114,8 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
                       fun ?MODULE:rm_send_update/5, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Neighbors, ?RT:init(Neighbors)}, fun ?MODULE:on_active/2);
+      {Neighbors, ?RT:init(Neighbors), ?RT:empty_ext(Neighbors)},
+      fun ?MODULE:on_active/2);
 
 on_inactive({trigger_rt}, State) ->
     %% keep trigger active to avoid generating new triggers when
@@ -143,7 +145,7 @@ on_inactive(_Msg, State) ->
                          unknown_event;
                ({deactivate_rt}, state_active())
                   -> {'$gen_component', [{on_handler, Handler::gen_component:handler()},...], State::state_inactive()}.
-on_active({deactivate_rt}, {Neighbors, _OldRT})  ->
+on_active({deactivate_rt}, {Neighbors, _OldRT, _ERT})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), ?MODULE),
     % send new empty RT to the dht_node so that all routing messages
@@ -155,16 +157,18 @@ on_active({deactivate_rt}, {Neighbors, _OldRT})  ->
 
 %% userdevguide-begin rt_loop:update_rt
 % Update routing table with changed neighborhood from the rm
-on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
+on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, OldERT}) ->
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
-            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp and rt_chord
             % trigger immediate rebuild
-            gen_component:post_op({periodic_rt_rebuild}, {NewNeighbors, NewRT})
+            gen_component:post_op({periodic_rt_rebuild}, {NewNeighbors, NewRT, NewERT})
         ;
         {ok, NewRT} ->
-            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            {NewNeighbors, NewRT}
+            %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp and rt_chord
+            {NewNeighbors, NewRT, NewERT}
     end;
 %% userdevguide-end rt_loop:update_rt
 
@@ -175,48 +179,50 @@ on_active({trigger_rt}, State) ->
     gen_component:post_op({periodic_rt_rebuild}, State);
 
 % Actual periodic rebuilding of the RT
-on_active({periodic_rt_rebuild}, {Neighbors, OldRT}) ->
+on_active({periodic_rt_rebuild}, {Neighbors, OldRT, OldERT}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
-    ?RT:check(OldRT, NewRT, Neighbors, true),
-    {Neighbors, NewRT};
+    %% ?RT:check(OldRT, NewRT, Neighbors, true),
+    NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, Neighbors, true), % TODO replace _tmp and rt_chord
+    {Neighbors, NewRT, NewERT};
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
-on_active({fd_notify, crash, DeadPid, Reason}, {Neighbors, OldRT}) ->
+on_active({fd_notify, crash, DeadPid, Reason}, {Neighbors, OldRT, OldERT}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid, Reason),
-    ?RT:check(OldRT, NewRT, Neighbors, false),
-    {Neighbors, NewRT};
+    %% ?RT:check(OldRT, NewRT, Neighbors, false),
+    NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, Neighbors, false), % TODO replace _tmp and rt_chord
+    {Neighbors, NewRT, NewERT};
 on_active({fd_notify, _Event, _DeadPid, _Reason}, State) ->
     State;
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
-   {_Neighbors, RTState} = State) ->
+   {_Neighbors, RT, _ERT} = State) ->
     KeyValueList =
-        [{"rt_size", ?RT:get_size(RTState)},
-         {"rt (index, node):", ""} | ?RT:dump(RTState)],
+        [{"rt_size", ?RT:get_size(RT)},
+         {"rt (index, node):", ""} | ?RT:dump(RT)],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on_active({dump, Pid}, {_Neighbors, RTState} = State) ->
-    comm:send_local(Pid, {dump_response, RTState}),
+on_active({dump, Pid}, {_Neighbors, RT, _ERT} = State) ->
+    comm:send_local(Pid, {dump_response, RT}),
     State;
 
-on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, RT} = State) ->
+on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, _RT, ERT} = State) ->
     case config:read(leases) of
         true ->
             %% TODO : lookup_aux_leases expects a dht_node_state
             lookup_aux_leases(State, Key, Hops, Msg);
         _ ->
-            lookup_aux_chord(Neighbors, RT, Key, Hops, Msg)
+            lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg)
     end,
     State;
 
 on_active({send_error, _Target, {?send_to_group_member, routing_table, {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
     log:log(warn, "[routing_table] lookup_aux failed 1. Target: ~p. Msg: ~p.", [_Target, _Message]),
-    _ = comm:send_local_after(1000, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State;
 
 on_active({send_error, _Target, {?lookup_aux, Key, Hops, Msg} = _Message, _Reason}, State) ->
@@ -224,7 +230,7 @@ on_active({send_error, _Target, {?lookup_aux, Key, Hops, Msg} = _Message, _Reaso
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State;
 
-on_active({send_error, Target, {?lookup_fin, Key, Data, Msg} = _Message, _Reason}, State) ->
+on_active({send_error, _Target, {?lookup_fin, Key, Data, Msg} = _Message, _Reason}, State) ->
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, ?HOPS_FROM_DATA(Data) + 1, Msg}),
     State;
 
@@ -232,9 +238,9 @@ on_active({send_error, Target, {?lookup_fin, Key, Data, Msg} = _Message, _Reason
 on_active(Message, State) ->
     ?RT:handle_custom_message(Message, State).
 
--spec lookup_aux_chord(Neighbors::nodelist:neighborhood(), RT::?RT:rt(), Key::intervals:key(),
+-spec lookup_aux_chord(Neighbors::nodelist:neighborhood(), RT::?RT:external_rt(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux_chord(Neighbors, RT, Key, Hops, Msg) ->
+lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
     %% TODO : wrap_message expects a dht_node_state
     %% Noop in chord, simple
     %% frt_common: Neighbours, node_id, external_rt,
@@ -246,8 +252,7 @@ lookup_aux_chord(Neighbors, RT, Key, Hops, Msg) ->
             %% TODO: do I need a WrappedMsg here ??!
             comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
         _ ->
-            ExtRT = rt_chord:export_rt_to_dht_node(RT, Neighbors),
-            case rt_chord:next_hop(Neighbors, ExtRT, Key) of
+            case rt_chord:next_hop(Neighbors, ERT, Key) of
                 {Node, undefined} ->
                     %% log:log(warn, "[routing_table] lookup_aux next_hop undefined"),
                     NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
@@ -260,7 +265,7 @@ lookup_aux_chord(Neighbors, RT, Key, Hops, Msg) ->
 
 -spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux_leases(State, Key, Hops, Msg) ->
+lookup_aux_leases(_State, _Key, _Hops, _Msg) ->
     log:fatal("leases not yet implemented"),
     erlang:exit('not yet implemented').
 
@@ -274,15 +279,22 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
 % outside this module:
 
 -spec get_neighb(State::state_active()) -> nodelist:neighborhood().
-get_neighb({Neighbors, _RT}) ->
+get_neighb({Neighbors, _RT, _ERT}) ->
     Neighbors.
 
 -spec get_rt(State::state_active()) -> ?RT:rt().
-get_rt({_Neighbors, RT}) -> RT.
+get_rt({_Neighbors, RT, _ERT}) -> RT.
 
 -spec set_rt(State::state_active(), RT::?RT:rt()) -> NewState::state_active().
-set_rt({Neighbors, _OldRT}, NewRT) ->
-    {Neighbors, NewRT}.
+set_rt({Neighbors, _OldRT, ERT}, NewRT) ->
+    {Neighbors, NewRT, ERT}.
+
+-spec get_ert(State::state_active()) -> ?RT:external_rt().
+get_ert({_Neighbors, _RT, ERT}) -> ERT.
+
+-spec set_ert(State::state_active(), ERT::?RT:external_rt()) -> NewState::state_active().
+set_ert({Neighbors, RT, _OldERT}, ERT) ->
+    {Neighbors, RT, ERT}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
