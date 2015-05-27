@@ -116,7 +116,7 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:make_ring_with_ids(
       ?RT:get_replica_keys(?RT:hash_key("0")),
       [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0},
-                 {join_lb_psv, lb_psv_simple}, {lb_psv_samples, 1}, {leases, false}]
+                 {join_lb_psv, lb_psv_simple}, {lb_psv_samples, 1}]
             ++ MoveConf ++ additional_ring_config()}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
