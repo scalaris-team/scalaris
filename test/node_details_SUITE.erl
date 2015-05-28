@@ -57,7 +57,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 

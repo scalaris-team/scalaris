@@ -31,8 +31,8 @@ init_per_suite(Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     Config.
 
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 
 get_node_info(_Config) ->
      {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_node_info, []),

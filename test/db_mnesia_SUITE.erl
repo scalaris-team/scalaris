@@ -62,7 +62,7 @@ end_per_suite(Config) ->
     _ = file:delete(WorkingDir ++ "schema.DAT"),
 
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 rw_suite_runs(N) ->
     erlang:min(N, 200).

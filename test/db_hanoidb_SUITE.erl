@@ -46,7 +46,7 @@ end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
     tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 rw_suite_runs(N) ->
     erlang:min(N, 200).

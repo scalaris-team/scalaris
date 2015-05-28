@@ -38,8 +38,8 @@ init_per_suite(Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     Config.
 
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 
 run_increment_1_1000(_Config) ->
     Threads    = 1,

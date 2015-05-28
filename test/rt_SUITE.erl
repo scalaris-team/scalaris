@@ -42,7 +42,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 %% @doc Returns whether the default routing table from ?RT has chord-like keys.
 -spec default_rt_has_chord_keys() -> boolean().

@@ -42,7 +42,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 % TODO: add tests for simple node lists (the following tests only test functions with neighborhood structures)
 

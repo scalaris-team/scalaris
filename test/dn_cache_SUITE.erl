@@ -39,7 +39,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    Config.
+    ok.
 
 dn_detection(Config) ->
     pid_groups:join_as("dn_cache_group", node),

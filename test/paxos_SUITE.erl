@@ -40,8 +40,8 @@ init_per_suite(Config) ->
     comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port()),
     Config.
 
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 
 -spec make_groupname(Prefix::string(), Number::integer()) -> pid_groups:groupname().
 make_groupname(Prefix, Number) ->

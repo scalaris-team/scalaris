@@ -45,13 +45,13 @@ init_per_suite(Config) ->
     tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
     Config.
 
-end_per_suite(Config) ->
+end_per_suite(_Config) ->
     tester:unregister_value_creator({typedef, random_bias, generator, []}),
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
-    Config.
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

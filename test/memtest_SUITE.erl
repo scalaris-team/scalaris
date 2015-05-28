@@ -42,8 +42,8 @@ init_per_suite(Config) ->
     _ = code:ensure_loaded(gossip_load_default), % otherwise loaded too late
     Config.
 
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 
 init_per_group(Group, Config) ->
     ct:comment(io_lib:format("BEGIN ~p", [Group])),

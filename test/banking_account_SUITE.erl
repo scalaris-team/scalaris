@@ -31,8 +31,8 @@ init_per_suite(Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     Config.
 
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 
 money_transfer(A, B) ->
     TLog0 = api_tx:new_tlog(),

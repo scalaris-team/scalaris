@@ -43,10 +43,10 @@ init_per_suite(Config) ->
     tester:register_value_creator({typedef, db_backend_beh, key, []}, db_backend_beh, tester_create_db_key, 1),
     Config.
 
-end_per_suite(Config) ->
+end_per_suite(_Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
     tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
-    Config.
+    ok.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
