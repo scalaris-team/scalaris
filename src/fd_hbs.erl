@@ -505,6 +505,8 @@ state_get_subscriptions(State, SearchedPid) ->
                 %% pdb:tab2list may contain unrelated entries, but <- lets
                 %% only pass structurally matching entries here without an
                 %% assignment exception.
+                Subscriber =/= '$monitor_count',
+                Subscriber =/= '$monitor',
                 SearchedPid =:= WatchedPid].
 
 -spec state_del_all_subscriptions(state(), [comm:erl_local_pid()]) -> state().
