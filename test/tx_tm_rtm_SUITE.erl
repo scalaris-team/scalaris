@@ -314,7 +314,7 @@ tm_crash(_) ->
     %% report all tx_tms as failed after the commit has started...
     _ = spawn(fun() ->
                       timer:sleep(1500),
-                      [comm:send_local(fd, {crashed, comm:make_global(TM), 'DOWN'}) || TM <- TMs]
+                      fd:report(crash, TMs, 'DOWN')
               end),
 
     Res = api_tx:req_list([{read, "a"}, {commit}]),
@@ -347,7 +347,7 @@ tp_crash(_) ->
     %% got the request.
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
     %% report the one tp as failed
-    _ = comm:send_local(fd, {crashed, comm:make_global(Proposer), 'DOWN'}),
+    fd:report(crash, [Proposer], 'DOWN'),
 
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
@@ -377,8 +377,7 @@ all_tp_crash(_) ->
     %% got the request).
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
     %% report the one tp as failed
-    _ = [comm:send_local(fd, {crashed, comm:make_global(Proposer), 'DOWN'}) ||
-            Proposer <- Proposers],
+    fd:report(crash, Proposers, 'DOWN'),
 
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
