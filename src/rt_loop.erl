@@ -163,13 +163,13 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, OldERT, D
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
             %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp and rt_chord
+            NewERT = ?RT:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp
             % trigger immediate rebuild
             gen_component:post_op({periodic_rt_rebuild}, {NewNeighbors, NewRT, NewERT, DHTPid})
         ;
         {ok, NewRT} ->
             %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp and rt_chord
+            NewERT = ?RT:check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true), % TODO replace _tmp
             {NewNeighbors, NewRT, NewERT, DHTPid}
     end;
 %% userdevguide-end rt_loop:update_rt
@@ -186,7 +186,7 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT, OldERT, DHTPid}) ->
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
     %% ?RT:check(OldRT, NewRT, Neighbors, true),
-    NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, Neighbors, true), % TODO replace _tmp and rt_chord
+    NewERT = ?RT:check_tmp(OldRT, NewRT, OldERT, Neighbors, true), % TODO replace _tmp
     {Neighbors, NewRT, NewERT, DHTPid};
 %% userdevguide-end rt_loop:trigger
 
@@ -194,7 +194,7 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT, OldERT, DHTPid}) ->
 on_active({fd_notify, crash, DeadPid, Reason}, {Neighbors, OldRT, OldERT, DHTPid}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid, Reason),
     %% ?RT:check(OldRT, NewRT, Neighbors, false),
-    NewERT = rt_chord:check_tmp(OldRT, NewRT, OldERT, Neighbors, false), % TODO replace _tmp and rt_chord
+    NewERT = ?RT:check_tmp(OldRT, NewRT, OldERT, Neighbors, false), % TODO replace _tmp
     {Neighbors, NewRT, NewERT, DHTPid};
 on_active({fd_notify, _Event, _DeadPid, _Reason}, State) ->
     State;
@@ -251,7 +251,7 @@ lookup_aux_chord(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
     % ==> change wrap_message/4: instead of State, use Neighbors and RT-State!
     WrappedMsg = Msg,
     % NOTE: chord-like routing requires routing through predecessor -> only decide at pred:
-    case rt_chord:next_hop(Neighbors, ERT, Key) of
+    case ?RT:next_hop(Neighbors, ERT, Key) of
         succ ->
             %% TODO: do I need a WrappedMsg here ??!
             comm:send_local(DHTPid, {lookup_decision, Key, Hops, WrappedMsg});
