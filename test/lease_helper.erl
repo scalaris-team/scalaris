@@ -57,7 +57,7 @@ wait_for_correct_ring() ->
                        Res == ok
              end).
 
--spec wait_for_number_of_valid_active_leases(pos_integer()) -> ok.
+-spec wait_for_number_of_valid_active_leases(integer()) -> ok.
 wait_for_number_of_valid_active_leases(Count) ->
     wait_for(fun () ->
                      AllLeases = get_all_leases(),
