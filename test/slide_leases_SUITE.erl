@@ -207,13 +207,12 @@ join_leave_test(JoinTargetSize, LeaveTargetSize) ->
 leave_until(TargetSize, TargetSize) ->
     ok;
 leave_until(CurrentSize, TargetSize) ->
-    Group = pid_groups:group_with(dht_node),
-    Node = pid_groups:pid_of(Group, dht_node),
+    Node = lease_checker:get_random_save_node(),
+    Group = pid_groups:group_of(comm:make_local(Node)),
     ct:pal("shuting down node: ~s ~w", [Group, Node]),
     ok = api_vm:kill_node(Group),
     lease_helper:wait_for_ring_size(CurrentSize - 1),
-    ct:pal("have correct ring size ~w", [Node]),
-    log:log("wait for ring to stabilize in shutdown"),
+    ct:pal("wait for ring to stabilize iafter shutdown"),
     util:wait_for(fun admin:check_leases/0, 10000),
     ct:pal("shuting down node: success"),
     leave_until(CurrentSize - 1, TargetSize).
