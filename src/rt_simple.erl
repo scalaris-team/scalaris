@@ -21,6 +21,7 @@
 -vsn('$Id$').
 
 -behaviour(rt_beh).
+-export([check_tmp/5, check_tmp/6, next_hop/3]).
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_simple:types
@@ -233,27 +234,39 @@ check_config() ->
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_simple:handle_custom_message
 
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
+check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check4).
+
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check5).
+
 %% userdevguide-begin rt_simple:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(OldRT, NewRT, Neighbors, ReportToFD) ->
-    check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+                Neighbors::nodelist:neighborhood(),
+                ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+    check_tmp(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table only changes the internal RT has
 %%      changed.
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(OldRT, NewRT, _OldNeighbors, NewNeighbors, ReportToFD) ->
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+                OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
+                ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, NewRT, OldERT, _OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldRT =:= NewRT of
-        true -> ok;
+        true -> OldERT;
         _ ->
-            Pid = pid_groups:get_my(dht_node),
-            RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
-            comm:send_local(Pid, {rt_update, RT_ext}),
+            Pid = node:pidX(nodelist:node(NewNeighbors)),
+            NewERT = export_rt_to_dht_node(NewRT, NewNeighbors),
+            comm:send_local(comm:make_local(Pid), {rt_update, NewERT}),
             % update failure detector:
             case ReportToFD of
                 true ->
@@ -261,7 +274,8 @@ check(OldRT, NewRT, _OldNeighbors, NewNeighbors, ReportToFD) ->
                     OldPids = to_pid_list(OldRT),
                     fd:update_subscriptions(self(), OldPids, NewPids);
                 _ -> ok
-            end
+            end,
+            NewERT
     end.
 %% userdevguide-end rt_simple:check
 
@@ -279,10 +293,16 @@ empty_ext(Neighbors) -> empty(Neighbors).
 -spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Key) ->
     Neighbors = dht_node_state:get(State, neighbors),
-    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
-        true -> {succ,  node:pidX(nodelist:succ(Neighbors))};
-        _    -> {other, node:pidX(nodelist:succ(Neighbors))}
+    RT = dht_node_state:get(State, rt),
+    next_hop(Neighbors, RT, Key).
+
+-spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
+next_hop(Neighbors, RT, Id) ->
+    case intervals:in(Id, nodelist:succ_range(Neighbors)) of
+        true -> succ;
+        _    -> node:pidX(RT)
     end.
+
 %% userdevguide-end rt_simple:next_hop
 
 
@@ -299,10 +319,12 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 
 %% userdevguide-begin rt_simple:to_list
 %% @doc Converts the (external) representation of the routing table to a list
-%%      in the order of the fingers, i.e. first=succ, second=shortest finger,
-%%      third=next longer finger,...
+%%      {Id, Pid} tuples in the order of the fingers, i.e. first=succ,
+%%      second=shortest finger, third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
-to_list(State) -> [dht_node_state:get(State, succ)].
+to_list(State) ->
+    Succ = dht_node_state:get(State, rt), % ERT = Succ
+    [{node:id(Succ), node:pidX(Succ)}].
 %% userdevguide-end rt_simple:to_list
 
 %% userdevguide-begin rt_simple:wrap_message
