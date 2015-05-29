@@ -175,9 +175,9 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
 erase_lease_dbs(Node) ->
     F = fun(State) ->
                 State1 = dht_node_state:set_prbr_state(State , leases_1, prbr:init(lease_db1)),
-                State2 = dht_node_state:set_prbr_state(State1, leases_1, prbr:init(lease_db1)),
-                State3 = dht_node_state:set_prbr_state(State2, leases_1, prbr:init(lease_db1)),
-                State4 = dht_node_state:set_prbr_state(State3, leases_1, prbr:init(lease_db1)),
+                State2 = dht_node_state:set_prbr_state(State1, leases_2, prbr:init(lease_db2)),
+                State3 = dht_node_state:set_prbr_state(State2, leases_3, prbr:init(lease_db3)),
+                State4 = dht_node_state:set_prbr_state(State3, leases_4, prbr:init(lease_db4)),
                 State4
         end,
     change_node_state(Node, F).
