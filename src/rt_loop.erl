@@ -276,13 +276,7 @@ lookup_aux_leases(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
             %% next_hop and nodelist:succ(Neighbors) return different nodes if
             %% key is in the interval of the succ.
             NextHop = case ?RT:next_hop(Neighbors, ERT, Key) of
-                          succ ->
-                              Succ = nodelist:succ(Neighbors),
-                              %% get succ pid from ERT if possible
-                              case gb_trees:lookup(node:id(Succ), ERT) of
-                                  {value, Pid} -> Pid;
-                                  none -> node:pidX(Succ)
-                              end;
+                          succ -> ?RT:succ(ERT, Neighbors);
                           Pid -> Pid
                       end,
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},

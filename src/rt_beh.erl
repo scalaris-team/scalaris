@@ -38,6 +38,7 @@
 -callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
 -callback next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
+-callback succ(external_rt(), nodelist:neighborhood()) -> comm:mypid().
 
 -callback init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 -callback update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
@@ -87,6 +88,8 @@ behaviour_info(callbacks) ->
      {hash_key, 1}, {get_random_node_id, 0},
      % routing
      {next_hop, 2},
+     % return the succ
+     {succ, 2},
      % trigger for new stabilization round
      {init_stabilize, 2},
      % adapt RT to changed neighborhood

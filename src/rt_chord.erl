@@ -78,6 +78,7 @@ get_random_node_id() ->
             (hash_key(randoms:getRandomString()) band Mask2) bor Mask1
     end.
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RT Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -515,6 +516,15 @@ next_hop(Neighbors, RT, Id) ->
     end.
 %% userdevguide-end rt_chord:next_hop
 
+%% @doc Return the succ, but get the pid from ERT if possible
+%%      (to hopefully get a rt_loop pid instead of a dht_node state pid)
+-spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
+succ(ERT, Neighbors) ->
+    Succ = nodelist:succ(Neighbors),
+    case gb_trees:lookup(node:id(Succ), ERT) of
+        {value, Pid} -> Pid;
+        none -> node:pidX(Succ)
+    end.
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().

@@ -285,6 +285,11 @@ next_hop(State, Key) ->
     end.
 %% userdevguide-end rt_simple:next_hop
 
+
+-spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
+succ(ERT, Neighbors) ->
+    erlang:error(rt_beh_error_succ).
+
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node. Both
 %%      are the same here.

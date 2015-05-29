@@ -573,6 +573,10 @@ next_hop(State, Id) ->
     {Tag, node:pidX(Node)}.
 %% userdevguide-end rt_frtchord:next_hop
 
+-spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
+succ(ERT, Neighbors) ->
+    erlang:error(rt_beh_error_succ).
+
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up next_hop/2. For this, it is
