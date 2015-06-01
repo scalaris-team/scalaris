@@ -99,17 +99,20 @@ collect_type_info(Module, Type, Arity, ParseState) ->
     tester_parse_state:state().
 parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, List}},
             Module, ParseState) ->
-    {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
+    {TheTypeSpec, NewParseState} = parse_type_log(ATypeSpec, Module, ParseState,
+                                                  {record_type_attribute, TypeName}),
     tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, List,
                                      NewParseState);
 parse_chunk({attribute, _Line, type, {TypeName, ATypeSpec, List}},
             Module, ParseState) ->
-    {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
+    {TheTypeSpec, NewParseState} = parse_type_log(ATypeSpec, Module, ParseState,
+                                                  {type_attribute, TypeName}),
     tester_parse_state:add_type_spec({type, Module, TypeName, length(List)}, TheTypeSpec, List,
                                      NewParseState);
 parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, List}},
             Module, ParseState) ->
-    {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
+    {TheTypeSpec, NewParseState} = parse_type_log(ATypeSpec, Module, ParseState,
+                                                  {opaque_type_attribute, TypeName}),
     tester_parse_state:add_type_spec({type, Module, TypeName, length(List)}, TheTypeSpec, List,
                                      NewParseState);
 parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
@@ -130,11 +133,13 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
                   _ ->
                       TheFunSpec
               end || TheFunSpec <- AFunSpec],
-    {CleanFunSpec, NewParseState} = parse_type({union_fun, FunSpec}, Module, ParseState),
+    {CleanFunSpec, NewParseState} = parse_type_log({union_fun, FunSpec}, Module, ParseState,
+                                                   {fun_spec, FunName}),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity},
                                      CleanFunSpec, [], NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
-    {TheTypeSpec, NewParseState} = parse_type(TypeList, Module, ParseState),
+    {TheTypeSpec, NewParseState} = parse_type_log(TypeList, Module, ParseState,
+                                                  {record_attribute, TypeName}),
     tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, [],
                                      NewParseState);
 parse_chunk({attribute, _Line, _AttributeName, _AttributeValue}, _Module,
@@ -145,6 +150,17 @@ parse_chunk({function, _Line, _FunName, _FunArity, FunCode}, _Module, ParseState
     tester_value_collector:parse_expression(FunCode, ParseState);
 parse_chunk({eof, _Line}, _Module, ParseState) ->
     ParseState.
+
+-spec parse_type_log/4 :: (any(), module(), tester_parse_state:state(), tuple()) ->
+                                  {type_spec() , tester_parse_state:state()}.
+parse_type_log(Type, Module, ParseState, Info) ->
+    try
+        parse_type(Type, Module, ParseState)
+    catch
+        unkown_type ->
+            ct:pal("~p:~p: failed to parse  ~p", [Module, Info, Type]),
+            exit(foobar)
+    end.
 
 -spec parse_type/3 :: (any(), module(), tester_parse_state:state()) ->
     {type_spec() , tester_parse_state:state()}.
@@ -413,6 +429,7 @@ parse_type({type, _Line, TypeName, L}, Module, ParseState) ->
 %%     {{ann_type, [Left, Right]}, ParseState};
 parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
+    throw(unkown_type),
     {unkown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) ->
