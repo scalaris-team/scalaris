@@ -156,32 +156,6 @@ new_succ({OldNeighborhood}, NewSucc) ->
                                         predListLength(), succListLength()),
     {{node_discovery}, {NewNeighborhood}}.
 
-%% @doc Removes the given predecessor as a result from a graceful leave only!
--spec remove_pred(State::state(), OldPred::node:node_type(),
-                  PredsPred::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_pred({OldNeighborhood}, OldPred, PredsPred) ->
-    NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
-    NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
-    {{graceful_leave, pred, OldPred}, {NewNbh2}}.
-
-%% @doc Removes the given successor as a result from a graceful leave only!
--spec remove_succ(State::state(), OldSucc::node:node_type(),
-                  SuccsSucc::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
-    NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
-    NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
-    {{graceful_leave, succ, OldSucc}, {NewNbh2}}.
-
-%% @doc Removes the given node as a result from a graceful leave only!
--spec remove_node(State::state(), NodePid::comm:mypid())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_node({OldNeighborhood}, NodePid) ->
-    % TODO: find replacement?
-    NewNbh1 = nodelist:remove(NodePid, OldNeighborhood),
-    {{graceful_leave, other, NodePid}, {NewNbh1}}.
-
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood}, NewMe) ->
@@ -211,20 +185,33 @@ contact_new_nodes(NewNodes) ->
         false -> ok
     end.
 
--spec leave(State::state()) -> ok.
-leave(_State) -> ok.
-
-% failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
+%% @doc Failure detector reported dead/changed node.
+-spec fd_notify(State::state(), Event::fd:event(), DeadPid::comm:mypid(),
+                Data::term())
         -> {ChangeReason::rm_loop:reason(), state()}.
-crashed_node({OldNeighborhood}, DeadPid, Reason) when Reason =:= jump orelse Reason =:= leave ->
-    NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
-    {{node_crashed, DeadPid}, {NewNeighborhood}};
-crashed_node({OldNeighborhood}, DeadPid, _Reason) ->
+fd_notify({OldNeighborhood}, leave, _DeadPid, OldNode) ->
+    % graceful leave -> do not add as zombie candidate!
+    NewNeighborhood = nodelist:remove(OldNode, OldNeighborhood),
+    % TODO: find replacement?
+    {{graceful_leave, OldNode}, {NewNeighborhood}};
+fd_notify({OldNeighborhood}, jump, _DeadPid, OldNode) ->
+    % remove old node while jumping -> do not add as zombie candidate!
+    FilterFun = fun(N) ->
+                        ?implies(node:same_process(N, OldNode),
+                                 node:is_newer(N, OldNode))
+                end,
+    NewNeighborhood = nodelist:filter(OldNeighborhood, FilterFun),
+    % TODO: find replacement?
+    {{graceful_leave, OldNode}, {NewNeighborhood}};
+fd_notify({OldNeighborhood}, crash, DeadPid, _Reason) ->
+    % crash, i.e. non-graceful leave -> add as zombie candidate
     FilterFun = fun(N) -> not node:same_process(N, DeadPid) end,
-    NewNeighborhood =
-        nodelist:filter(OldNeighborhood, FilterFun, fun dn_cache:add_zombie_candidate/1),
-    {{node_crashed, DeadPid}, {NewNeighborhood}}.
+    NewNeighborhood = nodelist:filter(OldNeighborhood, FilterFun,
+                                      fun dn_cache:add_zombie_candidate/1),
+    % TODO: find replacement?
+    {{node_crashed, DeadPid}, {NewNeighborhood}};
+fd_notify(State, _Event, _DeadPid, _Data) ->
+    {{unknown}, State}.
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type())

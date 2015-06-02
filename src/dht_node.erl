@@ -457,14 +457,11 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
 
-on({fd_notify, crash, DeadPid, Reason}, State) ->
+on({fd_notify, Event, DeadPid, Data}, State) ->
+    % TODO: forward to further integrated modules, e.g. join?
     RMState = dht_node_state:get(State, rm_state),
-    RMState1 = rm_loop:crashed_node(RMState, DeadPid, Reason),
-    % TODO: integrate crash handler for join
+    RMState1 = rm_loop:fd_notify(RMState, Event, DeadPid, Data),
     dht_node_state:set_rm(State, RMState1);
-on({fd_notify, _Event, _DeadPid, _Reason}, State) ->
-    % TODO: forward to integrated modules?
-    State;
 
 % dead-node-cache reported dead node to be alive again
 on({zombie, Node}, State) ->
