@@ -30,6 +30,7 @@
                                              tester_parse_state:state().
 unittest_collect_module_info(Module, ParseState) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    erlang:put(module, Module),
     ModuleFile = code:where_is_file(atom_to_list(Module) ++ ".beam"),
     {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
         = beam_lib:chunks(ModuleFile, [abstract_code]),
@@ -40,6 +41,7 @@ unittest_collect_module_info(Module, ParseState) ->
 -spec collect_fun_info/4 :: (module(), atom(), non_neg_integer(),
                              tester_parse_state:state()) -> tester_parse_state:state().
 collect_fun_info(Module, Func, Arity, ParseState) ->
+    erlang:put(module, Module),
     ParseState2 =
         case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState) of
             {value, _} -> ParseState;
@@ -117,10 +119,10 @@ parse_chunk_log(Type, Module, State) ->
             exit(foobar);
         parse_error ->
             ct:pal("~p:~p: failed to parse chunk", [Module, Type]),
-            exit(foobar);
-        error:Reason ->
-            ct:pal("~p:~p: failed to parse chunk (error:~p)", [Module, Type, Reason]),
-            exit(foobar)
+            exit(foobar)%;
+%        error:Reason ->
+%            ct:pal("~p:~p: failed to parse chunk (error:~p)", [Module, Type, Reason]),
+%            exit(foobar)
     end.
 
 -spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) ->
@@ -185,12 +187,12 @@ parse_type_log(Type, Module, ParseState, Info) ->
     try
         parse_type(Type, Module, ParseState)
     catch
-        unkown_type ->
+        unknown_type ->
             ct:pal("~p:~p: failed to parse type ~p", [Module, Info, Type]),
-            exit(foobar);
-        error:Reason ->
-            ct:pal("~p:~p: failed to parse type ~p (error:~p)", [Module, Info, Type, Reason]),
-            exit(foobar)
+            exit(foobar)%;
+%%        error:Reason ->
+%%            ct:pal("~p:~p: failed to parse type ~p (error:~p)", [Module, Info, Type, Reason]),
+%%            exit(foobar)
     end.
 
 -spec parse_type/3 :: (any(), module(), tester_parse_state:state()) ->
@@ -445,9 +447,16 @@ parse_type({user_type, Line, TypeName, L}, Module, ParseState) ->
 parse_type({type, _Line, map, MapFields = [{type, _, map_field_assoc, _}| _]}, Module, ParseState) ->
     %% ct:pal("type assoc map ~p:~p~n~w~n~w~n~w~n", [Module, map, MapFields, erlang:get(current_module), _Line]),
     {Fields, NextParseState}
-        = lists:foldl(fun ({type, _, map_field_assoc, [{atom,_,FieldName}, Type]}, {FieldList, State}) ->
-                              {TheTypeSpec, NewParseState} = parse_type(Type, Module, State),
-                              {[{assoc_map_fields, FieldName, TheTypeSpec} | FieldList], NewParseState}
+        = lists:foldl(fun (FieldType, {FieldList, State}) ->
+                              case FieldType of
+                                  {type, _, map_field_assoc, [NameType, Type]} ->
+                                      {TheNameTypeSpec, NewParseState} = parse_type(NameType, Module, State),
+                                      {TheTypeSpec, NewParseState2} = parse_type(Type, Module, NewParseState),
+                                      {[{assoc_map_fields, TheNameTypeSpec, TheTypeSpec} | FieldList], NewParseState2};
+                                  _ ->
+                                      ct:pal("unknown map field: ~p", [FieldType]),
+                                      throw(parse_error)
+                              end
                       end,
                       {[], ParseState}, MapFields),
     {{type_assoc_map, Fields}, NextParseState};
@@ -471,8 +480,8 @@ parse_type({union, L}, Module, ParseState) ->
     {{union, Types}, NextParseState};
 parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
-    throw(unkown_type),
-    {unkown, ParseState}.
+    throw(unknown_type),
+    {unknown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) ->
     {list(type_spec()), tester_parse_state:state()}.
