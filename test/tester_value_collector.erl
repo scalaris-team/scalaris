@@ -26,91 +26,104 @@
 -export([parse_expression/2]).
 
 -spec parse_expression(any(), any()) -> any().
-parse_expression(Clauses, ParseState) when is_list(Clauses) ->
-    lists:foldl(fun parse_expression/2, ParseState, Clauses);
+parse_expression(Expr, State) ->
+    try
+        parse_expression_intern(Expr, State)
+    catch
+        unknown_expression ->
+            ct:pal("failed to parse expression ~p", [Expr]),
+            exit(foobar)%;
+        %error:Reason ->
+        %    ct:pal("failed to parse expression ~p (error:~p)", [Expr, Reason]),
+        %    exit(foobar)
+    end.
+
+-spec parse_expression_intern(any(), any()) -> any().
+parse_expression_intern(Clauses, ParseState) when is_list(Clauses) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Clauses);
 % binary comprehension
-parse_expression({bc, _, LeftElement, RightElements}, ParseState) ->
-    parse_expression(LeftElement, lists:foldl(fun parse_expression/2, ParseState, RightElements));
+parse_expression_intern({bc, _, LeftElement, RightElements}, ParseState) ->
+    parse_expression_intern(LeftElement, lists:foldl(fun parse_expression_intern/2, ParseState, RightElements));
 % binary generator
-parse_expression({b_generate, _, Pattern, Expression}, ParseState) ->
-    parse_expression(Pattern, parse_expression(Expression, ParseState));
-parse_expression({call, _, Fun, Parameters}, ParseState) ->
-    parse_expression(Parameters, parse_expression(Fun, ParseState));
-parse_expression({'case', _, Value, Clauses}, ParseState) ->
-    parse_expression(Clauses, parse_expression(Value, ParseState));
-parse_expression({clause, _Line, Pattern, _, Clause}, ParseState) ->
-    parse_expression(Clause, parse_expression(Pattern, ParseState));
-parse_expression({cons, _, Head, Tail}, ParseState) ->
-    parse_expression(Tail, parse_expression(Head, ParseState));
-parse_expression({'fun', _, {clauses, Clauses}}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Clauses);
-parse_expression({named_fun, _Loc, _Name, Clauses}, ParseState) -> % EEP37: Funs with names
-    lists:foldl(fun parse_expression/2, ParseState, Clauses);
-parse_expression({'fun', _, {function, _Name, _Arity}}, ParseState) ->
+parse_expression_intern({b_generate, _, Pattern, Expression}, ParseState) ->
+    parse_expression_intern(Pattern, parse_expression_intern(Expression, ParseState));
+parse_expression_intern({call, _, Fun, Parameters}, ParseState) ->
+    parse_expression_intern(Parameters, parse_expression_intern(Fun, ParseState));
+parse_expression_intern({'case', _, Value, Clauses}, ParseState) ->
+    parse_expression_intern(Clauses, parse_expression_intern(Value, ParseState));
+parse_expression_intern({clause, _Line, Pattern, _, Clause}, ParseState) ->
+    parse_expression_intern(Clause, parse_expression_intern(Pattern, ParseState));
+parse_expression_intern({cons, _, Head, Tail}, ParseState) ->
+    parse_expression_intern(Tail, parse_expression_intern(Head, ParseState));
+parse_expression_intern({'fun', _, {clauses, Clauses}}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Clauses);
+parse_expression_intern({named_fun, _Loc, _Name, Clauses}, ParseState) -> % EEP37: Funs with names
+    lists:foldl(fun parse_expression_intern/2, ParseState, Clauses);
+parse_expression_intern({'fun', _, {function, _Name, _Arity}}, ParseState) ->
     ParseState;
-parse_expression({'fun', _, {function, _Module, _Name, _Arity}}, ParseState) ->
+parse_expression_intern({'fun', _, {function, _Module, _Name, _Arity}}, ParseState) ->
     ParseState;
-parse_expression({generate, _, Expression, L}, ParseState) ->
-    parse_expression(L, parse_expression(Expression, ParseState));
-parse_expression({'if', _, Clauses}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Clauses);
-parse_expression({lc, _, Expression, Qualifiers}, ParseState) ->
-    parse_expression(Qualifiers, parse_expression(Expression, ParseState));
-parse_expression({match, _, Left, Right}, ParseState) ->
-    parse_expression(Left, parse_expression(Right, ParseState));
-parse_expression({op, _, _, Value}, ParseState) ->
-    parse_expression(Value, ParseState);
-parse_expression({op, _, _, Left, Right}, ParseState) ->
-    parse_expression(Left, parse_expression(Right, ParseState));
-parse_expression({'receive', _, Clauses}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Clauses);
-parse_expression({'receive', _, Clauses, Timeout, AfterBody}, ParseState) ->
-    ParseState2 = lists:foldl(fun parse_expression/2, ParseState, Clauses),
-    ParseState3 = parse_expression(Timeout, ParseState2),
-    parse_expression(AfterBody, ParseState3);
-parse_expression({record, _, _Name, Fields}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Fields);
-parse_expression({record, _, _Variable, _Name, Fields}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Fields);
-parse_expression({record_field, _, Name, Value}, ParseState) ->
-    parse_expression(Value, parse_expression(Name, ParseState));
-parse_expression({record_field, _, Name, _RecordType, Value}, ParseState) ->
-    parse_expression(Value, parse_expression(Name, ParseState));
-parse_expression({record_index, _, _Name, Value}, ParseState) ->
-    parse_expression(Value, ParseState);
-parse_expression({'try', _, Body, CaseClauses, CatchClauses, AfterBody}, ParseState) ->
-    ParseState2 = parse_expression(Body, ParseState),
-    ParseState3 = lists:foldl(fun parse_expression/2, ParseState2, CaseClauses),
-    ParseState4 = lists:foldl(fun parse_expression/2, ParseState3, CatchClauses),
-    parse_expression(AfterBody, ParseState4);
-parse_expression({'catch', _, Expression}, ParseState) ->
-    parse_expression(Expression, ParseState);
-parse_expression({block, _, ExpressionList}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, ExpressionList);
-parse_expression({tuple, _, Values}, ParseState) ->
-    lists:foldl(fun parse_expression/2, ParseState, Values);
-parse_expression({remote, _, Module, Fun}, ParseState) ->
-    parse_expression(Module, parse_expression(Fun, ParseState));
-parse_expression({var, _, _Variable}, ParseState) ->
+parse_expression_intern({generate, _, Expression, L}, ParseState) ->
+    parse_expression_intern(L, parse_expression_intern(Expression, ParseState));
+parse_expression_intern({'if', _, Clauses}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Clauses);
+parse_expression_intern({lc, _, Expression, Qualifiers}, ParseState) ->
+    parse_expression_intern(Qualifiers, parse_expression_intern(Expression, ParseState));
+parse_expression_intern({match, _, Left, Right}, ParseState) ->
+    parse_expression_intern(Left, parse_expression_intern(Right, ParseState));
+parse_expression_intern({op, _, _, Value}, ParseState) ->
+    parse_expression_intern(Value, ParseState);
+parse_expression_intern({op, _, _, Left, Right}, ParseState) ->
+    parse_expression_intern(Left, parse_expression_intern(Right, ParseState));
+parse_expression_intern({'receive', _, Clauses}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Clauses);
+parse_expression_intern({'receive', _, Clauses, Timeout, AfterBody}, ParseState) ->
+    ParseState2 = lists:foldl(fun parse_expression_intern/2, ParseState, Clauses),
+    ParseState3 = parse_expression_intern(Timeout, ParseState2),
+    parse_expression_intern(AfterBody, ParseState3);
+parse_expression_intern({record, _, _Name, Fields}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Fields);
+parse_expression_intern({record, _, _Variable, _Name, Fields}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Fields);
+parse_expression_intern({record_field, _, Name, Value}, ParseState) ->
+    parse_expression_intern(Value, parse_expression_intern(Name, ParseState));
+parse_expression_intern({record_field, _, Name, _RecordType, Value}, ParseState) ->
+    parse_expression_intern(Value, parse_expression_intern(Name, ParseState));
+parse_expression_intern({record_index, _, _Name, Value}, ParseState) ->
+    parse_expression_intern(Value, ParseState);
+parse_expression_intern({'try', _, Body, CaseClauses, CatchClauses, AfterBody}, ParseState) ->
+    ParseState2 = parse_expression_intern(Body, ParseState),
+    ParseState3 = lists:foldl(fun parse_expression_intern/2, ParseState2, CaseClauses),
+    ParseState4 = lists:foldl(fun parse_expression_intern/2, ParseState3, CatchClauses),
+    parse_expression_intern(AfterBody, ParseState4);
+parse_expression_intern({'catch', _, Expression}, ParseState) ->
+    parse_expression_intern(Expression, ParseState);
+parse_expression_intern({block, _, ExpressionList}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, ExpressionList);
+parse_expression_intern({tuple, _, Values}, ParseState) ->
+    lists:foldl(fun parse_expression_intern/2, ParseState, Values);
+parse_expression_intern({remote, _, Module, Fun}, ParseState) ->
+    parse_expression_intern(Module, parse_expression_intern(Fun, ParseState));
+parse_expression_intern({var, _, _Variable}, ParseState) ->
     %ct:pal("~w", [_Variable]),
     ParseState;
-parse_expression({atom, _, Atom}, ParseState) ->
+parse_expression_intern({atom, _, Atom}, ParseState) ->
     tester_parse_state:add_atom(Atom, ParseState);
-parse_expression({bin, _, [{bin_element,_,{string,_,String},default,default}]},
+parse_expression_intern({bin, _, [{bin_element,_,{string,_,String},default,default}]},
                  ParseState) ->
     tester_parse_state:add_binary(list_to_binary(String), ParseState);
-parse_expression({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},default}]},
+parse_expression_intern({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},default}]},
                  ParseState) ->
     ParseState;
-parse_expression({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},[binary]}]},
+parse_expression_intern({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},[binary]}]},
                  ParseState) ->
     ParseState;
-parse_expression({bin, _, [{bin_element,_,{var,_,_},default,[binary]}]},
+parse_expression_intern({bin, _, [{bin_element,_,{var,_,_},default,[binary]}]},
                  ParseState) ->
     ParseState;
-parse_expression({bin, _, []}, ParseState) ->
+parse_expression_intern({bin, _, []}, ParseState) ->
     ParseState;
-parse_expression({bin, _, Elements}, ParseState) when is_list(Elements) ->
+parse_expression_intern({bin, _, Elements}, ParseState) when is_list(Elements) ->
     BinStrings =
         [String ||
          {bin_element,_,{string,_,String},default,default} <- Elements],
@@ -118,22 +131,30 @@ parse_expression({bin, _, Elements}, ParseState) when is_list(Elements) ->
       fun(String, Acc) ->
               tester_parse_state:add_binary(list_to_binary(String), Acc)
       end, ParseState, BinStrings);
-parse_expression({float, _, Float}, ParseState) ->
+parse_expression_intern({float, _, Float}, ParseState) ->
     tester_parse_state:add_float(Float, ParseState);
-parse_expression({char, _, _Char}, ParseState) ->
+parse_expression_intern({char, _, _Char}, ParseState) ->
     % @todo
     ParseState;
-parse_expression({integer, _, Integer}, ParseState) ->
+parse_expression_intern({integer, _, Integer}, ParseState) ->
     tester_parse_state:add_integer(Integer, ParseState);
-parse_expression({map, _, []}, ParseState) -> % map:new()
-    ParseState;
-parse_expression({nil, _}, ParseState) ->
+parse_expression_intern({map, _, L}, ParseState) when is_list(L) -> % map:new(X)
+    parse_expression_intern(L, ParseState);
+parse_expression_intern({map, _, Var, L}, ParseState) when is_list(L) -> % map:new(X)
+    parse_expression_intern(Var, parse_expression_intern(L, ParseState));
+parse_expression_intern({map_field_exact, _, Left, Right}, ParseState) -> % map field
+    parse_expression_intern(Left, parse_expression_intern(Right, ParseState));
+parse_expression_intern({map_field_assoc, _, Left, Right}, ParseState) -> % map field
+    parse_expression_intern(Left, parse_expression_intern(Right, ParseState));
+parse_expression_intern({nil, _}, ParseState) ->
     tester_parse_state:add_atom(nil, ParseState);
-parse_expression({string, _, String}, ParseState) ->
+parse_expression_intern({string, _, String}, ParseState) ->
     tester_parse_state:add_string(String, ParseState);
 
-parse_expression(Expression, _ParseState) ->
-    ?ct_fail("unknown expression: ~w in ~w:~w", [Expression,
-                                                 erlang:get(module),
-                                                 erlang:get(fun_name)]).
+parse_expression_intern(Expression, ParseState) ->
+    ct:pal("unknown expression: ~w in ~w:~w", [Expression,
+                                               erlang:get(module),
+                                               erlang:get(fun_name)]),
+    throw(unknown_expression),
+    ParseState.
 
