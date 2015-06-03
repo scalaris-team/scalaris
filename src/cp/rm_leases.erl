@@ -82,7 +82,7 @@ rm_filter(Old, New, Reason) ->
             OldRange =/= NewRange;
         {node_discovery} ->
             OldRange =/= NewRange;
-        {graceful_leave, _PredOrSucc, _Node} -> % @todo ?
+        {graceful_leave, _Node} -> % @todo ?
             false;
         {update_id_failed} -> % @todo ?
             false;

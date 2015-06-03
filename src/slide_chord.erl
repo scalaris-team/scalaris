@@ -88,7 +88,8 @@ change_my_id(State, SlideOp, ReplyPid) ->
     case slide_op:is_leave(SlideOp2) andalso
              slide_op:get_next_op(SlideOp2) =:= {none} of
         true ->
-            rm_loop:leave(),
+            Tag = ?IIF(slide_op:is_jump(SlideOp2), jump, leave),
+            rm_loop:leave(Tag),
             % de-activate processes not needed anymore:
             dht_node_reregister:deactivate(),
             % note: do not deactivate gossip, vivaldi or dc_clustering -

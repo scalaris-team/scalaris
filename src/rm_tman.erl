@@ -271,47 +271,6 @@ new_succ(State, NewSucc) ->
     % similar to new_pred/2
     {{node_discovery}, update_nodes(State, [NewSucc], [], null)}.
 
-%% @doc Removes the given predecessor as a result from a graceful leave only!
--spec remove_pred(State::state(), OldPred::node:node_type(),
-                  PredsPred::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_pred(State, OldPred, PredsPred) ->
-    State2 = update_nodes(State, [PredsPred], [OldPred], null),
-    % in order for incremental leaves to finish correctly, we must remove any
-    % out-dated preds which seem to be the new predecessor in our state here!
-    % -> try to re-add them with updated information though
-    NewNeighborhood1 = element(1, State2),
-    I = intervals:new('(', node:id(PredsPred), nodelist:nodeid(NewNeighborhood1), ')'),
-    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, PredsPred),
-    State3 = setelement(1, State2, NewNeighborhood2),
-    {{graceful_leave, pred, OldPred}, State3}.
-
-%% @doc Removes the given successor as a result from a graceful leave only!
--spec remove_succ(State::state(), OldSucc::node:node_type(),
-                  SuccsSucc::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_succ(State, OldSucc, SuccsSucc) ->
-    % similar to remove_pred/3
-    State2 = update_nodes(State, [SuccsSucc], [OldSucc], null),
-    % remove any out-dated succs which seem to be the new successor
-    % -> try to re-add them with updated information though
-    NewNeighborhood1 = element(1, State2),
-    I = intervals:new('(', nodelist:nodeid(NewNeighborhood1), node:id(SuccsSucc), ')'),
-    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, SuccsSucc),
-    State3 = setelement(1, State2, NewNeighborhood2),
-    {{graceful_leave, succ, OldSucc}, State3}.
-
-%% @doc Removes the given node as a result from a graceful leave only!
--spec remove_node(State::state(), NodePid::comm:mypid())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-remove_node(State, NodePid) ->
-    {Neighborhood, RandViewSize, Cache, Churn} =
-        update_nodes(State, [], [NodePid], null),
-    % try to find a replacement in the cache:
-    NewNeighborhood = trigger_update(Neighborhood, [], Cache),
-    {{graceful_leave, other, NodePid},
-     {NewNeighborhood, RandViewSize, Cache, Churn}}.
-
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
@@ -377,19 +336,42 @@ contact_new_nodes([_|_] = NewNodes) ->
 contact_new_nodes([]) ->
     ok.
 
--spec leave(State::state()) -> ok.
-leave(_State) -> ok.
-
-% failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
+%% @doc Failure detector reported dead/changed node.
+-spec fd_notify(State::state(), Event::fd:event(), DeadPid::comm:mypid(),
+                Data::term())
         -> {ChangeReason::rm_loop:reason(), state()}.
-crashed_node(State, DeadPid, Reason) when Reason =:= jump orelse Reason =:= leave ->
-    % graceful leave - do not add as zombie candidate!
+fd_notify(State, leave, _DeadPid, OldNode) ->
+    % graceful leave -> do not add as zombie candidate!
+    {Neighborhood, RandViewSize, Cache, Churn} =
+        update_nodes(State, [], [OldNode], null),
+    % try to find a replacement in the cache:
+    NewNeighborhood = trigger_update(Neighborhood, [], Cache),
+    {{graceful_leave, OldNode},
+     {NewNeighborhood, RandViewSize, Cache, Churn}};
+fd_notify(State, jump, _DeadPid, OldNode) ->
+    % remove old node while jumping -> do not add as zombie candidate!
+    % the node will be added again (or might already have been added)
+    % -> only remove from neighbours if older!
+    FilterFun = fun(N) ->
+                        ?implies(node:same_process(N, OldNode),
+                                 node:is_newer(N, OldNode))
+                end,
+    {Neighborhood, RandViewSize, Cache, Churn} =
+        update_nodes2(State, [], true, FilterFun, null),
+    % try to find a replacement in the cache:
+    NewNeighborhood = trigger_update(Neighborhood, [], Cache),
+    {{graceful_leave, OldNode},
+     {NewNeighborhood, RandViewSize, Cache, Churn}};
+fd_notify(State, crash, DeadPid, _Reason) ->
+    % crash, i.e. non-graceful leave -> add as zombie candidate
+    {Neighborhood, RandViewSize, Cache, Churn} =
+        update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1),
+    % try to find a replacement in the cache:
+    NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{node_crashed, DeadPid},
-     update_nodes(State, [], [DeadPid], null)};
-crashed_node(State, DeadPid, _Reason) ->
-    {{node_crashed, DeadPid},
-     update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1)}.
+     {NewNeighborhood, RandViewSize, Cache, Churn}};
+fd_notify(State, _Event, _DeadPid, _Data) ->
+    {{unknown}, State}.
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type())
@@ -487,48 +469,46 @@ trigger_update(OldNeighborhood, MyRndView, OtherNodes) ->
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
         -> NewState::state().
-update_nodes(State, [], [], _RemoveNodeEvalFun) ->
+update_nodes(State, NodesToAdd, [], RemoveNodeEvalFun) ->
+    update_nodes2(State, NodesToAdd, false, fun(_N) -> true end, RemoveNodeEvalFun);
+update_nodes(State, NodesToAdd, [Node], RemoveNodeEvalFun) ->
+    FilterFun = fun(N) -> not node:same_process(N, Node) end,
+    update_nodes2(State, NodesToAdd, true, FilterFun, RemoveNodeEvalFun);
+update_nodes(State, NodesToAdd, [_,_|_] = NodesToRemove, RemoveNodeEvalFun) ->
+    FilterFun = fun(N) -> not lists:any(
+                            fun(B) -> node:same_process(N, B) end,
+                            NodesToRemove)
+                end,
+    update_nodes2(State, NodesToAdd, true, FilterFun, RemoveNodeEvalFun).
+
+%% @doc Helper for update_nodes/4 with a more generic interface.
+%% @see update_nodes/4
+-spec update_nodes2(State::state(),
+                    NodesToAdd::[node:node_type()], MayRemove::boolean(),
+                    NodesFilterFun::fun((node:node_type()) -> boolean()),
+                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
+        -> NewState::state().
+update_nodes2(State, [], false, _FilterFun, _RemoveNodeEvalFun) ->
     State;
-update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
-             NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
+update_nodes2({OldNeighborhood, RandViewSize, OldCache, _Churn},
+             NodesToAdd, MayRemove, FilterFun, RemoveNodeEvalFun) ->
     % keep all nodes that are not in NodesToRemove
     % note: NodesToRemove should have 0 or 1 element in most cases
     OldPredPid = node:pidX(nodelist:pred(OldNeighborhood)),
     OldSuccPid = node:pidX(nodelist:succ(OldNeighborhood)),
-    case NodesToRemove of
-        [] ->
-            Nbh1 = OldNeighborhood,
-            NewCache = OldCache;
-        [Node] when is_function(RemoveNodeEvalFun) ->
-            FilterFun = fun(N) -> not node:same_process(N, Node) end,
-            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
-            NewCache = nodelist:lfilter(OldCache, FilterFun);
-        [Node] ->
-            FilterFun = fun(N) -> not node:same_process(N, Node) end,
-            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
-            NewCache = nodelist:lfilter(OldCache, FilterFun);
-        [_,_|_] when is_function(RemoveNodeEvalFun) ->
-            FilterFun = fun(N) -> not lists:any(
-                                    fun(B) -> node:same_process(N, B) end,
-                                    NodesToRemove)
-                        end,
-            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
-            NewCache = nodelist:lfilter(OldCache, FilterFun);
-        [_,_|_] ->
-            FilterFun = fun(N) -> not lists:any(
-                                    fun(B) -> node:same_process(N, B) end,
-                                    NodesToRemove)
-                        end,
-            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
-            NewCache = nodelist:lfilter(OldCache, FilterFun)
-    end,
+    Nbh1 = if is_function(RemoveNodeEvalFun) ->
+                  nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun);
+              true ->
+                  nodelist:filter(OldNeighborhood, FilterFun)
+           end,
+    NewCache = nodelist:lfilter(OldCache, FilterFun),
 
     NewNeighborhood = nodelist:add_nodes(Nbh1, NodesToAdd,
                                          get_pred_list_length(),
                                          get_succ_list_length()),
 
     NewChurn = has_churn(OldNeighborhood, NewNeighborhood),
-    NewRandViewSize = case NewChurn andalso NodesToRemove =/= [] of
+    NewRandViewSize = case NewChurn andalso MayRemove of
                           true -> 0;
                           _    -> RandViewSize
                       end,

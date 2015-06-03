@@ -1132,7 +1132,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
         -> dht_node_state:state().
 finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     SupDhtNode = pid_groups:get_my(sup_dht_node),
-    fd:report(crash, sup:sup_get_all_children(SupDhtNode), leave),
+    % note: the prepare_send_data1 callback already notified nodes subscribed to fd
     State1 = finish_slide(State, SlideOp),
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
     comm:send_local(pid_groups:find_a(service_per_vm),
@@ -1142,8 +1142,7 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     State1;
 finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     NewId = slide_op:get_jump_target_id(SlideOp),
-    SupDhtNode = pid_groups:get_my(sup_dht_node),
-    fd:report(crash, sup:sup_get_all_children(SupDhtNode), jump),
+    % note: the prepare_send_data1 callback already notified nodes subscribed to fd
     State1 = finish_slide(State, SlideOp),
 
     %% Rejoin at NewId but keep processes

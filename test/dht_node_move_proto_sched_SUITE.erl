@@ -73,4 +73,6 @@ proto_sched_fun(stop) ->
             proto_sched:wait_for_end(),
             unittest_helper:print_proto_sched_stats(at_end_if_failed),
             proto_sched:cleanup()
-    end.
+    end;
+proto_sched_fun(Fun) when is_function(Fun) ->
+    Fun().

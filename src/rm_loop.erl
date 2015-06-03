@@ -42,13 +42,13 @@
 -define(TRACE_STATE(OldState, NewState, Reason), ok).
 
 -export([send_trigger/0, init_first/0, init/4, on/2,
-         leave/0, update_id/1,
+         leave/1, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
          notify_slide_finished/1,
          propose_new_neighbors/1,
          % received at dht_node, (also) handled here:
-         crashed_node/3, zombie_node/2,
+         fd_notify/4, zombie_node/2,
          % node/neighborhood change subscriptions:
          subscribe/5, unsubscribe/2,
          subscribe_dneighbor_change_filter/3,
@@ -61,8 +61,7 @@
 -export_type([state/0, reason/0]).
 
 -type reason() :: {slide_finished, pred | succ | none} | % a slide finished
-                  {graceful_leave, pred | succ, Node::node:node_type()} | % the given node is about to leave
-                  {graceful_leave, other, NodePid::comm:mypid()} | % the given node is about to leave
+                  {graceful_leave, Node::node:node_type()} | % the given node is about to leave
                   {node_crashed, Node::comm:mypid()} | % the given node crashed
                   {add_subscriber} | % a subscriber was added
                   {node_discovery} | % a new/changed node was discovered
@@ -92,10 +91,7 @@
     {rm, notify_slide_finished, SlideType::pred | succ} |
     {rm, propose_new_neighbors, NewNodes::[node:node_type(),...]} |
     {rm, node_info, SourcePid::comm:mypid(), Which::[is_leaving | succlist | succ | predlist | pred | node,...]} |
-    {rm, leave} |
-    {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
-    {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
-    {rm, node_left, Node::node:node_type()} |
+    {rm, leave, Tag::jump | leave} |
     {rm, update_my_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
@@ -128,14 +124,14 @@ is_responsible(Key, {RM_State, HasLeft, _SubscrTable}) ->
         intervals:in(Key, nodelist:node_range(?RM:get_neighbors(RM_State))).
 
 
-%% @doc Notifies the successor and predecessor that the current dht_node is
+%% @doc Notifies fd-subscribed nodes that the current dht_node is
 %%      going to leave. Will inform the dht_node process (message handled in
 %%      dht_node_move).
 %%      Note: only call this method from inside the dht_node process!
--spec leave() -> ok.
-leave() ->
+-spec leave(Tag::jump | leave) -> ok.
+leave(Tag) ->
     Pid = pid_groups:get_my(dht_node),
-    comm:send_local(Pid, {rm, leave}).
+    comm:send_local(Pid, {rm, leave, Tag}).
 
 %% @doc Sends a message to the remote node's dht_node process notifying
 %%      it of a new successor.
@@ -285,21 +281,6 @@ on({rm, propose_new_neighbors, NewNodes}, State) ->
     ?RM:contact_new_nodes(NewNodes),
     State;
 
-% only from graceful leave
-on({rm, pred_left, OldPred, PredsPred}, State) ->
-    RMFun = fun(RM_State) -> ?RM:remove_pred(RM_State, OldPred, PredsPred) end,
-    update_state(State, RMFun);
-
-% only from graceful leave
-on({rm, succ_left, OldSucc, SuccsSucc}, State) ->
-    RMFun = fun(RM_State) -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
-    update_state(State, RMFun);
-
-% only from graceful leave
-on({rm, node_left, NodePid}, State) ->
-    RMFun = fun(RM_State) -> ?RM:remove_node(RM_State, NodePid) end,
-    update_state(State, RMFun);
-
 on({rm, update_my_id, NewId}, State) ->
     Neighborhood = ?RM:get_neighbors(element(1, State)),
     OldMe = nodelist:node(Neighborhood),
@@ -343,22 +324,16 @@ on({rm, node_info, SourcePid, Which}, {RM_State, HasLeft, _SubscrTable} = State)
     comm:send(SourcePid, {rm, node_info_response, NodeDetails}, ?SEND_OPTIONS),
     State;
 
-on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
+on({rm, leave, Tag}, {RM_State, _HasLeft, SubscrTable}) ->
     Neighborhood = ?RM:get_neighbors(RM_State),
     Me = nodelist:node(Neighborhood),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    fd:report(Tag, sup:sup_get_all_children(SupDhtNode), Me),
+    % also update the pred in the successor:
     Pred = nodelist:pred(Neighborhood),
-    Succ = nodelist:succ(Neighborhood),
-    comm:send(node:pidX(Succ), {rm, pred_left, Me, Pred}, ?SEND_OPTIONS),
-    comm:send(node:pidX(Pred), {rm, succ_left, Me, Succ}, ?SEND_OPTIONS),
-    % notify other nodes to remove this node (independent of the fd since node
-    % jumps now re-use node IDs)
-    MyPid = node:pidX(Me),
-    _ = [begin
-             NPid = node:pidX(N),
-             comm:send(NPid, {rm, node_left, MyPid})
-         end || N <- tl(nodelist:to_list(Neighborhood)), N =/= Pred, N =/= Succ],
-    comm:send_local(self(), {move, node_leave}), % msg to dht_node
-    ?RM:leave(RM_State),
+    notify_new_pred(node:pidX(nodelist:succ(Neighborhood)), Pred),
+    % msg to dht_node to continue the slide:
+    comm:send_local(self(), {move, node_leave}),
     {RM_State, true, SubscrTable};
 
 %% requests the move state of the rm, e.g. before rejoining the ring
@@ -398,13 +373,14 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
     end.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason()) -> state().
-crashed_node(State, DeadPid, Reason) ->
-    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid, Reason) end,
+-spec fd_notify(State::state(), Event::fd:event(), DeadPid::comm:mypid(),
+                Data::term()) -> state().
+fd_notify(State, Event, DeadPid, Data) ->
+    RMFun = fun(RM_State) -> ?RM:fd_notify(RM_State, Event, DeadPid, Data) end,
     NewState = update_state(State, RMFun, DeadPid),
-    % only do rrepair for non-slide failures (otherwise the data was already transferred)
+    % do rrepair in case of non-graceful leaves only
     case config:read(rrepair_after_crash) andalso
-             not lists:member(Reason, [leave, jump]) of
+             Event =:= crash of
         true ->
             OldPred = nodelist:pred(?RM:get_neighbors(element(1, State))),
             NewNeighb = ?RM:get_neighbors(element(1, NewState)),

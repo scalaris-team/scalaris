@@ -1103,8 +1103,12 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
              end(),
     ct:pal("Result: ~p~n", [Result]),
     ?proto_sched(stop),
+    % when the protocol finishes, the pred/succ infos in the ring should be correct!
+    ?proto_sched(fun admin:check_ring/0), % only safe with proto_sched!
     %% check result
     if Result =:= wrong_pred_succ_node ->
+            % should not happen with proto_sched!
+            ?proto_sched(fun() -> ?ct_fail("Result should not be wrong_pred_succ_node", []) end),
             ct:pal("Retrying because of wrong_pred_succ_node"),
             timer:sleep(10),
             perform_jump(JumpingNode, TargetKey, InvalidTarget);
