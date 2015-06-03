@@ -822,9 +822,10 @@ normalize_pidinfo(Pid) ->
     case is_pid(Pid) of
         true ->
             ?ASSERT(node(Pid) =:= node()),
-            PidName = case pid_groups:group_and_name_of(Pid) of
+            PidName = try pid_groups:group_and_name_of(Pid) of
                           failed -> no_pid_name;
                           Name -> Name
+                      catch _:_ -> no_pid_name
                       end,
             {comm:make_global(Pid), PidName};
         false ->
@@ -833,10 +834,11 @@ normalize_pidinfo(Pid) ->
                     case comm:is_local(Pid) of
                         true ->
                             PidName =
-                                case pid_groups:group_and_name_of(
+                                try pid_groups:group_and_name_of(
                                        comm:make_local(Pid)) of
                                     failed -> no_pid_name;
                                     Name -> Name
+                                catch _:_ -> no_pid_name
                                 end,
                             {Pid, PidName};
                         false -> {Pid, non_local_pid_name_unknown}
