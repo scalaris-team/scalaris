@@ -14,6 +14,7 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc    value collector for test generator
+%%         see http://www.erlang.org/doc/apps/erts/absform.html
 %% @end
 %% @version $Id$
 -module(tester_value_collector).
@@ -27,6 +28,12 @@
 -spec parse_expression(any(), any()) -> any().
 parse_expression(Clauses, ParseState) when is_list(Clauses) ->
     lists:foldl(fun parse_expression/2, ParseState, Clauses);
+% binary comprehension
+parse_expression({bc, _, LeftElement, RightElements}, ParseState) ->
+    parse_expression(LeftElement, lists:foldl(fun parse_expression/2, ParseState, RightElements));
+% binary generator
+parse_expression({b_generate, _, Pattern, Expression}, ParseState) ->
+    parse_expression(Pattern, parse_expression(Expression, ParseState));
 parse_expression({call, _, Fun, Parameters}, ParseState) ->
     parse_expression(Parameters, parse_expression(Fun, ParseState));
 parse_expression({'case', _, Value, Clauses}, ParseState) ->
