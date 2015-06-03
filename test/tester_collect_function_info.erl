@@ -117,7 +117,7 @@ parse_chunk_log(Type, Module, State) ->
             exit(foobar);
         parse_error ->
             ct:pal("~p:~p: failed to parse chunk", [Module, Type]),
-            exit(foobar)%;
+            exit(foobar);
         error:Reason ->
             ct:pal("~p:~p: failed to parse chunk (error:~p)", [Module, Type, Reason]),
             exit(foobar)
@@ -187,7 +187,7 @@ parse_type_log(Type, Module, ParseState, Info) ->
     catch
         unkown_type ->
             ct:pal("~p:~p: failed to parse type ~p", [Module, Info, Type]),
-            exit(foobar)
+            exit(foobar);
         error:Reason ->
             ct:pal("~p:~p: failed to parse type ~p (error:~p)", [Module, Info, Type, Reason]),
             exit(foobar)
