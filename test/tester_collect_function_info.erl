@@ -21,9 +21,21 @@
 -vsn('$Id$').
 
 -export([collect_fun_info/4]).
+-export([unittest_collect_module_info/2]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
+
+-spec unittest_collect_module_info/2 :: (module(), tester_parse_state:state()) ->
+                                             tester_parse_state:state().
+unittest_collect_module_info(Module, ParseState) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    ModuleFile = code:where_is_file(atom_to_list(Module) ++ ".beam"),
+    {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
+        = beam_lib:chunks(ModuleFile, [abstract_code]),
+    lists:foldl(fun(Chunk, InnerParseState) ->
+                        parse_chunk_log(Chunk, Module, InnerParseState)
+                end, ParseState, AbstractCode).
 
 -spec collect_fun_info/4 :: (module(), atom(), non_neg_integer(),
                              tester_parse_state:state()) -> tester_parse_state:state().
