@@ -48,7 +48,7 @@ collect_fun_info(Module, Func, Arity, ParseState) ->
                 {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
                     = beam_lib:chunks(ModuleFile, [abstract_code]),
                 lists:foldl(fun(Chunk, InnerParseState) ->
-                                    parse_chunk(Chunk, Module, InnerParseState)
+                                    parse_chunk_log(Chunk, Module, InnerParseState)
                             end, ParseState, AbstractCode)
         end,
     ParseState3 = case tester_parse_state:has_unknown_types(ParseState2) of
@@ -101,11 +101,27 @@ collect_type_info(Module, Type, Arity, ParseState) ->
                     {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
                     = beam_lib:chunks(FileName, [abstract_code]),
                     lists:foldl(fun (Chunk, InnerParseState) ->
-                                        parse_chunk(Chunk, Module, InnerParseState)
+                                        parse_chunk_log(Chunk, Module, InnerParseState)
                                 end, ParseState, AbstractCode)
             end
     end.
 
+-spec parse_chunk_log/3 :: (any(), module(), tester_parse_state:state()) ->
+    tester_parse_state:state().
+parse_chunk_log(Type, Module, State) ->
+    try
+        parse_chunk(Type, Module, State)
+    catch
+        subst_error ->
+            ct:pal("~p:~p: failed to substitute", [Module, Type]),
+            exit(foobar);
+        parse_error ->
+            ct:pal("~p:~p: failed to parse chunk", [Module, Type]),
+            exit(foobar)%;
+        error:Reason ->
+            ct:pal("~p:~p: failed to parse chunk (error:~p)", [Module, Type, Reason]),
+            exit(foobar)
+    end.
 
 -spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) ->
     tester_parse_state:state().
@@ -137,10 +153,10 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
                       catch
                           {subst_error, Description} ->
                               ct:pal("substitution error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
-                              exit(foobar);
+                              throw(subst_error);
                           {parse_error, Description} ->
                               ct:pal("parse error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
-                              exit(foobar)
+                              throw(parse_error)
                       end;
                   _ ->
                       TheFunSpec
@@ -170,7 +186,10 @@ parse_type_log(Type, Module, ParseState, Info) ->
         parse_type(Type, Module, ParseState)
     catch
         unkown_type ->
-            ct:pal("~p:~p: failed to parse  ~p", [Module, Info, Type]),
+            ct:pal("~p:~p: failed to parse type ~p", [Module, Info, Type]),
+            exit(foobar)
+        error:Reason ->
+            ct:pal("~p:~p: failed to parse type ~p (error:~p)", [Module, Info, Type, Reason]),
             exit(foobar)
     end.
 
