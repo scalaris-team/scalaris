@@ -202,6 +202,8 @@ parse_type({type, _Line, nonempty_list, [Type]}, Module, ParseState) ->
     {{nonempty_list, ListType}, ParseState2};
 parse_type({type, _Line, list, []}, _Module, ParseState) ->
     {{list, {typedef, tester, test_any, []}}, ParseState};
+parse_type([], _Module, ParseState) ->
+    {{list, {typedef, tester, test_any, []}}, ParseState};
 parse_type({type, _Line, range, [Begin, End]}, Module, ParseState) ->
     {BeginType, ParseState2} = parse_type(Begin, Module, ParseState),
     {EndType, ParseState3} = parse_type(End, Module, ParseState2),
@@ -395,6 +397,8 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
     end;
 parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
     {{var, Atom}, ParseState};
+parse_type({var, Atom}, _Module, ParseState) when is_atom(Atom) ->
+    {{var, Atom}, ParseState};
 parse_type({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
     {{constraint, nyi}, ParseState};
 parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState) ->
@@ -439,6 +443,13 @@ parse_type({type, _Line, TypeName, L}, Module, ParseState) ->
     end;
 %% parse_type({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
 %%     {{ann_type, [Left, Right]}, ParseState};
+parse_type({union, L}, Module, ParseState) ->
+    Foldl = fun (NextType, {TypeList, AParseState}) ->
+                    {TheTypeSpec, NewParseState} = parse_type(NextType, Module, AParseState),
+                    {[TheTypeSpec | TypeList], NewParseState}
+            end,
+    {Types, NextParseState} = lists:foldl(Foldl, {[], ParseState}, L),
+    {{union, Types}, NextParseState};
 parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     throw(unkown_type),
