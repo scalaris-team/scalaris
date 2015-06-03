@@ -51,4 +51,8 @@ all() ->
         [{group, graceful_leave_load}] ++
         test_cases().
 
+-spec additional_ring_config() -> [].
+additional_ring_config() ->
+    [].
+
 -include("join_leave_SUITE.hrl").

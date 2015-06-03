@@ -53,6 +53,15 @@ all() ->
          {group, graceful_leave_load}] ++
         test_cases().
 
+-spec additional_ring_config() -> [{stabilization_interval_base, 100000},...].
+additional_ring_config() ->
+    % increase ring stabilisation interval since proto_sched infections get
+    % lost if rm subscriptions are triggered instead of continuing due to our
+    % direct (and infected) messages!
+    [{stabilization_interval_base, 100000}, % ms
+     {tman_cyclon_interval, 100} % s
+    ].
+
 -include("join_leave_SUITE.hrl").
 
 -spec proto_sched_fun(start | restart | stop) -> ok.
