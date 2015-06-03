@@ -117,7 +117,8 @@ get_meminfo() ->
 %% @doc Checks whether the NewMemInfo field indicates increased memory use
 %%      compared to PrevMemInfo and returns whether this is the case or not.
 %%      AddedSize is the expected binary size difference.
-%%      Note: Tolerates 50k binary and 50k processes_used overhead.
+%%      Note: Tolerates 250k binary, 250k processes_used and 250k ets overhead
+%%            (keep in sync with check_memory_inc_/5).
 -spec check_memory_inc_bool(
         PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
         NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> boolean().
@@ -125,19 +126,18 @@ check_memory_inc_bool(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
 
-    % NOTE: use stronger bounds than check_memory_inc/4 as other processes may increase the memory use again
     % we do not create additional atoms!
     NewMemInfo#mem_info.atom_used =:= PrevMemInfo#mem_info.atom_used andalso
     % tolerate 50k binary memory overhead for running maintenance processes and binary messages
-    NewMemInfo#mem_info.binary =< (PrevMemInfo#mem_info.binary + AddedSize + 50000) andalso
+    NewMemInfo#mem_info.binary =< (PrevMemInfo#mem_info.binary + AddedSize + 250000) andalso
     % tolerate 50k processes_used memory overhead for running maintenance processes like RT rebuild etc.
-    NewMemInfo#mem_info.processes_used =< (PrevMemInfo#mem_info.processes_used + 50000) andalso
-    NewMemInfo#mem_info.ets =< (PrevMemInfo#mem_info.ets + 50000 + (EntryEtsSize * NewItems)).
+    NewMemInfo#mem_info.processes_used =< (PrevMemInfo#mem_info.processes_used + 250000) andalso
+    NewMemInfo#mem_info.ets =< (PrevMemInfo#mem_info.ets + 250000 + (EntryEtsSize * NewItems)).
 
 %% @doc Checks whether the NewMemInfo field indicates increased memory use
 %%      compared to PrevMemInfo. AddedSize is the expected binary size
 %%      difference.
-%%      Note: Tolerates 250k binary and 250k processes_used overhead.
+%%      Note: Tolerates 250k binary, 250k processes_used and 250k ets overhead.
 -spec check_memory_inc(
         PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
         NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> ok.
@@ -169,6 +169,8 @@ check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, CheckAtoms) ->
                            lists:flatten(io_lib:format("PrevProcUSize: ~B, NewProcUSize: ~B, Diff: ~B",
                                          [PrevMemInfo#mem_info.processes_used, NewMemInfo#mem_info.processes_used,
                                           NewMemInfo#mem_info.processes_used - PrevMemInfo#mem_info.processes_used]))),
+
+    % tolerate 250k ets memory overhead
     ?equals_pattern_w_note(NewMemInfo#mem_info.ets, X when X =< PrevMemInfo#mem_info.ets + 250000 + (EntryEtsSize * NewItems),
                            lists:flatten(io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
                                          [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
@@ -217,8 +219,7 @@ write(Number, Size) when Number >= 1 ->
                          end,
                          fun(BSize, _PrevSize) -> BSize end,
                          0),
-    garbage_collect_all_and_check(40, PrevMemInfo, 1, MyBinSize),
-    NewMemInfo = get_meminfo(),
+    NewMemInfo = garbage_collect_all_and_check(40, PrevMemInfo, 1, MyBinSize),
 %%     ct:pal("~p~n", [erlang:memory()]),
     print_table_info(Table),
     check_memory_inc(PrevMemInfo, NewMemInfo, 1, MyBinSize),
@@ -230,10 +231,7 @@ fill_1000(_Config) ->
 fill_2000(_Config) ->
     fill(2000, 20000). % ca. 200MiB RAM
 
-fill(Number, Size) ->
-    fill(1, Number, Size).
-
-fill(Start, End, Size) when End >= Start ->
+fill(Number, Size) when Number >= 1 ->
     DHTNodes = pid_groups:find_all(dht_node),
 %%     ct:pal("~p~n", [erlang:memory()]),
     Table = hd([Tab || Tab <- ets:all(),
@@ -242,7 +240,7 @@ fill(Start, End, Size) when End >= Start ->
     print_table_info(Table),
     PrevMemInfo = get_meminfo(),
     MyBinSize =
-        util:for_to_fold(Start, End,
+        util:for_to_fold(1, Number,
                          fun(I) ->
                                  Key = lists:flatten(io_lib:format("fill_~B", [I])),
                                  Bin = make_binary(I, Size),
@@ -254,21 +252,17 @@ fill(Start, End, Size) when End >= Start ->
                          end,
                          fun(BSize, TotalSize) -> TotalSize + BSize end,
                          0),
-    garbage_collect_all_and_check(40, PrevMemInfo, (End - Start + 1), MyBinSize),
-    NewMemInfo = get_meminfo(),
+    NewMemInfo = garbage_collect_all_and_check(40, PrevMemInfo, Number, MyBinSize),
 %%     ct:pal("~p~n", [erlang:memory()]),
     print_table_info(Table),
-    check_memory_inc(PrevMemInfo, NewMemInfo, (End - Start + 1), MyBinSize),
+    check_memory_inc(PrevMemInfo, NewMemInfo, Number, MyBinSize),
     ok.
 
 % @doc Modifies 100 items 100 times.
 modify_100x100(_Config) ->
     modify(100, 100, 20000). % ca. 10MiB RAM
 
-modify(Number, Repeat, Size) ->
-    modify(1, Number, Repeat, Size).
-
-modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
+modify(Number, Repeat, Size) when Number >= 1 andalso Repeat >= 1 ->
     DHTNodes = pid_groups:find_all(dht_node),
 %%     ct:pal("~p~n", [erlang:memory()]),
     Table = hd([Tab || Tab <- ets:all(),
@@ -278,7 +272,7 @@ modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
     PrevMemInfo = get_meminfo(),
     MyBinSize =
         util:for_to_fold(
-          Start, End,
+          1, Number,
           fun(I) ->
                   util:for_to_fold(
                     1, Repeat,
@@ -296,11 +290,10 @@ modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
                   end,
           fun(BSize, TotalSize) -> TotalSize + BSize end,
           0),
-    garbage_collect_all_and_check(40, PrevMemInfo, (End - Start + 1), MyBinSize),
-    NewMemInfo = get_meminfo(),
+    NewMemInfo = garbage_collect_all_and_check(40, PrevMemInfo, Number, MyBinSize),
 %%     ct:pal("~p~n", [erlang:memory()]),
     print_table_info(Table),
-    check_memory_inc(PrevMemInfo, NewMemInfo, (End - Start + 1), MyBinSize),
+    check_memory_inc(PrevMemInfo, NewMemInfo, Number, MyBinSize),
     ok.
 
 create_ring_100(Config) ->
@@ -317,8 +310,7 @@ create_ring_100(Config) ->
               unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0}]}]),
               unittest_helper:stop_ring()
       end),
-    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
-    NewMemInfo = get_meminfo(),
+    NewMemInfo = garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
     NewProcesses = unittest_helper:get_processes(),
     {_OnlyOld, _Both, OnlyNew} =
         util:split_unique(OldProcesses, NewProcesses,
@@ -342,8 +334,7 @@ add_remove_nodes_50(_Config) ->
     _ = api_vm:shutdown_nodes_by_name(NewNodes),
     timer:sleep(1000), % wait for vivaldi_latency timeouts
     unittest_helper:wait_for_stable_ring_deep(),
-    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
-%%     NewMemInfo = get_meminfo(),
+    _ = garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
     NewProcesses = unittest_helper:get_processes(),
     {_OnlyOld, _Both, OnlyNew} =
         util:split_unique(OldProcesses, NewProcesses,
@@ -368,8 +359,7 @@ add_kill_nodes_50(_Config) ->
     _ = api_vm:kill_nodes_by_name(NewNodes),
     timer:sleep(1000), % wait for vivaldi_latency timeouts
     unittest_helper:wait_for_stable_ring_deep(),
-    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
-%%     NewMemInfo = get_meminfo(),
+    _ = garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
     NewProcesses = unittest_helper:get_processes(),
     {_OnlyOld, _Both, OnlyNew} =
         util:split_unique(OldProcesses, NewProcesses,
@@ -388,11 +378,13 @@ garbage_collect_all() ->
     % wait a bit for the gc to finish
     timer:sleep(1000).
 
-garbage_collect_all_and_check(0, _MemInfo, _NewItems, _AddedSize) -> ok;
+garbage_collect_all_and_check(0, _MemInfo, _NewItems, _AddedSize) ->
+    get_meminfo();
 garbage_collect_all_and_check(Retries, MemInfo, NewItems, AddedSize) when Retries > 0 ->
     garbage_collect_all_and_check_(1, Retries + 1, MemInfo, NewItems, AddedSize).
 
-garbage_collect_all_and_check_(Max, Max, _MemInfo, _NewItems, _AddedSize) -> ok;
+garbage_collect_all_and_check_(Max, Max, _MemInfo, _NewItems, _AddedSize) ->
+    get_meminfo();
 garbage_collect_all_and_check_(N, Max, MemInfo, NewItems, AddedSize) when N < Max ->
     garbage_collect_all(),
     MemInfo2 = get_meminfo(),
@@ -404,6 +396,6 @@ garbage_collect_all_and_check_(N, Max, MemInfo, NewItems, AddedSize) when N < Ma
             MemInfo2#mem_info.processes_used - MemInfo#mem_info.processes_used,
             MemInfo2#mem_info.ets - MemInfo#mem_info.ets]),
     case check_memory_inc_bool(MemInfo, MemInfo2, NewItems, AddedSize) of
-        true  -> ok;
+        true  -> MemInfo2;
         false -> garbage_collect_all_and_check_(N + 1, Max, MemInfo, NewItems, AddedSize)
     end.
