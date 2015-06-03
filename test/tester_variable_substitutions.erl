@@ -53,6 +53,9 @@ substitute({type, Line,TypeType, Types}, Substitutions) ->
 substitute({tuple, Types}, Substitutions) ->
     {tuple, substitute(Types, Substitutions)};
 
+substitute({union, _Line, Types}, Substitutions) ->
+    {union, substitute(Types, Substitutions)};
+
 substitute({union, Types}, Substitutions) ->
     {union, substitute(Types, Substitutions)};
 
@@ -79,6 +82,9 @@ substitute({remote_type,Line,[Left,Right,L]}, Substitutions) ->
 substitute(any, _Substitutions) ->
     any;
 
+substitute({paren_type, Line,[{type,_,union, Vars}]}, Substitutions) ->
+    substitute({union, Line, Vars}, Substitutions);
+
 % value types
 substitute({atom,Line,Value}, _Substitutions) ->
     {atom,Line,Value};
@@ -86,8 +92,8 @@ substitute({integer,Line,Value}, _Substitutions) ->
     {integer,Line,Value};
 
 substitute(Unknown, Substitutions) ->
-    ct:pal("Unknown: ~w", [Unknown]),
-    ct:pal("~w", [gb_trees:to_list(Substitutions)]),
+    ct:pal("Unknown substitution: ~w", [Unknown]),
+    ct:pal("Known substitutions: ~w", [gb_trees:to_list(Substitutions)]),
     throw({subst_error, unknown_expression}),
     exit(foobar).
 
