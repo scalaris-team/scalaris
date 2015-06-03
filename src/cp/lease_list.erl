@@ -188,15 +188,14 @@ remove_active_lease_from_dht_node_state(Lease, Id, State) ->
     log:log("you are trying to remove an active lease via any?!? ~w", [Lease]),
     LeaseList = dht_node_state:get(State, lease_list),
     Active = LeaseList#lease_list_t.active,
-    Id = l_on_cseq:get_id(Lease),
-    case l_on_cseq:get_id(Active) =:= Id of
-        true ->
+    case l_on_cseq:get_id(Active) of
+        Id ->
             % async. call!
             service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
             util:sleep_for_ever(),
             dht_node_state:set_lease_list(remove_next_round(Id, State),
                                           LeaseList#lease_list_t{active=empty});
-        false ->
+        _ ->
             State
     end.
 
