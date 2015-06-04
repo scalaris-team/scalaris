@@ -197,6 +197,11 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
+        {typedef, orddict, orddict, []} ->
+            check_list(orddict:to_list(Value), % [Key,Value]
+                       {list, {tuple,
+                               [{typedef, tester, test_any, []}, {typedef, tester, test_any, []}]}},
+                       CheckStack, ParseState);
         {typedef, _Module, _TypeName, []} ->
             check_typedef(Value, Type, CheckStack, ParseState);
         {union, _Union} ->

@@ -221,6 +221,12 @@ create_value_({tuple, {typedef, tester, test_any, []}}, Size, ParseState) ->
     erlang:list_to_tuple(Values);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
+create_value_({typedef, orddict, orddict, []}, Size, ParseState) ->
+    KVs = create_value({list,
+                        {tuple,
+                         [{typedef, tester, test_any, []}, {typedef, tester, test_any, []}]}},
+                       Size, ParseState),
+    orddict:from_list(KVs);
 create_value_({typedef, Module, TypeName, TypeList}, Size, ParseState) ->
     %ct:pal("typedef~n~w~n~w~n", [TypeName, TypeList]),
     %ct:pal("~w", [{type, Module, TypeName, length(TypeList)}]),
