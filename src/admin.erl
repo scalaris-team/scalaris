@@ -181,7 +181,6 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
 -spec wait_for_stable_ring(non_neg_integer()) -> boolean().
 wait_for_stable_ring(NrOfNodes) ->
     Fun = fun() ->
-                  io:format("~p ~p ~p ~n", [number_of_nodes(), check_ring(), check_ring_deep()]),
                   case config:read(leases) of
                       true ->
                           (number_of_nodes() =:= NrOfNodes) andalso
