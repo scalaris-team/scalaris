@@ -22,6 +22,7 @@
 -export([add_node/1, add_node_at_id/1, add_nodes/1,
          del_node/2, del_nodes/2, del_nodes_by_name/2,
          get_dht_node_specs/0,
+         wait_for_stable_ring/1,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
          number_of_nodes/0,
@@ -176,6 +177,22 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
             _ = supervisor:terminate_child(main_sup, Id),
             supervisor:delete_child(main_sup, Id)
     end.
+
+-spec wait_for_stable_ring(non_neg_integer()) -> boolean().
+wait_for_stable_ring(NrOfNodes) ->
+    Fun = fun() ->
+                  io:format("~p ~p ~p ~n", [number_of_nodes(), check_ring(), check_ring_deep()]),
+                  case config:read(leases) of
+                      true ->
+                          (number_of_nodes() =:= NrOfNodes) andalso
+                              (check_leases() =:= true);
+                      failed ->
+                          (number_of_nodes() =:= NrOfNodes) andalso
+                              (check_ring() =:= ok) andalso
+                              (check_ring_deep() =:= ok)
+                  end
+          end,
+    util:wait_for(Fun).
 
 %% @doc Contact mgmt server and check that each node's successor and predecessor
 %%      are correct.
