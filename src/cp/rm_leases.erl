@@ -103,7 +103,13 @@ rm_exec(Pid, _Tag, Old, New, _Reason) ->
 on({rm_change, OldRange, NewRange}, State) ->
     ?TRACE("the range has changed: ~w -> ~w", [OldRange, NewRange]),
     ?TRACE("state: ~w", [State]),
-    compare_and_fix_rm_with_leases(State, OldRange, NewRange);
+    This = comm:reply_as(comm:this(), 4, {compare_and_fix, OldRange, NewRange, '_'}),
+    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, [lease_list, my_range]}),
+    State;
+
+on({compare_and_fix, OldRange, NewRange,
+    {get_state_response, [{lease_list, L}, {my_range, Range}]}}, State) ->
+    compare_and_fix_rm_with_leases(State, OldRange, NewRange, L, Range);
 
 on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
@@ -162,17 +168,16 @@ on({takeover_after_rm_change, LeaseId, _Lease, Result}, State) ->
                 end;
         {takeover, success, L2} ->
             ?TRACE("takeover_after_rm_change success", []),
-            % @todo we call receive in an on-handler ?!?
-            comm:send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), lease_list}),
-            LeaseList = receive
-                            {get_state_response, L} ->
-                                L
-                        end,
-            ActiveLease = lease_list:get_active_lease(LeaseList),
-            Pid = comm:reply_as(self(), 4, {merge_after_rm_change, L2, ActiveLease, '_'}),
-            l_on_cseq:lease_merge(L2, ActiveLease, Pid),
-            remove_takeover(State, LeaseId, L2)
+            This = comm:reply_as(comm:this(), 5, {takeover_success, get_state, L2, LeaseId, '_'}),
+            comm:send_local(pid_groups:get_my(dht_node), {get_state, This, lease_list}),
+            State
     end;
+
+on({takeover_success, get_state, L2, LeaseId, {get_state_response, LeaseList}}, State) ->
+    ActiveLease = lease_list:get_active_lease(LeaseList),
+    Pid = comm:reply_as(self(), 4, {merge_after_rm_change, L2, ActiveLease, '_'}),
+    l_on_cseq:lease_merge(L2, ActiveLease, Pid),
+    remove_takeover(State, LeaseId, L2);
 
 on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     ?TRACE("merge after rm_change: ~w", [Result]),
@@ -194,15 +199,10 @@ on({get_takeovers, Pid}, #state{takeovers=Takeovers} = State) ->
     comm:send(Pid, {get_takeovers_response, Takeovers}),
     State.
 
--spec compare_and_fix_rm_with_leases(state(), intervals:interval(), intervals:interval()) 
+-spec compare_and_fix_rm_with_leases(state(), intervals:interval(), intervals:interval(), 
+                                     lease_list:lease_list(), intervals:interval()) 
                                      -> state().
-compare_and_fix_rm_with_leases(State, OldRange, NewRange) ->
-    % @todo we call receive in an on-handler ?!?
-    comm:send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), [lease_list, my_range]}),
-    {LeaseList, MyRange} = receive
-            {get_state_response, [{lease_list, L}, {my_range, Range}]} ->
-                {L, Range}
-             end,
+compare_and_fix_rm_with_leases(State, OldRange, NewRange, LeaseList, MyRange) ->
     ?TRACE("lease list ~w", [LeaseList]),
     ActiveRange = lease_list:get_active_range(LeaseList),
     case intervals:is_empty(ActiveRange) of
@@ -256,9 +256,10 @@ prepare_takeover(State, MyRange, ActiveRange) ->
                            gb_trees:tree(?RT:key(), l_on_cseq:lease_t()).
 get_takeovers(RMLeasesPid) ->
     comm:send_local(RMLeasesPid, {get_takeovers, comm:this()}),
+    trace_mpath:thread_yield(),
     receive
-        {get_takeovers_response, TakeOvers} ->
-            TakeOvers
+        ?SCALARIS_RECV({get_takeovers_response, TakeOvers},% ->
+            TakeOvers)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -279,7 +280,7 @@ add_takeover(#state{takeovers=Takeovers} = State, Lease) ->
     end.
 
 -spec remove_takeover(state(), l_on_cseq:lease_id(), l_on_cseq:lease_t()) -> state().
-remove_takeover(#state{takeovers=Takeovers} = State, Id, Lease) ->
+remove_takeover(#state{takeovers=Takeovers} = State, Id, _Lease) ->
     NewTakeovers = gb_trees:delete_any(Id, Takeovers),
     State#state{takeovers=NewTakeovers}.
 

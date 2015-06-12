@@ -147,21 +147,26 @@ get_dht_node_state(Pid, What) ->
     Cookie = {os:timestamp(), randoms:getRandomInt()},
     This = comm:reply_as(comm:this(), 2, {get_dht_node_state_response, '_', Cookie}),
     comm:send(Pid, {get_state, This, What}),
+    trace_mpath:thread_yield(),
     Result = 
         receive
-            {get_dht_node_state_response, {get_state_response, Data}, Cookie} ->
-                {true, Data}
+            ?SCALARIS_RECV({get_dht_node_state_response, {get_state_response, Data}, Cookie},% ->
+                {true, Data})
         after 50 ->
                 false
         end,
     % drain message queue
+    drain_message_queue(),
+    Result.
+
+drain_message_queue() ->
+    trace_mpath:thread_yield(),
     receive
-        {get_dht_state_response, _Data, _Cookie} ->
-            ok
+        ?SCALARIS_RECV({get_dht_state_response, _Data, _Cookie},% ->
+                       ok)
     after 0 ->
             ok
-    end,
-    Result.
+    end.
 
 -spec get_all_leases() -> list(lease_list:lease_list()).
 get_all_leases() ->
@@ -172,7 +177,8 @@ get_all_leases() ->
 -spec all_dht_nodes() -> list(comm:mypid()).
 all_dht_nodes() ->
     mgmt_server:node_list(),
+    trace_mpath:thread_yield(),
     receive
-        {get_list_response, Nodes} ->
-            Nodes
+        ?SCALARIS_RECV({get_list_response, Nodes},% ->
+            Nodes)
     end.
