@@ -239,14 +239,19 @@ set_local_address(Address, Port) ->
 get_local_address_port() ->
     case erlang:get(local_address_port) of
         undefined ->
-            case ets:lookup(?MODULE, local_address_port) of
-                [{local_address_port, Value = {undefined, _MyPort}}] ->
-                    Value;
-                [{local_address_port, Value}] ->
-                    erlang:put(local_address_port, Value),
-                    Value;
-                [] ->
-                    undefined
+            % ets:lookup will throw if the table does not exist yet
+            try
+                case ets:lookup(?MODULE, local_address_port) of
+                    [{local_address_port, Value = {undefined, _MyPort}}] ->
+                        Value;
+                    [{local_address_port, Value}] ->
+                        erlang:put(local_address_port, Value),
+                        Value;
+                    [] ->
+                        undefined
+                end
+            catch
+                error:_ -> undefined
             end;
         Value -> Value
     end.
