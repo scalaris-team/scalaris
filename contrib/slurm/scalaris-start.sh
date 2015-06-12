@@ -3,6 +3,7 @@
 source $(pwd)/env.sh
 
 function fix_known_hosts() {
+    let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
     if [ -e $ETCDIR/scalaris.local.cfg ]
     then
         mv $ETCDIR/scalaris.local.cfg .
@@ -48,7 +49,7 @@ function start_servers() {
         PORT=14195
         YAWSPORT=8000
         for TASKSPERNODE in `seq 1 $VMS_PER_NODE`; do
-            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --screen -d -t joining start
+            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
             let PORT+=1
             let YAWSPORT+=1
         done
@@ -56,14 +57,15 @@ function start_servers() {
     PORT=14196
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
-        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --screen -d -t joining start
+        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
         let PORT+=1
         let YAWSPORT+=1
     done
-    srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n first -p 14195 -y 8000 --screen -d -m -t first start
+    srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first start
 }
 
 function wait_for_servers_to_start {
+    let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE\*$DHT_NODES_PER_VM
     for NODE in `scontrol show hostnames`; do
         RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
         while [ $RUNNING_NODES -ne $VMS_PER_NODE ]
@@ -71,6 +73,17 @@ function wait_for_servers_to_start {
             RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
         done
     done
+
+    # wait for the first VM to start
+    NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+    while [ $NR_OF_FIRSTS -ne 1 ]
+    do
+        NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+    done
+    # wait for the first VM to initialize
+    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', api_vm, wait_for_scalaris_to_start, []), io:format('waited for scalaris: ~p~n', [A]), halt(0)."
+    # wait for the ring to stabilize
+    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', admin, wait_for_stable_ring, [$NR_OF_NODES]), io:format('waited for the ring: ~p~n', [A]), halt(0)."
 }
 
 module load erlang/$ERLANG_VERSION
