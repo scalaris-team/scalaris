@@ -185,7 +185,7 @@ wait_for_stable_ring(NrOfNodes) ->
                       true ->
                           (number_of_nodes() =:= NrOfNodes) andalso
                               (check_leases() =:= true);
-                      failed ->
+                      _ ->
                           (number_of_nodes() =:= NrOfNodes) andalso
                               (check_ring() =:= ok) andalso
                               (check_ring_deep() =:= ok)
