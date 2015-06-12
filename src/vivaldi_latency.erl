@@ -83,9 +83,10 @@ on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
     kill;
 
-on({'DOWN', _MonitorRef, process, Owner, _Info},
+on({'DOWN', MonitorRef, process, Owner, _Info},
    {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
     log:log(info, "shutdown vivaldi_latency due to vivaldi shutting down", []),
+    gen_component:demonitor(MonitorRef),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,7 +98,7 @@ init({Owner, RemotePid, Token}) ->
     msg_delay:send_local(config:read(gossip_vivaldi_latency_timeout),
                          self(), {shutdown}, [{?quiet}]),
     comm:send_local(self(), {start_ping}),
-    erlang:monitor(process, Owner),
+    gen_component:monitor(Owner),
     {Owner, RemotePid, Token, unknown, 0, []}.
 
 -spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(),

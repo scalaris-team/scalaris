@@ -302,7 +302,7 @@ on({report, Event, LocalPids, Data}, State) ->
               ?SEND_OPTIONS),
     State;
 
-on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
+on({'DOWN', _MonitorRef, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
            [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
     %% send crash report to remote end.
@@ -584,8 +584,8 @@ state_add_monitor(State, WatchedPid) ->
     CountKey = {'$monitor_count', WatchedPid},
     X = case pdb:get(CountKey, Table) of
             undefined ->
-                MonRef = erlang:monitor(process, comm:make_local(
-                                          comm:get_plain_pid(WatchedPid))),
+                MonRef = gen_component:monitor(comm:make_local(
+                                                 comm:get_plain_pid(WatchedPid))),
                 pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
                 1;
             {CountKey, I} when is_integer(I) ->
@@ -604,7 +604,7 @@ state_del_monitor(State, WatchedPid) ->
                 {CountKey, 1} ->
                     MonKey = {'$monitor', WatchedPid},
                     {MonKey, MonRef} = pdb:take(MonKey, Table),
-                    erlang:demonitor(MonRef),
+                    gen_component:demonitor(MonRef),
                     true;
                 {CountKey, X} when is_integer(X) andalso X > 1 ->
                     pdb:set({CountKey, X - 1}, Table),

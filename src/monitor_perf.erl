@@ -63,6 +63,10 @@ init_bench() ->
 
 -spec bench_service(Owner::pid()) -> ok.
 bench_service(Owner) ->
+    % do not use gen_component:monitor/1 since this is not a gen_component
+    % -> tolerates that this side channel will not be traced by
+    %    trace_mpath/proto_sched if the monitor dies (it should not die unless
+    %    shutting down the VM anyway!)
     erlang:monitor(process, Owner),
     bench_service_loop(Owner).
 

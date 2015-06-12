@@ -55,7 +55,8 @@
 -export([bp_set/3, bp_set_cond/3, bp_set_cond_async/3,
          bp_del/2, bp_del_async/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
--export([bp_about_to_kill/1]).
+-export([bp_about_to_kill/1,
+         monitor/1, demonitor/1, demonitor/2]).
 
 -export_type([handler/0]).
 -export_type([bp_name/0]). %% for unittests
@@ -329,6 +330,20 @@ bp_barrier(Pid) ->
 %% @see sup:sup_terminate_childs/1
 -spec bp_about_to_kill(pid()) -> ok.
 bp_about_to_kill(Pid) ->
+    Self = self(),
+    ?DBG_ASSERT(Pid =/= Self),
+    % if infected, remove all monitors, send infected DOWN messages ourself
+    % note: need to get the monitors before we add ours below
+    MonitoredBy =
+        case trace_mpath:infected() of
+            true ->
+                {monitored_by, X} = erlang:process_info(Pid, monitored_by),
+                X;
+            _ ->
+                []
+        end,
+
+    %% about_to_kill handling
     MonitorRef = erlang:monitor(process, Pid),
     % suspend gen_component independently from break points being set/active
     % (60s should be enough for the sub-sequent kill)
@@ -343,7 +358,86 @@ bp_about_to_kill(Pid) ->
                     [Pid, pid_groups:group_and_name_of(Pid),
                      erlang:process_info(Pid, [registered_name, initial_call, current_function])])
     end,
+
+    %% continued infected 'DOWN' message handling (after pausing the processes)
+    % TODO: add infected 'EXIT' messages from links?
+    % note: the proto_sched process also sets a monitor but this should not be
+    %       the process to kill since processes do not kill themselves!
+    _ = [begin
+             ?DBG_ASSERT(PidX =/= Self),
+             % we can only handly gen_components here, other monitors cause uncontrolled side effects
+             ?DBG_ASSERT(is_gen_component(PidX)),
+             MonitorX = erlang:monitor(process, PidX),
+             PidX ! {'$gen_component', remove_monitor, Pid, Self},
+             receive
+                 {'$gen_component', monitor, MonRef} when is_reference(MonRef) ->
+                     erlang:demonitor(MonitorX, [flush]),
+                     %log:pal("about_to_kill: ~p monitors ~p with ref ~p", [PidX, Pid, MonRef]),
+                     % send infected DOWN message:
+                     comm:send_local(PidX, {'DOWN', MonRef, process, Pid, about_to_kill}),
+                     ok;
+                 {'$gen_component', monitor, undefined} ->
+                     % not monitoring any more
+                     erlang:demonitor(MonitorX, [flush]),
+                     %log:pal("about_to_kill: ~p monitors ~p with ref ~p", [PidX, Pid, no_ref]),
+                     ok;
+                 {'DOWN', MonitorX, process, PidX, _Info2} ->
+                     % monitoring PID is unavailable
+                     ok
+             after 2000 ->
+                 erlang:demonitor(MonitorX, [flush]),
+                 log:pal("Failed to remove uninfected monitor at ~p (~p) for ~p within 2s~n~.2p",
+                         [PidX, pid_groups:group_and_name_of(PidX), Pid,
+                          erlang:process_info(PidX, [registered_name, initial_call, current_function])])
+             end
+         end || PidX <- MonitoredBy,
+                % exclude already paused pids:
+                erlang:process_info(PidX, priority) =/= {priority, low}],
+    
     ok.
+
+%% @doc Sets an erlang monitor using erlang:monitor/2 in a gen_component
+%%      process and stores info to support killing gen_components with
+%%      trace_mpath/proto_sched.
+%% @see bp_about_to_kill/1
+-spec monitor(comm:erl_local_pid_plain()) -> reference().
+monitor(Pid) ->
+    ?DBG_ASSERT(is_gen_component(self())),
+    MonRef = erlang:monitor(process, Pid),
+    %log:pal("monitor: ~p monitors ~p with ref ~p", [self(), Pid, MonRef]),
+    % we need the real pid in the process dictionary for bp_about_to_kill/1 to work
+    RealPid = if is_atom(Pid) ->
+                     case whereis(Pid) of
+                         undefined ->
+                             % this process is not alive anymore -> store the
+                             % registered name instead so the check in
+                             % demonitor/2 does not hit
+                             Pid;
+                         X when is_pid(X) ->
+                             X
+                     end;
+                 is_pid(Pid) ->
+                     Pid
+              end,
+    % only a single monitor allowed:,
+    undefined = erlang:put({'$gen_component_monitor_ref', RealPid}, MonRef),
+    undefined = erlang:put({'$gen_component_monitor_pid', MonRef}, RealPid),
+    MonRef.
+
+-spec demonitor(MonitorRef::reference()) -> true.
+demonitor(MonitorRef) ->
+    ?MODULE:demonitor(MonitorRef, []).
+
+-spec demonitor(MonitorRef::reference(), OptionList::[flush | info]) -> boolean().
+demonitor(MonitorRef, OptionList) ->
+    ?DBG_ASSERT(is_gen_component(self())),
+    %log:pal("demonitor: ~p demonitors ref ~p", [self(), MonitorRef]),
+    Res = erlang:demonitor(MonitorRef, OptionList),
+    % previous monitor must exist:
+    Pid = erlang:erase({'$gen_component_monitor_pid', MonitorRef}),
+    ?ASSERT2(Pid =/= undefined, Pid),
+    MonitorRef = erlang:erase({'$gen_component_monitor_ref', Pid}),
+    Res.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% generic framework
@@ -772,6 +866,12 @@ on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) -
     process_flag(priority, normal),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, GCState);
+on_gc_msg({'$gen_component', remove_monitor, Pid, Source} = Msg, UState, GCState) ->
+    MonRef = erlang:get({'$gen_component_monitor_ref', Pid}),
+    erlang:demonitor(MonRef),
+    comm:send_local(Source, {'$gen_component', monitor, MonRef}),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
+    loop(UState, GCState);
 on_gc_msg({'$gen_component', get_state, Pid, Cookie} = _Msg, UState, GCState) ->
     comm:send_local(
       Pid, {'$gen_component', get_state_response, Cookie, UState}),
@@ -972,6 +1072,12 @@ on_bp_req_in_bp(Msg, State,
                 _IsFromQueue) ->
     comm:send_local(
       Pid, {'$gen_component', get_component_state_response, Cookie, State}),
+    wait_for_bp_leave(Msg, State, true);
+on_bp_req_in_bp(Msg, State, {'$gen_component', remove_monitor, Pid, Source},
+                _IsFromQueue) ->
+    MonRef = erlang:get({'$gen_component_monitor_ref', Pid}),
+    erlang:demonitor(MonRef),
+    comm:send_local(Source, {'$gen_component', monitor, MonRef}),
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
                 {'$gen_component', about_to_kill, Time, Pid} = SleepMsg,

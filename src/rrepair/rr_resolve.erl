@@ -366,8 +366,9 @@ on({update_key_entries_ack, NewEntryList}, State =
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk]),
     shutdown(resolve_ok, NewState);
 
-on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
+on({'DOWN', MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
+    gen_component:demonitor(MonitorRef),
     kill.
 
 %% @doc Maps the given tuple list (with keys as first elements) to the MyI
@@ -622,7 +623,7 @@ print_resolve_stats(Stats) ->
 
 -spec init(state()) -> state().
 init(State) ->
-    _ = erlang:monitor(process, State#rr_resolve_state.ownerPid),
+    _ = gen_component:monitor(State#rr_resolve_state.ownerPid),
     State.
 
 -spec start() -> {ok, MyPid::pid()}.

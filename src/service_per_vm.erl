@@ -126,7 +126,7 @@ init(_Arg) ->
 % @doc registers a dht node
 on({register_dht_node, Pid}, {Nodes, CommHasStarted, SupHasStarted}) ->
     % only local processes may register!
-    MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(Pid))),
+    MonRef = gen_component:monitor(comm:make_local(comm:get_plain_pid(Pid))),
     {[{MonRef, Pid} | Nodes], CommHasStarted, SupHasStarted};
 
 % @doc de-registers a dht node
@@ -135,13 +135,14 @@ on({deregister_dht_node, Pid}, {Nodes, CommHasStarted, SupHasStarted} = State) -
         {value, {MonRef, Pid}, Rest} ->
             % allow erlang_demonitor to take its DOWN message off the message
             % queue if present!
-            erlang:demonitor(MonRef, [flush]),
+            gen_component:demonitor(MonRef, [flush]),
             {Rest, CommHasStarted, SupHasStarted};
         false -> State
     end;
 
 on({'DOWN', MonitorRef, process, _LocalPid, _Info1}, {Nodes, CommHasStarted, SupHasStarted}) ->
     % compare the monitor reference only (it is tied to the Pid and unique)
+    gen_component:demonitor(MonitorRef),
     {[X || {MonRef, _Node} = X <- Nodes, MonRef =/= MonitorRef], CommHasStarted, SupHasStarted};
 
 % @doc replies with the list of registered dht nodes
