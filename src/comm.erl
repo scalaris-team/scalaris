@@ -400,7 +400,7 @@ init_and_wait_for_valid_IP() ->
                              _ -> KnownHosts1
                          end,
             % note, comm:this() may be invalid at this moment
-            _ = [send(KnownHost, {hi}, [{group_member, service_per_vm}, {?quiet}])
+            _ = [send(KnownHost, {comm_says_hi}, [{group_member, service_per_vm}, {?quiet}])
                    || KnownHost <- KnownHosts],
             timer:sleep(100),
             init_and_wait_for_valid_IP()
