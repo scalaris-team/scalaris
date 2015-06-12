@@ -615,7 +615,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              case TraceEntry#state.status of
                  {delivered, To, Ref, _Time} ->
                      %% this delivered was done, so we can schedule a new msg.
-                     erlang:demonitor(Ref),
+                     erlang:demonitor(Ref, [flush]),
 
                      %% enqueue a new deliver request for this TraceId
                      ?TRACE("~p proto_sched:on({on_handler_done, ~p})"
