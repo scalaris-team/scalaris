@@ -234,22 +234,19 @@ set_local_address(Address, Port) ->
 
 %% @doc returns the local ip address and port
 -spec(get_local_address_port() -> {inet:ip_address(), tcp_port()}
-                                      | undefined
                                       | {undefined, tcp_port()}).
 get_local_address_port() ->
     case erlang:get(local_address_port) of
         undefined ->
             % ets:lookup will throw if the table does not exist yet
-            try
-                case ets:lookup(?MODULE, local_address_port) of
-                    [{local_address_port, Value = {undefined, _MyPort}}] ->
-                        Value;
-                    [{local_address_port, Value}] ->
-                        erlang:put(local_address_port, Value),
-                        Value;
-                    [] ->
-                        undefined
-                end
+            try ets:lookup(?MODULE, local_address_port) of
+                [{local_address_port, Value = {undefined, _MyPort}}] ->
+                    Value;
+                [{local_address_port, Value}] ->
+                    erlang:put(local_address_port, Value),
+                    Value;
+                [] ->
+                    {undefined, 0}
             catch
                 error:_ -> undefined
             end;
