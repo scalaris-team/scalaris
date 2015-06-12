@@ -178,7 +178,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
             supervisor:delete_child(main_sup, Id)
     end.
 
--spec wait_for_stable_ring(non_neg_integer()) -> boolean().
+-spec wait_for_stable_ring(non_neg_integer()) -> ok.
 wait_for_stable_ring(NrOfNodes) ->
     Fun = fun() ->
                   case config:read(leases) of
