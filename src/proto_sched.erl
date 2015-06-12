@@ -146,8 +146,8 @@
 -export_type([passed_state/0]).
 -export_type([callback_on_msg/0]).
 
--type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
--type delay_queue_key()  :: {Dest :: comm:mypid()}.
+-type queue_key()        :: {Src :: anypid(), Dest :: anypid()}.
+-type delay_queue_key()  :: {Dest :: anypid()}.
 -type msg_queues()       :: [queue_key()].
 -type msg_delay_queues() :: [delay_queue_key()].
 
@@ -910,7 +910,7 @@ send_out_pending_messages(Queues) ->
                   end,
                   Queues).
 
--spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global,
+-spec add_message(anypid(), anypid(), comm:message(), local | global,
                   comm:send_options(), state_t()) -> state_t().
 add_message(Src, Dest, Msg, LorG, SendOptions, #state{msg_queues = OldQueues} = State) ->
     Key = {Src, Dest},
