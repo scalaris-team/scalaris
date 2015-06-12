@@ -122,7 +122,7 @@
 
 %% report messages from other modules
 -export([start/2]).
--export([log_send/5, log_info/3]).
+-export([log_send/6, log_info/3]).
 -export([epidemic_reply_msg/4]).
 
 %% gen_component behaviour
@@ -134,7 +134,7 @@
 -type trace_id()     :: term().
 -type send_event()   :: {log_send, Time::'_', trace_id(),
                          Source::anypid(), Dest::anypid(), comm:message(),
-                         local | global}.
+                         local | global, comm:send_options()}.
 -type info_event()   :: {log_info, Time::'_', trace_id(),
                          Source::anypid(), Info::comm:message()}.
 
@@ -161,7 +161,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), reference(), erlang:timestamp()},
+          | {delivered, comm:mypid(), reference(), erlang:timestamp(), comm:send_options()},
          to_be_cleaned           = ?required(state, to_be_cleaned)
          :: false | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
@@ -350,15 +350,15 @@ epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
 -spec log_send(passed_state(), anypid(), anypid(), comm:message(),
-               local | global | local_after) -> ok.
-log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
+               local | global | local_after, comm:send_options()) -> ok.
+log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal, SendOptions) ->
     case passed_state_logger(PState) of
         {proto_sched, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, '_', TraceId, FromPid, ToPid, Msg, LocalOrGlobal})
+              {log_send, '_', TraceId, FromPid, ToPid, Msg, LocalOrGlobal, SendOptions})
     end,
     ok.
 
@@ -407,7 +407,7 @@ on({thread_begin, TraceId, Client}, State) ->
             NewState = lists:keystore(TraceId, 1, State, {TraceId, T3}),
             gen_component:post_op({log_send, os:timestamp(),
                                    TraceId, Client, Client,
-                                   {thread_release_to_run}, global}, NewState);
+                                   {thread_release_to_run}, global, []}, NewState);
         _ ->
             log:log("Wrong proto_sched:thread_begin, found state is: ~.0p",
                     [T1]),
@@ -441,7 +441,7 @@ on({thread_num, TraceId, N, Client}, State) ->
             State
     end;
 
-on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
+on({log_send, _Time, TraceId, From, To, UMsg, LorG, SendOptions}, State) ->
     ?TRACE("proto_sched:on({log_send ... ~.0p (~.0p) -> ~.0p (~.0p): ~.0p})",
            [From,
             pid_groups:group_and_name_of(From),
@@ -452,9 +452,9 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
     ?DBG_ASSERT2(not infected(), infected_in_on_handler),
     TmpEntry = case lists:keyfind(TraceId, 1, State) of
                    false ->
-                       add_message(From, To, UMsg, LorG, new(TraceId));
+                       add_message(From, To, UMsg, LorG, SendOptions, new(TraceId));
                    {TraceId, OldTrace} ->
-                       add_message(From, To, UMsg, LorG, OldTrace)
+                       add_message(From, To, UMsg, LorG, SendOptions, OldTrace)
                end,
     %% call the callback function (if any)
     CallbackFun = TmpEntry#state.callback_on_send,
@@ -465,7 +465,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% still waiting for all threads to join
             ?DBG_ASSERT2(UMsg =:= {thread_release_to_run}, wrong_starting_msg),
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {delivered, FromGPid, _Ref, _DeliverTime} ->
+        {delivered, FromGPid, _Ref, _DeliverTime, _OldSendOptions} ->
             %% only From is allowed to enqueue messages
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
@@ -489,7 +489,7 @@ on({log_info, _Time, TraceId, From, Info}, State) ->
         new ->
             %% still waiting for all threads to join
             lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
-        {delivered, FromGPid, _Ref, _DeliverTime} ->
+        {delivered, FromGPid, _Ref, _DeliverTime, _OldSendOptions} ->
             %% only From is allowed to enqueue infos
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary infos
@@ -535,7 +535,7 @@ on({deliver, TraceId}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _ToPid, _Ref, _Time} ->
+                {delivered, _ToPid, _Ref, _Time, _OldSendOptions} ->
                     ?TRACE("There is already message delivered to ~.0p",
                            [_ToPid]),
                     erlang:throw(proto_sched_already_in_delivered_mode);
@@ -558,7 +558,7 @@ on({deliver, TraceId}, State) ->
                     NewEntry = TraceEntry#state{status = stopped},
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
                 _ ->
-                    {From, To, LorG, Msg, NumPossible, TmpEntry} =
+                    {From, To, LorG, Msg, SendOptions, NumPossible, TmpEntry} =
                         pop_random_message(TraceEntry),
                     ?TRACE("Chosen from ~p possible next messages.", [NumPossible]),
                     Monitor = case comm:is_local(comm:make_global(To)) of
@@ -572,7 +572,8 @@ on({deliver, TraceId}, State) ->
                                       status = {delivered,
                                                 comm:make_global(To),
                                                 Monitor,
-                                                os:timestamp()},
+                                                os:timestamp(),
+                                                SendOptions},
                                       num_delivered_msgs
                                        = 1 + TmpEntry#state.num_delivered_msgs,
                                       delivered_msgs
@@ -613,7 +614,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              State;
          {TraceId, TraceEntry} ->
              case TraceEntry#state.status of
-                 {delivered, To, Ref, _Time} ->
+                 {delivered, To, Ref, _Time, _OldSendOptions} ->
                      %% this delivered was done, so we can schedule a new msg.
                      erlang:demonitor(Ref, [flush]),
 
@@ -644,7 +645,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              end
      end;
 
-on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
+on({send_error, Pid, Msg, Reason} = _ShepherdMsg, State) ->
     %% call on_handler_done and continue with message delivery
     TraceId = get_trace_id(get_passed_state(Msg)),
     ?TRACE("send error for trace id ~p: ~p calling on_handler_done.", [TraceId, _ShepherdMsg]),
@@ -652,9 +653,26 @@ on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
         false -> State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, Pid, _Ref, _Time} ->
-                    %% send error, generate on_handler_done
-                    gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State);
+                {delivered, Pid, _Ref, _Time, OldSendOptions} ->
+                    %% send error, generate on_handler_done and enqueue a
+                    %% send_error message if a shepherd was used
+                    State1 =
+                        case lists:keyfind(shepherd, 1, OldSendOptions) of
+                            {shepherd, ShepherdPid} ->
+                                % work with envelopes
+                                {RealShepherdPid, RealMsg} =
+                                    comm:unpack_cookie(
+                                      ShepherdPid,
+                                      {send_error, Pid, get_orig_msg(Msg), Reason}),
+                                TmpEntry =
+                                    add_message(whereis(comm_server),
+                                                RealShepherdPid, RealMsg,
+                                                local, [], TraceEntry),
+                                lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
+                            false ->
+                                State
+                        end,
+                    gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State1);
                 _  ->
                     %% not in state delivered, so probably the monitor
                     %% already cleaned up for the died process with
@@ -737,7 +755,7 @@ on({cleanup, TraceId, CallerPid}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _To, _Ref, _Time} ->
+                {delivered, _To, _Ref, _Time, _OldSendOptions} ->
                     ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
                     NewEntry = TraceEntry#state{
                                  to_be_cleaned = {to_be_cleaned, CallerPid}},
@@ -764,27 +782,34 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
 on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
            [Ref, Pid, _Reason]),
-    %% search for trace with status delivered, Pid and Ref
-    StateTail = lists:dropwhile(fun({_TraceId, X}) ->
-                                        case X#state.status of
-                                            {delivered, _Pid, Ref, _Time} ->
-                                                false;
-                                            _ -> true
-                                        end end,
-                                State),
-    case StateTail of
-        [] -> State; %% outdated 'DOWN' message - ok
-        [TraceEntry | _] ->
-            %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-            %%         [Ref, Pid, Reason]),
-            %% the process we delivered to has died, so we generate us a
-            %% gc_on_done message ourselves.
-            %% use post_op to avoid concurrency with send_error
-            %% message when delivering to already dead nodes.
-            gen_component:post_op({on_handler_done,
-                                     element(1, TraceEntry),
-                                     pid_ended_died_or_killed, comm:make_global(Pid)}, State)
-    end;
+    % TODO: should we also enqueue a send_error message if a shepherd
+    %       was used but we do not have a send_error in our message queue?
+    % -> for now rely on a send_error which should be there for local
+    %    messages (recall that monitors are only set up for local pids)
+    %    and do not create the on_handler_done by ourself!
+    State;
+%%     %% search for trace with status delivered, Pid and Ref
+%%     StateTail = lists:dropwhile(fun({_TraceId, X}) ->
+%%                                         case X#state.status of
+%%                                             {delivered, _Pid, Ref, _Time, _OldSendOptions} ->
+%%                                                 false;
+%%                                             _ -> true
+%%                                         end end,
+%%                                 State),
+%%     case StateTail of
+%%         [] -> State; %% outdated 'DOWN' message - ok
+%%         [_TraceEntry | _] ->
+%%             %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+%%             %%         [Ref, Pid, Reason]),
+%%             %% the process we delivered to has died, so we generate a
+%%             %% gc_on_done message ourselves.
+%%             %% use post_op to avoid concurrency with send_error
+%%             %% message when delivering to already dead nodes.
+%%             gen_component:post_op({on_handler_done,
+%%                                    element(1, TraceEntry),
+%%                                    pid_ended_died_or_killed,
+%%                                    comm:make_global(Pid)}, State)
+%%     end;
 
 on({check_slow_handler_trigger}, State) ->
     msg_delay:send_trigger(1, {check_slow_handler_trigger}),
@@ -800,7 +825,7 @@ on({check_slow_handler_action}, State) ->
     %% amount of time the response is pending
     %% current function of the process delivered to (when local)
     [ case TState#state.status of
-          {delivered, _GPid, _Ref, StartTime} ->
+          {delivered, _GPid, _Ref, StartTime, _OldSendOptions} ->
               Delta = timer:now_diff(os:timestamp(), StartTime) div 1000000,
               case 1 =< Delta of
                   true -> report_slow_handler(TId, TState);
@@ -813,7 +838,7 @@ on({check_slow_handler_action}, State) ->
 
 -spec report_slow_handler(trace_id(), state_t()) -> ok.
 report_slow_handler(Tid, Entry) ->
-    {delivered, GPid, _Ref, StartTime} = Entry#state.status,
+    {delivered, GPid, _Ref, StartTime, _OldSendOptions} = Entry#state.status,
     Delta = (timer:now_diff(os:timestamp(), StartTime) div 100000)/10,
     {PidGrpName, StackTrace} =
         case comm:is_local(GPid) of
@@ -885,10 +910,11 @@ send_out_pending_messages(Queues) ->
                   end,
                   Queues).
 
--spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global, state_t()) -> state_t().
-add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
+-spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global,
+                  comm:send_options(), state_t()) -> state_t().
+add_message(Src, Dest, Msg, LorG, SendOptions, #state{msg_queues = OldQueues} = State) ->
     Key = {Src, Dest},
-    NewQueues = add_to_list_of_queues(Key, {LorG, Msg}, OldQueues),
+    NewQueues = add_to_list_of_queues(Key, {LorG, Msg, SendOptions}, OldQueues),
     State#state{msg_queues = NewQueues}.
 
 %% -spec add_delay_message(comm:mypid(), comm:message(), state_t()) -> state_t().
@@ -898,18 +924,17 @@ add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
 %%     NewQueues = add_to_list_of_queues(Key, Msg, OldQueues),
 %%     State#state{msg_delay_queues = NewQueues}.
 
--spec pop_random_message(state_t()) ->
-                                {Src::comm:mypid(), Dest::comm:mypid(),
-                                 local | global, Msg::comm:message(),
-                                 Possibilities::pos_integer(),
-                                 state_t()}.
+-spec pop_random_message(state_t())
+        -> {Src::comm:mypid(), Dest::comm:mypid(), local | global,
+            Msg::comm:message(), comm:send_options(),
+            Possibilities::pos_integer(), state_t()}.
 pop_random_message(#state{msg_queues = OldQueues} = State) ->
     {{Src, Dest} = Key, Len} = util:randomelem_and_length(OldQueues),
     Q = erlang:get(Key),
-    {{value, {LorG, M}}, Q2} = queue:out(Q),
+    {{value, {LorG, M, SendOptions}}, Q2} = queue:out(Q),
     NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
     State2 = State#state{msg_queues = NewQueues},
-    {Src, Dest, LorG, M, Len, State2}.
+    {Src, Dest, LorG, M, SendOptions, Len, State2}.
 
 %% -spec pop_random_delay_message(state_t()) -> {comm:mypid(), comm:message(), state_t()}.
 %% pop_random_delay_message(#state{msg_delay_queues = OldQueues} = State) ->
@@ -920,7 +945,7 @@ pop_random_message(#state{msg_queues = OldQueues} = State) ->
 %%     {Dest, M, State2}.
 
 -spec add_to_list_of_queues
-        (queue_key(), {local | global, comm:message()}, msg_queues()) -> msg_queues().%;
+        (queue_key(), {local | global, comm:message(), comm:send_options()}, msg_queues()) -> msg_queues().%;
         %(delay_queue_key(), comm:message(), msg_delay_queues()) -> msg_delay_queues().
 add_to_list_of_queues(Key, M, Queues) ->
     case erlang:get(Key) of
@@ -948,6 +973,10 @@ update_queue_in_list_of_queues(Key, Q, Queues) ->
 -spec get_passed_state(gc_mpath_msg()) -> passed_state().
 get_passed_state(Msg) ->
     element(3, Msg).
+
+-spec get_orig_msg(gc_mpath_msg()) -> comm:message().
+get_orig_msg(Msg) ->
+    element(6, Msg).
 
 -spec get_trace_id(passed_state()) -> trace_id().
 get_trace_id(State) ->

@@ -55,7 +55,7 @@
          to_texfile_no_time/2, to_texfile_no_time/3]).
 
 %% report tracing events from other modules
--export([log_send/5]).
+-export([log_send/6]).
 -export([log_info/2, log_info/3]).
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
@@ -677,8 +677,10 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, comm:make_global(FromPid), ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global|local_after) -> DeliverAlsoDirectly :: boolean().
-log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(),
+               local | global | local_after, comm:send_options())
+        -> DeliverAlsoDirectly :: boolean().
+log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal, SendOptions) ->
     Now = os:timestamp(),
     case passed_state_logger(PState) of
         io_format ->
@@ -704,7 +706,8 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, Now, TraceId, FromPid1, ToPid1, MsgMapFun(Msg, FromPid, ToPid), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
+              {log_send, Now, TraceId, FromPid1, ToPid1, MsgMapFun(Msg, FromPid, ToPid),
+               ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
             true;
         {proto_sched, _} when LocalOrGlobal =:= local_after ->
             %% Do delivery via proto_sched and *not* via
@@ -714,10 +717,12 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             %% TODO: see comm:send_local_after
             %% TODO: Should be queued to another queue in the proto_sched to
             %% allow violation of FIFO ordering
-            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
+            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal,
+                                 SendOptions),
             false;
         {proto_sched, _} ->
-            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
+            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal,
+                                 SendOptions),
             false
     end.
 
