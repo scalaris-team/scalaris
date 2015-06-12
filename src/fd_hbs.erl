@@ -583,12 +583,15 @@ state_add_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
     CountKey = {'$monitor_count', WatchedPid},
     X = case pdb:get(CountKey, Table) of
-            undefined                        -> 1;
-            {CountKey, I} when is_integer(I) -> I + 1
+            undefined ->
+                MonRef = erlang:monitor(process, comm:make_local(
+                                          comm:get_plain_pid(WatchedPid))),
+                pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
+                1;
+            {CountKey, I} when is_integer(I) ->
+                I + 1
         end,
     pdb:set({CountKey, X}, Table),
-    MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(WatchedPid))),
-    pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
     State.
 
 -spec state_del_monitor(state(), comm:mypid()) -> {Found::boolean(), state()}.
