@@ -23,12 +23,12 @@
 -behaviour(gen_component).
 
 -export([dump_node_states/0, kill_nodes/1, kill_nodes_by_name/1, register_dht_node/1, 
-         deregister_dht_node/1]).
+         deregister_dht_node/1, is_scalaris_ready/0]).
 
 -export([start_link/1, init/1, on/2]).
 
 % state of the module
--type state() :: [{MonitorRef::reference(), DhtNode::comm:mypid()}].
+-type state() :: {[{MonitorRef::reference(), DhtNode::comm:mypid()}], boolean(), boolean()}.
 
 % accepted messages the module
 -type message() ::
@@ -39,6 +39,8 @@
     {delete_node, SupPid::pid() | atom(), SupId::pid() | term()} |
     {trigger_gc} | %% only internally inside the process
     {hi}.
+
+-include("scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
@@ -86,6 +88,20 @@ deregister_dht_node(Pid) ->
         Service -> comm:send_local(Service, {deregister_dht_node, Pid})
     end.
 
+-spec is_scalaris_ready() -> boolean().
+is_scalaris_ready() ->
+    case get_service() of
+        failed ->
+            false;
+        ServicePid ->
+            %% comm:this() can't be trusted yet
+            comm:send_local(ServicePid, {is_ready_local, self()}),
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV({is_ready_local_response, Ready}, %% ->
+                               Ready)
+            end
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
@@ -103,37 +119,37 @@ init(_Arg) ->
     %% find my IP address
     comm:init_and_wait_for_valid_IP(),
     msg_delay:send_trigger(10, {trigger_gc}),
-    [].
+    {[], false, false}.
 
 -spec on(Message :: message(), State :: state()) -> state().
 
 % @doc registers a dht node
-on({register_dht_node, Pid}, State) ->
+on({register_dht_node, Pid}, {Nodes, CommHasStarted, SupHasStarted}) ->
     % only local processes may register!
     MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(Pid))),
-    [{MonRef, Pid} | State];
+    {[{MonRef, Pid} | Nodes], CommHasStarted, SupHasStarted};
 
 % @doc de-registers a dht node
-on({deregister_dht_node, Pid}, State) ->
-    case lists:keytake(Pid, 2, State) of
+on({deregister_dht_node, Pid}, {Nodes, CommHasStarted, SupHasStarted} = State) ->
+    case lists:keytake(Pid, 2, Nodes) of
         {value, {MonRef, Pid}, Rest} ->
             % allow erlang_demonitor to take its DOWN message off the message
             % queue if present!
             erlang:demonitor(MonRef, [flush]),
-            Rest;
+            {Rest, CommHasStarted, SupHasStarted};
         false -> State
     end;
 
-on({'DOWN', MonitorRef, process, _LocalPid, _Info1}, State) ->
+on({'DOWN', MonitorRef, process, _LocalPid, _Info1}, {Nodes, CommHasStarted, SupHasStarted}) ->
     % compare the monitor reference only (it is tied to the Pid and unique)
-    [X || {MonRef, _Node} = X <- State, MonRef =/= MonitorRef];
+    {[X || {MonRef, _Node} = X <- Nodes, MonRef =/= MonitorRef], CommHasStarted, SupHasStarted};
 
 % @doc replies with the list of registered dht nodes
-on({get_dht_nodes, Pid}, State) ->
+on({get_dht_nodes, Pid}, {Nodes, _CommHasStarted, _SupHasStarted} = State) ->
     case comm:is_valid(Pid) of
         true ->
-            Nodes = [Node || {_MonRef, Node} <- State],
-            comm:send(Pid, {get_dht_nodes_response, Nodes});
+            Pids = [Node || {_MonRef, Node} <- Nodes],
+            comm:send(Pid, {get_dht_nodes_response, Pids});
         false ->
             ok
     end,
@@ -166,7 +182,14 @@ on({trigger_gc}, State) ->
     State;
 
 %% message from comm:init_and_wait_for_valid_IP/0 (no reply needed)
-on({hi}, State) ->
+on({comm_says_hi}, {Nodes, _CommHasStarted, SupHasStarted}) ->
+    {Nodes, true, SupHasStarted};
+
+on({scalaris_says_hi}, {Nodes, CommHasStarted, _SupHasStarted}) ->
+    {Nodes, CommHasStarted, true};
+
+on({is_ready_local, Pid}, {_Nodes, CommHasStarted, SupHasStarted} = State) ->
+    comm:send_local(Pid, {is_ready_local_response, CommHasStarted andalso SupHasStarted}),
     State.
 
 -spec get_service() -> comm:mypid() | failed.
