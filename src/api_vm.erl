@@ -25,7 +25,8 @@
          shutdown_node/1, shutdown_nodes/1, shutdown_nodes_by_name/1,
          kill_node/1, kill_nodes/1, kill_nodes_by_name/1,
          get_other_vms/1,
-         shutdown_vm/0, kill_vm/0]).
+         shutdown_vm/0, kill_vm/0,
+         wait_for_scalaris_to_start/0]).
 
 -include("scalaris.hrl").
 
@@ -196,3 +197,8 @@ kill_vm() ->
 kill_vm2() ->
     timer:sleep(1000),
     erlang:halt().
+
+%% @doc waits until the supervisor has started and the VM has IP+port
+-spec wait_for_scalaris_to_start() -> ok.
+wait_for_scalaris_to_start() ->
+    util:wait_for(fun service_per_vm:is_scalaris_ready/0).
