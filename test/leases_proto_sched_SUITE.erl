@@ -35,7 +35,7 @@ groups() ->
 
 all() ->
     [
-     %{group, join_tests}
+     {group, join_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 300}} ].
@@ -78,7 +78,8 @@ proto_sched_fun(stop) ->
             %% process was running the proto_sched
             %% thats fine, otherwise thread_end()
             %% will raise an exception
-            proto_sched:thread_end()
+            proto_sched:thread_end(),
+            proto_sched:wait_for_end()
     end.
 
 -spec proto_sched2_fun(setup, ThreadNum::pos_integer()) -> ok;
@@ -92,14 +93,10 @@ proto_sched2_fun(cleanup, _Arg) ->
 
 test_single_join(_Config) ->
     proto_sched2_fun(setup, 1),
-    spawn(fun() ->
-                  proto_sched_fun(start),
-                  {[_], []} = api_vm:add_nodes(1),
-                  lease_helper:wait_for_ring_size(5),
-                  util:wait_for(fun admin:check_leases/0),
-                  proto_sched_fun(stop)
-               end),
+    proto_sched_fun(start),
+    {[_], []} = api_vm:add_nodes(1),
+    lease_helper:wait_for_ring_size(5),
+    proto_sched_fun(stop),
     proto_sched2_fun(cleanup, []),
-    ct:pal("infos: ~p", [proto_sched:get_infos()]),
-    ct:pal("ring fully joined (5)"),
+    ?assert(admin:check_leases()),
     ok.
