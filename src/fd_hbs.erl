@@ -578,15 +578,33 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
                  State
     end.
 
+%% @doc Helper to extract the real pid from a watched (local!) pid.
+-spec get_real_pid(comm:mypid()) -> pid().
+get_real_pid(WatchedPid) ->
+    PlainPid = comm:make_local(comm:get_plain_pid(WatchedPid)),
+    if is_atom(PlainPid) ->
+           case whereis(PlainPid) of
+               undefined ->
+                   % this process is not alive anymore -> store the
+                   % registered name instead so the check in
+                   % gen_component:demonitor/2 does not hit
+                   PlainPid;
+               X when is_pid(X) ->
+                   X
+           end;
+       is_pid(PlainPid) ->
+           PlainPid
+    end.
+
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
-    CountKey = {'$monitor_count', WatchedPid},
+    PlainPid = get_real_pid(WatchedPid),
+    CountKey = {'$monitor_count', PlainPid},
     X = case pdb:get(CountKey, Table) of
             undefined ->
-                MonRef = gen_component:monitor(comm:make_local(
-                                                 comm:get_plain_pid(WatchedPid))),
-                pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
+                MonRef = gen_component:monitor(PlainPid),
+                pdb:set({{'$monitor', PlainPid}, MonRef}, Table),
                 1;
             {CountKey, I} when is_integer(I) ->
                 I + 1
@@ -597,12 +615,13 @@ state_add_monitor(State, WatchedPid) ->
 -spec state_del_monitor(state(), comm:mypid()) -> {Found::boolean(), state()}.
 state_del_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
-    CountKey = {'$monitor_count', WatchedPid},
+    PlainPid = get_real_pid(WatchedPid),
+    CountKey = {'$monitor_count', PlainPid},
     Found = case pdb:take(CountKey, Table) of
                 undefined ->
                     false;
                 {CountKey, 1} ->
-                    MonKey = {'$monitor', WatchedPid},
+                    MonKey = {'$monitor', PlainPid},
                     {MonKey, MonRef} = pdb:take(MonKey, Table),
                     gen_component:demonitor(MonRef),
                     true;
@@ -615,7 +634,8 @@ state_del_monitor(State, WatchedPid) ->
 -spec state_has_monitor(state(), comm:mypid()) -> boolean().
 state_has_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
-    MonKey = {'$monitor', WatchedPid},
+    PlainPid = get_real_pid(WatchedPid),
+    MonKey = {'$monitor', PlainPid},
     pdb:get(MonKey, Table) =/= undefined.
 
 -spec rempid_new(comm:mypid()) -> rempid().
