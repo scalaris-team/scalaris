@@ -21,7 +21,7 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([get_replica_keys/1, range_read/2]).
+-export([get_replica_keys/1, range_read/2, split_ring/1]).
 
 -export([unreliable_lookup/2,
          unreliable_get_key/1, unreliable_get_key/3]).
@@ -100,3 +100,7 @@ delete_and_cleanup_timer(TimerRef, Id) ->
         ?SCALARIS_RECV({range_read_timeout, Id}, ok) %% -> ok
     after 0 -> ok
     end.
+
+-spec split_ring(pos_integer()) -> [?RT:key()].
+split_ring(Parts) ->
+    [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, Parts)].
