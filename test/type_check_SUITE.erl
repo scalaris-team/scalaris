@@ -69,7 +69,8 @@ tester_type_check_api(_Config) ->
         [ {api_dht, [], []},
           {api_dht_raw,
            [ {unreliable_lookup,2}, %% creates arb. messages
-             {unreliable_get_key,3} %% creates arb. IP-adresses
+             {unreliable_get_key,3}, %% creates arb. IP-adresses
+             {split_ring, 1} %% needs feeder to limit the input size
            ],
            [ {range_read,1}, %% bug in range_read?
              {range_read_loop,5}, %% receives msgs
