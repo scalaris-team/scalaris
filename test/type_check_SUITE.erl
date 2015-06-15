@@ -441,6 +441,7 @@ tester_type_check_rrepair(_Config) ->
            ]},
           {rr_recon,
            [
+             {init, 1}, %% registers a monitor (only one allowed per PID)
              {on, 2}, %% tries to send messages, needs valid state with pid
              {start, 2}, %% tries to spawn processes
              {map_interval, 2}, %% second interval must be in a single quadrant
@@ -500,6 +501,7 @@ tester_type_check_rrepair(_Config) ->
            ]},
           {rr_resolve,
            [
+             {init, 1}, %% registers a monitor (only one allowed per PID)
              {on, 2}, %% tries to send messages, needs valid state with pid
              {start, 0}, %% tries to spawn processes
              {merge_stats, 2} %% tested via feeder

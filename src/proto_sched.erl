@@ -161,7 +161,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), reference(), erlang:timestamp(), comm:send_options()},
+          | {delivered, comm:mypid(), reference(), erlang:timestamp()},
          to_be_cleaned           = ?required(state, to_be_cleaned)
          :: false | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
@@ -465,7 +465,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG, SendOptions}, State) ->
             %% still waiting for all threads to join
             ?DBG_ASSERT2(UMsg =:= {thread_release_to_run}, wrong_starting_msg),
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {delivered, FromGPid, _Ref, _DeliverTime, _OldSendOptions} ->
+        {delivered, FromGPid, _Ref, _DeliverTime} ->
             %% only From is allowed to enqueue messages
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
@@ -489,7 +489,7 @@ on({log_info, _Time, TraceId, From, Info}, State) ->
         new ->
             %% still waiting for all threads to join
             lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
-        {delivered, FromGPid, _Ref, _DeliverTime, _OldSendOptions} ->
+        {delivered, FromGPid, _Ref, _DeliverTime} ->
             %% only From is allowed to enqueue infos
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary infos
@@ -535,7 +535,7 @@ on({deliver, TraceId}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _ToPid, _Ref, _Time, _OldSendOptions} ->
+                {delivered, _ToPid, _Ref, _Time} ->
                     ?TRACE("There is already message delivered to ~.0p",
                            [_ToPid]),
                     erlang:throw(proto_sched_already_in_delivered_mode);
@@ -572,8 +572,7 @@ on({deliver, TraceId}, State) ->
                                       status = {delivered,
                                                 comm:make_global(To),
                                                 Monitor,
-                                                os:timestamp(),
-                                                SendOptions},
+                                                os:timestamp()},
                                       num_delivered_msgs
                                        = 1 + TmpEntry#state.num_delivered_msgs,
                                       delivered_msgs
@@ -598,7 +597,8 @@ on({deliver, TraceId}, State) ->
                     CallbackFun(From, To, Msg),
                     %% Send infected message with a shepherd. In case of send errors,
                     %% we will be informed by a {send_error, Pid, Msg, Reason} message.
-                    comm:send(comm:make_global(To), InfectedMsg, [{shepherd, self()}]),
+                    ShepherdPid = comm:reply_as(self(), 2, {send_error, '_', SendOptions}),
+                    comm:send(comm:make_global(To), InfectedMsg, [{shepherd, ShepherdPid}]),
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry})
             end
     end;
@@ -614,7 +614,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              State;
          {TraceId, TraceEntry} ->
              case TraceEntry#state.status of
-                 {delivered, To, Ref, _Time, _OldSendOptions} ->
+                 {delivered, To, Ref, _Time} ->
                      %% this delivered was done, so we can schedule a new msg.
                      erlang:demonitor(Ref, [flush]),
 
@@ -645,39 +645,42 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              end
      end;
 
-on({send_error, Pid, Msg, Reason} = _ShepherdMsg, State) ->
+on({send_error, {send_error, Pid, Msg, Reason}, SendOptions} = _ShepherdMsg, State) ->
     %% call on_handler_done and continue with message delivery
     TraceId = get_trace_id(get_passed_state(Msg)),
     ?TRACE("send error for trace id ~p: ~p calling on_handler_done.", [TraceId, _ShepherdMsg]),
     case lists:keyfind(TraceId, 1, State) of
         false -> State;
         {TraceId, TraceEntry} ->
+            %% enqueue a send_error message if a shepherd was used
+            %% NOTE: we do this in any state, since the monitor may have hit
+            %%       before in which case the DOWN message will clean up and
+            %%       generate and process an on_handler_done
+            State1 =
+                case lists:keyfind(shepherd, 1, SendOptions) of
+                    {shepherd, ShepherdPid} ->
+                        % work with envelopes
+                        {RealShepherdPid, RealMsg} =
+                            comm:unpack_cookie(
+                              ShepherdPid,
+                              {send_error, Pid, get_orig_msg(Msg), Reason}),
+                        TmpEntry =
+                            add_message(whereis(comm_server),
+                                        RealShepherdPid, RealMsg,
+                                        local, [], TraceEntry),
+                        lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
+                    false ->
+                        State
+                end,
             case TraceEntry#state.status of
-                {delivered, Pid, _Ref, _Time, OldSendOptions} ->
-                    %% send error, generate on_handler_done and enqueue a
-                    %% send_error message if a shepherd was used
-                    State1 =
-                        case lists:keyfind(shepherd, 1, OldSendOptions) of
-                            {shepherd, ShepherdPid} ->
-                                % work with envelopes
-                                {RealShepherdPid, RealMsg} =
-                                    comm:unpack_cookie(
-                                      ShepherdPid,
-                                      {send_error, Pid, get_orig_msg(Msg), Reason}),
-                                TmpEntry =
-                                    add_message(whereis(comm_server),
-                                                RealShepherdPid, RealMsg,
-                                                local, [], TraceEntry),
-                                lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-                            false ->
-                                State
-                        end,
+                {delivered, Pid, _Ref, _Time} ->
+                    %% send error, generate on_handler_done
                     gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State1);
                 _  ->
                     %% not in state delivered, so probably the monitor
                     %% already cleaned up for the died process with
                     %% its 'DOWN' message.
-                    State
+                    State1
             end
     end;
 
@@ -755,7 +758,7 @@ on({cleanup, TraceId, CallerPid}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _To, _Ref, _Time, _OldSendOptions} ->
+                {delivered, _To, _Ref, _Time} ->
                     ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
                     NewEntry = TraceEntry#state{
                                  to_be_cleaned = {to_be_cleaned, CallerPid}},
@@ -782,34 +785,32 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
 on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
            [Ref, Pid, _Reason]),
-    % TODO: should we also enqueue a send_error message if a shepherd
-    %       was used but we do not have a send_error in our message queue?
-    % -> for now rely on a send_error which should be there for local
-    %    messages (recall that monitors are only set up for local pids)
-    %    and do not create the on_handler_done by ourself!
-    State;
-%%     %% search for trace with status delivered, Pid and Ref
-%%     StateTail = lists:dropwhile(fun({_TraceId, X}) ->
-%%                                         case X#state.status of
-%%                                             {delivered, _Pid, Ref, _Time, _OldSendOptions} ->
-%%                                                 false;
-%%                                             _ -> true
-%%                                         end end,
-%%                                 State),
-%%     case StateTail of
-%%         [] -> State; %% outdated 'DOWN' message - ok
-%%         [_TraceEntry | _] ->
-%%             %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-%%             %%         [Ref, Pid, Reason]),
-%%             %% the process we delivered to has died, so we generate a
-%%             %% gc_on_done message ourselves.
-%%             %% use post_op to avoid concurrency with send_error
-%%             %% message when delivering to already dead nodes.
-%%             gen_component:post_op({on_handler_done,
-%%                                    element(1, TraceEntry),
-%%                                    pid_ended_died_or_killed,
-%%                                    comm:make_global(Pid)}, State)
-%%     end;
+    %% NOTE: do not create a send_error message since the message may have been
+    %% received, otherwise, our shepherd should have kicked in (a send_error
+    %% will then be in our message queue)
+
+    %% search for trace with status delivered, Pid and Ref
+    StateTail = lists:dropwhile(fun({_TraceId, X}) ->
+                                        case X#state.status of
+                                            {delivered, _Pid, Ref, _Time} ->
+                                                false;
+                                            _ -> true
+                                        end end,
+                                State),
+    case StateTail of
+        [] -> State; %% outdated 'DOWN' message - ok
+        [TraceEntry | _] ->
+            %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+            %%         [Ref, Pid, Reason]),
+            %% the process we delivered to has died, so we generate a
+            %% gc_on_done message ourselves.
+            %% use post_op to avoid concurrency with send_error
+            %% message when delivering to already dead nodes.
+            gen_component:post_op({on_handler_done,
+                                   element(1, TraceEntry),
+                                   pid_ended_died_or_killed,
+                                   comm:make_global(Pid)}, State)
+    end;
 
 on({check_slow_handler_trigger}, State) ->
     msg_delay:send_trigger(1, {check_slow_handler_trigger}),
@@ -825,7 +826,7 @@ on({check_slow_handler_action}, State) ->
     %% amount of time the response is pending
     %% current function of the process delivered to (when local)
     [ case TState#state.status of
-          {delivered, _GPid, _Ref, StartTime, _OldSendOptions} ->
+          {delivered, _GPid, _Ref, StartTime} ->
               Delta = timer:now_diff(os:timestamp(), StartTime) div 1000000,
               case 1 =< Delta of
                   true -> report_slow_handler(TId, TState);
@@ -838,7 +839,7 @@ on({check_slow_handler_action}, State) ->
 
 -spec report_slow_handler(trace_id(), state_t()) -> ok.
 report_slow_handler(Tid, Entry) ->
-    {delivered, GPid, _Ref, StartTime, _OldSendOptions} = Entry#state.status,
+    {delivered, GPid, _Ref, StartTime} = Entry#state.status,
     Delta = (timer:now_diff(os:timestamp(), StartTime) div 100000)/10,
     {PidGrpName, StackTrace} =
         case comm:is_local(GPid) of
