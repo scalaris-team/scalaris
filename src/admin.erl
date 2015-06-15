@@ -19,7 +19,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([add_node/1, add_node_at_id/1, add_nodes/1,
+-export([add_node/1, add_node_at_id/1, add_nodes/1, add_nodes_at_ids/1,
          del_node/2, del_nodes/2, del_nodes_by_name/2,
          get_dht_node_specs/0,
          wait_for_stable_ring/1,
@@ -74,6 +74,12 @@ add_nodes(Count) ->
     Results = [add_node([]) || _X <- lists:seq(1, Count)],
     lists:partition(fun(E) -> not is_tuple(E) end, Results).
 %% userdevguide-end admin:add_nodes
+
+-spec add_nodes_at_ids(list(?RT:key())) -> {[pid_groups:groupname()], [{error, term()}]}.
+add_nodes_at_ids([]) -> {[], []};
+add_nodes_at_ids(Keys) ->
+    Results = [add_node_at_id(Key) || Key <- Keys],
+    lists:partition(fun(E) -> not is_tuple(E) end, Results).
 
 -spec get_dht_node_specs()
         -> [{Id::term() | undefined, Child::pid() | undefined,

@@ -57,6 +57,7 @@ verbose=0
 port=""
 yaws_port=""
 join_at=""
+join_at_list=""
 start_mgmt_server=0
 DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
@@ -76,6 +77,7 @@ usage(){
     echo "    -p <port>   - TCP port for the Scalaris node"
     echo "    -y <port>   - TCP port for the built-in webserver (YAWS)"
     echo "    -k <key>    - join at the given key"
+    echo "    -j <list>   - join at the given list of keys"
     echo "    -v          - verbose"
     echo "    -l <dir>    - use this logdir base directory (will create a sub-folder"
     echo "                  per node)"
@@ -682,6 +684,9 @@ scalarisstart(){
     if [ "$join_at" != "" ]; then
         tmp="$tmp -scalaris join_at $join_at"
     fi
+    if [ "$join_at_list" != "" ]; then
+        tmp="$tmp -scalaris join_at_list $join_at_list"
+    fi
     if [ $start_mgmt_server -eq 1 ]; then
         tmp="$tmp -scalaris start_mgmt_server true"
     fi
@@ -829,7 +834,7 @@ until [ -z "$1" ]; do
       DBG_CHECK_RING_TIMEOUT=$1
       shift;;
     *)
-      if getopts "dhifqmsvn:p:y:k:e:c:l:t:" optionName; then
+      if getopts "dhifqmsvn:p:y:k:j:e:c:l:t:" optionName; then
         case "$optionName" in
             c) SCALARIS_COOKIE=$OPTARG;;
             e) erl_flags=$OPTARG;;
@@ -837,6 +842,7 @@ until [ -z "$1" ]; do
             h) usage 0;;
             i) echo "WARN: interactive is now default";;
             k) join_at=$OPTARG;;
+            j) join_at_list=$OPTARG;;
             l) LOGDIR=$(readlink -m "$OPTARG");;
             n) NODE_NAME=$OPTARG;;
             p) port=$OPTARG;;

@@ -21,7 +21,7 @@
 -vsn('$Id$').
 
 -export([get_version/0, get_info/0,
-         number_of_nodes/0, get_nodes/0, add_nodes/1,
+         number_of_nodes/0, get_nodes/0, add_nodes/1, add_nodes_at_ids/1,
          shutdown_node/1, shutdown_nodes/1, shutdown_nodes_by_name/1,
          kill_node/1, kill_nodes/1, kill_nodes_by_name/1,
          get_other_vms/1,
@@ -80,6 +80,21 @@ add_nodes(Number) when is_integer(Number) andalso Number >= 0 ->
       end),
     Result.
 %% userdevguide-end api_vm:add_nodes
+
+-spec add_nodes_at_ids(list(?RT:key())) -> {[pid_groups:groupname()], [{error, term()}]}.
+add_nodes_at_ids(Keys) when is_list(Keys) ->
+    Result = {Ok, _Failed} = admin:add_nodes_at_ids(Keys),
+    % at least wait for the successful nodes to have joined, i.e. left the join phases
+    util:wait_for(
+      fun() ->
+              DhtModule = config:read(dht_node),
+              NotReady = [Name || Name <- Ok,
+                                  not DhtModule:is_alive(
+                                    gen_component:get_state(
+                                      pid_groups:pid_of(Name, dht_node)))],
+              [] =:= NotReady
+      end),
+    Result.
 
 %% @doc Wait for the given nodes to disappear.
 -spec wait_for_nodes_to_disappear(Names::[pid_groups:groupname()]) -> ok.

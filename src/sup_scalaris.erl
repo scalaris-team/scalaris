@@ -113,9 +113,14 @@ get_dht_node_descs(Options) ->
                                [{PID_group, TheOptions}])
        end || PID_group <- PID_groups];
     _ ->
-      DHTNodeJoinAt = case util:app_get_env(join_at, random) of
-                           random -> [];
-                           Id     -> [{{dht_node, id}, Id}, {skip_psv_lb}]
+      DHTNodeJoinAt = case {util:app_get_env(join_at, random),
+                            util:app_get_env(join_at_list, no_list)} of
+                          {random, no_list} ->
+                              [];
+                          {_, List} when is_list(List) ->
+                              [{{dht_node, id}, hd(List)}, {skip_psv_lb}];
+                           {Id, no_list} ->
+                              [{{dht_node, id}, Id},       {skip_psv_lb}]
                       end,
       DhtNodeId = randoms:getRandomString(),
       DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
@@ -222,7 +227,12 @@ childs(Options) ->
 add_additional_nodes() ->
     Size = config:read(nodes_per_vm),
     log:log(info, "Starting ~B nodes", [Size]),
-    _ = api_vm:add_nodes(Size - 1),
+    case util:app_get_env(join_at_list, no_list) of
+        no_list ->
+            _ = api_vm:add_nodes(Size - 1);
+        List ->
+            _ = api_vm:add_nodes_at_ids(tl(List))
+    end,
     ok.
 
 start_first_services() ->
