@@ -18,7 +18,6 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
-import java.io.FileNotFoundException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -57,6 +56,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	
 	private static final String ALL_ID_PREFIX = "_ALL_IDS";
@@ -651,7 +651,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 			final String id;
 			{
 				final JSONObject jsonobj = new JSONObject();
-				final AbstractClassMetaData cmd = op.getClassMetaData();
 				populateJsonObj(jsonobj, op);
 				id = getPersistableIdentity(op);
 				System.out.println("deleting object with key=" + id);

@@ -15,7 +15,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Store a simple object (without relationships).
 	 */
 	@Test
-	public void test_01_scalaris_store() {
+	public void test01Store() {
 		Product product = new Product(1, "Sony Discman", "A standard discman from Sony", 1.99);
 		storeObject(product);
 	}
@@ -24,7 +24,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Store a object with a relationship to another persistable object. 
 	 */
 	@Test
-	public void test_02_scalaris_store() {
+	public void test02Store() {
 		Author author = new Author("Jrr");
 		Book book = new Book(2, "Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
 		storeObject(book);
@@ -34,7 +34,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Store an object with 1-N relationships.
 	 */
 	@Test
-	public void test_03_scalaris_store() {
+	public void test03Store() {
 		Author author = new Author("Tolkien");
         Inventory inv = new Inventory("My Inventory");
         Product product = new Product(20, "Sony Discman","A standard discman from Sony",200.00);
@@ -49,7 +49,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Retrieve a simple object (without relationships) by its ID.
 	 */
 	@Test
-	public void test_01_scalaris_retrieve_by_id() {
+	public void test01RetrieveById() {
 		Product product = new Product(100, "Sony Discman", "A standard discman from Sony", 1.99);
 		Object productId = storeObject(product);
 		
@@ -62,7 +62,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * by its ID.
 	 */
 	@Test
-	public void test_02_scalaris_retrieve_by_id() {
+	public void test02RetrieveById() {
 		Author author = new Author("JRRR Tolkien");
 		Book book = new Book(42, "Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
 		Object bookId = storeObject(book);
@@ -75,7 +75,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Retrieve an object with 1-N relationships by its ID.
 	 */
 	@Test
-	public void test_03_scalaris_retrieve_by_id() {
+	public void test03RetrieveById() {
 		int prodKey = 301;
 		int bookKey = 302;
 		
@@ -103,7 +103,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Retrieve an object by its primary key which consists of only one attribute.
 	 */
 	@Test
-	public void test_01_scalaris_retrieve_by_single_key() {
+	public void test01RetrieveBySingleKey() {
 		int keyValue = 501;
 		Product product = new Product(keyValue, "Sony Discman", "A standard discman from Sony", 1.99);
 		storeObject(product);
@@ -116,7 +116,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Try to retrieve an object by its primary key which does not exist.
 	 */
 	@Test
-	public void test_02_scalaris_retrieve_by_single_key() {
+	public void test02RetrieveBySingleKey() {
 		int keyValue = 502;
 		// it is not stored
 		Product product = new Product(keyValue, "Sony Discman", "A standard discman from Sony", 1.99);
@@ -133,7 +133,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Delete an object by its ID
 	 */
 	@Test
-	public void test_01_scalaris_delete_by_id() {
+	public void test01DeleteById() {
 		Author author = new Author("JRR");
 		Book book = new Book(200, "Lord","The ",49.99, author, "1234", "MyBooks");
 		Object bookId = storeObject(book);
@@ -152,7 +152,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 * Update one field of a stored object
 	 */
 	@Test
-	public void test_01_scalaris_single_field_update() {
+	public void test01SingleFieldUpdate() {
 		Author author = new Author("JRR2");
 		Book book = new Book(600, "Lord","The ",49.99, author, "1234", "MyBooks");
 		Object bookId = storeObject(book);

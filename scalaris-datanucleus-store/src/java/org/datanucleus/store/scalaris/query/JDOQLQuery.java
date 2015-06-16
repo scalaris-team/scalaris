@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
-import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.query.evaluator.JDOQLEvaluator;
 import org.datanucleus.query.evaluator.JavaQueryEvaluator;
@@ -34,13 +33,16 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
 import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
-import org.datanucleus.util.Localiser;
-import org.datanucleus.util.NucleusLogger;
 
 /**
- * JDOQL query for JSON datastores.
+ * JDOQL query for scalaris datastores.
  */
 public class JDOQLQuery extends AbstractJDOQLQuery {
+	/**
+	 * Default serial version....
+	 */
+	private static final long serialVersionUID = 1L;
+
 	/**
 	 * Constructs a new query instance that uses the given persistence manager.
 	 * 
