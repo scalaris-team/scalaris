@@ -66,10 +66,11 @@
 -callback export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 -callback handle_custom_message(comm:message(), rt_loop:state_active()) -> rt_loop:state_active() | unknown_event.
 
--callback check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
--callback check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+-callback check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> NewERT::external_rt().
+-callback check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+            OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> NewERT::external_rt().
 
 -callback check_config() -> boolean().
 -callback wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
@@ -119,7 +120,7 @@ behaviour_info(callbacks) ->
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods
-     {check, 4}, {check, 5},
+     {check, 5}, {check, 6},
      {check_config, 0},
      % wrap and unwrap lookup messages
      {wrap_message, 6},

@@ -40,7 +40,7 @@
 % exports for unit tests
 -export([check_rt_integrity/1, check_well_connectedness/1, get_random_key_from_generator/3]).
 
--export([next_hop/3, check_tmp/5, check_tmp/6]).
+-export([next_hop/3]).
 
 %% Make dialyzer stop complaining about unused functions
 
@@ -412,7 +412,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 
         false -> OldRT
     end,
-    NewERT = check_tmp(OldRT, NewRT, rt_loop:get_ert(State),
+    NewERT = check(OldRT, NewRT, rt_loop:get_ert(State),
                     rt_loop:get_neighb(State), true),
     rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 
@@ -447,7 +447,7 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
         case rt_lookup_node(id(NewNode), OldRT) of
             none ->
                 RT = add_normal_entry(NewNode, OldRT),
-                ERT = check_tmp(OldRT, RT, rt_loop:get_ert(State),
+                ERT = check(OldRT, RT, rt_loop:get_ert(State),
                                 rt_loop:get_neighb(State), true),
                 {RT, ERT};
             {value, _RTEntry} -> {OldRT, rt_loop:get_ert(State)}
@@ -465,34 +465,24 @@ handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
 
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check4).
-
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check5).
-
 %% userdevguide-begin rt_frtchord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
                 Neighbors::nodelist:neighborhood(),
                 ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
-    check_tmp(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
+check(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+    check(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table only changes if the internal RT has
 %%      changed.
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
                 OldNeighbors::nodelist:neighborhood(),
                 NewNeighbors::nodelist:neighborhood(),
                 ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
+check(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
     % if the routing tables haven't changed and the successor/predecessor haven't changed
     % as well, do nothing
     case OldRT =:= NewRT andalso

@@ -30,7 +30,7 @@
          get_split_key/3, get_split_keys/3,
          dump/1, to_list/1, export_rt_to_dht_node/2,
          handle_custom_message/2,
-         check/4, check/5,
+         check/5, check/6,
          check_config/0,
          client_key_to_binary/1,
          wrap_message/6,

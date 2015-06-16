@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([next_hop/3, check_tmp/5, check_tmp/6]).
+-export([next_hop/3]).
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
@@ -416,33 +416,23 @@ handle_custom_message(_Message, _State) ->
     unknown_event.
 %% userdevguide-end rt_chord:handle_custom_message
 
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check4).
-
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check5).
-
 %% userdevguide-begin rt_chord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(), Neighbors::nodelist:neighborhood(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(), Neighbors::nodelist:neighborhood(),
             ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, OldRT, OldERT, _Neighbors, _ReportToFD) ->
+check(OldRT, OldRT, OldERT, _Neighbors, _ReportToFD) ->
     OldERT;
-check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+check(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
     check_do_update(OldRT, NewRT, OldERT, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table also changes if the neighborhood changes.
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
             OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
             ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
+check(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldNeighbors =:= NewNeighbors andalso OldRT =:= NewRT of
         true -> OldERT;
         _ -> check_do_update(OldRT, NewRT, OldERT, NewNeighbors, ReportToFD)

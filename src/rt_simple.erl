@@ -21,7 +21,7 @@
 -vsn('$Id$').
 
 -behaviour(rt_beh).
--export([check_tmp/5, check_tmp/6, next_hop/3]).
+-export([next_hop/3]).
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_simple:types
@@ -234,33 +234,23 @@ check_config() ->
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_simple:handle_custom_message
 
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check4).
-
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
-    erlang:error(rt_beh_error_check5).
-
 %% userdevguide-begin rt_simple:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
                 Neighbors::nodelist:neighborhood(),
                 ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
-    check_tmp(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
+check(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+    check(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table only changes the internal RT has
 %%      changed.
--spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+-spec check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
                 OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(),
                 ReportToFD::boolean()) -> NewERT::external_rt().
-check_tmp(OldRT, NewRT, OldERT, _OldNeighbors, NewNeighbors, ReportToFD) ->
+check(OldRT, NewRT, OldERT, _OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldRT =:= NewRT of
         true -> OldERT;
         _ ->
