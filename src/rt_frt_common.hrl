@@ -588,9 +588,11 @@ next_hop(Neighbors, ERT, Id) ->
     end.
 %% userdevguide-end rt_frtchord:next_hop
 
+%% @doc Return the succ
+%% TODO: lookup succ in ERT (if changing to rt_loop pids in RT)
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
-succ(_ERT, _Neighbors) ->
-    erlang:error(rt_beh_error_succ).
+succ(_ERT, Neighbors) ->
+    node:pidX(nodelist:succ(Neighbors)).
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node.

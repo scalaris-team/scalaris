@@ -288,9 +288,11 @@ next_hop(Neighbors, RT, Id) ->
 %% userdevguide-end rt_simple:next_hop
 
 
+%% @doc Return the succ
+%%      No need to lookup the succ in the ERT, only dht_node pids are used anyway.
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
-succ(_ERT, _Neighbors) ->
-    erlang:error(rt_beh_error_succ).
+succ(_ERT, Neighbors) ->
+    node:pidX(nodelist:succ(Neighbors)).
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node. Both
