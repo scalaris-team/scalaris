@@ -40,8 +40,6 @@
 % exports for unit tests
 -export([check_rt_integrity/1, check_well_connectedness/1, get_random_key_from_generator/3]).
 
--export([next_hop/3]).
-
 %% Make dialyzer stop complaining about unused functions
 
 % The following fsets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1)unctions are only used when ?RT == rt_frtchord. Dialyzer should not
@@ -588,12 +586,6 @@ next_hop(Neighbors, ERT, Id) ->
     {_NextHopId, Pid} -> Pid;
         succ -> succ
     end.
-
--spec next_hop(dht_node_state:state(), key()) -> succ | comm:mypid().
-next_hop(State, Id) ->
-    ERT = dht_node_state:get(State, rt),
-    Neighbors = dht_node_state:get(State, neighbors),
-    next_hop(Neighbors, ERT, Id).
 %% userdevguide-end rt_frtchord:next_hop
 
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().

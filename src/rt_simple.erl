@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -behaviour(rt_beh).
--export([next_hop/3]).
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_simple:types
@@ -280,19 +279,12 @@ empty_ext(Neighbors) -> empty(Neighbors).
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
-next_hop(State, Key) ->
-    Neighbors = dht_node_state:get(State, neighbors),
-    RT = dht_node_state:get(State, rt),
-    next_hop(Neighbors, RT, Key).
-
 -spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true -> succ;
         _    -> node:pidX(RT)
     end.
-
 %% userdevguide-end rt_simple:next_hop
 
 

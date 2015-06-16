@@ -37,7 +37,7 @@
 -callback init(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
--callback next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
+-callback next_hop(nodelist:neighborhood(), external_rt(), key()) -> succ | comm:mypid().
 -callback succ(external_rt(), nodelist:neighborhood()) -> comm:mypid().
 
 -callback init_stabilize(nodelist:neighborhood(), rt()) -> rt().
@@ -90,7 +90,7 @@ behaviour_info(callbacks) ->
      % mapping: key space -> identifier space
      {hash_key, 1}, {get_random_node_id, 0},
      % routing
-     {next_hop, 2},
+     {next_hop, 3},
      % return the succ
      {succ, 2},
      % trigger for new stabilization round

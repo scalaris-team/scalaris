@@ -20,8 +20,6 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([next_hop/3]).
-
 -behaviour(rt_beh).
 -include("scalaris.hrl").
 
@@ -472,17 +470,8 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 
 %% userdevguide-begin rt_chord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
-%%      If the routing table has less entries than the rt_size_use_neighbors
-%%      config parameter, the neighborhood is also searched in order to find a
-%%      proper next hop.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
-next_hop(State, Id) ->
-    Neighbors = dht_node_state:get(State, neighbors),
-    RT = dht_node_state:get(State, rt),
-    next_hop(Neighbors, RT, Id).
-
 -spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
