@@ -77,7 +77,7 @@ public class JPQLQuery extends AbstractJPQLQuery
     protected Object performExecute(Map parameters)
     {
     	
-    	return new java.util.ArrayList();
+		throw new NucleusException("Don't currently support JPQL");
 //        ClassLoaderResolver clr = ec.getClassLoaderResolver();
 //        final AbstractClassMetaData cmd = ec.getMetaDataManager().getMetaDataForClass(candidateClass, clr);
 //        Properties options = new Properties();

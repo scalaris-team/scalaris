@@ -27,7 +27,7 @@
 		<query class-name="org.datanucleus.store.scalaris.query.JPQLQuery"
 			datastore="scalaris" name="JPQL">
 		</query>
-		<query class-name="org.datanucleus.store.scalaris.query.JDOLQuery"
+		<query class-name="org.datanucleus.store.scalaris.query.JDOQLQuery"
 			datastore="scalaris" name="JDOQL">
 		</query>
 	</extension>

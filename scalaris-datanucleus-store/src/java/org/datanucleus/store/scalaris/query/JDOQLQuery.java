@@ -20,12 +20,22 @@ Contributors :
  ***********************************************************************/
 package org.datanucleus.store.scalaris.query;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusException;
+import org.datanucleus.metadata.AbstractClassMetaData;
+import org.datanucleus.query.evaluator.JDOQLEvaluator;
+import org.datanucleus.query.evaluator.JavaQueryEvaluator;
 import org.datanucleus.store.StoreManager;
+import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
+import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
+import org.datanucleus.util.Localiser;
+import org.datanucleus.util.NucleusLogger;
 
 /**
  * JDOQL query for JSON datastores.
@@ -73,54 +83,29 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
 		super(storeMgr, om, query);
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	protected Object performExecute(Map parameters) {
-		throw new NucleusException("Don't currently support JDOQL");
-
-		// ClassLoaderResolver clr = ec.getClassLoaderResolver();
-		// final AbstractClassMetaData cmd =
-		// ec.getMetaDataManager().getMetaDataForClass(candidateClass, clr);
-		// Properties options = new Properties();
-		// options.put(ConnectionFactoryImpl.STORE_JSON_URL,
-		// ((JsonPersistenceHandler)getStoreManager().getPersistenceHandler()).getURLPathForQuery(cmd));
-		// ManagedConnection mconn =
-		// getStoreManager().getConnection(ec,options);
-		// try
-		// {
-		// long startTime = System.currentTimeMillis();
-		// if (NucleusLogger.QUERY.isDebugEnabled())
-		// {
-		// NucleusLogger.QUERY.debug(LOCALISER.msg("021046", "JDOQL",
-		// getSingleStringQuery(), null));
-		// }
-		// List candidates = null;
-		// if (candidateCollection == null)
-		// {
-		// candidates =
-		// ((JsonPersistenceHandler)getStoreManager().getPersistenceHandler()).getObjectsOfCandidateType(
-		// ec, mconn, candidateClass, subclasses, ignoreCache, options);
-		// }
-		// else
-		// {
-		// candidates = new ArrayList(candidateCollection);
-		// }
-		//
-		// JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this,
-		// candidates, compilation,
-		// parameters, ec.getClassLoaderResolver());
-		// Collection results = resultMapper.execute(true, true, true, true,
-		// true);
-		//
-		// if (NucleusLogger.QUERY.isDebugEnabled())
-		// {
-		// NucleusLogger.QUERY.debug(LOCALISER.msg("021074", "JDOQL",
-		// "" + (System.currentTimeMillis() - startTime)));
-		// }
-		//
-		// return results;
-		// }
-		// finally
-		// {
-		// mconn.release();
-		// }
+        AbstractClassMetaData cmd = ec.getMetaDataManager().getMetaDataForClass(candidateClass, ec.getClassLoaderResolver());
+        ManagedConnection mconn = getStoreManager().getConnection(ec);
+       
+        try {        	
+	        // get all stored instances of class candidateClass
+	        List candidates;
+	        if (candidateCollection == null) {
+	        	candidates = ((ScalarisPersistenceHandler)getStoreManager().getPersistenceHandler())
+	        		.getObjectsOfCandidateType(ec, mconn, candidateClass, cmd);
+	        } else {
+	        	candidates = new ArrayList<Object>(candidateCollection);
+	        }
+	        
+	        // execute query
+	        JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this, candidates, compilation,
+	                parameters, ec.getClassLoaderResolver());
+			Collection results = resultMapper.execute(true, true, true, true, true);
+			
+	        return results;
+        } finally {
+        	mconn.release();
+        }
 	}
 }

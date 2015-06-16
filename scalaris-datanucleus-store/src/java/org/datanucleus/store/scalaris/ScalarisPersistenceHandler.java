@@ -18,10 +18,12 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
+import java.io.FileNotFoundException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
@@ -57,7 +59,7 @@ import de.zib.scalaris.UnknownException;
 
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	
-	private static final String ALL_KEY_PREFIX = "_ALL_KEYS";
+	private static final String ALL_ID_PREFIX = "_ALL_IDS";
 	
 	/** Setup localiser for messages. */
 	static {
@@ -100,6 +102,21 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	}
 	
 	/**
+	 * Convenience method which returns the key containing all stored identities of 
+	 * the given class.
+	 * @param clazz
+	 * 		The class for which the key is generated for.
+	 * @return 
+	 * 		Scalaris key as string.
+	 */
+	private String getManagementKeyName(Class<?> clazz) {
+		return getManagementKeyName(clazz.getCanonicalName());
+	}
+	private String getManagementKeyName(String className) {
+		return String.format("%s%s", className, ALL_ID_PREFIX);
+	}
+	
+	/**
 	 * To support queries it is necessary to have the possibility to iterate over 
 	 * all stored objects of a specific type. Since Scalaris stores only key-value pairs without
 	 * structured tables, this is not "natively" supported. 
@@ -114,9 +131,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 * @param op
 	 * 		The data source
 	 */
-	public void insertObjectToAllKey(final ObjectProvider op) {
+	private void insertObjectToAllKey(final ObjectProvider op) {
 		AbstractClassMetaData cmd = op.getClassMetaData();
-		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_KEY_PREFIX);
+		final String key = getManagementKeyName(cmd.getFullClassName());
 		final String objectStringIdentity = getPersistableIdentity(op);
 		
 		ExecutionContext ec = op.getExecutionContext();
@@ -182,9 +199,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 * @param op
 	 * 		The data source
 	 */
-	public void removeObjectFromAllKey(final ObjectProvider op) {
+	private void removeObjectFromAllKey(final ObjectProvider op) {
 		AbstractClassMetaData cmd = op.getClassMetaData();
-		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_KEY_PREFIX);
+		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_ID_PREFIX);
 		final String objectStringIdentity = getPersistableIdentity(op);
 		
 		ExecutionContext ec = op.getExecutionContext();
@@ -229,6 +246,48 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 		} finally {
 			mConn.release();
 		}
+	}
+	
+	/**
+	 * Convenience method to get all objects of the candidate type from the specified connection.
+	 * Objects of subclasses are ignored.
+	 * @param ec
+	 * @param mconn
+	 * @param candidateClass
+	 */
+	public List<Object> getObjectsOfCandidateType(final ExecutionContext ec, ManagedConnection mconn, 
+			Class<?> candidateClass, AbstractClassMetaData cmd) {
+		List<Object> results = new ArrayList<Object>();
+		String managementKey = getManagementKeyName(candidateClass);
+		
+		de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn.getConnection();
+		
+		try {
+			// read the management key
+			Transaction t = new Transaction(conn);
+			JSONArray json = new JSONArray(t.read(managementKey).stringValue());
+			
+			// retrieve all values from the management key
+			for (int i = 0; i < json.length(); i++) {
+				String s = json.getString(i);
+				results.add(IdentityUtils.getObjectFromPersistableIdentity(s, cmd, ec));
+			}
+			
+			t.commit();
+		} catch (NotFoundException e) {
+			// the management key does not exist which means there
+			// are no instances of this class stored.
+		} catch (ConnectionException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (AbortException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (UnknownException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (JSONException e) {
+			// management key has invalid format
+			throw new NucleusException(e.getMessage(), e);
+		}
+		return results;
 	}
 	
 	
