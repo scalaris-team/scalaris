@@ -1,0 +1,159 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>de.zib.scalaris</groupId>
+	<version>4.0.99-SNAPSHOT</version>
+	<artifactId>scalaris-datanucleus-store</artifactId>
+	<name>datanucleus.store.scalaris</name>
+	<description>&quot;Scalaris&quot; data store plugin for Datanucleus deriving from  Datanucleus-json plugin.
+	
+	The research leading to these results has received funding from the European Union’s Seventh Framework Programme (FP7/2007-2013) under grant agreement n° 258862.
+
+</description>
+	<url>http://www.datanucleus.org</url>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+	<inceptionYear>2012</inceptionYear>
+	<organization>
+		<name>Orange</name>
+	</organization>
+
+	<scm>
+		<url>http://datanucleus.svn.sourceforge.net/viewvc/datanucleus/platform/store.json/trunk/</url>
+		<connection>scm:svn:https://datanucleus.svn.sourceforge.net/svnroot/datanucleus/platform/store.json/trunk</connection>
+	</scm>
+
+
+	<repositories>
+		<repository>
+			<id>DN_M2_Repo</id>
+			<url>http://www.datanucleus.org/downloads/maven2/</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>scalaris</id>
+			<url>https://scalaris.googlecode.com/svn/maven/</url>
+		</repository>
+	</repositories>
+	<distributionManagement>
+		<snapshotRepository>
+			<id>datanucleus-nightly</id>
+			<name>DataNucleus Nightly</name>
+			<url>file:/home/jpox/htdocs/downloads/maven2-nightly/</url>
+			<uniqueVersion>false</uniqueVersion>
+		</snapshotRepository>
+		<repository>
+			<id>datanucleus</id>
+			<url>scpexe://www.datanucleus.org//home/jpox/htdocs/downloads/maven2/</url>
+		</repository>
+	</distributionManagement>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.datanucleus</groupId>
+			<artifactId>datanucleus-core</artifactId>
+			<version>[4.0.3,4.0.99)</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>de.zib.scalaris</groupId>
+			<artifactId>java-api</artifactId>
+			<version>0.7.2</version>
+		</dependency>
+		<dependency>
+		  <!-- Scalaris does not set its dependencies correctly, add here: -->
+		  <groupId>org.erlang.otp</groupId>
+		  <artifactId>jinterface</artifactId>
+		  <version>[1.5.6-custom, )</version>
+		</dependency>
+	</dependencies>
+
+	<!-- Build process -->
+	<build>
+		<sourceDirectory>src/java</sourceDirectory>
+		<resources>
+			<resource>
+				<filtering>true</filtering>
+				<directory>src/java</directory>
+				<includes>
+					<include>**/plugin.xml</include>
+					<include>**/*.properties</include>
+					<include>**/*.dtd</include>
+					<include>**/*.xsd</include>
+					<include>**/*.jdo</include>
+					<include>**/META-INF/services/*</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>${basedir}</directory>
+				<includes>
+					<include>plugin.xml</include>
+				</includes>
+			</resource>
+			<resource>
+				<!-- Need to have MANIFEST-MF in place before packaging, so unit-tests 
+					will work -->
+				<directory>${basedir}/META-INF</directory>
+				<targetPath>META-INF</targetPath>
+				<includes>
+					<include>MANIFEST.MF</include>
+					<include>LICENSE.txt</include>
+					<include>NOTICE.txt</include>
+					<include>README.txt</include>
+				</includes>
+			</resource>
+		</resources>
+
+		<plugins>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+					<source>1.5</source>
+					<target>1.5</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<archive>
+						<manifestFile>META-INF/MANIFEST.MF</manifestFile>
+					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>2.2.1</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+
+		<extensions>
+			<extension>
+				<groupId>org.apache.maven.wagon</groupId>
+				<artifactId>wagon-ssh-external</artifactId>
+				<version>2.2</version>
+			</extension>
+		</extensions>
+	</build>
+</project>

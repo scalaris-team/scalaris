@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<persistence xmlns="http://java.sun.com/xml/ns/persistence"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://java.sun.com/xml/ns/persistence http://java.sun.com/xml/ns/persistence/persistence_1_0.xsd" version="1.0">
+
+    <!-- Tutorial "unit" -->
+    <persistence-unit name="Tutorial">
+        <class>de.zib.scalaris.datanucleus.store.test.Inventory</class>
+        <class>de.zib.scalaris.datanucleus.store.test.Product</class>
+        <class>de.zib.scalaris.datanucleus.store.test.Book</class>
+        <exclude-unlisted-classes/>
+        <properties>
+       		<property name="javax.jdo.option.ConnectionURL" value="excel:file:tutorial.xls"/>
+            <property name="javax.jdo.option.Mapping" value="excel"/>
+            <property name="datanucleus.schema.autoCreateAll" value="true"/>
+
+			<property name="datanucleus.autoCreateSchema" value="true" />
+        </properties>
+    </persistence-unit>
+    
+    <!-- Scalaris Test "unit" -->
+    <persistence-unit name="Scalaris_Test">
+        <class>de.zib.scalaris.datanucleus.store.test.Inventory</class>
+        <class>de.zib.scalaris.datanucleus.store.test.Product</class>
+        <class>de.zib.scalaris.datanucleus.store.test.Book</class>
+        <class>de.zib.scalaris.datanucleus.store.test.Author</class>
+        <exclude-unlisted-classes/>
+        <properties>
+       		<property name="javax.jdo.option.ConnectionURL" value="scalaris:node" />
+       		
+			<property name="scalaris.cookie" value="chocolate chip cookie" />
+			<property name="scalaris.node" value="firstnode@localhost" />
+			<property name="scalaris.debug" value="true" />
+			<property name="scalaris.client.appendUUID" value="true" />
+			<property name="scalaris.client.name" value="java_client_datatnucleus" />
+			
+			<!-- Without this it is neccessary to detach an persistet object manually to be able
+				to use it outside of an transaction -->
+			<property name="datanucleus.DetachAllOnCommit" value="true" />
+	    </properties>
+    </persistence-unit>
+</persistence>

@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite failures="0" time="1.593" errors="5" skipped="0" tests="10" name="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage">
+  <properties>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="sun.boot.library.path" value="/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64"/>
+    <property name="java.vm.version" value="24.79-b02"/>
+    <property name="java.vm.vendor" value="Oracle Corporation"/>
+    <property name="java.vendor.url" value="http://java.oracle.com/"/>
+    <property name="path.separator" value=":"/>
+    <property name="guice.disable.misplaced.annotation.check" value="true"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="file.encoding.pkg" value="sun.io"/>
+    <property name="user.country" value="GB"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="sun.os.patch.level" value="unknown"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="user.dir" value="/nfs/csr/bzcskrzy/src/scalaris-datanucleus-store/scalaris-datanucleus-store-test"/>
+    <property name="java.runtime.version" value="1.7.0_79-b14"/>
+    <property name="java.awt.graphicsenv" value="sun.awt.X11GraphicsEnvironment"/>
+    <property name="java.endorsed.dirs" value="/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/endorsed"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.io.tmpdir" value="/tmp"/>
+    <property name="line.separator" value="
+"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="os.name" value="Linux"/>
+    <property name="classworlds.conf" value="/nfs/csr/bzcskrzy/workspace/.metadata/.plugins/org.eclipse.m2e.core/launches/m2conf6084249870415569109.tmp"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/usr/java/packages/lib/amd64:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="java.class.version" value="51.0"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="os.version" value="3.13.0-53-generic"/>
+    <property name="user.home" value="/home/csr/bzcskrzy"/>
+    <property name="user.timezone" value="Europe/Berlin"/>
+    <property name="java.awt.printerjob" value="sun.print.PSPrinterJob"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.specification.version" value="1.7"/>
+    <property name="user.name" value="bzcskrzy"/>
+    <property name="java.class.path" value="/nfs/csr/bzcskrzy/.eclipse/org.eclipse.platform_3.8_155965261/configuration/org.eclipse.osgi/bundles/277/1/.cp/jars/plexus-classworlds-2.4.jar"/>
+    <property name="java.vm.specification.version" value="1.7"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.home" value="/usr/lib/jvm/java-7-openjdk-amd64/jre"/>
+    <property name="sun.java.command" value="org.codehaus.plexus.classworlds.launcher.Launcher -B test"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="user.language" value="en"/>
+    <property name="awt.toolkit" value="sun.awt.X11.XToolkit"/>
+    <property name="java.vm.info" value="mixed mode"/>
+    <property name="java.version" value="1.7.0_79"/>
+    <property name="java.ext.dirs" value="/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/ext:/usr/java/packages/lib/ext"/>
+    <property name="securerandom.source" value="file:/dev/./urandom"/>
+    <property name="sun.boot.class.path" value="/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/resources.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/rt.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/sunrsasign.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/jsse.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/jce.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/charsets.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/rhino.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/jfr.jar:/usr/lib/jvm/java-7-openjdk-amd64/jre/classes"/>
+    <property name="java.vendor" value="Oracle Corporation"/>
+    <property name="maven.home" value="/nfs/csr/bzcskrzy/src/scalaris-datanucleus-store/scalaris-datanucleus-store-test/EMBEDDED"/>
+    <property name="file.separator" value="/"/>
+    <property name="java.vendor.url.bug" value="http://bugreport.sun.com/bugreport/"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="sun.cpu.isalist" value=""/>
+  </properties>
+  <testcase time="0.732" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_03_scalaris_retrieve_by_id">
+    <error message="com.orange.org.json.JSONObject$Null cannot be cast to java.lang.String" type="java.lang.ClassCastException">java.lang.ClassCastException: com.orange.org.json.JSONObject$Null cannot be cast to java.lang.String
+	at org.datanucleus.store.scalaris.FetchFieldManager.fetchObjectFieldInternal(FetchFieldManager.java:521)
+	at org.datanucleus.store.scalaris.FetchFieldManager.fetchObjectField(FetchFieldManager.java:261)
+	at org.datanucleus.state.AbstractStateManager.replacingObjectField(AbstractStateManager.java:1590)
+	at org.datanucleus.state.StateManagerImpl.replacingObjectField(StateManagerImpl.java:117)
+	at de.zib.scalaris.datanucleus.store.test.Inventory.dnReplaceField(Inventory.java)
+	at de.zib.scalaris.datanucleus.store.test.Inventory.dnReplaceFields(Inventory.java)
+	at org.datanucleus.state.StateManagerImpl.replaceFields(StateManagerImpl.java:3131)
+	at org.datanucleus.state.StateManagerImpl.replaceFields(StateManagerImpl.java:3158)
+	at org.datanucleus.store.scalaris.ScalarisPersistenceHandler.fetchObject(ScalarisPersistenceHandler.java:602)
+	at org.datanucleus.state.AbstractStateManager.loadFieldsFromDatastore(AbstractStateManager.java:1147)
+	at org.datanucleus.state.StateManagerImpl.loadUnloadedFieldsInFetchPlan(StateManagerImpl.java:2716)
+	at org.datanucleus.state.AbstractStateManager.loadFieldsInFetchPlan(AbstractStateManager.java:1089)
+	at org.datanucleus.ExecutionContextImpl.performDetachAllOnTxnEndPreparation(ExecutionContextImpl.java:4460)
+	at org.datanucleus.ExecutionContextImpl.preCommit(ExecutionContextImpl.java:4115)
+	at org.datanucleus.ExecutionContextImpl.transactionPreCommit(ExecutionContextImpl.java:683)
+	at org.datanucleus.TransactionImpl.internalPreCommit(TransactionImpl.java:388)
+	at org.datanucleus.TransactionImpl.commit(TransactionImpl.java:277)
+	at org.datanucleus.api.jdo.JDOTransaction.commit(JDOTransaction.java:107)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.retrieveObjectById(TestScalarisStorage.java:238)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.test_03_scalaris_retrieve_by_id(TestScalarisStorage.java:129)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:53)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:123)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:104)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.apache.maven.surefire.util.ReflectionUtils.invokeMethodWithArray(ReflectionUtils.java:164)
+	at org.apache.maven.surefire.booter.ProviderFactory$ProviderProxy.invoke(ProviderFactory.java:110)
+	at org.apache.maven.surefire.booter.SurefireStarter.invokeProvider(SurefireStarter.java:175)
+	at org.apache.maven.surefire.booter.SurefireStarter.runSuitesInProcessWhenForked(SurefireStarter.java:107)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:68)
+</error>
+    <system-out>
+################
+Starting test: test_03_scalaris_retrieve_by_id
+
+INSERT
+{scalaris.node=firstnode@localhost, scalaris.cookie=chocolate chip cookie, scalaris.client.name=java_client_datatnucleus, scalaris.client.appendUUID=true}
+I am the first for java_client_datatnucleus
+insert looking for key=key discriminator=null table=null
+INSERT
+insert looking for key=key discriminator=null table=null
+id=org.datanucleus.identity.IdentityReference@423afe2a json={&quot;id&quot;:301,&quot;price&quot;:200,&quot;description&quot;:&quot;A standard discman from Sony&quot;,&quot;name&quot;:&quot;Sony Discman&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Product&quot;}
+INSERT
+insert looking for key=key discriminator=null table=null
+INSERT
+insert looking for key=key discriminator=null table=null
+id=de.zib.scalaris.datanucleus.store.test.Author:JRR Tolkien json={&quot;name&quot;:&quot;JRR Tolkien&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author&quot;}
+id=org.datanucleus.identity.IdentityReference@43bc2c2a json={&quot;id&quot;:302,&quot;author&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author:JRR Tolkien&quot;,&quot;price&quot;:49.99,&quot;description&quot;:&quot;The classic story&quot;,&quot;name&quot;:&quot;Lord of the Rings by Tolkien&quot;,&quot;isbn&quot;:&quot;12345678&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Book&quot;,&quot;publisher&quot;:&quot;MyBooks Factory&quot;}
+name=products idColl.size()=2 idColl=[null, null]
+id=de.zib.scalaris.datanucleus.store.test.Inventory:Retrieval_Inventory json={&quot;name&quot;:&quot;Retrieval_Inventory&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Inventory&quot;,&quot;products&quot;:[null,null]}
+FIND id=class org.datanucleus.identity.LongId
+!!! -&gt; connection
+!!!!!!!!!de.zib.scalaris.datanucleus.store.test.Product
+FETCH de.zib.scalaris.datanucleus.store.test.Product
+fetch looking for key=de.zib.scalaris.datanucleus.store.test.Product:301 discriminator=null table=null
+FIND id=class org.datanucleus.identity.LongId
+FETCH de.zib.scalaris.datanucleus.store.test.Book
+fetch looking for key=de.zib.scalaris.datanucleus.store.test.Book:302 discriminator=null table=null
+looking for field author Book
+FIND id=class org.datanucleus.identity.StringId
+LOCATE
+############# locateObject(class=de.zib.scalaris.datanucleus.store.test.Author,key=de.zib.scalaris.datanucleus.store.test.Author:JRR Tolkien
+locate : {&quot;name&quot;:&quot;JRR Tolkien&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author&quot;}
+FIND id=class org.datanucleus.identity.StringId
+LOCATE
+############# locateObject(class=de.zib.scalaris.datanucleus.store.test.Inventory,key=de.zib.scalaris.datanucleus.store.test.Inventory:Retrieval_Inventory
+locate : {&quot;name&quot;:&quot;Retrieval_Inventory&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Inventory&quot;,&quot;products&quot;:[null,null]}
+FETCH de.zib.scalaris.datanucleus.store.test.Inventory
+fetch looking for key=de.zib.scalaris.datanucleus.store.test.Inventory:Retrieval_Inventory discriminator=null table=null
+looking for field products Inventory
+</system-out>
+  </testcase>
+  <testcase time="0.221" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_03_scalaris_store"/>
+  <testcase time="0.119" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_01_scalaris_delete_by_id">
+    <error message="Unable to find the object with a null id!" type="javax.jdo.JDONullIdentityException">javax.jdo.JDONullIdentityException: Unable to find the object with a null id!
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1712)
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1698)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.deleteObjectById(TestScalarisStorage.java:281)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.test_01_scalaris_delete_by_id(TestScalarisStorage.java:172)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:53)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:123)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:104)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.apache.maven.surefire.util.ReflectionUtils.invokeMethodWithArray(ReflectionUtils.java:164)
+	at org.apache.maven.surefire.booter.ProviderFactory$ProviderProxy.invoke(ProviderFactory.java:110)
+	at org.apache.maven.surefire.booter.SurefireStarter.invokeProvider(SurefireStarter.java:175)
+	at org.apache.maven.surefire.booter.SurefireStarter.runSuitesInProcessWhenForked(SurefireStarter.java:107)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:68)
+</error>
+    <system-out>
+################
+Starting test: test_01_scalaris_delete_by_id
+
+INSERT
+insert looking for key=key discriminator=null table=null
+INSERT
+insert looking for key=key discriminator=null table=null
+id=de.zib.scalaris.datanucleus.store.test.Author:JRR json={&quot;name&quot;:&quot;JRR&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author&quot;}
+id=org.datanucleus.identity.IdentityReference@4563b254 json={&quot;id&quot;:200,&quot;author&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author:JRR&quot;,&quot;price&quot;:49.99,&quot;description&quot;:&quot;The &quot;,&quot;name&quot;:&quot;Lord&quot;,&quot;isbn&quot;:&quot;1234&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Book&quot;,&quot;publisher&quot;:&quot;MyBooks&quot;}
+</system-out>
+  </testcase>
+  <testcase time="0.056" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_02_scalaris_retrieve_by_single_key"/>
+  <testcase time="0.052" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_02_scalaris_store"/>
+  <testcase time="0.044" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_01_scalaris_store"/>
+  <testcase time="0.077" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_01_scalaris_single_field_update">
+    <error message="Unable to find the object with a null id!" type="javax.jdo.JDONullIdentityException">javax.jdo.JDONullIdentityException: Unable to find the object with a null id!
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1712)
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1698)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.retrieveObjectById(TestScalarisStorage.java:237)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.test_01_scalaris_single_field_update(TestScalarisStorage.java:191)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:53)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:123)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:104)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.apache.maven.surefire.util.ReflectionUtils.invokeMethodWithArray(ReflectionUtils.java:164)
+	at org.apache.maven.surefire.booter.ProviderFactory$ProviderProxy.invoke(ProviderFactory.java:110)
+	at org.apache.maven.surefire.booter.SurefireStarter.invokeProvider(SurefireStarter.java:175)
+	at org.apache.maven.surefire.booter.SurefireStarter.runSuitesInProcessWhenForked(SurefireStarter.java:107)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:68)
+</error>
+    <system-out>
+################
+Starting test: test_01_scalaris_single_field_update
+
+INSERT
+insert looking for key=key discriminator=null table=null
+INSERT
+insert looking for key=key discriminator=null table=null
+id=de.zib.scalaris.datanucleus.store.test.Author:JRR2 json={&quot;name&quot;:&quot;JRR2&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author&quot;}
+id=org.datanucleus.identity.IdentityReference@4f4fe346 json={&quot;id&quot;:600,&quot;author&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author:JRR2&quot;,&quot;price&quot;:49.99,&quot;description&quot;:&quot;The &quot;,&quot;name&quot;:&quot;Lord&quot;,&quot;isbn&quot;:&quot;1234&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Book&quot;,&quot;publisher&quot;:&quot;MyBooks&quot;}
+</system-out>
+  </testcase>
+  <testcase time="0.07" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_02_scalaris_retrieve_by_id">
+    <error message="Unable to find the object with a null id!" type="javax.jdo.JDONullIdentityException">javax.jdo.JDONullIdentityException: Unable to find the object with a null id!
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1712)
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1698)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.retrieveObjectById(TestScalarisStorage.java:237)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.test_02_scalaris_retrieve_by_id(TestScalarisStorage.java:101)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:53)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:123)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:104)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.apache.maven.surefire.util.ReflectionUtils.invokeMethodWithArray(ReflectionUtils.java:164)
+	at org.apache.maven.surefire.booter.ProviderFactory$ProviderProxy.invoke(ProviderFactory.java:110)
+	at org.apache.maven.surefire.booter.SurefireStarter.invokeProvider(SurefireStarter.java:175)
+	at org.apache.maven.surefire.booter.SurefireStarter.runSuitesInProcessWhenForked(SurefireStarter.java:107)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:68)
+</error>
+    <system-out>
+################
+Starting test: test_02_scalaris_retrieve_by_id
+
+INSERT
+insert looking for key=key discriminator=null table=null
+INSERT
+insert looking for key=key discriminator=null table=null
+id=de.zib.scalaris.datanucleus.store.test.Author:JRRR Tolkien json={&quot;name&quot;:&quot;JRRR Tolkien&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author&quot;}
+id=org.datanucleus.identity.IdentityReference@153015e8 json={&quot;id&quot;:42,&quot;author&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Author:JRRR Tolkien&quot;,&quot;price&quot;:49.99,&quot;description&quot;:&quot;The classic story&quot;,&quot;name&quot;:&quot;Lord of the Rings by Tolkien&quot;,&quot;isbn&quot;:&quot;12345678&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Book&quot;,&quot;publisher&quot;:&quot;MyBooks Factory&quot;}
+</system-out>
+  </testcase>
+  <testcase time="0.086" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_01_scalaris_retrieve_by_single_key"/>
+  <testcase time="0.085" classname="de.zib.scalaris.datanucleus.store.test.TestScalarisStorage" name="test_01_scalaris_retrieve_by_id">
+    <error message="Unable to find the object with a null id!" type="javax.jdo.JDONullIdentityException">javax.jdo.JDONullIdentityException: Unable to find the object with a null id!
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1712)
+	at org.datanucleus.api.jdo.JDOPersistenceManager.getObjectById(JDOPersistenceManager.java:1698)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.retrieveObjectById(TestScalarisStorage.java:237)
+	at de.zib.scalaris.datanucleus.store.test.TestScalarisStorage.test_01_scalaris_retrieve_by_id(TestScalarisStorage.java:87)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+	at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+	at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:53)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:123)
+	at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:104)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at org.apache.maven.surefire.util.ReflectionUtils.invokeMethodWithArray(ReflectionUtils.java:164)
+	at org.apache.maven.surefire.booter.ProviderFactory$ProviderProxy.invoke(ProviderFactory.java:110)
+	at org.apache.maven.surefire.booter.SurefireStarter.invokeProvider(SurefireStarter.java:175)
+	at org.apache.maven.surefire.booter.SurefireStarter.runSuitesInProcessWhenForked(SurefireStarter.java:107)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:68)
+</error>
+    <system-out>
+################
+Starting test: test_01_scalaris_retrieve_by_id
+
+INSERT
+insert looking for key=key discriminator=null table=null
+id=org.datanucleus.identity.IdentityReference@277cd3d6 json={&quot;id&quot;:100,&quot;price&quot;:1.99,&quot;description&quot;:&quot;A standard discman from Sony&quot;,&quot;name&quot;:&quot;Sony Discman&quot;,&quot;class&quot;:&quot;de.zib.scalaris.datanucleus.store.test.Product&quot;}
+</system-out>
+  </testcase>
+</testsuite>
