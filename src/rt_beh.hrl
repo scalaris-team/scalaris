@@ -33,7 +33,7 @@
          check/4, check/5,
          check_config/0,
          client_key_to_binary/1,
-         wrap_message/4,
+         wrap_message/6,
          unwrap_message/2
      ]).
 

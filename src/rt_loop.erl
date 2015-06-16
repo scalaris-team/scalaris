@@ -38,7 +38,7 @@
 % add source information to debug routing damaged messages
 -define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
 -define(HOPS_FROM_DATA(Data), element(2, Data)).
--type data() :: {Source::c)mm:mypid(), Hops::non_neg_integer()}.
+-type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
 -else.
 -define(HOPS_TO_DATA(Hops), Hops).
 -define(HOPS_FROM_DATA(Data), Data).
@@ -222,7 +222,9 @@ on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, _RT, ERT, DHTPid} = State) 
     end,
     State;
 
-on_active({send_error, _Target, {?send_to_group_member, routing_table, {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
+on_active({send_error, _Target, {?send_to_group_member, routing_table,
+                                 {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
+    %% TODO can this message be received at routing_table?
     log:log(warn, "[routing_table] lookup_aux failed 1. Target: ~p. Msg: ~p.", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State;
@@ -244,16 +246,11 @@ on_active(Message, State) ->
                        DHTNodePid::comm:mypid(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_chord(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
-    %% TODO : wrap_message expects a dht_node_state
-    %% Noop in chord, simple
-    %% frt_common: Neighbours, node_id, external_rt,
-    %% WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
-    % ==> change wrap_message/4: instead of State, use Neighbors and RT-State!
-    WrappedMsg = Msg,
+    MyNode = nodelist:node(Neighbors),
+    WrappedMsg = ?RT:wrap_message(Key, Msg, MyNode, ERT, Neighbors, Hops),
     % NOTE: chord-like routing requires routing through predecessor -> only decide at pred:
     case ?RT:next_hop(Neighbors, ERT, Key) of
         succ ->
-            %% TODO: do I need a WrappedMsg here ??!
             comm:send_local(DHTPid, {lookup_decision, Key, Hops, WrappedMsg});
         NextHop ->
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
@@ -264,8 +261,6 @@ lookup_aux_chord(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
                         DHTNodePid::comm:mypid(), Key::intervals:key(),
                         Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_leases(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
-    %% log:pal("lookup_aux_leases in rt_loop"),
-    %% TODO implement WrappedMsg
     WrappedMsg = ?RT:wrap_message(Key, Msg, no_dht_node_state, Hops),
     % NOTE: leases do not require routing through predecessor -> let the own node decide:
     case intervals:in(Key, nodelist:node_range(Neighbors)) of

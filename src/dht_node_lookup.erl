@@ -78,18 +78,17 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
 -spec lookup_decision_chord(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_decision_chord(State, Key, Hops, Msg) ->
-    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     Neighbors = dht_node_state:get(State, neighbors),
     Succ = node:pidX(nodelist:succ(Neighbors)),
     % NOTE: re-evaluate that the successor is really (still) responsible:
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true ->
             %% log:log(warn, "[dht_node] lookup_fin on lookup_decision"),
-            NewMsg = {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg},
+            NewMsg = {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg},
             comm:send(Succ, NewMsg, [{shepherd, self()}]);
         _ ->
             log:log(warn, "[dht_node] lookup_aux on lookup_decision"),
-            NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+            NewMsg = {?lookup_aux, Key, Hops + 1, Msg},
             comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
     end.
 

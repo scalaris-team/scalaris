@@ -550,7 +550,7 @@ export_rt_to_dht_node(RT, Neighbors) ->
 %% @doc Converts the (external) representation of the routing table to a list of
 %%      {Id, Pid} tuples, in the order of the fingers, i.e. first=succ,
 %%      second=shortest finger, third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
+-spec to_list(dht_node_state:state()) -> list({key(), comm:mypid()}).
 to_list(State) ->
     ERT = dht_node_state:get(State, rt),
     Neighbors = dht_node_state:get(State, neighbors),
@@ -561,9 +561,10 @@ to_list(State) ->
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
--spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
+-spec wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
+                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
                    Hops::non_neg_integer()) -> comm:message().
-wrap_message(_Key, Msg, _State, _Hops) -> Msg.
+wrap_message(_Key, Msg, _MyNode, _ERT, _Neighbors, _Hops) -> Msg.
 %% userdevguide-end rt_chord:wrap_message
 
 %% userdevguide-begin rt_chord:unwrap_message

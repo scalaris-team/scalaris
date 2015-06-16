@@ -307,7 +307,7 @@ next_hop(Neighbors, RT, Id) ->
 
 
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
-succ(ERT, Neighbors) ->
+succ(_ERT, _Neighbors) ->
     erlang:error(rt_beh_error_succ).
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
@@ -329,9 +329,10 @@ to_list(State) ->
 
 %% userdevguide-begin rt_simple:wrap_message
 %% @doc Wrap lookup messages. This is a noop in rt_simple.
--spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
+-spec wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
+                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
                    Hops::non_neg_integer()) -> comm:message().
-wrap_message(_Key, Msg, _State, _Hops) -> Msg.
+wrap_message(_Key, Msg, _MyNode, _MyERT, _Neighbors, _Hops) -> Msg.
 %% userdevguide-end rt_simple:wrap_message
 
 %% userdevguide-begin rt_simple:unwrap_message
