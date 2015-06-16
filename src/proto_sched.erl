@@ -780,6 +780,16 @@ on({'DOWN', Ref, process, Pid, noproc = _Reason}, State) ->
            [Ref, Pid, _Reason]),
     %% the process did not exist when the monitor was opened and we should thus
     %% also have a send_error in our message box which will clean up
+    %% search for trace with status delivered and Ref
+    true = lists:any(
+             % note: Pid is always a real local pid, but _Pid is a comm:mypid()!
+             %       since Ref is unique though, we do not need to check the pid, too
+             fun({_TraceId, #state{status = {delivered, _Pid, RefX, _Time}}})
+                  when RefX =:= Ref ->
+                     true;
+                ({_TraceId, _}) ->
+                     false
+             end, State),
     State;
 
 on({'DOWN', Ref, process, Pid, _Reason}, State) ->
@@ -789,28 +799,27 @@ on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     %% received, otherwise, our shepherd should have kicked in (a send_error
     %% will then be in our message queue)
 
-    %% search for trace with status delivered, Pid and Ref
-    StateTail = lists:dropwhile(fun({_TraceId, X}) ->
-                                        case X#state.status of
-                                            {delivered, _Pid, Ref, _Time} ->
-                                                false;
-                                            _ -> true
-                                        end end,
-                                State),
-    case StateTail of
-        [] -> State; %% outdated 'DOWN' message - ok
-        [TraceEntry | _] ->
-            %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-            %%         [Ref, Pid, Reason]),
-            %% the process we delivered to has died, so we generate a
-            %% gc_on_done message ourselves.
-            %% use post_op to avoid concurrency with send_error
-            %% message when delivering to already dead nodes.
-            gen_component:post_op({on_handler_done,
-                                   element(1, TraceEntry),
-                                   pid_ended_died_or_killed,
-                                   comm:make_global(Pid)}, State)
-    end;
+    %% search for trace with status delivered and Ref
+    [TraceEntry | _] =
+        lists:dropwhile(
+          % note: Pid is always a real local pid, but _Pid is a comm:mypid()!
+          %       since Ref is unique though, we do not need to check the pid, too
+          fun({_TraceId, #state{status = {delivered, _Pid, RefX, _Time}}})
+               when RefX =:= Ref ->
+                  false;
+             ({_TraceId, _}) ->
+                  true
+          end, State),
+    %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+    %%         [Ref, Pid, Reason]),
+    %% the process we delivered to has died, so we generate a
+    %% gc_on_done message ourselves.
+    %% use post_op to avoid concurrency with send_error
+    %% message when delivering to already dead nodes.
+    gen_component:post_op({on_handler_done,
+                           element(1, TraceEntry),
+                           pid_ended_died_or_killed,
+                           comm:make_global(Pid)}, State);
 
 on({check_slow_handler_trigger}, State) ->
     msg_delay:send_trigger(1, {check_slow_handler_trigger}),
