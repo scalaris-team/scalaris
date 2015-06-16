@@ -74,24 +74,24 @@ kill_nodes_by_name(Names) ->
 %%      local(!) dht_node process.
 -spec register_dht_node(comm:mypid()) -> ok.
 register_dht_node(Pid) ->
-    case get_service() of
-        failed  -> ok;
-        Service -> comm:send_local(Service, {register_dht_node, Pid})
+    case whereis(service_per_vm) of
+        undefined -> ok;
+        Service   -> comm:send_local(Service, {register_dht_node, Pid})
     end.
 
 %% @doc Sends a deregister message to a running service_per_vm to remove a
 %%      local(!) dht_node process.
 -spec deregister_dht_node(comm:mypid()) -> ok.
 deregister_dht_node(Pid) ->
-    case get_service() of
-        failed  -> ok;
-        Service -> comm:send_local(Service, {deregister_dht_node, Pid})
+    case whereis(service_per_vm) of
+        undefined -> ok;
+        Service   -> comm:send_local(Service, {deregister_dht_node, Pid})
     end.
 
 -spec is_scalaris_ready() -> boolean().
 is_scalaris_ready() ->
-    case get_service() of
-        failed ->
+    case whereis(service_per_vm) of
+        undefined ->
             false;
         ServicePid ->
             %% comm:this() can't be trusted yet
@@ -192,7 +192,3 @@ on({scalaris_says_hi}, {Nodes, CommHasStarted, _SupHasStarted}) ->
 on({is_ready_local, Pid}, {_Nodes, CommHasStarted, SupHasStarted} = State) ->
     comm:send_local(Pid, {is_ready_local_response, CommHasStarted andalso SupHasStarted}),
     State.
-
--spec get_service() -> comm:mypid() | failed.
-get_service() ->
-    pid_groups:find_a(service_per_vm).

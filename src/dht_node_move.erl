@@ -1135,7 +1135,7 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     % note: the prepare_send_data1 callback already notified nodes subscribed to fd
     State1 = finish_slide(State, SlideOp),
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-    comm:send_local(pid_groups:find_a(service_per_vm),
+    comm:send_local(whereis(service_per_vm),
                     {delete_node, SupDhtNode, SupDhtNodeId}),
     % note: we will be killed soon but need to be removed from the supervisor first
     % -> do not kill this process

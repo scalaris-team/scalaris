@@ -672,7 +672,7 @@ get_known_nodes(JoinUUId) ->
             comm:send(Host, {get_dht_nodes, comm:this()}, [{shepherd, Self}])
          end || Host <- util:random_subset(3, KnownHosts)],
     % also try to get some nodes from the current erlang VM:
-    OwnServicePerVm = pid_groups:find_a(service_per_vm),
+    OwnServicePerVm = whereis(service_per_vm),
     ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}),
     comm:send_local(OwnServicePerVm, {get_dht_nodes, comm:this()}),
     % timeout just in case
