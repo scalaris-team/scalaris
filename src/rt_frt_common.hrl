@@ -40,6 +40,8 @@
 % exports for unit tests
 -export([check_rt_integrity/1, check_well_connectedness/1, get_random_key_from_generator/3]).
 
+-export([next_hop/3, check_tmp/5, check_tmp/6]).
+
 %% Make dialyzer stop complaining about unused functions
 
 % The following fsets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1)unctions are only used when ?RT == rt_frtchord. Dialyzer should not
@@ -391,7 +393,7 @@ handle_custom_message({get_rt, Pid}, State) ->
 
 handle_custom_message({get_rt_reply, RT}, State) ->
     %% merge the routing tables. Note: We don't care if this message is not from our
-    %current successor. We just have to make sure that the merged entries are valid.
+    %% current successor. We just have to make sure that the merged entries are valid.
     OldRT = rt_loop:get_rt(State),
     NewRT = case OldRT =/= RT of
         true ->
@@ -407,10 +409,12 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                 end,
                 OldRT, get_rt_tree(RT));
 
+
         false -> OldRT
     end,
-    check(OldRT, NewRT, rt_loop:get_neighb(State), true),
-    rt_loop:set_rt(State, NewRT);
+    NewERT = check_tmp(OldRT, NewRT, rt_loop:get_ert(State),
+                    rt_loop:get_neighb(State), true),
+    rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 
 % lookup a random key chosen with a pdf:
 % x = sourcenode + d(s,succ)*(d(s,pred)/d(s,succ))^rnd
@@ -439,68 +443,81 @@ handle_custom_message({rt_get_node, From}, State) ->
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
-    NewRT = case rt_lookup_node(id(NewNode), OldRT) of
-                none ->
-                    RT = add_normal_entry(NewNode, OldRT),
-                    check(OldRT, RT, rt_loop:get_neighb(State), true),
-                    RT
-                    ;
-                {value, _RTEntry} -> OldRT
-            end,
-    rt_loop:set_rt(State, NewRT);
+    {NewRT, NewERT} =
+        case rt_lookup_node(id(NewNode), OldRT) of
+            none ->
+                RT = add_normal_entry(NewNode, OldRT),
+                ERT = check_tmp(OldRT, RT, rt_loop:get_ert(State),
+                                rt_loop:get_neighb(State), true),
+                {RT, ERT};
+            {value, _RTEntry} -> {OldRT, rt_loop:get_ert(State)}
+        end,
+    rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
     NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
     gossip_load:get_values_best([{msg_delay, config:read(rt_frt_gossip_interval)}]),
-    RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
-    comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
-    rt_loop:set_rt(State, NewRT);
+    ERT = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
+    comm:send_local(pid_groups:get_my(dht_node), {rt_update, ERT}),
+    rt_loop:set_ert(rt_loop:set_rt(State, NewRT), ERT);
 
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
 
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
+check(_OldRT, _OldRT, _Neighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check4).
+
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+check(_OldRT, _NewRT, _OldNeighbors, _NewNeighbors, _ReportToFD) -> % TODO remove
+    erlang:error(rt_beh_error_check5).
+
 %% userdevguide-begin rt_frtchord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
-check(OldRT, NewRT, Neighbors, ReportToFD) ->
-    check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+                Neighbors::nodelist:neighborhood(),
+                ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, NewRT, OldERT, Neighbors, ReportToFD) ->
+    check_tmp(OldRT, NewRT, OldERT, Neighbors, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table only changes if the internal RT has
 %%      changed.
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
+-spec check_tmp(OldRT::rt(), NewRT::rt(), OldERT::external_rt(),
+                OldNeighbors::nodelist:neighborhood(),
+                NewNeighbors::nodelist:neighborhood(),
+                ReportToFD::boolean()) -> NewERT::external_rt().
+check_tmp(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, ReportToFD) ->
     % if the routing tables haven't changed and the successor/predecessor haven't changed
     % as well, do nothing
     case OldRT =:= NewRT andalso
          nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) andalso
          nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) of
-        true -> ok;
+        true -> OldERT;
         _Else -> export_to_dht(NewRT, ReportToFD)
     end.
 
 % @doc Helper to send the new routing table to the dht node
--spec export_to_dht(rt(), ReportToFD :: boolean()) -> ok.
+-spec export_to_dht(rt(), ReportToFD :: boolean()) ->
+    NewERT::external_rt().
 export_to_dht(NewRT, ReportToFD) ->
     Pid = pid_groups:get_my(dht_node),
+    ERT = export_rt_to_dht_node_helper(NewRT),
     case Pid of
         failed -> ok;
-        _E     ->
-            RTExt = export_rt_to_dht_node_helper(NewRT),
-            comm:send_local(Pid, {rt_update, RTExt})
+        _ -> comm:send_local(Pid, {rt_update, ERT})
     end,
     % update failure detector:
     case ReportToFD of
         true -> add_fd(NewRT);
-        _Else -> ok
+        _ -> ok
     end,
-    ok
-    .
+    ERT.
 
 % @doc Helper to check for routing table changes, excluding changes to the neighborhood.
 -spec check_helper(OldRT :: rt(), NewRT :: rt(), ReportToFD :: boolean()) -> ok.
@@ -547,15 +564,14 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_node(dht_node_state:state(), key()) -> {succ | other, mynode()}.
-next_hop_node(State, Id) ->
-    Neighbors = dht_node_state:get(State, neighbors),
+-spec next_hop_node(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | mynode().
+next_hop_node(Neighbors, ERT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true ->
-            {succ, node2mynode(nodelist:succ(Neighbors))};
-        _ -> ExtRT = dht_node_state:get(State, rt),
-             RT = external_rt_get_tree(ExtRT),
-             RTSize = get_size(ExtRT),
+            succ;
+        _ ->
+             RT = external_rt_get_tree(ERT),
+             RTSize = get_size(ERT),
              {NextHopId, NextHop} = case util:gb_trees_largest_smaller_than(Id, RT) of
                                         {value, Id1, Node} ->
                                             {Id1, Node};
@@ -566,24 +582,32 @@ next_hop_node(State, Id) ->
                                     end,
                  case RTSize < config:read(rt_size_use_neighbors) of
                      false ->
-                         {other, {NextHopId, NextHop}};
+                         {NextHopId, NextHop};
                      _     -> % check neighborhood:
                          % create a fake LastFound node:node_type() for largest_smaller_than
                          % (only Id is used in largest_smaller_than)
                          BestSoFar = node:new(NextHop, NextHopId, 0),
                          NextHopNew = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
-                         {other, node2mynode(NextHopNew)}
+                         node2mynode(NextHopNew)
                  end
     end.
 
--spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
+-spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
+next_hop(Neighbors, ERT, Id) ->
+    case next_hop_node(Neighbors, ERT, Id) of
+    {_NextHopId, Pid} -> Pid;
+        succ -> succ
+    end.
+
+-spec next_hop(dht_node_state:state(), key()) -> succ | comm:mypid().
 next_hop(State, Id) ->
-    {Tag, {_NextHopId, Pid}} = next_hop_node(State, Id),
-    {Tag, Pid}.
+    ERT = dht_node_state:get(State, rt),
+    Neighbors = dht_node_state:get(State, neighbors),
+    next_hop(Neighbors, ERT, Id).
 %% userdevguide-end rt_frtchord:next_hop
 
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
-succ(ERT, Neighbors) ->
+succ(_ERT, _Neighbors) ->
     erlang:error(rt_beh_error_succ).
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
@@ -612,12 +636,15 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 %% @doc Converts the external representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
+-spec to_list(dht_node_state:state()) -> list({key(), comm:mypid()}).
 to_list(State) -> % match external RT
-    {_, RT} = dht_node_state:get(State, rt),
+    {_, ERT} = dht_node_state:get(State, rt),
+    KVList = gb_trees:to_list(ERT),
+    FakeNodes = lists:map(fun ({Id, Pid}) -> node:new(Pid, Id, 0) end, KVList),
     Neighbors = dht_node_state:get(State, neighbors),
-    nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
-        nodelist:node(Neighbors)).
+    NodeList = nodelist:mk_nodelist([nodelist:succ(Neighbors) | FakeNodes],
+        nodelist:node(Neighbors)),
+    lists:map(fun (Node) -> {node:id(Node), node:pidX(Node)} end, NodeList).
 
 %% @doc Converts the internal representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
@@ -1098,23 +1125,23 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% userdevguide-begin rt_frtchord:wrap_message
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
--spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
-                   Hops::non_neg_integer()) ->
-    {'$wrapped', mynode(), comm:message()} | comm:message().
-wrap_message(_Key, Msg, State, 0) ->
-    MyNode = dht_node_state:get(State, node),
+-spec wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
+                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
+                   Hops::non_neg_integer()) -> {'$wrapped', mynode(),
+                                                comm:message()} | comm:message().
+wrap_message(_Key, Msg, MyNode, _ERT, _Neighbors, 0) ->
     {'$wrapped', node2mynode(MyNode), Msg};
 
-wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
+wrap_message(Key, {'$wrapped', Issuer, _} = Msg, MyNode, ERT, Neighbors, 1) ->
     %% The reduction ratio is only useful if this is not the last hop
-    case intervals:in(Key, nodelist:succ_range(dht_node_state:get(State, neighbors))) of
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> ok;
         false ->
-            MyId = dht_node_state:get(State, node_id),
+            MyId = node:id(MyNode),
             SenderId = id(Issuer),
             SenderPid = pidX(Issuer),
-            {_Tag, {NextHopId, NextHop}} = next_hop_node(State, Key),
-            SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
+            {NextHopId, NextHop} = next_hop_node(Neighbors, ERT, Key),
+            SendMsg = case external_rt_get_ring_size(ERT) of
                 unknown -> true;
                 RingSize ->
                     FirstDist = get_range(SenderId, MyId),
@@ -1137,7 +1164,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
     learn_on_forward(Issuer),
     Msg;
 
-wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _State, _) ->
+wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _MyNode, _ERT, _Neighbors, _Hops) ->
     learn_on_forward(Issuer),
     Msg.
 

@@ -28,15 +28,15 @@
 number_to_key(N) -> N.
 
 create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes) ->
-    {length(Nodes), 
+    {length(Nodes),
         gb_trees:from_orddict(
             [begin
                         Key = number_to_key(N),
-                        {Key, node:new(lists:nth(Idx, Nodes), Key, 0)}
+                        {Key, lists:nth(Idx, Nodes)}
                 end || {N, Idx} <- RT_Keys])}.
 
 check_next_hop(State, _Succ, N, NodeExp) ->
-    ?equals_w_note(element(2, ?RT:next_hop(State, number_to_key(N))), NodeExp, io_lib:format("~B", [N])).
+    ?equals_w_note(?RT:next_hop(State, number_to_key(N)), NodeExp, io_lib:format("~B", [N])).
 
 -spec check_split_key_half(Begin::?RT:key(), End::?RT:key() | ?PLUS_INFINITY_TYPE, SplitKey::?RT:key()) -> true.
 check_split_key_half(Begin, End, SplitKey) ->
@@ -56,7 +56,7 @@ check_split_key(Begin, End, SplitKey, SplitFraction) ->
                           _ -> ?RT:get_range(Begin, SplitKey)
                       end,
     %%     ct:pal("BeginToSplitKeyRange: ~.0p, ~.0p", [BeginToSplitKey, SplitKey]),
-    
+
     ?equals_pattern_w_note(
         BeginToSplitKey,
         Range when Range == (FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction),

@@ -211,6 +211,11 @@ on({?lookup_fin, Key, Data, Msg}, State) ->
 
 on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
+
+on({send_error, Target, {?send_to_group_member, routing_table,
+                         {?lookup_aux, _Key, _Hops, _Msg} = Message}, _Reason}, State) ->
+    dht_node_lookup:lookup_aux_failed(State, Target, Message);
+
 %on({send_failed, {send_error, Target, {?lookup_aux, _, _, _}} = Message, _Reason}, _Pids}}, State) ->
 %    dht_node_lookup:lookup_aux_failed(State, Target, Message);
 on({send_error, Target, {?lookup_fin, _, _, _} = Message, _Reason}, State) ->
