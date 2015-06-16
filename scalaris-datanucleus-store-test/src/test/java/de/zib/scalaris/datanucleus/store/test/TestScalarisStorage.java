@@ -3,44 +3,13 @@ package de.zib.scalaris.datanucleus.store.test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import javax.jdo.JDOHelper;
 import javax.jdo.JDOObjectNotFoundException;
-import javax.jdo.PersistenceManager;
-import javax.jdo.PersistenceManagerFactory;
-import javax.jdo.Transaction;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
-import org.junit.runners.Suite.SuiteClasses;
 
 import de.zib.scalaris.datanucleus.store.test.Product;
 
-
-@SuiteClasses({
-    TestScalarisStorage.class
-})
-
-
-public class TestScalarisStorage {
-	
-	private static final String PERSISTENCE_UNIT_NAME = "Scalaris_Test";
-	
-	@Rule
-	public TestName testName = new TestName();
-	
-	@Before
-	public void before() {
-		System.out.println("\n################");
-		System.out.printf("Starting test: %s\n\n", testName.getMethodName());
-	}
-	
-	@After
-	public void after() {
-		// TODO: Clear datastore
-	}
+public class TestScalarisStorage extends ScalarisTestBase {
 	
 	/**
 	 * Store a simple object (without relationships).
@@ -196,96 +165,5 @@ public class TestScalarisStorage {
 		
 		Book updated = (Book) retrieveObjectById(updatedId);
 		assertEquals(retrieved, updated);
-	}
-	
-	/*
-	 * Store an object in the data store. 
-	 * Returns the identity of the stored object.
-	 */
-	private Object storeObject(Object o) {
-		PersistenceManagerFactory pmf = JDOHelper.getPersistenceManagerFactory(PERSISTENCE_UNIT_NAME);
-		PersistenceManager pm = pmf.getPersistenceManager();
-		Transaction tx = pm.currentTransaction();
-		
-		Object objectID;
-		try {
-			tx.begin();
-			pm.makePersistent(o);
-			objectID = pm.getObjectId(o);
-			tx.commit();
-		} finally {
-			if (tx.isActive()) {
-				tx.rollback();
-			}
-			pm.close();
-		}
-		return objectID;
-	}
-	
-	/*
-	 * Retrieve an object stored in the data store by its ID.
-	 * Can throw exceptions if unsuccessful (e.g. JDOObjectNotFoundException).
-	 */
-	private Object retrieveObjectById(Object objectId) {
-		PersistenceManagerFactory pmf = JDOHelper.getPersistenceManagerFactory(PERSISTENCE_UNIT_NAME);
-		PersistenceManager pm = pmf.getPersistenceManager();
-		Transaction tx = pm.currentTransaction();
-		
-		Object retrieved;
-		try {
-			tx.begin();
-			retrieved = pm.getObjectById(objectId);
-			tx.commit();
-		} finally {
-			if (tx.isActive()) {
-				tx.rollback();
-			}
-			pm.close();
-		}
-		return retrieved;
-	}
-	
-	/*
-	 * This method can be used to retrieve an object by its primary key if it consists of only
-	 * one attribute. Can throw exceptions if unsuccessful (e.g. JDOObjectNotFoundException).
-	 */
-	private Object retrieveObjectBySingleKey(Class<?> objectClass, Object keyValue) {
-		PersistenceManagerFactory pmf = JDOHelper.getPersistenceManagerFactory(PERSISTENCE_UNIT_NAME);
-		PersistenceManager pm = pmf.getPersistenceManager();
-		Transaction tx = pm.currentTransaction();
-		
-		Object retrieved;
-		try {
-			tx.begin();
-			retrieved = pm.getObjectById(objectClass, keyValue);
-			tx.commit();
-		} finally {
-			if (tx.isActive()) {
-				tx.rollback();
-			}
-			pm.close();
-		}
-		return retrieved;
-	}
-	
-	/*
-	 * Delete an object stored in the data store by its ID.
-	 * Can throw exceptions if unsuccessful (e.g. JDOObjectNotFoundException).
-	 */
-	private void deleteObjectById(Object objectId) {
-		PersistenceManagerFactory pmf = JDOHelper.getPersistenceManagerFactory(PERSISTENCE_UNIT_NAME);
-		PersistenceManager pm = pmf.getPersistenceManager();
-		Transaction tx = pm.currentTransaction();
-		try {
-			tx.begin();
-			Object retrieved = pm.getObjectById(objectId);
-			pm.deletePersistent(retrieved);
-			tx.commit();
-		} finally {
-			if (tx.isActive()) {
-				tx.rollback();
-			}
-			pm.close();
-		}
 	}
 }
