@@ -422,6 +422,18 @@ monitor(Pid) ->
     % only a single monitor allowed:,
     undefined = erlang:put({'$gen_component_monitor_ref', RealPid}, MonRef),
     undefined = erlang:put({'$gen_component_monitor_pid', MonRef}, RealPid),
+
+    % if the process did not exist yet, convert the DOWN message to an infected message:
+    case trace_mpath:infected() of
+        true ->
+            receive
+                {'DOWN', MonRef, process, _Pid, noproc = _Reason} = Msg ->
+                    comm:send_local(self(), Msg)
+            after 0 -> ok
+            end;
+        _ ->
+            ok
+    end,
     MonRef.
 
 -spec demonitor(MonitorRef::reference()) -> true.
