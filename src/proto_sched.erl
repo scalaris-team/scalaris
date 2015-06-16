@@ -652,10 +652,11 @@ on({send_error, {send_error, Pid, Msg, Reason}, SendOptions} = _ShepherdMsg, Sta
     case lists:keyfind(TraceId, 1, State) of
         false -> State;
         {TraceId, TraceEntry} ->
+            %% NOTE: if the monitor has hit before, its 'DOWN' message with
+            %%       reason 'noproc' is ignored (see below) and we can assume
+            %%       a delivered state
+            {delivered, Pid, _Ref, _Time} = TraceEntry#state.status,
             %% enqueue a send_error message if a shepherd was used
-            %% NOTE: we do this in any state, since the monitor may have hit
-            %%       before in which case the DOWN message will clean up and
-            %%       generate and process an on_handler_done
             State1 =
                 case lists:keyfind(shepherd, 1, SendOptions) of
                     {shepherd, ShepherdPid} ->
@@ -672,16 +673,8 @@ on({send_error, {send_error, Pid, Msg, Reason}, SendOptions} = _ShepherdMsg, Sta
                     false ->
                         State
                 end,
-            case TraceEntry#state.status of
-                {delivered, Pid, _Ref, _Time} ->
-                    %% send error, generate on_handler_done
-                    gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State1);
-                _  ->
-                    %% not in state delivered, so probably the monitor
-                    %% already cleaned up for the died process with
-                    %% its 'DOWN' message.
-                    State1
-            end
+            %% process not alive -> generate on_handler_done
+            gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State1)
     end;
 
 on({register_callback, CallbackFun, OnX, TraceId, Client}, State) ->
@@ -781,6 +774,13 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
             comm:send_local(CallerPid, {cleanup_done}),
             State
     end;
+
+on({'DOWN', Ref, process, Pid, noproc = _Reason}, State) ->
+    ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+           [Ref, Pid, _Reason]),
+    %% the process did not exist when the monitor was opened and we should thus
+    %% also have a send_error in our message box which will clean up
+    State;
 
 on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
