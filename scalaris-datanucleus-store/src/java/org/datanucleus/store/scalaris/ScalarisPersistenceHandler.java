@@ -1,5 +1,5 @@
 /**********************************************************************
-Copyright (c) 2008 Erik Bengtson and others. All rights reserved.
+oCopyright (c) 2008 Erik Bengtson and others. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -19,6 +19,7 @@ Contributors:
 package org.datanucleus.store.scalaris;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,17 +45,19 @@ import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
 import org.datanucleus.util.StringUtils;
 
+import com.orange.org.json.JSONArray;
 import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
+	
+	private static final String ALL_KEY_PREFIX = "_ALL_KEYS";
 	
 	/** Setup localiser for messages. */
 	static {
@@ -95,6 +98,139 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	private String getPersistableIdentity(final ObjectProvider op) {
 		return IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
 	}
+	
+	/**
+	 * To support queries it is necessary to have the possibility to iterate over 
+	 * all stored objects of a specific type. Since Scalaris stores only key-value pairs without
+	 * structured tables, this is not "natively" supported. 
+	 * Therefore an extra key is added to the store containing all keys of available objects of a 
+	 * type. 
+	 * This key has the structure <full-class-name><ALL_KEY_PREFIX>.
+	 * The value is an JSON-array containing all keys of <full-class-name> instances.
+	 * 
+	 * This methods adds another entry to such a key based on the passed ObjectProvider. 
+	 * If no such key-value pair exists, it is created. 
+	 * 
+	 * @param op
+	 * 		The data source
+	 */
+	public void insertObjectToAllKey(final ObjectProvider op) {
+		AbstractClassMetaData cmd = op.getClassMetaData();
+		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_KEY_PREFIX);
+		final String objectStringIdentity = getPersistableIdentity(op);
+		
+		ExecutionContext ec = op.getExecutionContext();
+		ManagedConnection mConn = storeMgr.getConnection(ec);
+		de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn.getConnection();
+		
+		// retrieve the existing value (null if it does not exist).
+		JSONArray json = null;
+		try {
+			try {
+				Transaction t = new Transaction(conn);
+				json = new JSONArray(t.read(key).stringValue());
+				t.commit();
+			} catch (NotFoundException e) {
+				// the key does not exist.
+			}
+		
+			// add the new identity if it does not already exists
+			if (json == null) {
+				json = new JSONArray();
+			}
+			for (int i = 0; i < json.length(); i++) {
+				String s = json.getString(i);
+				if (s != null && s.equals(objectStringIdentity)) {
+					// This object identity is already stored here 
+					// It is not necessary to write since nothing changed.
+					return;
+				}
+			}
+			json.put(objectStringIdentity);
+			
+			// commit changes
+			Transaction t1 = new Transaction(conn);
+			t1.write(key, json.toString());
+			t1.commit();
+			
+		} catch (ConnectionException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (UnknownException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (AbortException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (JSONException e) {
+			// the value has an invalid structure
+			throw new NucleusDataStoreException(e.getMessage(), e);
+		} finally {
+			mConn.release();
+		}
+	}
+	
+	/**
+	 * To support queries it is necessary to have the possibility to iterate over 
+	 * all stored objects of a specific type. Since Scalaris stores only key-value pairs without
+	 * structured tables, this is not "natively" supported. 
+	 * Therefore an extra key is added to the store containing all keys of available objects of a 
+	 * type. 
+	 * This key has the structure <full-class-name><ALL_KEY_PREFIX>.
+	 * The value is an JSON-array containing all keys of <full-class-name> instances.
+	 * 
+	 * This methods removes an entry of such a key based on the passed ObjectProvider. 
+	 * If no such key-value pair exists, nothing happens. 
+	 * 
+	 * @param op
+	 * 		The data source
+	 */
+	public void removeObjectFromAllKey(final ObjectProvider op) {
+		AbstractClassMetaData cmd = op.getClassMetaData();
+		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_KEY_PREFIX);
+		final String objectStringIdentity = getPersistableIdentity(op);
+		
+		ExecutionContext ec = op.getExecutionContext();
+		ManagedConnection mConn = storeMgr.getConnection(ec);
+		de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn.getConnection();
+		
+		// retrieve the existing value (null if it does not exist).
+		JSONArray json = null;
+		try {
+			try {
+				Transaction t = new Transaction(conn);
+				json = new JSONArray(t.read(key).stringValue());
+				t.commit();
+			} catch (NotFoundException e) {
+				// the key does not exist, therefore there is nothing to do here.
+				return;
+			}
+			
+			// remove all occurrences of the key
+			ArrayList<String> list = new ArrayList<String>(json.length());
+			for (int i = 0; i < json.length(); i++) {
+				String s = json.getString(i);
+				if (s != null && !s.equals(objectStringIdentity)) {
+					list.add(s);
+				}
+			}
+			json = new JSONArray(list);
+			
+			// commit changes
+			Transaction t1 = new Transaction(conn);
+			t1.write(key, json.toString());
+			t1.commit();
+		} catch (ConnectionException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (UnknownException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (AbortException e) {
+			throw new NucleusException(e.getMessage(), e);
+		} catch (JSONException e) {
+			// the value has an invalid structure
+			throw new NucleusDataStoreException(e.getMessage(), e);
+		} finally {
+			mConn.release();
+		}
+	}
+	
 	
 	public void insertObject(ObjectProvider op) {
 		System.out.println("INSERT");
@@ -207,6 +343,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 				try {
 					t1.write(id, jsonobj.toString());
 					t1.commit();
+					
+					// update reference on successful insert
+					insertObjectToAllKey(op);
 				} catch (ConnectionException e) {
 					e.printStackTrace();
 				} catch (UnknownException e) {
@@ -469,6 +608,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 					t1.write(id, jsonobj.toString());
 					t1.commit();
 					System.out.println("deleted id=" + id);
+					// on success remove the corresponding entry in its 
+					// account key
+					removeObjectFromAllKey(op);
+					
 				} catch (ConnectionException e) {
 					throw new NucleusDataStoreException(e.getMessage(), e);
 //				} catch (TimeoutException e) {
