@@ -633,7 +633,7 @@ to_list(State) -> % match external RT
 %% @doc Converts the internal representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec internal_to_list(rt()) -> nodelist:snodelist().
+-spec internal_to_list(rt()) -> [mynode()].
 internal_to_list(#rt_t{} = RT) ->
     SourceNode = get_source_node(RT),
     ListOfNodes = [rt_entry_node(N) || N <- gb_trees:values(get_rt_tree(RT))],
@@ -642,7 +642,7 @@ internal_to_list(#rt_t{} = RT) ->
 
 % @doc Helper to do the actual work of converting a list of node:node_type() records
 % to list beginning with the source node and wrapping around at 0
--spec sorted_nodelist(nodelist:snodelist(), SourceNode::key()) -> nodelist:snodelist().
+-spec sorted_nodelist(ListOfNodes::[mynode()], SourceNode::key()) -> [mynode()].
 sorted_nodelist(ListOfNodes, SourceNode) ->
     % sort
     Sorted = lists:sort(fun(A, B) -> id(A) =< id(B) end,
@@ -840,14 +840,10 @@ entry_learning(Entry, Type, RT) ->
                         get_rt_tree(RT)),
                     rt_set_nodes(RT, Nodes);
                 _ ->
-                    case node:is_newer(Entry, rt_entry_node(ExistingEntry)) of
-                        true -> % replace an existing node with a newer version
-                            Nodes = gb_trees:enter(rt_entry_id(ExistingEntry),
+                    Nodes = gb_trees:enter(rt_entry_id(ExistingEntry),
                                            rt_entry_set_node(ExistingEntry, Entry),
                                            get_rt_tree(RT)),
-                            rt_set_nodes(RT, Nodes);
-                        false -> RT
-                    end
+                    rt_set_nodes(RT, Nodes)
             end
     end.
 
@@ -930,12 +926,12 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 
 % @doc Add an entry of a specific type to the routing table
 %-spec add_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) -> rt().
--spec add_entry(node:node_type(),'normal' | 'source' | 'sticky',rt()) -> rt().
+-spec add_entry(mynode(), 'normal' | 'source' | 'sticky', rt()) -> rt().
 add_entry(Node, Type, RT) ->
     entry_learning_and_filtering(Node, Type, RT).
 
 % @doc Add a sticky entry to the routing table
--spec add_sticky_entry(Entry :: node:node_type(), rt()) -> rt().
+-spec add_sticky_entry(Entry :: mynode(), rt()) -> rt().
 add_sticky_entry(Entry, RT) -> add_entry(Entry, sticky, RT).
 
 % @doc Add the source entry to the routing table
@@ -948,16 +944,16 @@ add_source_entry(Entry, #rt_t{source=undefined} = RT) ->
     NewRT.
 
 % @doc Add a normal entry to the routing table
--spec add_normal_entry(Entry :: node:node_type(), rt()) -> rt().
+-spec add_normal_entry(Entry :: mynode(), rt()) -> rt().
 add_normal_entry(Entry, RT) ->
     add_entry(Entry, normal, RT).
 
 % @doc Get the inner node:node_type() of a rt_entry
--spec rt_entry_node(N :: rt_entry()) -> node:node_type().
+-spec rt_entry_node(N :: rt_entry()) -> mynode().
 rt_entry_node(#rt_entry{node=N}) -> N.
 
 % @doc Set the inner node:node_type() of a rt_entry
--spec rt_entry_set_node(Entry :: rt_entry(), Node :: node:node_type()) -> rt_entry().
+-spec rt_entry_set_node(Entry :: rt_entry(), Node :: mynode()) -> rt_entry().
 rt_entry_set_node(#rt_entry{} = Entry, Node) -> Entry#rt_entry{node=Node}.
 
 % @doc Calculate the distance between two nodes in the routing table
