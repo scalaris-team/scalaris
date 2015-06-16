@@ -305,7 +305,7 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %% @doc Converts the (external) representation of the routing table to a list
 %%      {Id, Pid} tuples in the order of the fingers, i.e. first=succ,
 %%      second=shortest finger, third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
+-spec to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 to_list(State) ->
     Succ = dht_node_state:get(State, rt), % ERT = Succ
     [{node:id(Succ), node:pidX(Succ)}].

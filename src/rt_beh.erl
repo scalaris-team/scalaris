@@ -62,7 +62,7 @@
 
 -callback dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 
--callback to_list(dht_node_state:state()) -> nodelist:snodelist().
+-callback to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 -callback export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 -callback handle_custom_message(comm:message(), rt_loop:state_active()) -> rt_loop:state_active() | unknown_event.
 

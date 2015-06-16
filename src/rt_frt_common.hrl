@@ -620,7 +620,7 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 %% @doc Converts the external representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> list({key(), comm:mypid()}).
+-spec to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 to_list(State) -> % match external RT
     {_, ERT} = dht_node_state:get(State, rt),
     KVList = gb_trees:to_list(ERT),
