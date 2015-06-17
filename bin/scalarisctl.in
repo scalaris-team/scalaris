@@ -685,7 +685,7 @@ scalarisstart(){
         tmp="$tmp -scalaris join_at $join_at"
     fi
     if [ "$join_at_list" != "" ]; then
-        tmp="$tmp -scalaris join_at_list $join_at_list"
+        tmp="$tmp -scalaris join_at_list '$join_at_list'"
     fi
     if [ $start_mgmt_server -eq 1 ]; then
         tmp="$tmp -scalaris start_mgmt_server true"
@@ -842,7 +842,7 @@ until [ -z "$1" ]; do
             h) usage 0;;
             i) echo "WARN: interactive is now default";;
             k) join_at=$OPTARG;;
-            j) join_at_list=$OPTARG;;
+            j) join_at_list="$OPTARG";;
             l) LOGDIR=$(readlink -m "$OPTARG");;
             n) NODE_NAME=$OPTARG;;
             p) port=$OPTARG;;
