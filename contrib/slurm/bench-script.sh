@@ -36,4 +36,5 @@ erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "{ok, Res} = 
 #                                           #
 #############################################
 
+echo "stopping servers"
 $(pwd)/scalaris-stop.sh

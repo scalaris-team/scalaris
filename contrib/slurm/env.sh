@@ -7,3 +7,4 @@ export ETCDIR=$SCALARIS_DIR/bin
 export BINDIR=$SCALARIS_DIR/bin
 export BEAMDIR=$SCALARIS_DIR/ebin
 
+export SHUFFLE_NODE_IDS=1

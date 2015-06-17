@@ -8,7 +8,7 @@ function fix_known_hosts() {
     then
         mv $ETCDIR/scalaris.local.cfg .
     else
-        touch $ETCDIR/scalaris.local.cfg
+        touch scalaris.local.cfg
     fi
     NODEIDX=1
     echo "{known_hosts, [" >> $ETCDIR/scalaris.local.cfg
@@ -45,23 +45,41 @@ function start_servers() {
     HEADNODE=`scontrol show hostnames | head -n1`
     TAILNODES=`scontrol show hostnames | tail -n +2`
 
+    let NR_OF_DHT_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE\*$DHT_NODES_PER_VM
+    let NR_OF_VMS=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
+
+    KEYLIST=""
+    if [ $SHUFFLE_NODE_IDS -eq 1 ]
+    then
+        KEYLIST=`erl -name bench_ -pa $BEAMDIR -noinput -eval "L = util:lists_split(util:shuffle(api_dht_raw:split_ring($NR_OF_DHT_NODES)), $NR_OF_VMS), io:format('~p', [L]), halt(0)."`
+    else
+        KEYLIST=`erl -name bench_ -pa $BEAMDIR -noinput -eval "L = util:lists_split(api_dht_raw:split_ring($NR_OF_DHT_NODES), $NR_OF_VMS), io:format('~p', [L]), halt(0)."`
+    fi
+
+    VM_IDX=1
+    JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
+    srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first start
+    let VM_IDX+=1
     for NODE in $TAILNODES; do
         PORT=14195
         YAWSPORT=8000
         for TASKSPERNODE in `seq 1 $VMS_PER_NODE`; do
-            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+            JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
+            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
             let PORT+=1
             let YAWSPORT+=1
+            let VM_IDX+=1
         done
     done
     PORT=14196
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
-        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+        JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
+        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+        let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1
     done
-    srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first start
 }
 
 function wait_for_servers_to_start {
