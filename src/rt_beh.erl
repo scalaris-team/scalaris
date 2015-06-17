@@ -73,9 +73,9 @@
             ReportToFD::boolean()) -> NewERT::external_rt().
 
 -callback check_config() -> boolean().
--callback wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
-                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
-                   Hops::non_neg_integer()) -> comm:message().
+-callback wrap_message(Key::key(), Msg::comm:message(), MyERT::external_rt(),
+                       Neighbors::nodelist:neighborhood(),
+                       Hops::non_neg_integer()) -> comm:message().
 -callback unwrap_message(Msg::comm:message(), State::dht_node_state:state()) ->
     comm:message().
 
@@ -123,7 +123,7 @@ behaviour_info(callbacks) ->
      {check, 5}, {check, 6},
      {check_config, 0},
      % wrap and unwrap lookup messages
-     {wrap_message, 6},
+     {wrap_message, 5},
      {unwrap_message, 2}
     ];
 behaviour_info(_Other) ->

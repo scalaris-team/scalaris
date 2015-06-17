@@ -246,8 +246,7 @@ on_active(Message, State) ->
                        DHTNodePid::comm:mypid(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_chord(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
-    MyNode = nodelist:node(Neighbors),
-    WrappedMsg = ?RT:wrap_message(Key, Msg, MyNode, ERT, Neighbors, Hops),
+    WrappedMsg = ?RT:wrap_message(Key, Msg, ERT, Neighbors, Hops),
     % NOTE: chord-like routing requires routing through predecessor -> only decide at pred:
     case ?RT:next_hop(Neighbors, ERT, Key) of
         succ ->
@@ -261,7 +260,7 @@ lookup_aux_chord(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
                         DHTNodePid::comm:mypid(), Key::intervals:key(),
                         Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_leases(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
-    WrappedMsg = ?RT:wrap_message(Key, Msg, no_dht_node_state, Hops),
+    WrappedMsg = ?RT:wrap_message(Key, Msg, ERT, Neighbors, Hops),
     % NOTE: leases do not require routing through predecessor -> let the own node decide:
     case intervals:in(Key, nodelist:node_range(Neighbors)) of
         true ->

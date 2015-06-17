@@ -540,10 +540,10 @@ to_list(State) ->
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
--spec wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
-                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
+-spec wrap_message(Key::key(), Msg::comm:message(), MyERT::external_rt(),
+                   Neighbors::nodelist:neighborhood(),
                    Hops::non_neg_integer()) -> comm:message().
-wrap_message(_Key, Msg, _MyNode, _ERT, _Neighbors, _Hops) -> Msg.
+wrap_message(_Key, Msg, _ERT, _Neighbors, _Hops) -> Msg.
 %% userdevguide-end rt_chord:wrap_message
 
 %% userdevguide-begin rt_chord:unwrap_message

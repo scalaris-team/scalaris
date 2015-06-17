@@ -1105,18 +1105,20 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% userdevguide-begin rt_frtchord:wrap_message
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
--spec wrap_message(Key::key(), Msg::comm:message(), MyNode::node:node_type(),
-                   MyERT::external_rt(), Neighbors::nodelist:neighborhood(),
+-spec wrap_message(Key::key(), Msg::comm:message(), MyERT::external_rt(),
+                   Neighbors::nodelist:neighborhood(),
                    Hops::non_neg_integer()) -> {'$wrapped', mynode(),
                                                 comm:message()} | comm:message().
-wrap_message(_Key, Msg, MyNode, _ERT, _Neighbors, 0) ->
+wrap_message(_Key, Msg, _ERT, Neighbors, 0) ->
+    MyNode = nodelist:node(Neighbors),
     {'$wrapped', node2mynode(MyNode), Msg};
 
-wrap_message(Key, {'$wrapped', Issuer, _} = Msg, MyNode, ERT, Neighbors, 1) ->
+wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
     %% The reduction ratio is only useful if this is not the last hop
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> ok;
         false ->
+            MyNode = nodelist:node(Neighbors),
             MyId = node:id(MyNode),
             SenderId = id(Issuer),
             SenderPid = pidX(Issuer),
@@ -1144,7 +1146,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, MyNode, ERT, Neighbors, 1) ->
     learn_on_forward(Issuer),
     Msg;
 
-wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _MyNode, _ERT, _Neighbors, _Hops) ->
+wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _ERT, _Neighbors, _Hops) ->
     learn_on_forward(Issuer),
     Msg.
 
