@@ -775,16 +775,16 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
             State
     end;
 
-on({'DOWN', Ref, process, Pid, noproc = _Reason}, State) ->
+on({'DOWN', Ref, process, _Pid, noproc = _Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-           [Ref, Pid, _Reason]),
+           [Ref, _Pid, _Reason]),
     %% the process did not exist when the monitor was opened and we should thus
     %% also have a send_error in our message box which will clean up
     %% search for trace with status delivered and Ref
     true = lists:any(
-             % note: Pid is always a real local pid, but _Pid is a comm:mypid()!
+             % note: _Pid is always a real local pid, but _PidX is a comm:mypid()!
              %       since Ref is unique though, we do not need to check the pid, too
-             fun({_TraceId, #state{status = {delivered, _Pid, RefX, _Time}}})
+             fun({_TraceId, #state{status = {delivered, _PidX, RefX, _Time}}})
                   when RefX =:= Ref ->
                      true;
                 ({_TraceId, _}) ->
@@ -802,9 +802,9 @@ on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     %% search for trace with status delivered and Ref
     [TraceEntry | _] =
         lists:dropwhile(
-          % note: Pid is always a real local pid, but _Pid is a comm:mypid()!
+          % note: Pid is always a real local pid, but _PidX is a comm:mypid()!
           %       since Ref is unique though, we do not need to check the pid, too
-          fun({_TraceId, #state{status = {delivered, _Pid, RefX, _Time}}})
+          fun({_TraceId, #state{status = {delivered, _PidX, RefX, _Time}}})
                when RefX =:= Ref ->
                   false;
              ({_TraceId, _}) ->
