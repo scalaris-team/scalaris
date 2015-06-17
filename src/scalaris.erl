@@ -77,15 +77,22 @@ load() ->
 -spec start(StartType::normal, StartArgs::[])
         -> {ok, Pid::pid()}.
 start(normal, []) ->
-    util:if_verbose("~nAlready registered: ~p.~n", [erlang:registered()]),
-    util:if_verbose("Running with node name ~p.~n", [node()]),
-    config:init([]),
-    _ = pid_groups:start_link(),
-    case sup_scalaris:start_link() of
-        % ignore -> {error, ignore}; % no longer needed as dialyzer states
-        X = {ok, Pid} when is_pid(Pid) ->
-            comm:send_local(service_per_vm, {scalaris_says_hi}),
-            X
+    try
+        util:if_verbose("~nAlready registered: ~p.~n", [erlang:registered()]),
+        util:if_verbose("Running with node name ~p.~n", [node()]),
+        config:init([]),
+        _ = pid_groups:start_link(),
+        case sup_scalaris:start_link() of
+            %% ignore -> {error, ignore}; % no longer needed as dialyzer states
+            X = {ok, Pid} when is_pid(Pid) ->
+                comm:send_local(service_per_vm, {scalaris_says_hi}),
+                X
+        end
+    catch
+        Error:Reason ->
+            io:format("Ups, Scalaris crashed with ~p:~p~n~p~n",
+                      [Error, Reason, util:get_stacktrace()]),
+            halt(1)
     end.
 
 -spec stop(any()) -> ok.
