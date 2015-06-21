@@ -78,7 +78,7 @@ next_hop(_Config) ->
     Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
     DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {2, 2}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
-    RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes]]),
+    RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes], Neighbors]),
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
@@ -86,7 +86,7 @@ next_hop(_Config) ->
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 0),
 
-    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, lists:nth(6, DHTNodes)]),
+    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
 
     %% the aux -> fin conversion is moved to dht_node_lookup, so the following
     %% check doesn't work anymore for next_hop
@@ -116,9 +116,10 @@ next_hop2(_Config) ->
     Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
     DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
-    RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes]]),
     Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
                                   SuccSucc, 2, 2),
+    RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes], Neighbors]),
+    %% log:pal("RT:~n~190.2p", [gb_trees:to_list(RT)]),
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process

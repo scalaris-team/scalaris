@@ -27,7 +27,7 @@
 
 number_to_key(N) -> N.
 
-create_rt(_RT_Keys, [Succ | _DHTNodes] = _Nodes) ->
+create_rt(_RT_Keys, [Succ | _DHTNodes] = _Nodes, _Neighbors) ->
     node:new(Succ, number_to_key(1), 0).
 
 check_next_hop(State, Succ, N, _NodeExp) ->

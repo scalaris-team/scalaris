@@ -27,13 +27,15 @@
 
 number_to_key(N) -> N.
 
-create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes) ->
-    {length(Nodes),
-        gb_trees:from_orddict(
+create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes, Neighbors) ->
+    RT1 = gb_trees:from_orddict(
             [begin
-                        Key = number_to_key(N),
-                        {Key, lists:nth(Idx, Nodes)}
-                end || {N, Idx} <- RT_Keys])}.
+                 Key = number_to_key(N),
+                 {Key, lists:nth(Idx, Nodes)}
+             end || {N, Idx} <- RT_Keys]),
+    RT2 = lists:foldl(fun(Node, AccIn) -> gb_trees:enter(node:id(Node), node:pidX(Node), AccIn) end,
+                      RT1, nodelist:succs(Neighbors) ++ nodelist:preds(Neighbors)),
+    {length(Nodes), RT2}.
 
 check_next_hop(State, _Succ, N, NodeExp) ->
     Neighbors = dht_node_state:get(State, neighbors),
