@@ -56,23 +56,11 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 		throw new UnsupportedOperationException();
 	}
 
-	// @Override
-	// public String manageClassForIdentity(Object id, ClassLoaderResolver clr)
-	// {
-	// return "org.datanucleus.samples.jpa.Bookdsfd";
-	//
-	// // return super.manageClassForIdentity(id, clr);
-	// }
-
 	@Override
 	public String getClassNameForObjectID(Object id, ClassLoaderResolver clr,
 			ExecutionContext ec) {
-		// TODO Auto-generated method stub
 
-		// System.out.println("FETCH " + op.getObject().getClass().getName());
 		Map<String, String> options = new HashMap<String, String>();
-		// // options.put("Content-Type", "application/json");
-		// ExecutionContext ec = op.getExecutionContext();
 		ManagedConnection mconn = this.getConnection(ec, options);
 		de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
 				.getConnection();
@@ -96,8 +84,6 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 			return myType;
 		} catch (ConnectionException e) {
 			throw new NucleusException(e.getMessage(), e);
-//		} catch (TimeoutException e) {
-//			throw new NucleusException(e.getMessage(), e);
 		} catch (UnknownException e) {
 			throw new NucleusException(e.getMessage(), e);
 		} catch (AbortException e) {
@@ -109,7 +95,6 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 			throw new NucleusException(e.getMessage(), e);
 		} catch (NotFoundException e) {
 
-			// throw new NucleusException(e.getMessage(), e);
 		} catch (ClassCastException e) {
 			throw new NucleusException(e.getMessage(), e);
 		}
@@ -119,16 +104,9 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 			// revert to default implementation for special cases
 			myType = super.getClassNameForObjectID(id, clr, ec);
 		}
-		// String myType =super.getClassNameForObjectID(id, clr, ec);
 
 		System.out.println("!!!!!!!!!" + myType);
-		// return "org.datanucleus.samples.jpa.tutorial.Book";
 
 		return myType;
 	}
-
-	/**
-	 * Accessor for the supported options in string form
-	 */
-
 }
