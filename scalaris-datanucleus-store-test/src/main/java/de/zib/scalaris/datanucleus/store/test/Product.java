@@ -17,18 +17,21 @@ Contributors:
 **********************************************************************/
 package de.zib.scalaris.datanucleus.store.test;
 
+import javax.jdo.annotations.IdGeneratorStrategy;
 import javax.jdo.annotations.PersistenceCapable;
+import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
+import javax.jdo.annotations.IdentityType;
 
 /**
  * Definition of a Product
  * Represents a product, and contains the key aspects of the item.
  */
-@PersistenceCapable
+@PersistenceCapable(identityType = IdentityType.APPLICATION)
 public class Product
 {
     @PrimaryKey
-    protected long id;
+    private long id = -1;
     
     protected String name=null;
 

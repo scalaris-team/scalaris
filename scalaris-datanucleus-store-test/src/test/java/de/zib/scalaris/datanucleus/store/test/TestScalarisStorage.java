@@ -5,11 +5,17 @@ import static org.junit.Assert.fail;
 
 import javax.jdo.JDOObjectNotFoundException;
 
+import org.junit.After;
 import org.junit.Test;
 
-import de.zib.scalaris.datanucleus.store.test.Product;
+import static de.zib.scalaris.datanucleus.store.test.StoreUtils.*;
 
 public class TestScalarisStorage extends ScalarisTestBase {
+	
+	@After
+	public void after() {
+		deleteAllInstances(Author.class, Product.class, Book.class, Inventory.class);
+	}
 	
 	/**
 	 * Store a simple object (without relationships).

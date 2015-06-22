@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.jdo.annotations.Join;
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
@@ -53,6 +52,12 @@ public class Inventory {
         return products;
     }
 
+    public void addAll(Product... p) {
+    	for (Product prod : p) {
+    		add(prod);
+    	}
+    }
+    
     public void add(Product p) {
     	products.add(p);
     }
