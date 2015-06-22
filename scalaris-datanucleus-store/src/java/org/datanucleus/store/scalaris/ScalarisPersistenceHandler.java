@@ -29,6 +29,7 @@ import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.exceptions.NucleusObjectNotFoundException;
+import org.datanucleus.exceptions.NucleusUserException;
 import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.identity.SCOID;
 import org.datanucleus.metadata.AbstractClassMetaData;
@@ -84,21 +85,84 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 *            data source
 	 * @return primary key as string
 	 */
-	private void populateJsonObj(JSONObject jsonobj, final ObjectProvider op) {
+	private void populateJsonObj(JSONObject jsonobj, ObjectProvider op) {
 		AbstractClassMetaData acmd = op.getClassMetaData();
-		final int[] fieldNumbers = acmd.getAllMemberPositions();
+		int[] fieldNumbers = acmd.getAllMemberPositions();
 		op.provideFields(fieldNumbers, new StoreFieldManager(op, jsonobj, true));
 	}
 	
 	/**
 	 * Returns the object identity as string which can be used of the key-value store
 	 * as key to uniquely identify the object.
+	 * ATTENTION:
+	 * 		If the data store is (partially) responsible to generate an ID
+	 * 		(e.g. because of IdGeneratorStrategy.IDENTITY). This method may 
+	 * 		change primary key attribute values.
+	 * This method should be used only to insert a new object in the data store, otherwise
+	 * consider using getPersitableIdentity.
 	 * @param op
 	 * 			data source.
-	 * @return Identity of object provided by op
+	 * @return Identity of object provided by op or null if at least 
+	 * one primary key field is not loaded.
 	 */
-	private String getPersistableIdentity(final ObjectProvider op) {
-		return IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
+	private String generatePersistableIdentity(ObjectProvider op) {
+		AbstractClassMetaData cmd = op.getClassMetaData();
+		
+		if (cmd.pkIsDatastoreAttributed(storeMgr)) {
+			// The primary key must be (partially) calculated by the data store.
+			// There is no distinction between APPLICATION and DATASTORE IdentityType (yet)
+			
+            int[] pkFieldNumbers = cmd.getPKMemberPositions();
+
+            for (int i=0;i<pkFieldNumbers.length; i++) {
+                AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
+                
+                if (storeMgr.isStrategyDatastoreAttributed(cmd, pkFieldNumbers[i])) {
+                	Long idKey =  (long) (Math.random() * 100000000); // TODO This is just for test purposes
+                    op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
+                    System.out.println("RANDOMLY GENERATED KEY: " + idKey);
+                }
+            }
+          
+            String identity = getPersistableIdentity(op);
+            op.setPostStoreNewObjectId(identity);
+			return identity;
+		} else {
+			return IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
+		}
+	}
+	
+	/**
+	 * Returns the object identity as string which can be used of the key-value store
+	 * as key to uniquely identify the object.
+	 * @param op
+	 * @return Identity of object provided by op or null if at least 
+	 * one primary key field is not loaded.
+	 */
+	private String getPersistableIdentity(ObjectProvider op) {
+		AbstractClassMetaData cmd = op.getClassMetaData();
+		String keySeparator = ":";
+		
+		if (cmd.pkIsDatastoreAttributed(storeMgr)) {
+			// The primary key must be (partially) calculated by the data store.
+			// There is no distinction between APPLICATION and DATASTORE IdentityType (yet)
+			// ID structure is: <class-name>:<pk1>:<pk2>
+			
+			StringBuilder keyBuilder = new StringBuilder(cmd.getFullClassName());
+
+			int[] pkFieldNumbers = cmd.getPKMemberPositions();
+			for (int i = 0; i < pkFieldNumbers.length; i++) {
+				AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
+				
+				keyBuilder.append(keySeparator);
+				keyBuilder.append(op.provideField(mmd.getAbsoluteFieldNumber()));
+			}
+			
+			return keyBuilder.toString();
+		} else {
+			// The data store has nothing to do with generating a key value			
+			return IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
+		}
 	}
 	
 	/**
@@ -133,8 +197,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 */
 	private void insertObjectToAllKey(final ObjectProvider op) {
 		AbstractClassMetaData cmd = op.getClassMetaData();
-		final String key = getManagementKeyName(cmd.getFullClassName());
-		final String objectStringIdentity = getPersistableIdentity(op);
+		String key = getManagementKeyName(cmd.getFullClassName());
+		String objectStringIdentity = getPersistableIdentity(op);
 		
 		ExecutionContext ec = op.getExecutionContext();
 		ManagedConnection mConn = storeMgr.getConnection(ec);
@@ -199,10 +263,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 * @param op
 	 * 		The data source
 	 */
-	private void removeObjectFromAllKey(final ObjectProvider op) {
+	private void removeObjectFromAllKey(ObjectProvider op) {
 		AbstractClassMetaData cmd = op.getClassMetaData();
-		final String key = String.format("%s%s", cmd.getFullClassName(), ALL_ID_PREFIX);
-		final String objectStringIdentity = getPersistableIdentity(op);
+		String key  = getManagementKeyName(cmd.getFullClassName());
+		String objectStringIdentity = getPersistableIdentity(op);
 		
 		ExecutionContext ec = op.getExecutionContext();
 		ManagedConnection mConn = storeMgr.getConnection(ec);
@@ -255,7 +319,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 	 * @param mconn
 	 * @param candidateClass
 	 */
-	public List<Object> getObjectsOfCandidateType(final ExecutionContext ec, ManagedConnection mconn, 
+	public List<Object> getObjectsOfCandidateType(ExecutionContext ec, ManagedConnection mconn, 
 			Class<?> candidateClass, AbstractClassMetaData cmd) {
 		List<Object> results = new ArrayList<Object>();
 		String managementKey = getManagementKeyName(candidateClass);
@@ -384,9 +448,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 				}
 			}
 
+			final String id = generatePersistableIdentity(op);
 			populateJsonObj(jsonobj, op);
-			final String id = getPersistableIdentity(op);
-		
+
 			if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
 				NucleusLogger.DATASTORE_NATIVE.debug("POST "
 						+ jsonobj.toString());
@@ -648,13 +712,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 						op.getInternalObjectId()));
 			}
 
-			final String id;
-			{
-				final JSONObject jsonobj = new JSONObject();
-				populateJsonObj(jsonobj, op);
-				id = getPersistableIdentity(op);
-				System.out.println("deleting object with key=" + id);
-			}
+			final String id = getPersistableIdentity(op);
+			System.out.println("deleting object with key=" + id);
 
 			final JSONObject jsonobj = new JSONObject();
 

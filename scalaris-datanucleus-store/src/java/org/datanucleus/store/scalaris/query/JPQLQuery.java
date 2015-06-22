@@ -30,7 +30,12 @@ import org.datanucleus.store.query.AbstractJPQLQuery;
  */
 public class JPQLQuery extends AbstractJPQLQuery
 {
-    /**
+	/**
+	 * Default serial version....
+	 */
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Constructs a new query instance that uses the given persistence manager.
      * @param storeMgr StoreManager for this query
      * @param ec the associated ExecutionContext for this query.
@@ -62,7 +67,7 @@ public class JPQLQuery extends AbstractJPQLQuery
         super(storeMgr, ec, query);
     }
 
-    protected Object performExecute(Map parameters)
+    protected Object performExecute(@SuppressWarnings("rawtypes") Map parameters)
     {
     	
 		throw new NucleusException("Don't currently support JPQL");

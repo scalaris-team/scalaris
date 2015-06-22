@@ -27,11 +27,12 @@ import javax.jdo.annotations.IdentityType;
  * Definition of a Product
  * Represents a product, and contains the key aspects of the item.
  */
-@PersistenceCapable(identityType = IdentityType.APPLICATION)
+@PersistenceCapable
 public class Product
 {
     @PrimaryKey
-    private long id = -1;
+	@Persistent(valueStrategy = IdGeneratorStrategy.IDENTITY)
+    private long id;
     
     protected String name=null;
 
@@ -39,9 +40,7 @@ public class Product
 
     protected double price=0.0;
 
-    public Product(long id, String name, String description, double price)
-    {
-    	this.id = id;
+    public Product(String name, String description, double price) {
         this.name = name;
         this.description = description;
         this.price = price;

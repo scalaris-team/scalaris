@@ -34,9 +34,9 @@ public class Book extends Product
 
     protected String publisher=null;
 
-    public Book(long id, String name, String description, double price, Author author, String isbn, String publisher)
+    public Book(String name, String description, double price, Author author, String isbn, String publisher)
     {
-        super(id, name,description,price);
+        super(name,description,price);
         this.author = author;
         this.isbn = isbn;
         this.publisher = publisher;

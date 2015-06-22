@@ -55,7 +55,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 	public NucleusConnection getNucleusConnection(ExecutionContext om) {
 		throw new UnsupportedOperationException();
 	}
-
+	
 	@Override
 	public String getClassNameForObjectID(Object id, ClassLoaderResolver clr,
 			ExecutionContext ec) {

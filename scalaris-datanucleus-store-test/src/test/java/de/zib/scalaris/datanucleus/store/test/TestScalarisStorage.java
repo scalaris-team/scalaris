@@ -22,7 +22,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 */
 	@Test
 	public void test01Store() {
-		Product product = new Product(1, "Sony Discman", "A standard discman from Sony", 1.99);
+		Product product = new Product("Sony Discman", "A standard discman from Sony", 1.99);
 		storeObject(product);
 	}
 	
@@ -32,7 +32,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	@Test
 	public void test02Store() {
 		Author author = new Author("Jrr");
-		Book book = new Book(2, "Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
+		Book book = new Book("Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
 		storeObject(book);
 	}
 	
@@ -43,8 +43,8 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	public void test03Store() {
 		Author author = new Author("Tolkien");
         Inventory inv = new Inventory("My Inventory");
-        Product product = new Product(20, "Sony Discman","A standard discman from Sony",200.00);
-        Book book = new Book(21, "Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
+        Product product = new Product("Sony Discman","A standard discman from Sony",200.00);
+        Book book = new Book("Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
         inv.add(product);
         inv.add(book);
         
@@ -56,7 +56,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 */
 	@Test
 	public void test01RetrieveById() {
-		Product product = new Product(100, "Sony Discman", "A standard discman from Sony", 1.99);
+		Product product = new Product("Sony Discman", "A standard discman from Sony", 1.99);
 		Object productId = storeObject(product);
 		
 		Product retrieved = (Product) retrieveObjectById(productId);
@@ -70,7 +70,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	@Test
 	public void test02RetrieveById() {
 		Author author = new Author("JRRR Tolkien");
-		Book book = new Book(42, "Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
+		Book book = new Book("Lord of the Rings by Tolkien","The classic story",49.99, author, "12345678", "MyBooks Factory");
 		Object bookId = storeObject(book);
 		
 		Book retrieved = (Book) retrieveObjectById(bookId);
@@ -82,22 +82,19 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 */
 	@Test
 	public void test03RetrieveById() {
-		int prodKey = 301;
-		int bookKey = 302;
-		
         Inventory inv = new Inventory("Retrieval_Inventory");
-        Product product = new Product(prodKey, "Sony Discman","A standard discman from Sony",200.00);
+        Product product = new Product("Sony Discman","A standard discman from Sony",200.00);
         Author author = new Author("JRR Tolkien");
-        Book book = new Book(bookKey, "Lord of the Rings by Tolkien","The classic story",49.99, author , "12345678", "MyBooks Factory");
+        Book book = new Book("Lord of the Rings by Tolkien","The classic story",49.99, author , "12345678", "MyBooks Factory");
         inv.add(product);
         inv.add(book);
         Object inventoryId = storeObject(inv);
         
         
         // check child objects
-        Product retrievedProduct = (Product) retrieveObjectBySingleKey(Product.class, prodKey);
+        Product retrievedProduct = (Product) retrieveObjectBySingleKey(Product.class, product.getId());
         assertEquals(product, retrievedProduct);
-        Book retrievedBook = (Book) retrieveObjectBySingleKey(Book.class, bookKey);
+        Book retrievedBook = (Book) retrieveObjectBySingleKey(Book.class, book.getId());
         assertEquals(book, retrievedBook);
         
         // check parent
@@ -110,11 +107,10 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 */
 	@Test
 	public void test01RetrieveBySingleKey() {
-		int keyValue = 501;
-		Product product = new Product(keyValue, "Sony Discman", "A standard discman from Sony", 1.99);
+		Product product = new Product("Sony Discman", "A standard discman from Sony", 1.99);
 		storeObject(product);
 		
-		Product retrieved = (Product) retrieveObjectBySingleKey(product.getClass(), keyValue);
+		Product retrieved = (Product) retrieveObjectBySingleKey(product.getClass(), product.getId());
 		assertEquals(product, retrieved);
 	}
 	
@@ -123,13 +119,11 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	 */
 	@Test
 	public void test02RetrieveBySingleKey() {
-		int keyValue = 502;
-		// it is not stored
-		Product product = new Product(keyValue, "Sony Discman", "A standard discman from Sony", 1.99);
+		Product product = new Product("Sony Discman", "A standard discman from Sony", 1.99);
 
 		try {
-			retrieveObjectBySingleKey(product.getClass(), keyValue);
-			fail("Expected Expcetion because the stored object does not exist"); 
+			retrieveObjectBySingleKey(product.getClass(), product.getId());
+			fail("Expected an expcetion to be thrown because the stored object does not exist"); 
 		} catch (JDOObjectNotFoundException e) {
 			// good
 		}
@@ -141,7 +135,7 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	@Test
 	public void test01DeleteById() {
 		Author author = new Author("JRR");
-		Book book = new Book(200, "Lord","The ",49.99, author, "1234", "MyBooks");
+		Book book = new Book("Lord","The ",49.99, author, "1234", "MyBooks");
 		Object bookId = storeObject(book);
 		
 		deleteObjectById(bookId);
@@ -160,9 +154,8 @@ public class TestScalarisStorage extends ScalarisTestBase {
 	@Test
 	public void test01SingleFieldUpdate() {
 		Author author = new Author("JRR2");
-		Book book = new Book(600, "Lord","The ",49.99, author, "1234", "MyBooks");
+		Book book = new Book("Lord","The ",49.99, author, "1234", "MyBooks");
 		Object bookId = storeObject(book);
-		
 		Book retrieved  = (Book) retrieveObjectById(bookId);
 		assertEquals(book, retrieved);
 		

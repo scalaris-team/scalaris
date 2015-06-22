@@ -15,16 +15,16 @@ import org.junit.Test;
 @SuppressWarnings("rawtypes")
 public class TestScalarisQuery extends ScalarisTestBase {
 	
-	private static Product discman = new Product(1, "Sony Discman", "A standard discman from Sony", 1.99);
+	private static Product discman = new Product("Sony Discman", "A standard discman from Sony", 1.99);
 	
 	@BeforeClass
 	public static void setup() {
 		Product[] products = {
 			discman,
-			new Product(2, "Sony Xperia Z1", "A fancy smartphone", 200.3),
-			new Product(3, "Sony Xperia Z2", "Another smartphone", 300.1),
-			new Product(4, "Sony Xperia Z3", "Yet another smartphone", 400.2),
-			new Product(5, "Sony Xperia Z1 Compact", "A compact smartphone", 250.7),
+			new Product("Sony Xperia Z1", "A fancy smartphone", 200.3),
+			new Product("Sony Xperia Z2", "Another smartphone", 300.1),
+			new Product("Sony Xperia Z3", "Yet another smartphone", 400.2),
+			new Product("Sony Xperia Z1 Compact", "A compact smartphone", 250.7),
 		};
 		Inventory invSony = new Inventory("Sony");
 		invSony.addAll(products);
@@ -33,9 +33,9 @@ public class TestScalarisQuery extends ScalarisTestBase {
 		Author tolkien = new Author("JRR Tolkien");
 		Author lovecraft = new Author("H. P. LoveCraft");
 		Object[] books = {
-				new Book(1, "Lord of the rings 1", "Stuff happens", 56.00, tolkien, "111111", "PublisherA"),
-				new Book(2, "Lord of the rings 2", "More Stuff happens", 23.00, tolkien, "22222", "PublisherB"),
-				new Book(3, "Cthulhu", "horror stuff", 19.99, lovecraft, "43433", "PublisherC")
+				new Book("Lord of the rings 1", "Stuff happens", 56.00, tolkien, "111111", "PublisherA"),
+				new Book("Lord of the rings 2", "More Stuff happens", 23.00, tolkien, "22222", "PublisherB"),
+				new Book("Cthulhu", "horror stuff", 19.99, lovecraft, "43433", "PublisherC")
 		};
 		storeObjects(books);
 	}
@@ -59,6 +59,15 @@ public class TestScalarisQuery extends ScalarisTestBase {
 	}
 	
 	@Test
+	public void testQueryFilter() {
+		PersistenceManager pm = getNewPersistenceManager();
+		Query q = pm.newQuery(Product.class);
+		q.setFilter("price < 300.1");
+		List result = (List) q.execute();
+		assertEquals(3, result.size());
+	}
+	
+	@Test
 	public void testQueryOrderByPrice() {
 		PersistenceManager pm = getNewPersistenceManager();
 		Query q = pm.newQuery(Product.class);
@@ -74,4 +83,4 @@ public class TestScalarisQuery extends ScalarisTestBase {
 			lastSeenPrice = p.getPrice();
 		}
 	}
-}
+}	
