@@ -18,24 +18,12 @@ Contributors :
 ***********************************************************************/
 package org.datanucleus.store.scalaris.query;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusException;
-import org.datanucleus.metadata.AbstractClassMetaData;
-import org.datanucleus.query.evaluator.JPQLEvaluator;
-import org.datanucleus.query.evaluator.JavaQueryEvaluator;
 import org.datanucleus.store.StoreManager;
-import org.datanucleus.store.connection.ManagedConnection;
-import org.datanucleus.store.scalaris.ConnectionFactoryImpl;
-import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
 import org.datanucleus.store.query.AbstractJPQLQuery;
-import org.datanucleus.util.NucleusLogger;
 
 /**
  * JPQL query for JSON datastores.
@@ -78,57 +66,5 @@ public class JPQLQuery extends AbstractJPQLQuery
     {
     	
 		throw new NucleusException("Don't currently support JPQL");
-//        ClassLoaderResolver clr = ec.getClassLoaderResolver();
-//        final AbstractClassMetaData cmd = ec.getMetaDataManager().getMetaDataForClass(candidateClass, clr);
-//        Properties options = new Properties();
-//        options.put(ConnectionFactoryImpl.STORE_JSON_URL, ((ScalarisPersistenceHandler)getStoreManager().getPersistenceHandler()).getURLPathForQuery(cmd));
-//        ManagedConnection mconn = getStoreManager().getConnection(ec,options);
-//        try
-//        {
-//            long startTime = System.currentTimeMillis();
-//            if (NucleusLogger.QUERY.isDebugEnabled())
-//            {
-//                NucleusLogger.QUERY.debug(LOCALISER.msg("021046", "JPQL", getSingleStringQuery(), null));
-//            }
-//            List candidates = null;
-//            if (candidateCollection == null)
-//            {
-//                // TODO Cater for "subclasses" flag
-//                candidates = ((ScalarisPersistenceHandler)getStoreManager().getPersistenceHandler()).getObjectsOfCandidateType(
-//                    ec, mconn, candidateClass, subclasses, ignoreCache, options);
-//            }
-//            else
-//            {
-//                candidates = new ArrayList(candidateCollection);
-//            }
-//
-//            JavaQueryEvaluator resultMapper = new JPQLEvaluator(this, candidates, compilation, 
-//                parameters, ec.getClassLoaderResolver());
-//            Collection results = resultMapper.execute(true, true, true, true, true);
-//
-//            if (NucleusLogger.QUERY.isDebugEnabled())
-//            {
-//                NucleusLogger.QUERY.debug(LOCALISER.msg("021074", "JPQL", 
-//                    "" + (System.currentTimeMillis() - startTime)));
-//            }
-//
-//            if (type == BULK_DELETE)
-//            {
-//                ec.deleteObjects(results.toArray());
-//                return Long.valueOf(results.size());
-//            }
-//            else if (type == BULK_UPDATE)
-//            {
-//                throw new NucleusException("Bulk Update is not yet supported");
-//            }
-//            else
-//            {
-//                return results;
-//            }
-//        }
-//        finally
-//        {
-//            mconn.release();
-//        }
     }
 }
