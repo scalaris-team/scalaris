@@ -43,16 +43,21 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.VersionHelper;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.schema.naming.ColumnType;
+import org.datanucleus.store.valuegenerator.ValueGenerator;
+import org.datanucleus.transaction.NucleusTransactionException;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
 import org.datanucleus.util.StringUtils;
 
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.orange.org.json.JSONArray;
 import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
@@ -61,7 +66,8 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
     private static final String ALL_ID_PREFIX = "_ALL_IDS";
-
+    private static final String ID_GEN_KEY = "ID_GEN";
+    
     /** Setup localiser for messages. */
     static {
         Localiser.registerBundle("org.datanucleus.store.scalaris.Localisation",
@@ -91,8 +97,56 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         op.provideFields(fieldNumbers, new StoreFieldManager(op, jsonobj, true));
     }
 
-    private long generateNextIdentity() {
-        throw new NucleusUserException("NOT IMPLEMENTED YET");
+    /**
+     * Generate a new ID which can be used to store a value at an unique key.
+     * Every time this function is called the value stored at key ID_GEN_KEY
+     * is incremented by one. The value stored there is value which is returned
+     * by this function. 
+     * All object classes share the same ID generator key.
+     * TODO: use different ID keys for different classes (?).
+     * @param op
+     *      ObjectProvider of the object this ID is generated for.
+     * @return
+     *      A new ID.
+     */
+    private long generateNextIdentity(ObjectProvider op) {
+        ExecutionContext ec = op.getExecutionContext();
+        ManagedConnection mConn = storeMgr.getConnection(ec);
+        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
+                .getConnection();
+        
+        long newID = 0;
+        
+        Transaction t = new Transaction(conn);
+        try {
+            try {
+                ErlangValue storedVal = t.read(ID_GEN_KEY);
+                newID = storedVal.longValue() + 1;
+                t.addOnNr(ID_GEN_KEY, new OtpErlangLong(1));
+            } catch (NotFoundException e) {
+                // No ID was generated yet
+                newID = 1;
+                t.write(ID_GEN_KEY, newID);
+            }
+          
+            t.commit();
+        } catch (ConnectionException e) {
+            throw new NucleusTransactionException("Could not generate a new ID because of transaction failure", e);
+        }  catch (AbortException e) {
+            throw new NucleusTransactionException("Could not generate a new ID becasue of transaction failure", e);
+        } catch (ClassCastException e) {
+            // This happens if the key does not exist
+            // which means no ID was generated yet.
+            throw new NucleusTransactionException("The value of the ID generator key was altered to an invalid value", e);
+        } catch (NotANumberException e) {
+            // this should never ever happen since the ClassCastException
+            // is thrown before we can try to increment the number
+            throw new NucleusTransactionException("The value of the ID generator key was altered to an invalid value", e);
+        } finally {
+            mConn.release();
+        }
+
+        return newID;
     }
 
     /**
@@ -130,7 +184,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         throw new NucleusUserException(
                                 "Any field using IDENTITY value generation with Scalaris should be of type Long/long");
                     }
-                    Long idKey = generateNextIdentity();
+                    Long idKey = generateNextIdentity(op);
                     op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
                     System.out.println("RANDOMLY GENERATED KEY: " + idKey);
                 }
