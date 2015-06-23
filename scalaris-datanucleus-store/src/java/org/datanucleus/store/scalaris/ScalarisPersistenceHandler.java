@@ -114,17 +114,17 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
                 .getConnection();
 
-        long newID = 0;
+        long newID = 0l;
 
         Transaction t = new Transaction(conn);
         try {
             try {
                 ErlangValue storedVal = t.read(ID_GEN_KEY);
-                newID = storedVal.longValue() + 1;
-                t.addOnNr(ID_GEN_KEY, new OtpErlangLong(1));
+                newID = storedVal.longValue() + 1l;
+                t.addOnNr(ID_GEN_KEY, new OtpErlangLong(1l));
             } catch (NotFoundException e) {
                 // No ID was generated yet
-                newID = 1;
+                newID = 1l;
                 t.write(ID_GEN_KEY, newID);
             }
 
@@ -184,15 +184,25 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
                 if (storeMgr.isStrategyDatastoreAttributed(cmd,
                         pkFieldNumbers[i])) {
-                    if (!mmd.getType().equals(Long.class)
-                            && !mmd.getType().equals(long.class)) {
-                        // Field type must be long or Long since this is the
-                        // only IDENTITY value that is currently supported
+                    Class mType = mmd.getType();
+                    if (!(mType.equals(Long.class) || mType.equals(long.class)
+                            || mType.equals(Integer.class) || mType
+                                .equals(int.class))) {
+                        // Field type must be long/Long or int/Integer since
+                        // this is the only IDENTITY value that is currently
+                        // supported
                         throw new NucleusUserException(
-                                "Any field using IDENTITY value generation with Scalaris should be of type Long/long");
+                                "Any field using IDENTITY value generation with Scalaris should be of type long/Long or int/Integer");
                     }
-                    Long idKey = generateNextIdentity(op);
-                    op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
+                    long idKey = generateNextIdentity(op);
+                    if (mType.equals(Integer.class) || mType.equals(int.class)) {
+                        if (idKey > Integer.MAX_VALUE) {
+                            throw new NucleusException("We run out of integer IDs!");
+                        }
+                        op.replaceField(mmd.getAbsoluteFieldNumber(), (int) idKey);
+                    } else {
+                        op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
+                    }
                     System.out.println("RANDOMLY GENERATED KEY: " + idKey);
                 }
             }
@@ -201,6 +211,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             op.setPostStoreNewObjectId(identity);
             return identity;
         } else {
+            // nothing must be done
             return IdentityUtils.getPersistableIdentityForId(op
                     .getExternalObjectId());
         }
@@ -887,19 +898,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 .getConnection();
 
         try {
-            AbstractClassMetaData cmd = op.getClassMetaData();
-            fetchObjectLog(op, fieldNumbers, cmd);
             final long startTime = System.currentTimeMillis();
-            cmd.getIdentityType();
 
-            final String key;
-            {
-                // final AbstractClassMetaData cmd = op.getClassMetaData();
-                key = getPersistableIdentity(op);
-                System.out.println("fetch looking for key=" + key
-                        + " discriminator=" + cmd.getDiscriminatorColumnName()
-                        + " table=" + cmd.getTable());
-            }
+            final String key = getPersistableIdentity(op);
 
             final JSONObject result;
             {
@@ -957,38 +958,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         } finally {
             mconn.release();
         }
-    }
-
-    /**
-     * @param op
-     * @param fieldNumbers
-     * @param cmd
-     */
-    private void fetchObjectLog(final ObjectProvider op,
-            final int[] fieldNumbers, final AbstractClassMetaData cmd) {
-        if (NucleusLogger.PERSISTENCE.isDebugEnabled()) {
-            // Debug information about what we are retrieving
-            StringBuffer str = new StringBuffer("Fetching object \"");
-            str.append(op.getObjectAsPrintable()).append("\" (id=");
-            str.append(op.getInternalObjectId()).append(")")
-                    .append(" fields [");
-            for (int i = 0; i < fieldNumbers.length; i++) {
-                if (i > 0) {
-                    str.append(",");
-                }
-                str.append(cmd.getMetaDataForManagedMemberAtAbsolutePosition(
-                        fieldNumbers[i]).getName());
-            }
-            str.append("]");
-            NucleusLogger.PERSISTENCE.debug(str.toString());
-        }
-
-        if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
-            NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
-                    "Scalaris.Fetch.Start", op.getObjectAsPrintable(),
-                    op.getInternalObjectId()));
-        }
-
     }
 
     /**
