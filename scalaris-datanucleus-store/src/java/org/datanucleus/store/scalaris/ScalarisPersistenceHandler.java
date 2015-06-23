@@ -67,7 +67,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
     private static final String ALL_ID_PREFIX = "_ALL_IDS";
     private static final String ID_GEN_KEY = "ID_GEN";
-    
+
     /** Setup localiser for messages. */
     static {
         Localiser.registerBundle("org.datanucleus.store.scalaris.Localisation",
@@ -99,24 +99,23 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
     /**
      * Generate a new ID which can be used to store a value at an unique key.
-     * Every time this function is called the value stored at key ID_GEN_KEY
-     * is incremented by one. The value stored there is value which is returned
-     * by this function. 
-     * All object classes share the same ID generator key.
-     * TODO: use different ID keys for different classes (?).
+     * Every time this function is called the value stored at key ID_GEN_KEY is
+     * incremented by one. The value stored there is value which is returned by
+     * this function. All object classes share the same ID generator key. TODO:
+     * use different ID keys for different classes (?).
+     * 
      * @param op
-     *      ObjectProvider of the object this ID is generated for.
-     * @return
-     *      A new ID.
+     *            ObjectProvider of the object this ID is generated for.
+     * @return A new ID.
      */
     private long generateNextIdentity(ObjectProvider op) {
         ExecutionContext ec = op.getExecutionContext();
         ManagedConnection mConn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
                 .getConnection();
-        
+
         long newID = 0;
-        
+
         Transaction t = new Transaction(conn);
         try {
             try {
@@ -128,20 +127,28 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 newID = 1;
                 t.write(ID_GEN_KEY, newID);
             }
-          
+
             t.commit();
         } catch (ConnectionException e) {
-            throw new NucleusTransactionException("Could not generate a new ID because of transaction failure", e);
-        }  catch (AbortException e) {
-            throw new NucleusTransactionException("Could not generate a new ID becasue of transaction failure", e);
+            throw new NucleusTransactionException(
+                    "Could not generate a new ID because of transaction failure",
+                    e);
+        } catch (AbortException e) {
+            throw new NucleusTransactionException(
+                    "Could not generate a new ID becasue of transaction failure",
+                    e);
         } catch (ClassCastException e) {
             // This happens if the key does not exist
             // which means no ID was generated yet.
-            throw new NucleusTransactionException("The value of the ID generator key was altered to an invalid value", e);
+            throw new NucleusTransactionException(
+                    "The value of the ID generator key was altered to an invalid value",
+                    e);
         } catch (NotANumberException e) {
             // this should never ever happen since the ClassCastException
             // is thrown before we can try to increment the number
-            throw new NucleusTransactionException("The value of the ID generator key was altered to an invalid value", e);
+            throw new NucleusTransactionException(
+                    "The value of the ID generator key was altered to an invalid value",
+                    e);
         } finally {
             mConn.release();
         }
