@@ -91,6 +91,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 		op.provideFields(fieldNumbers, new StoreFieldManager(op, jsonobj, true));
 	}
 	
+	private long generateNextIdentity() {
+		throw new NucleusUserException("NOT IMPLEMENTED YET");
+	}
+	
 	/**
 	 * Returns the object identity as string which can be used of the key-value store
 	 * as key to uniquely identify the object.
@@ -113,17 +117,20 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 			// There is no distinction between APPLICATION and DATASTORE IdentityType (yet)
 			
             int[] pkFieldNumbers = cmd.getPKMemberPositions();
-
             for (int i=0;i<pkFieldNumbers.length; i++) {
                 AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
                 
                 if (storeMgr.isStrategyDatastoreAttributed(cmd, pkFieldNumbers[i])) {
-                	Long idKey =  (long) (Math.random() * 100000000); // TODO This is just for test purposes
+                    if (!mmd.getType().equals(Long.class) && !mmd.getType().equals(long.class)){
+                        // Field type must be long or Long since this is the only IDENTITY value that is currently supported
+                        throw new NucleusUserException("Any field using IDENTITY value generation with Scalaris should be of type Long/long");
+                    }
+                	Long idKey =  generateNextIdentity();
                     op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
                     System.out.println("RANDOMLY GENERATED KEY: " + idKey);
                 }
             }
-          
+
             String identity = getPersistableIdentity(op);
             op.setPostStoreNewObjectId(identity);
 			return identity;
@@ -353,7 +360,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 		}
 		return results;
 	}
-	
 	
 	public void insertObject(ObjectProvider op) {
 		System.out.println("INSERT");
