@@ -1,28 +1,28 @@
 package com.orange.org.json;
 
 /*
-Copyright (c) 2002 JSON.org
+ Copyright (c) 2002 JSON.org
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-The Software shall be used for Good, not Evil.
+ The Software shall be used for Good, not Evil.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ */
 
 /**
  * This provides static methods to convert comma delimited text into a
@@ -30,27 +30,31 @@ SOFTWARE.
  * delimited text is a very popular format for data interchange. It is
  * understood by most database, spreadsheet, and organizer programs.
  * <p>
- * Each row of text represents a row in a table or a data record. Each row
- * ends with a NEWLINE character. Each row contains one or more values.
- * Values are separated by commas. A value can contain any character except
- * for comma, unless is is wrapped in single quotes or double quotes.
+ * Each row of text represents a row in a table or a data record. Each row ends
+ * with a NEWLINE character. Each row contains one or more values. Values are
+ * separated by commas. A value can contain any character except for comma,
+ * unless is is wrapped in single quotes or double quotes.
  * <p>
  * The first row usually contains the names of the columns.
  * <p>
- * A comma delimited list can be converted into a JSONArray of JSONObjects.
- * The names for the elements in the JSONObjects can be taken from the names
- * in the first row.
+ * A comma delimited list can be converted into a JSONArray of JSONObjects. The
+ * names for the elements in the JSONObjects can be taken from the names in the
+ * first row.
+ * 
  * @author JSON.org
  * @version 2
  */
 public class CDL {
 
     /**
-     * Get the next value. The value can be wrapped in quotes. The value can
-     * be empty.
-     * @param x A JSONTokener of the source text.
+     * Get the next value. The value can be wrapped in quotes. The value can be
+     * empty.
+     * 
+     * @param x
+     *            A JSONTokener of the source text.
      * @return The value string, or null if empty.
-     * @throws JSONException if the quoted string is badly formed.
+     * @throws JSONException
+     *             if the quoted string is badly formed.
      */
     private static String getValue(JSONTokener x) throws JSONException {
         char c;
@@ -74,7 +78,9 @@ public class CDL {
 
     /**
      * Produce a JSONArray of strings from a row of comma delimited values.
-     * @param x A JSONTokener of the source text.
+     * 
+     * @param x
+     *            A JSONTokener of the source text.
      * @return A JSONArray of strings.
      * @throws JSONException
      */
@@ -95,33 +101,38 @@ public class CDL {
                     if (c == '\n' || c == '\r' || c == 0) {
                         return ja;
                     }
-                    throw x.syntaxError("Bad character '" + c + "' (" +
-                            (int)c + ").");
+                    throw x.syntaxError("Bad character '" + c + "' (" + (int) c
+                            + ").");
                 }
             }
         }
     }
 
     /**
-     * Produce a JSONObject from a row of comma delimited text, using a
-     * parallel JSONArray of strings to provides the names of the elements.
-     * @param names A JSONArray of names. This is commonly obtained from the
-     *  first row of a comma delimited text file using the rowToJSONArray
-     *  method.
-     * @param x A JSONTokener of the source text.
+     * Produce a JSONObject from a row of comma delimited text, using a parallel
+     * JSONArray of strings to provides the names of the elements.
+     * 
+     * @param names
+     *            A JSONArray of names. This is commonly obtained from the first
+     *            row of a comma delimited text file using the rowToJSONArray
+     *            method.
+     * @param x
+     *            A JSONTokener of the source text.
      * @return A JSONObject combining the names and values.
      * @throws JSONException
      */
     public static JSONObject rowToJSONObject(JSONArray names, JSONTokener x)
             throws JSONException {
         JSONArray ja = rowToJSONArray(x);
-        return ja != null ? ja.toJSONObject(names) :  null;
+        return ja != null ? ja.toJSONObject(names) : null;
     }
 
     /**
      * Produce a JSONArray of JSONObjects from a comma delimited text string,
      * using the first row as a source of names.
-     * @param string The comma delimited text.
+     * 
+     * @param string
+     *            The comma delimited text.
      * @return A JSONArray of JSONObjects.
      * @throws JSONException
      */
@@ -132,7 +143,9 @@ public class CDL {
     /**
      * Produce a JSONArray of JSONObjects from a comma delimited text string,
      * using the first row as a source of names.
-     * @param x The JSONTokener containing the comma delimited text.
+     * 
+     * @param x
+     *            The JSONTokener containing the comma delimited text.
      * @return A JSONArray of JSONObjects.
      * @throws JSONException
      */
@@ -143,8 +156,11 @@ public class CDL {
     /**
      * Produce a JSONArray of JSONObjects from a comma delimited text string
      * using a supplied JSONArray as the source of element names.
-     * @param names A JSONArray of strings.
-     * @param string The comma delimited text.
+     * 
+     * @param names
+     *            A JSONArray of strings.
+     * @param string
+     *            The comma delimited text.
      * @return A JSONArray of JSONObjects.
      * @throws JSONException
      */
@@ -156,8 +172,11 @@ public class CDL {
     /**
      * Produce a JSONArray of JSONObjects from a comma delimited text string
      * using a supplied JSONArray as the source of element names.
-     * @param names A JSONArray of strings.
-     * @param x A JSONTokener of the source text.
+     * 
+     * @param names
+     *            A JSONArray of strings.
+     * @param x
+     *            A JSONTokener of the source text.
      * @return A JSONArray of JSONObjects.
      * @throws JSONException
      */
@@ -180,11 +199,12 @@ public class CDL {
         return ja;
     }
 
-
     /**
      * Produce a comma delimited text row from a JSONArray. Values containing
      * the comma character will be quoted.
-     * @param ja A JSONArray of strings.
+     * 
+     * @param ja
+     *            A JSONArray of strings.
      * @return A string ending in NEWLINE.
      */
     public static String rowToString(JSONArray ja) {
@@ -217,10 +237,11 @@ public class CDL {
     }
 
     /**
-     * Produce a comma delimited text from a JSONArray of JSONObjects. The
-     * first row will be a list of names obtained by inspecting the first
-     * JSONObject.
-     * @param ja A JSONArray of JSONObjects.
+     * Produce a comma delimited text from a JSONArray of JSONObjects. The first
+     * row will be a list of names obtained by inspecting the first JSONObject.
+     * 
+     * @param ja
+     *            A JSONArray of JSONObjects.
      * @return A comma delimited text.
      * @throws JSONException
      */
@@ -236,11 +257,13 @@ public class CDL {
     }
 
     /**
-     * Produce a comma delimited text from a JSONArray of JSONObjects using
-     * a provided list of names. The list of names is not included in the
-     * output.
-     * @param names A JSONArray of strings.
-     * @param ja A JSONArray of JSONObjects.
+     * Produce a comma delimited text from a JSONArray of JSONObjects using a
+     * provided list of names. The list of names is not included in the output.
+     * 
+     * @param names
+     *            A JSONArray of strings.
+     * @param ja
+     *            A JSONArray of JSONObjects.
      * @return A comma delimited text.
      * @throws JSONException
      */

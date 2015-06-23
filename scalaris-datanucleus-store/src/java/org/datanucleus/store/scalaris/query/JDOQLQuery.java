@@ -38,76 +38,81 @@ import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
  * JDOQL query for scalaris datastores.
  */
 public class JDOQLQuery extends AbstractJDOQLQuery {
-	/**
-	 * Default serial version....
-	 */
-	private static final long serialVersionUID = 1L;
+    /**
+     * Default serial version....
+     */
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * Constructs a new query instance that uses the given persistence manager.
-	 * 
-	 * @param storeMgr
-	 *            StoreManager for this query
-	 * @param om
-	 *            the associated ExecutionContext for this query.
-	 */
-	public JDOQLQuery(StoreManager storeMgr, ExecutionContext om) {
-		this(storeMgr, om, (JDOQLQuery) null);
-	}
+    /**
+     * Constructs a new query instance that uses the given persistence manager.
+     * 
+     * @param storeMgr
+     *            StoreManager for this query
+     * @param om
+     *            the associated ExecutionContext for this query.
+     */
+    public JDOQLQuery(StoreManager storeMgr, ExecutionContext om) {
+        this(storeMgr, om, (JDOQLQuery) null);
+    }
 
-	/**
-	 * Constructs a new query instance having the same criteria as the given
-	 * query.
-	 * 
-	 * @param storeMgr
-	 *            StoreManager for this query
-	 * @param om
-	 *            The ExecutionContext
-	 * @param q
-	 *            The query from which to copy criteria.
-	 */
-	public JDOQLQuery(StoreManager storeMgr, ExecutionContext om, JDOQLQuery q) {
-		super(storeMgr, om, q);
-	}
+    /**
+     * Constructs a new query instance having the same criteria as the given
+     * query.
+     * 
+     * @param storeMgr
+     *            StoreManager for this query
+     * @param om
+     *            The ExecutionContext
+     * @param q
+     *            The query from which to copy criteria.
+     */
+    public JDOQLQuery(StoreManager storeMgr, ExecutionContext om, JDOQLQuery q) {
+        super(storeMgr, om, q);
+    }
 
-	/**
-	 * Constructor for a JDOQL query where the query is specified using the
-	 * "Single-String" format.
-	 * 
-	 * @param storeMgr
-	 *            StoreManager for this query
-	 * @param om
-	 *            The persistence manager
-	 * @param query
-	 *            The query string
-	 */
-	public JDOQLQuery(StoreManager storeMgr, ExecutionContext om, String query) {
-		super(storeMgr, om, query);
-	}
+    /**
+     * Constructor for a JDOQL query where the query is specified using the
+     * "Single-String" format.
+     * 
+     * @param storeMgr
+     *            StoreManager for this query
+     * @param om
+     *            The persistence manager
+     * @param query
+     *            The query string
+     */
+    public JDOQLQuery(StoreManager storeMgr, ExecutionContext om, String query) {
+        super(storeMgr, om, query);
+    }
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	protected Object performExecute(Map parameters) {
-        AbstractClassMetaData cmd = ec.getMetaDataManager().getMetaDataForClass(candidateClass, ec.getClassLoaderResolver());
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    protected Object performExecute(Map parameters) {
+        AbstractClassMetaData cmd = ec.getMetaDataManager()
+                .getMetaDataForClass(candidateClass,
+                        ec.getClassLoaderResolver());
         ManagedConnection mconn = getStoreManager().getConnection(ec);
-       
-        try {        	
-	        // get all stored instances of class candidateClass
-	        List candidates;
-	        if (candidateCollection == null) {
-	        	candidates = ((ScalarisPersistenceHandler)getStoreManager().getPersistenceHandler())
-	        		.getObjectsOfCandidateType(ec, mconn, candidateClass, cmd);
-	        } else {
-	        	candidates = new ArrayList<Object>(candidateCollection);
-	        }
-	        
-	        // execute query
-	        JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this, candidates, compilation,
-	                parameters, ec.getClassLoaderResolver());
-			Collection results = resultMapper.execute(true, true, true, true, true);
-			
-	        return results;
+
+        try {
+            // get all stored instances of class candidateClass
+            List candidates;
+            if (candidateCollection == null) {
+                candidates = ((ScalarisPersistenceHandler) getStoreManager()
+                        .getPersistenceHandler()).getObjectsOfCandidateType(ec,
+                        mconn, candidateClass, cmd);
+            } else {
+                candidates = new ArrayList<Object>(candidateCollection);
+            }
+
+            // execute query
+            JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this,
+                    candidates, compilation, parameters,
+                    ec.getClassLoaderResolver());
+            Collection results = resultMapper.execute(true, true, true, true,
+                    true);
+
+            return results;
         } finally {
-        	mconn.release();
+            mconn.release();
         }
-	}
+    }
 }

@@ -14,40 +14,35 @@ limitations under the License.
 
 Contributors:
     ...
-**********************************************************************/
+ **********************************************************************/
 package de.zib.scalaris.datanucleus.store.test;
 
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.PrimaryKey;
 
-
 @PersistenceCapable
 public class Author {
-	
-	@PrimaryKey
+
+    @PrimaryKey
     protected String name = null;
 
-
-    public Author(String name)
-    {
+    public Author(String name) {
         this.name = name;
     }
 
-
-    public void setName(String name){
+    public void setName(String name) {
         this.name = name;
     }
 
-
-    public String toString(){
+    public String toString() {
         return "Author : " + name;
     }
-    
+
     public boolean equals(Object o) {
-    	if (o instanceof Author ) {
-    		Author other = (Author) o;
-    		return other.name.equals(name);
-    	}
-    	return false;
+        if (o instanceof Author) {
+            Author other = (Author) o;
+            return other.name.equals(name);
+        }
+        return false;
     }
 }

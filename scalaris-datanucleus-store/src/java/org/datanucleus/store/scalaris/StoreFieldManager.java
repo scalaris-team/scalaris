@@ -50,367 +50,370 @@ import com.orange.org.json.JSONObject;
  * ObjectProvider.
  */
 public class StoreFieldManager extends AbstractStoreFieldManager {
-	
-	final JSONObject jsonobj;
-	final StoreManager storeMgr;
 
-	public StoreFieldManager(ObjectProvider op, JSONObject jsonobj,
-			boolean insert) {
-		super(op, insert);
+    final JSONObject jsonobj;
+    final StoreManager storeMgr;
 
-		this.storeMgr = op.getExecutionContext().getStoreManager();
-		this.jsonobj = jsonobj;
+    public StoreFieldManager(ObjectProvider op, JSONObject jsonobj,
+            boolean insert) {
+        super(op, insert);
 
-		try {
-			jsonobj.put("class", cmd.getFullClassName());
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+        this.storeMgr = op.getExecutionContext().getStoreManager();
+        this.jsonobj = jsonobj;
 
-	public void storeBooleanField(int fieldNumber, boolean value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        try {
+            jsonobj.put("class", cmd.getFullClassName());
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (boolean) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeBooleanField(int fieldNumber, boolean value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeByteField(int fieldNumber, byte value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (boolean) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (int) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeByteField(int fieldNumber, byte value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeCharField(int fieldNumber, char value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (int) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, new Character(value));
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeCharField(int fieldNumber, char value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeDoubleField(int fieldNumber, double value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, new Character(value));
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (double) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeDoubleField(int fieldNumber, double value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeFloatField(int fieldNumber, float value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (double) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (double) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeFloatField(int fieldNumber, float value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeIntField(int fieldNumber, int value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (double) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (int) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeIntField(int fieldNumber, int value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeLongField(int fieldNumber, long value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (int) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (long) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeLongField(int fieldNumber, long value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeShortField(int fieldNumber, short value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (long) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
-		try {
-			jsonobj.put(name, (int) value);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+    public void storeShortField(int fieldNumber, short value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-	public void storeStringField(int fieldNumber, String value) {
-		if (!isStorable(fieldNumber)) {
-			return;
-		}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        try {
+            jsonobj.put(name, (int) value);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
+    public void storeStringField(int fieldNumber, String value) {
+        if (!isStorable(fieldNumber)) {
+            return;
+        }
 
-		try {
-			if (value != null) { 
-				jsonobj.put(name, value);
-			}
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
 
-	public void storeObjectField(int fieldNumber, Object value) {
-		AbstractMemberMetaData mmd = cmd
-				.getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-		if (!isStorable(mmd)) {
-			return;
-		}
+        try {
+            if (value != null) {
+                jsonobj.put(name, value);
+            }
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		ExecutionContext ec = op.getExecutionContext();
-		ClassLoaderResolver clr = ec.getClassLoaderResolver();
-		RelationType relationType = mmd.getRelationType(clr);
-		if (RelationType.isRelationSingleValued(relationType)
-				&& mmd.isEmbedded()) {
-			// Persistable object embedded into this table TODO Support this
-			throw new NucleusException("Embedded fields are not supported");
-		}
+    public void storeObjectField(int fieldNumber, Object value) {
+        AbstractMemberMetaData mmd = cmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        if (!isStorable(mmd)) {
+            return;
+        }
 
-		try {
-			storeObjectFieldInternal(fieldNumber, value, mmd, clr);
-		} catch (JSONException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
-	}
+        ExecutionContext ec = op.getExecutionContext();
+        ClassLoaderResolver clr = ec.getClassLoaderResolver();
+        RelationType relationType = mmd.getRelationType(clr);
+        if (RelationType.isRelationSingleValued(relationType)
+                && mmd.isEmbedded()) {
+            // Persistable object embedded into this table TODO Support this
+            throw new NucleusException("Embedded fields are not supported");
+        }
 
-	protected void storeObjectFieldInternal(int fieldNumber, Object value,
-			AbstractMemberMetaData mmd, ClassLoaderResolver clr)
-			throws JSONException {
-		RelationType relationType = mmd.getRelationType(clr);
-		String name = storeMgr.getNamingFactory().getColumnName(mmd,
-				ColumnType.COLUMN);
+        try {
+            storeObjectFieldInternal(fieldNumber, value, mmd, clr);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+    }
 
-		if (value == null) {
-			jsonobj.put(name, JSONObject.NULL);
-			return;
-		} else if (relationType == RelationType.NONE) {
-			if (mmd.getTypeConverterName() != null) {
-				// User-defined converter
-				TypeConverter conv = op.getExecutionContext().getTypeManager()
-						.getTypeConverterForName(mmd.getTypeConverterName());
-				jsonobj.put(name, conv.toDatastoreType(value));
-				return;
-			} else if (value instanceof Boolean) {
-				jsonobj.put(name, ((Boolean) value).booleanValue());
-			} else if (value instanceof Integer) {
-				jsonobj.put(name, ((Integer) value).intValue());
-			} else if (value instanceof Long) {
-				jsonobj.put(name, ((Long) value).longValue());
-			} else if (value instanceof Double) {
-				jsonobj.put(name, ((Double) value).doubleValue());
-			} else if (value instanceof Enum) {
-				ColumnMetaData[] colmds = mmd.getColumnMetaData();
-				// test is faulty
-				// boolean useNumeric =
-				// MetaDataUtils.persistColumnAsNumeric(colmds != null ?
-				// colmds[0] : null);
-				boolean useNumeric = true;
-				if (useNumeric) {
-					jsonobj.put(name, ((Enum) value).ordinal());
-				} else {
-					jsonobj.put(name, ((Enum) value).name());
-				}
-			} else if (value instanceof BigDecimal) {
-				jsonobj.put(name, value);
-			} else if (value instanceof BigInteger) {
-				jsonobj.put(name, value);
-			} else if (value instanceof Collection) {
-				// Collection<Non-PC> will be returned as JSONArray
-				jsonobj.put(name, value);
-			} else if (value instanceof Map) {
-				jsonobj.put(name, value);
-			} else {
-				// See if we can persist it as a Long/String
-				boolean useLong = false;
-				ColumnMetaData[] colmds = mmd.getColumnMetaData();
-				if (colmds != null && colmds.length == 1) {
-					String jdbc = colmds[0].getJdbcType().name();
-					if (jdbc != null
-							&& (jdbc.equalsIgnoreCase("INTEGER") || jdbc
-									.equalsIgnoreCase("NUMERIC"))) {
-						useLong = true;
-					}
-				}
-				TypeConverter strConv = op.getExecutionContext()
-						.getNucleusContext().getTypeManager()
-						.getTypeConverterForType(mmd.getType(), String.class);
-				TypeConverter longConv = op.getExecutionContext()
-						.getNucleusContext().getTypeManager()
-						.getTypeConverterForType(mmd.getType(), Long.class);
-				if (useLong) {
-					if (longConv != null) {
-						jsonobj.put(name, longConv.toDatastoreType(value));
-						return;
-					}
-				} else {
-					if (strConv != null) {
-						jsonobj.put(name, strConv.toDatastoreType(value));
-						return;
-					} else if (longConv != null) {
-						jsonobj.put(name, longConv.toDatastoreType(value));
-						return;
-					}
-				}
+    protected void storeObjectFieldInternal(int fieldNumber, Object value,
+            AbstractMemberMetaData mmd, ClassLoaderResolver clr)
+            throws JSONException {
+        RelationType relationType = mmd.getRelationType(clr);
+        String name = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
 
-				// Fallback to persist as a JSONObject and see what happens
-				JSONObject jsonobjfield = new JSONObject(value);
-				jsonobjfield.put("class", value.getClass().getName());
-				jsonobj.put(name, jsonobjfield);
-			}
+        if (value == null) {
+            jsonobj.put(name, JSONObject.NULL);
+            return;
+        } else if (relationType == RelationType.NONE) {
+            if (mmd.getTypeConverterName() != null) {
+                // User-defined converter
+                TypeConverter conv = op.getExecutionContext().getTypeManager()
+                        .getTypeConverterForName(mmd.getTypeConverterName());
+                jsonobj.put(name, conv.toDatastoreType(value));
+                return;
+            } else if (value instanceof Boolean) {
+                jsonobj.put(name, ((Boolean) value).booleanValue());
+            } else if (value instanceof Integer) {
+                jsonobj.put(name, ((Integer) value).intValue());
+            } else if (value instanceof Long) {
+                jsonobj.put(name, ((Long) value).longValue());
+            } else if (value instanceof Double) {
+                jsonobj.put(name, ((Double) value).doubleValue());
+            } else if (value instanceof Enum) {
+                ColumnMetaData[] colmds = mmd.getColumnMetaData();
+                // test is faulty
+                // boolean useNumeric =
+                // MetaDataUtils.persistColumnAsNumeric(colmds != null ?
+                // colmds[0] : null);
+                boolean useNumeric = true;
+                if (useNumeric) {
+                    jsonobj.put(name, ((Enum) value).ordinal());
+                } else {
+                    jsonobj.put(name, ((Enum) value).name());
+                }
+            } else if (value instanceof BigDecimal) {
+                jsonobj.put(name, value);
+            } else if (value instanceof BigInteger) {
+                jsonobj.put(name, value);
+            } else if (value instanceof Collection) {
+                // Collection<Non-PC> will be returned as JSONArray
+                jsonobj.put(name, value);
+            } else if (value instanceof Map) {
+                jsonobj.put(name, value);
+            } else {
+                // See if we can persist it as a Long/String
+                boolean useLong = false;
+                ColumnMetaData[] colmds = mmd.getColumnMetaData();
+                if (colmds != null && colmds.length == 1) {
+                    String jdbc = colmds[0].getJdbcType().name();
+                    if (jdbc != null
+                            && (jdbc.equalsIgnoreCase("INTEGER") || jdbc
+                                    .equalsIgnoreCase("NUMERIC"))) {
+                        useLong = true;
+                    }
+                }
+                TypeConverter strConv = op.getExecutionContext()
+                        .getNucleusContext().getTypeManager()
+                        .getTypeConverterForType(mmd.getType(), String.class);
+                TypeConverter longConv = op.getExecutionContext()
+                        .getNucleusContext().getTypeManager()
+                        .getTypeConverterForType(mmd.getType(), Long.class);
+                if (useLong) {
+                    if (longConv != null) {
+                        jsonobj.put(name, longConv.toDatastoreType(value));
+                        return;
+                    }
+                } else {
+                    if (strConv != null) {
+                        jsonobj.put(name, strConv.toDatastoreType(value));
+                        return;
+                    } else if (longConv != null) {
+                        jsonobj.put(name, longConv.toDatastoreType(value));
+                        return;
+                    }
+                }
 
-			return;
-		} else if (RelationType.isRelationSingleValued(relationType)) {
-			// 1-1, N-1 relation, so store the "id"
-			final Object valuePC = op.getExecutionContext().persistObjectInternal(
-					value, op, fieldNumber, -1);
-			final Object valueId = op.getExecutionContext().getApiAdapter()
-					.getIdForObject(valuePC);
-			if(valueId!=null) {
-				// ORANGE : added test 
-				jsonobj.put(name, IdentityUtils.getPersistableIdentityForId(valueId));
-			}
-			return;
-		} else if (RelationType.isRelationMultiValued(relationType)) {
-			// Collection/Map/Array
-			if (mmd.hasCollection()) {
-				final Collection<String> idColl = new ArrayList<String>();
-				final Collection coll = (Collection) value;
-				final Iterator collIter = coll.iterator();
-				while (collIter.hasNext()) {
-					final Object element = collIter.next();
-					final Object elementPC = op
-							.getExecutionContext()
-							.persistObjectInternal(element, op, fieldNumber, -1);
-					final Object elementID = op.getExecutionContext().getApiAdapter()
-							.getIdForObject(elementPC);
-					idColl.add(IdentityUtils.getPersistableIdentityForId(elementID));
-				}
-				System.out.println("name=" + name + " idColl.size()="
-						+ idColl.size() + " idColl=" + idColl);
-				if (idColl.size() > 0) {
-					// ORANGE: test added because code fails on empty collection
-					jsonobj.put(name, idColl);
-				}
-				return;
-			} else if (mmd.hasArray()) {
-				Collection ids = new ArrayList(Array.getLength(value));
-				for (int i = 0; i < Array.getLength(value); i++) {
-					final Object element = Array.get(value, i);
-					final Object elementPC = op
-							.getExecutionContext()
-							.persistObjectInternal(element, op, fieldNumber, -1);
-					final Object elementID = op.getExecutionContext().getApiAdapter()
-							.getIdForObject(elementPC);
-					ids.add(IdentityUtils.getPersistableIdentityForId(elementID));
-				}
-				jsonobj.put(name, ids);
-				return;
-			} else if (mmd.hasMap()) {
-				AbstractClassMetaData keyCmd = mmd.getMap()
-						.getKeyClassMetaData(clr,
-								op.getExecutionContext().getMetaDataManager());
-				AbstractClassMetaData valCmd = mmd.getMap()
-						.getValueClassMetaData(clr,
-								op.getExecutionContext().getMetaDataManager());
+                // Fallback to persist as a JSONObject and see what happens
+                JSONObject jsonobjfield = new JSONObject(value);
+                jsonobjfield.put("class", value.getClass().getName());
+                jsonobj.put(name, jsonobjfield);
+            }
 
-				Map idMap = new HashMap();
-				Map map = (Map) value;
-				Iterator<Map.Entry> mapIter = map.entrySet().iterator();
-				while (mapIter.hasNext()) {
-					Map.Entry entry = mapIter.next();
-					Object key = null;
-					Object val = null;
-					if (keyCmd != null) {
-						Object keyPC = op.getExecutionContext()
-								.persistObjectInternal(entry.getKey(), op,
-										fieldNumber, -1);
-						key = op.getExecutionContext().getApiAdapter()
-								.getIdForObject(keyPC);
-					} else {
-						key = entry.getKey();
-					}
-					if (valCmd != null) {
-						Object valPC = op.getExecutionContext()
-								.persistObjectInternal(entry.getValue(), op,
-										fieldNumber, -1);
-						val = op.getExecutionContext().getApiAdapter()
-								.getIdForObject(valPC);
-					} else {
-						val = entry.getValue();
-					}
-					idMap.put(key, val);
-				}
-				jsonobj.put(name, idMap);
-				return;
-			}
-		}
+            return;
+        } else if (RelationType.isRelationSingleValued(relationType)) {
+            // 1-1, N-1 relation, so store the "id"
+            final Object valuePC = op.getExecutionContext()
+                    .persistObjectInternal(value, op, fieldNumber, -1);
+            final Object valueId = op.getExecutionContext().getApiAdapter()
+                    .getIdForObject(valuePC);
+            if (valueId != null) {
+                // ORANGE : added test
+                jsonobj.put(name,
+                        IdentityUtils.getPersistableIdentityForId(valueId));
+            }
+            return;
+        } else if (RelationType.isRelationMultiValued(relationType)) {
+            // Collection/Map/Array
+            if (mmd.hasCollection()) {
+                final Collection<String> idColl = new ArrayList<String>();
+                final Collection coll = (Collection) value;
+                final Iterator collIter = coll.iterator();
+                while (collIter.hasNext()) {
+                    final Object element = collIter.next();
+                    final Object elementPC = op
+                            .getExecutionContext()
+                            .persistObjectInternal(element, op, fieldNumber, -1);
+                    final Object elementID = op.getExecutionContext()
+                            .getApiAdapter().getIdForObject(elementPC);
+                    idColl.add(IdentityUtils
+                            .getPersistableIdentityForId(elementID));
+                }
+                System.out.println("name=" + name + " idColl.size()="
+                        + idColl.size() + " idColl=" + idColl);
+                if (idColl.size() > 0) {
+                    // ORANGE: test added because code fails on empty collection
+                    jsonobj.put(name, idColl);
+                }
+                return;
+            } else if (mmd.hasArray()) {
+                Collection ids = new ArrayList(Array.getLength(value));
+                for (int i = 0; i < Array.getLength(value); i++) {
+                    final Object element = Array.get(value, i);
+                    final Object elementPC = op
+                            .getExecutionContext()
+                            .persistObjectInternal(element, op, fieldNumber, -1);
+                    final Object elementID = op.getExecutionContext()
+                            .getApiAdapter().getIdForObject(elementPC);
+                    ids.add(IdentityUtils
+                            .getPersistableIdentityForId(elementID));
+                }
+                jsonobj.put(name, ids);
+                return;
+            } else if (mmd.hasMap()) {
+                AbstractClassMetaData keyCmd = mmd.getMap()
+                        .getKeyClassMetaData(clr,
+                                op.getExecutionContext().getMetaDataManager());
+                AbstractClassMetaData valCmd = mmd.getMap()
+                        .getValueClassMetaData(clr,
+                                op.getExecutionContext().getMetaDataManager());
 
-		throw new NucleusException("Dont currently support field "
-				+ mmd.getFullFieldName() + " of type " + mmd.getTypeName());
-	}
+                Map idMap = new HashMap();
+                Map map = (Map) value;
+                Iterator<Map.Entry> mapIter = map.entrySet().iterator();
+                while (mapIter.hasNext()) {
+                    Map.Entry entry = mapIter.next();
+                    Object key = null;
+                    Object val = null;
+                    if (keyCmd != null) {
+                        Object keyPC = op.getExecutionContext()
+                                .persistObjectInternal(entry.getKey(), op,
+                                        fieldNumber, -1);
+                        key = op.getExecutionContext().getApiAdapter()
+                                .getIdForObject(keyPC);
+                    } else {
+                        key = entry.getKey();
+                    }
+                    if (valCmd != null) {
+                        Object valPC = op.getExecutionContext()
+                                .persistObjectInternal(entry.getValue(), op,
+                                        fieldNumber, -1);
+                        val = op.getExecutionContext().getApiAdapter()
+                                .getIdForObject(valPC);
+                    } else {
+                        val = entry.getValue();
+                    }
+                    idMap.put(key, val);
+                }
+                jsonobj.put(name, idMap);
+                return;
+            }
+        }
+
+        throw new NucleusException("Dont currently support field "
+                + mmd.getFullFieldName() + " of type " + mmd.getTypeName());
+    }
 }

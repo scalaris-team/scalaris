@@ -14,7 +14,7 @@ limitations under the License.
 
 Contributors :
     ...
-***********************************************************************/
+ ***********************************************************************/
 package org.datanucleus.store.scalaris.valuegenerator;
 
 import java.util.ArrayList;
@@ -30,8 +30,7 @@ import org.datanucleus.util.Localiser;
 /**
  * Generator to store and allocate identity values.
  */
-public class IncrementGenerator extends AbstractDatastoreGenerator<Long>
-{
+public class IncrementGenerator extends AbstractDatastoreGenerator<Long> {
     static final String INCREMENT_KEY_SUFFIX = "increment";
 
     /** Key used in the Table to access the increment count */
@@ -40,46 +39,51 @@ public class IncrementGenerator extends AbstractDatastoreGenerator<Long>
     private String collectionName = null;
 
     /**
-     * Constructor. Will receive the following properties (as a minimum) through this constructor.
+     * Constructor. Will receive the following properties (as a minimum) through
+     * this constructor.
      * <ul>
      * <li>class-name : Name of the class whose object is being inserted.</li>
      * <li>root-class-name : Name of the root class in this inheritance tree</li>
-     * <li>field-name : Name of the field with the strategy (unless datastore identity field)</li>
+     * <li>field-name : Name of the field with the strategy (unless datastore
+     * identity field)</li>
      * <li>catalog-name : Catalog of the table (if specified)</li>
      * <li>schema-name : Schema of the table (if specified)</li>
-     * <li>table-name : Name of the root table for this inheritance tree (containing the field).</li>
+     * <li>table-name : Name of the root table for this inheritance tree
+     * (containing the field).</li>
      * <li>column-name : Name of the column in the table (for the field)</li>
-     * <li>sequence-name : Name of the sequence (if specified in MetaData as "sequence)</li>
+     * <li>sequence-name : Name of the sequence (if specified in MetaData as
+     * "sequence)</li>
      * </ul>
-     * @param name Symbolic name for this generator
-     * @param props Properties controlling the behaviour of the generator (or null if not required).
+     * 
+     * @param name
+     *            Symbolic name for this generator
+     * @param props
+     *            Properties controlling the behaviour of the generator (or null
+     *            if not required).
      */
-    public IncrementGenerator(String name, Properties props)
-    {
+    public IncrementGenerator(String name, Properties props) {
         super(name, props);
         this.key = properties.getProperty("field-name", name);
         this.collectionName = properties.getProperty("sequence-table-name");
-        if (this.collectionName == null)
-        {
+        if (this.collectionName == null) {
             this.collectionName = "IncrementTable";
         }
-        if (properties.containsKey("key-cache-size"))
-        {
-            allocationSize = Integer.valueOf(properties.getProperty("key-cache-size"));
-        }
-        else
-        {
+        if (properties.containsKey("key-cache-size")) {
+            allocationSize = Integer.valueOf(properties
+                    .getProperty("key-cache-size"));
+        } else {
             allocationSize = 1;
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.datanucleus.store.valuegenerator.AbstractGenerator#reserveBlock(long)
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * org.datanucleus.store.valuegenerator.AbstractGenerator#reserveBlock(long)
      */
-    protected ValueGenerationBlock<Long> reserveBlock(long size)
-    {
-        if (size < 1)
-        {
+    protected ValueGenerationBlock<Long> reserveBlock(long size) {
+        if (size < 1) {
             return null;
         }
 

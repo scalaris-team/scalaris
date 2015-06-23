@@ -45,251 +45,250 @@ import de.zib.scalaris.UnknownException;
  * no-op.
  */
 public class ConnectionFactoryImpl extends AbstractConnectionFactory {
-	/**
-	 * Symbolic Name of property used in persistence-unit configuration file.
-	 * Property value Cookie used for connecting to Scalaris node. <property
-	 * name="..." value="..." />
-	 */
-	public final String PROPERTY_SCALARIS_COOKIE = "scalaris.cookie";
-	/**
-	 * Symbolic Name of property used in persistence-unit configuration file.
-	 * Should be the same as defined in Scalaris server <property name="..."
-	 * value="..." />
-	 */
-	public final String PROPERTY_SCALARIS_DEBUG = "scalaris.debug";
-	/**
-	 * Symbolic Name of property used in persistence-unit configuration file
-	 * <property name="..." value="..." />
-	 */
-	public final String PROPERTY_SCALARIS_NODE = "scalaris.node";
-	/**
-	 * Symbolic Name of property used in persistence-unit configuration file
-	 * <property name="..." value="..." />
-	 */
-	public final String PROPERTY_SCALARIS_CLIENT_NAME = "scalaris.client.name";
-	/**
-	 * Symbolic Name of property used in persistence-unit configuration file
-	 * <property name="..." value="..." />
-	 */
-	public final String PROPERTY_SCALARIS_CLIENT_APPENDUUID = "scalaris.client.appendUUID";
+    /**
+     * Symbolic Name of property used in persistence-unit configuration file.
+     * Property value Cookie used for connecting to Scalaris node. <property
+     * name="..." value="..." />
+     */
+    public final String PROPERTY_SCALARIS_COOKIE = "scalaris.cookie";
+    /**
+     * Symbolic Name of property used in persistence-unit configuration file.
+     * Should be the same as defined in Scalaris server <property name="..."
+     * value="..." />
+     */
+    public final String PROPERTY_SCALARIS_DEBUG = "scalaris.debug";
+    /**
+     * Symbolic Name of property used in persistence-unit configuration file
+     * <property name="..." value="..." />
+     */
+    public final String PROPERTY_SCALARIS_NODE = "scalaris.node";
+    /**
+     * Symbolic Name of property used in persistence-unit configuration file
+     * <property name="..." value="..." />
+     */
+    public final String PROPERTY_SCALARIS_CLIENT_NAME = "scalaris.client.name";
+    /**
+     * Symbolic Name of property used in persistence-unit configuration file
+     * <property name="..." value="..." />
+     */
+    public final String PROPERTY_SCALARIS_CLIENT_APPENDUUID = "scalaris.client.appendUUID";
 
-	/**
-	 * Constructor.
-	 * 
-	 * @param storeMgr
-	 *            Store Manager
-	 * @param resourceType
-	 *            Type of resource (tx, nontx)
-	 */
-	public ConnectionFactoryImpl(final StoreManager storeMgr,
-			final String resourceType) {
-		super(storeMgr, resourceType);
-	}
-	
-	/**
-	 * A Java Instance can only create one connection per scalaris node. We need
-	 * to store already created connection and reuse if necessary.
-	 * 
-	 * This need to be thread safe, hence volatile.
-	 */
-	private static final Hashtable<String, Connection> static_connectionSingletons = new Hashtable<String, Connection>();
-	
-	/**
-	 * Obtain a connection from the Factory. The connection will be enlisted
-	 * within the transaction associated to the ExecutionContext
-	 * 
-	 * @param ec
-	 *            the pool that is bound the connection during its lifecycle (or
-	 *            null)
-	 * @param txnOptions
-	 *            Any options for creating the connection
-	 * @return the {@link org.datanucleus.store.connection.ManagedConnection}
-	 */
-	public ManagedConnection createManagedConnection(final ExecutionContext ec,
-			final Map txnOptions) {
-		return new ManagedConnectionImpl(txnOptions, static_connectionSingletons);
-	}
+    /**
+     * Constructor.
+     * 
+     * @param storeMgr
+     *            Store Manager
+     * @param resourceType
+     *            Type of resource (tx, nontx)
+     */
+    public ConnectionFactoryImpl(final StoreManager storeMgr,
+            final String resourceType) {
+        super(storeMgr, resourceType);
+    }
 
-	
+    /**
+     * A Java Instance can only create one connection per scalaris node. We need
+     * to store already created connection and reuse if necessary.
+     * 
+     * This need to be thread safe, hence volatile.
+     */
+    private static final Hashtable<String, Connection> static_connectionSingletons = new Hashtable<String, Connection>();
 
-	/**
-	 * Implementation of a ManagedConnection for Scalaris database.
-	 */
-	public class ManagedConnectionImpl extends AbstractManagedConnection {
+    /**
+     * Obtain a connection from the Factory. The connection will be enlisted
+     * within the transaction associated to the ExecutionContext
+     * 
+     * @param ec
+     *            the pool that is bound the connection during its lifecycle (or
+     *            null)
+     * @param txnOptions
+     *            Any options for creating the connection
+     * @return the {@link org.datanucleus.store.connection.ManagedConnection}
+     */
+    public ManagedConnection createManagedConnection(final ExecutionContext ec,
+            final Map txnOptions) {
+        return new ManagedConnectionImpl(txnOptions,
+                static_connectionSingletons);
+    }
 
-		final private Map options;
-		final private  Hashtable<String, Connection> connectionSingletons;
+    /**
+     * Implementation of a ManagedConnection for Scalaris database.
+     */
+    public class ManagedConnectionImpl extends AbstractManagedConnection {
 
-		public ManagedConnectionImpl(final Map options,
-				final Hashtable<String, Connection> _connectionSingletons) {
-			this.options = options;
-			this.connectionSingletons = _connectionSingletons;
-		}
+        final private Map options;
+        final private Hashtable<String, Connection> connectionSingletons;
 
-		public void close() {
-			// TODO Auto-generated method stub
-		}
+        public ManagedConnectionImpl(final Map options,
+                final Hashtable<String, Connection> _connectionSingletons) {
+            this.options = options;
+            this.connectionSingletons = _connectionSingletons;
+        }
 
-		/**
-		 * Helper for copying setting from Datanucleus to Scalaris
-		 * 
-		 * @return
-		 * */
-		String copyProperty(final String propertyNameFrom,
-				final Properties propertiesTo, final String propertyNameTo,
-				final String defaultIfNotSet) {
-			final String v = storeMgr.getStringProperty(propertyNameFrom);
-			if (defaultIfNotSet == null && v == null) {
-				throw new NucleusDataStoreException("Property "
-						+ propertyNameFrom + " is mandatory");
-			}
-			final String ret = v == null ? defaultIfNotSet : v;
-			propertiesTo.put(propertyNameTo, ret);
-			return ret;
-		}
+        public void close() {
+            // TODO Auto-generated method stub
+        }
 
-		/**
-		 * Helper for copying setting from Datanucleus to Scalaris
-		 * 
-		 * @return
-		 * */
-		boolean copyProperty(final String propertyNameFrom,
-				final Properties propertiesTo, final String propertyNameTo,
-				final boolean defaultIfNotSet) {
-			final boolean ret = storeMgr.getBooleanProperty(propertyNameFrom,
-					defaultIfNotSet);
-			if (propertyNameTo != null)
-				propertiesTo.put(propertyNameTo, ret);
-			return ret;
-		}
+        /**
+         * Helper for copying setting from Datanucleus to Scalaris
+         * 
+         * @return
+         * */
+        String copyProperty(final String propertyNameFrom,
+                final Properties propertiesTo, final String propertyNameTo,
+                final String defaultIfNotSet) {
+            final String v = storeMgr.getStringProperty(propertyNameFrom);
+            if (defaultIfNotSet == null && v == null) {
+                throw new NucleusDataStoreException("Property "
+                        + propertyNameFrom + " is mandatory");
+            }
+            final String ret = v == null ? defaultIfNotSet : v;
+            propertiesTo.put(propertyNameTo, ret);
+            return ret;
+        }
 
-		public Object getConnection() {
+        /**
+         * Helper for copying setting from Datanucleus to Scalaris
+         * 
+         * @return
+         * */
+        boolean copyProperty(final String propertyNameFrom,
+                final Properties propertiesTo, final String propertyNameTo,
+                final boolean defaultIfNotSet) {
+            final boolean ret = storeMgr.getBooleanProperty(propertyNameFrom,
+                    defaultIfNotSet);
+            if (propertyNameTo != null)
+                propertiesTo.put(propertyNameTo, ret);
+            return ret;
+        }
 
-			Properties properties = new Properties();
-			copyProperty(PROPERTY_SCALARIS_NODE, properties,
-					"scalaris.node", (String) null);
-			copyProperty(PROPERTY_SCALARIS_COOKIE, properties,
-					"scalaris.cookie", (String) null);
-			final String cname = copyProperty(PROPERTY_SCALARIS_CLIENT_NAME,
-					properties, "scalaris.client.name", "java_client");
-			copyProperty(PROPERTY_SCALARIS_CLIENT_APPENDUUID, properties,
-					"scalaris.client.appendUUID", true);
-			final boolean debug = copyProperty(PROPERTY_SCALARIS_DEBUG,
-					properties, null, false);
+        public Object getConnection() {
 
-			{
-				Connection c = connectionSingletons.get(cname);
-				if (c != null)
-					return c;
-			}
-			System.out.println(properties.toString());
+            Properties properties = new Properties();
+            copyProperty(PROPERTY_SCALARIS_NODE, properties, "scalaris.node",
+                    (String) null);
+            copyProperty(PROPERTY_SCALARIS_COOKIE, properties,
+                    "scalaris.cookie", (String) null);
+            final String cname = copyProperty(PROPERTY_SCALARIS_CLIENT_NAME,
+                    properties, "scalaris.client.name", "java_client");
+            copyProperty(PROPERTY_SCALARIS_CLIENT_APPENDUUID, properties,
+                    "scalaris.client.appendUUID", true);
+            final boolean debug = copyProperty(PROPERTY_SCALARIS_DEBUG,
+                    properties, null, false);
 
-			final Connection connection;
-			synchronized (connectionSingletons) {
+            {
+                Connection c = connectionSingletons.get(cname);
+                if (c != null)
+                    return c;
+            }
+            System.out.println(properties.toString());
 
-				{// In case someone overruns me to the synchronized section
-					Connection c = connectionSingletons.get(cname);
-					if (c != null) {
-						System.out.println("Ouch. I was overrun");
-						return c;
-						
-					}
-				}
-					
-				{// I am the first one.
-					System.out.println("I am the first for "+cname);
-					try {
-						ConnectionFactory connectionFactory = new ConnectionFactory(
-								properties);
-						
-						connectionFactory.createConnection();
-						connection = connectionFactory.createConnection();
-						connectionSingletons.put(cname,connection);
-					} catch (ConnectionException e1) {
-						throw new NucleusDataStoreException(
-								"An error occured while creating scalaris connection",
-								e1);
-					}
-				}
+            final Connection connection;
+            synchronized (connectionSingletons) {
 
-			}
+                {// In case someone overruns me to the synchronized section
+                    Connection c = connectionSingletons.get(cname);
+                    if (c != null) {
+                        System.out.println("Ouch. I was overrun");
+                        return c;
 
-			// urlStr = urlStr.substring(urlStr.indexOf(storeMgr
-			// .getStoreManagerKey() + ":")
-			// + storeMgr.getStoreManagerKey().length() + 1);
-			// if (options.containsKey(STORE_JSON_URL)) {
-			// if (urlStr.endsWith("/")
-			// && options.get(STORE_JSON_URL).toString()
-			// .startsWith("/")) {
-			// urlStr += options.get(STORE_JSON_URL).toString()
-			// .substring(1);
-			// } else if (!urlStr.endsWith("/")
-			// && !options.get(STORE_JSON_URL).toString()
-			// .startsWith("/")) {
-			// urlStr += "/" + options.get(STORE_JSON_URL).toString();
-			// } else {
-			// urlStr += options.get(STORE_JSON_URL).toString();
-			// }
-			// }
-			// URL url;
-			// try {
-			// url = new URL(urlStr);
-			// return url.openConnection();
-			// } catch (MalformedURLException e) {
-			// throw new NucleusDataStoreException(e.getMessage(), e);
-			// } catch (IOException e) {
-			// throw new NucleusDataStoreException(e.getMessage(), e);
-			// }
-			//
+                    }
+                }
 
-			if (debug) {
-				// TODO: test for early development. to be removed someday.
-				Transaction t1 = new Transaction(connection); // Transaction()
+                {// I am the first one.
+                    System.out.println("I am the first for " + cname);
+                    try {
+                        ConnectionFactory connectionFactory = new ConnectionFactory(
+                                properties);
 
-				try {
-					t1.write("datanucleus", "connected at "
-							+ new java.util.Date() + " from java_client="
-							+ cname);
-					t1.commit();
-				} catch (ConnectionException e) {
-					throw new NucleusDataStoreException(
-							"an error occured in debug self test ", e);
+                        connectionFactory.createConnection();
+                        connection = connectionFactory.createConnection();
+                        connectionSingletons.put(cname, connection);
+                    } catch (ConnectionException e1) {
+                        throw new NucleusDataStoreException(
+                                "An error occured while creating scalaris connection",
+                                e1);
+                    }
+                }
 
-//				} catch (TimeoutException e) {
-//					throw new NucleusDataStoreException(
-//							"an error occured in debug self test ", e);
-				} catch (AbortException e) {
-					throw new NucleusDataStoreException(
-							"an error occured in debug self test ", e);
-				} catch (UnknownException e) {
-					throw new NucleusDataStoreException(
-							"an error occured in debug self test ", e);
-				}
-			}
+            }
 
-			return connection;
+            // urlStr = urlStr.substring(urlStr.indexOf(storeMgr
+            // .getStoreManagerKey() + ":")
+            // + storeMgr.getStoreManagerKey().length() + 1);
+            // if (options.containsKey(STORE_JSON_URL)) {
+            // if (urlStr.endsWith("/")
+            // && options.get(STORE_JSON_URL).toString()
+            // .startsWith("/")) {
+            // urlStr += options.get(STORE_JSON_URL).toString()
+            // .substring(1);
+            // } else if (!urlStr.endsWith("/")
+            // && !options.get(STORE_JSON_URL).toString()
+            // .startsWith("/")) {
+            // urlStr += "/" + options.get(STORE_JSON_URL).toString();
+            // } else {
+            // urlStr += options.get(STORE_JSON_URL).toString();
+            // }
+            // }
+            // URL url;
+            // try {
+            // url = new URL(urlStr);
+            // return url.openConnection();
+            // } catch (MalformedURLException e) {
+            // throw new NucleusDataStoreException(e.getMessage(), e);
+            // } catch (IOException e) {
+            // throw new NucleusDataStoreException(e.getMessage(), e);
+            // }
+            //
 
-		}
+            if (debug) {
+                // TODO: test for early development. to be removed someday.
+                Transaction t1 = new Transaction(connection); // Transaction()
 
-		public XAResource getXAResource() {
-			return null;
-		}
-	}
+                try {
+                    t1.write("datanucleus", "connected at "
+                            + new java.util.Date() + " from java_client="
+                            + cname);
+                    t1.commit();
+                } catch (ConnectionException e) {
+                    throw new NucleusDataStoreException(
+                            "an error occured in debug self test ", e);
+
+                    // } catch (TimeoutException e) {
+                    // throw new NucleusDataStoreException(
+                    // "an error occured in debug self test ", e);
+                } catch (AbortException e) {
+                    throw new NucleusDataStoreException(
+                            "an error occured in debug self test ", e);
+                } catch (UnknownException e) {
+                    throw new NucleusDataStoreException(
+                            "an error occured in debug self test ", e);
+                }
+            }
+
+            return connection;
+
+        }
+
+        public XAResource getXAResource() {
+            return null;
+        }
+    }
 }
 
 class ConnectorSingleton {
-	/** Constructeur privé */
-	private ConnectorSingleton() {
-	}
+    /** Constructeur privé */
+    private ConnectorSingleton() {
+    }
 
-	/** Holder */
-	private static class SingletonHolder {
-		/** Instance unique non préinitialisée */
-		private final static ConnectorSingleton instance = new ConnectorSingleton();
-	}
+    /** Holder */
+    private static class SingletonHolder {
+        /** Instance unique non préinitialisée */
+        private final static ConnectorSingleton instance = new ConnectorSingleton();
+    }
 
-	/** Point d'accès pour l'instance unique du singleton */
-	public static ConnectorSingleton getInstance() {
-		return SingletonHolder.instance;
-	}
+    /** Point d'accès pour l'instance unique du singleton */
+    public static ConnectorSingleton getInstance() {
+        return SingletonHolder.instance;
+    }
 }

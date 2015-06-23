@@ -41,72 +41,72 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
 public class ScalarisStoreManager extends AbstractStoreManager {
-	public ScalarisStoreManager(ClassLoaderResolver clr, PersistenceNucleusContext ctx,
-			Map<String, Object> props) {
-		super("scalaris", clr, ctx, props);
+    public ScalarisStoreManager(ClassLoaderResolver clr,
+            PersistenceNucleusContext ctx, Map<String, Object> props) {
+        super("scalaris", clr, ctx, props);
 
-		// Handler for persistence process
-		persistenceHandler = new ScalarisPersistenceHandler(this);
-		connectionMgr.disableConnectionPool();
+        // Handler for persistence process
+        persistenceHandler = new ScalarisPersistenceHandler(this);
+        connectionMgr.disableConnectionPool();
 
-		logConfiguration();
-	}
+        logConfiguration();
+    }
 
-	public NucleusConnection getNucleusConnection(ExecutionContext om) {
-		throw new UnsupportedOperationException();
-	}
-	
-	@Override
-	public String getClassNameForObjectID(Object id, ClassLoaderResolver clr,
-			ExecutionContext ec) {
+    public NucleusConnection getNucleusConnection(ExecutionContext om) {
+        throw new UnsupportedOperationException();
+    }
 
-		Map<String, String> options = new HashMap<String, String>();
-		ManagedConnection mconn = this.getConnection(ec, options);
-		de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-				.getConnection();
+    @Override
+    public String getClassNameForObjectID(Object id, ClassLoaderResolver clr,
+            ExecutionContext ec) {
 
-		String myType = null;
+        Map<String, String> options = new HashMap<String, String>();
+        ManagedConnection mconn = this.getConnection(ec, options);
+        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
+                .getConnection();
 
-		try {
-			Transaction t1 = new Transaction(conn);
-			JSONObject result = new JSONObject(t1.read(id.toString())
-					.stringValue());
+        String myType = null;
 
-			if (ScalarisPersistenceHandler.isADeletedRecord(result)) {
-				throw new NucleusObjectNotFoundException(
-						"Record has been deleted");
-			}
-			myType = result.getString("class");
+        try {
+            Transaction t1 = new Transaction(conn);
+            JSONObject result = new JSONObject(t1.read(id.toString())
+                    .stringValue());
 
-			System.out.println("CLASS " + myType + " for " + id.toString());
+            if (ScalarisPersistenceHandler.isADeletedRecord(result)) {
+                throw new NucleusObjectNotFoundException(
+                        "Record has been deleted");
+            }
+            myType = result.getString("class");
 
-			t1.commit();
-			return myType;
-		} catch (ConnectionException e) {
-			throw new NucleusException(e.getMessage(), e);
-		} catch (UnknownException e) {
-			throw new NucleusException(e.getMessage(), e);
-		} catch (AbortException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
+            System.out.println("CLASS " + myType + " for " + id.toString());
 
-		catch (JSONException e) {
+            t1.commit();
+            return myType;
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
 
-			throw new NucleusException(e.getMessage(), e);
-		} catch (NotFoundException e) {
+        catch (JSONException e) {
 
-		} catch (ClassCastException e) {
-			throw new NucleusException(e.getMessage(), e);
-		}
+            throw new NucleusException(e.getMessage(), e);
+        } catch (NotFoundException e) {
 
-		System.out.println("!!! -> connection");
-		if (myType == null) {
-			// revert to default implementation for special cases
-			myType = super.getClassNameForObjectID(id, clr, ec);
-		}
+        } catch (ClassCastException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
 
-		System.out.println("!!!!!!!!!" + myType);
+        System.out.println("!!! -> connection");
+        if (myType == null) {
+            // revert to default implementation for special cases
+            myType = super.getClassNameForObjectID(id, clr, ec);
+        }
 
-		return myType;
-	}
+        System.out.println("!!!!!!!!!" + myType);
+
+        return myType;
+    }
 }

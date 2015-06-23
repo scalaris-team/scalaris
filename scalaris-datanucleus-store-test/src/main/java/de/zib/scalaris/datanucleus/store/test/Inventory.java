@@ -14,7 +14,7 @@ limitations under the License.
 
 Contributors:
     ...
-**********************************************************************/
+ **********************************************************************/
 package de.zib.scalaris.datanucleus.store.test;
 
 import java.util.Arrays;
@@ -31,67 +31,65 @@ import javax.jdo.annotations.PrimaryKey;
 @PersistenceCapable
 public class Inventory {
 
-	@PrimaryKey
-    protected String name=null;
+    @PrimaryKey
+    protected String name = null;
 
     @Persistent(defaultFetchGroup = "true")
     protected Set<Product> products = new HashSet<Product>();
 
-    public Inventory(String name)
-    {
+    public Inventory(String name) {
         this.name = name;
     }
 
-    public String getName()
-    {
+    public String getName() {
         return name;
     }
 
-    public Set<Product> getProducts()
-    {
+    public Set<Product> getProducts() {
         return products;
     }
 
     public void addAll(Product... p) {
-    	for (Product prod : p) {
-    		add(prod);
-    	}
+        for (Product prod : p) {
+            add(prod);
+        }
     }
-    
+
     public void add(Product p) {
-    	products.add(p);
+        products.add(p);
     }
-    
-    public String toString(){
-    	StringBuilder prodString = new StringBuilder("null");
-    	if (products != null) {
-    		Product[] prod  = products.toArray(new Product[0]);
-    		prodString = new StringBuilder("[");
-    		for (Product p : prod) {
-    			prodString.append("{")
-    				.append(p.toString())
-    				.append("},");
-    		}
-    		prodString.append("]");
-    	}
+
+    public String toString() {
+        StringBuilder prodString = new StringBuilder("null");
+        if (products != null) {
+            Product[] prod = products.toArray(new Product[0]);
+            prodString = new StringBuilder("[");
+            for (Product p : prod) {
+                prodString.append("{").append(p.toString()).append("},");
+            }
+            prodString.append("]");
+        }
         return "Inventory: " + name + "; Products: " + prodString;
     }
-    
-    public boolean equals(Object o) {
-    	if (o instanceof Inventory) {
-    		Inventory other = (Inventory) o;
-    		if (!name.equals(other.name)) return false;
-    		
-    		// compare their products
-    		if (products == null && other.products == null) return true;
-    		if (products == null || other.products == null) return false;
 
-    		Product[] prods1 = products.toArray(new Product[0]);
-    		Product[] prods2 = other.products.toArray(new Product[0]);
-    		
-    		return Arrays.asList(prods1).containsAll(other.products) &&
-    				Arrays.asList(prods2).containsAll(products);
-    	}
-    	return false;
+    public boolean equals(Object o) {
+        if (o instanceof Inventory) {
+            Inventory other = (Inventory) o;
+            if (!name.equals(other.name))
+                return false;
+
+            // compare their products
+            if (products == null && other.products == null)
+                return true;
+            if (products == null || other.products == null)
+                return false;
+
+            Product[] prods1 = products.toArray(new Product[0]);
+            Product[] prods2 = other.products.toArray(new Product[0]);
+
+            return Arrays.asList(prods1).containsAll(other.products)
+                    && Arrays.asList(prods2).containsAll(products);
+        }
+        return false;
     }
 }

@@ -14,7 +14,7 @@ limitations under the License.
 
 Contributors:
     ...
-**********************************************************************/
+ **********************************************************************/
 package de.zib.scalaris.datanucleus.store.test;
 
 import javax.jdo.annotations.IdGeneratorStrategy;
@@ -24,21 +24,21 @@ import javax.jdo.annotations.PrimaryKey;
 import javax.jdo.annotations.IdentityType;
 
 /**
- * Definition of a Product
- * Represents a product, and contains the key aspects of the item.
+ * Definition of a Product Represents a product, and contains the key aspects of
+ * the item.
  */
 @PersistenceCapable
-public class Product
-{
+public class Product {
+
     @PrimaryKey
-	@Persistent(valueStrategy = IdGeneratorStrategy.IDENTITY)
+    @Persistent(valueStrategy = IdGeneratorStrategy.IDENTITY)
     private long id;
-    
-    protected String name=null;
 
-    protected String description=null;
+    protected String name = null;
 
-    protected double price=0.0;
+    protected String description = null;
+
+    protected double price = 0.0;
 
     public Product(String name, String description, double price) {
         this.name = name;
@@ -46,52 +46,46 @@ public class Product
         this.price = price;
     }
 
-    public long getId()
-    {
+    public long getId() {
         return id;
     }
 
-    public String getName()
-    {
+    public String getName() {
         return name;
     }
 
-    public String getDescription()
-    {
+    public String getDescription() {
         return description;
     }
 
-    public double getPrice()
-    {
+    public double getPrice() {
         return price;
     }
 
-    public void setName(String name)
-    {
+    public void setName(String name) {
         this.name = name;
     }
 
-    public void setDescription(String description)
-    {
+    public void setDescription(String description) {
         this.description = description;
     }
 
-    public void setPrice(double price)
-    {
+    public void setPrice(double price) {
         this.price = price;
     }
 
-    public String toString()
-    {
+    public String toString() {
         return "Product : " + id + " name=" + name + " [" + description + "]";
     }
-    
+
     @Override
     public boolean equals(Object o) {
-    	if (o instanceof Product) {
-    		Product other = (Product) o;
-    		return other.price == price && other.description.equals(description) && name.equals(other.name);
-    	}
-    	return false;
+        if (o instanceof Product) {
+            Product other = (Product) o;
+            return other.price == price
+                    && other.description.equals(description)
+                    && name.equals(other.name);
+        }
+        return false;
     }
 }

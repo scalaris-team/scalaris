@@ -14,7 +14,7 @@ limitations under the License.
 
 Contributors:
     ...
-**********************************************************************/
+ **********************************************************************/
 package de.zib.scalaris.datanucleus.store.test;
 
 import javax.jdo.annotations.PersistenceCapable;
@@ -24,71 +24,65 @@ import javax.jdo.annotations.Persistent;
  * Definition of a Book. Extends basic Product class.
  */
 @PersistenceCapable
-public class Book extends Product
-{
+public class Book extends Product {
 
-	@Persistent(defaultFetchGroup = "true")
-    protected Author author=null;
+    @Persistent(defaultFetchGroup = "true")
+    protected Author author = null;
 
-    protected String isbn=null;
+    protected String isbn = null;
 
-    protected String publisher=null;
+    protected String publisher = null;
 
-    public Book(String name, String description, double price, Author author, String isbn, String publisher)
-    {
-        super(name,description,price);
+    public Book(String name, String description, double price, Author author,
+            String isbn, String publisher) {
+        super(name, description, price);
         this.author = author;
         this.isbn = isbn;
         this.publisher = publisher;
     }
 
-    public Author getAuthor()
-    {
+    public Author getAuthor() {
         return author;
     }
 
-    public String getIsbn()
-    {
+    public String getIsbn() {
         return isbn;
     }
 
-    public String getPublisher()
-    {
+    public String getPublisher() {
         return publisher;
     }
 
-    public void setAuthor(Author author)
-    {
+    public void setAuthor(Author author) {
         this.author = author;
     }
 
-    public void setIsbn(String isbn)
-    {
+    public void setIsbn(String isbn) {
         this.isbn = isbn;
     }
 
-    public void setPublisher(String publisher)
-    {
+    public void setPublisher(String publisher) {
         this.publisher = publisher;
     }
 
-    public String toString()
-    {
+    public String toString() {
         return "Book : " + author + " - " + name;
     }
-    
+
     public boolean equals(Object o) {
-    	if (o instanceof Book && super.equals(o)) {
-    		Book other = (Book) o;
-    		
-    		if (other.isbn.equals(isbn) && other.publisher.equals(publisher)) {
-        	
-        		if (author == null && other.author == null) return true;
-        		if (author == null || other.author == null) return false;
-        		
-    			return other.author.equals(author);
-    		}
-    	}
-    	return false;
+        if (o instanceof Book && super.equals(o)) {
+            Book other = (Book) o;
+
+            if (other.isbn.equals(isbn) && other.publisher.equals(publisher)) {
+
+                if (author == null && other.author == null)
+                    return true;
+                if (author == null || other.author == null)
+                    return false;
+
+                return other.author.equals(author);
+            }
+        }
+        return false;
     }
 }
