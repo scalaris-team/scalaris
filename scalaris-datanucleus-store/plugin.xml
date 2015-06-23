@@ -37,5 +37,6 @@
 	</extension>
 
     <extension point="org.datanucleus.store_valuegenerator">
+        <valuegenerator name="increment" class-name="org.datanucleus.store.scalaris.valuegenerator.IncrementGenerator" datastore="scalaris"/>
     </extension>
 </plugin>
