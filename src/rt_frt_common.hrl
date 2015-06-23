@@ -42,7 +42,7 @@
 
 %% Make dialyzer stop complaining about unused functions
 
-% The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
+% The following fsets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1)unctions are only used when ?RT == rt_frtchord. Dialyzer should not
 % complain when they are not called.
 -compile({nowarn_unused_function,
           [{get_num_active_learning_lookups, 1},
@@ -160,40 +160,35 @@ init_stabilize(Neighbors, RT) ->
             init(Neighbors)
     end
     .
-
-
 %% userdevguide-end rt_frtchord:init_stabilize
-
-% Get the adjacent nodes. The source node is filtered.
--spec get_node_neighbors(nodelist:neighborhood()) -> sets:set(node:node_type()).
-get_node_neighbors(Neighborhood) ->
-    Source = nodelist:node(Neighborhood),
-    % filter the source node and add other nodes to a set
-    Filter = fun(Entry, Acc) -> case Entry of
-                Source -> Acc;
-                _Else -> sets:add_element(Entry, Acc) end
-    end,
-
-    lists:foldl(Filter,
-        lists:foldl(Filter, sets:new(),
-            nodelist:preds(Neighborhood)),
-        nodelist:succs(Neighborhood))
-    .
 
 %% @doc Update sticky entries
 %% This function converts sticky nodes from the RT which aren't in the neighborhood
 %% anymore to normal nodes. Afterwards it adds new nodes from the neighborhood.
--spec update_entries(NewNeighbors :: nodelist:neighborhood(),
-                              RT :: rt()) -> rt().
-update_entries(NewNeighbors, RT) ->
-    OldStickyNodes = sets:from_list(lists:map(fun rt_entry_node/1,
-            get_sticky_entries(RT))),
-    NewStickyNodes = get_node_neighbors(NewNeighbors),
+-spec update_entries(NewNeighborhood::nodelist:neighborhood(), RT::rt()) -> rt().
+update_entries(NewNeighborhood, RT) ->
+    %% neighborhood nodes (sticky ndoes) from RT
+    OldNeighbors = sets:from_list(lists:map(fun rt_entry_node/1, get_sticky_entries(RT))),
 
-    ConvertNodes = sets:subtract(OldStickyNodes, NewStickyNodes),
+    %% neighborhood nodes (succs + preds w/o self) from new neighborhood from rm
+    NewNeighbors = sets:from_list(tl(nodelist:to_list(NewNeighborhood))),
+
+    %% former neighborhood nodes which aren't neighboorhod nodes anymore
+    ConvertNodes = sets:subtract(OldNeighbors, NewNeighbors),
     ConvertNodesIds = util:sets_map(fun node:id/1, ConvertNodes),
 
-    ToBeAddedNodes = sets:subtract(NewStickyNodes, ConvertNodes),
+    %% new neighboorhod nodes
+    ToBeAddedNodes = sets:subtract(NewNeighbors, OldNeighbors),
+
+    %% uncomment for debugging
+    %% case sets:size(ConvertNodes) > 0 orelse sets:size(ToBeAddedNodes) > 0 of
+    %%     true ->
+    %%         log:pal("~w~nOldNeighbors:~n~190.2p~nNewNeighors:~n~190.2p~n" ++
+    %%                 "ConvertNodes:~n~190.2p~nToBeAddedNodes~n~190.2p~n",
+    %%                 [self(), sets:to_list(OldNeighbors), sets:to_list(NewNeighbors),
+    %%                  sets:to_list(ConvertNodes), sets:to_list(ToBeAddedNodes)]);
+    %%     false -> ok
+    %% end,
 
     % convert former neighboring nodes to normal nodes and add sticky nodes
     FilteredRT = lists:foldl(fun sticky_entry_to_normal_node/2, RT, ConvertNodesIds),
