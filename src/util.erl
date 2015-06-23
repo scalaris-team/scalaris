@@ -88,7 +88,7 @@
 -export([lists_takewith_feeder/2]).
 -export([lists_partition3_feeder/2]).
 
--export([sets_map/2]).
+-export([sets_map/2, sets_equal/2]).
 
 -type us_timestamp() :: non_neg_integer(). % micro seconds since Epoch
 
@@ -1400,6 +1400,11 @@ sets_map(Fun, Set) ->
     lists:reverse(sets:fold(fun (El, Acc) ->
                 [Fun(El) | Acc]
         end, [], Set)).
+
+%% @doc Compare two sets for equality.
+-spec sets_equal(sets:set(), sets:set()) -> boolean().
+sets_equal(Set1, Set2) ->
+    sets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1).
 
 %% @doc Combine the last N slots from a dump into one tuple. The number of slots to
 %% combine is determined by Interval (in us): Take as many slots as needed to look
