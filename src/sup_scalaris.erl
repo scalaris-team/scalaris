@@ -227,12 +227,12 @@ childs(Options) ->
 add_additional_nodes() ->
     Size = config:read(nodes_per_vm),
     log:log(info, "Starting ~B nodes", [Size]),
-    case util:app_get_env(join_at_list, no_list) of
-        no_list ->
-            _ = api_vm:add_nodes(Size - 1);
-        List ->
-            _ = api_vm:add_nodes_at_ids(tl(List))
-    end,
+    _ = case util:app_get_env(join_at_list, no_list) of
+            no_list ->
+                api_vm:add_nodes(Size - 1);
+            List ->
+                api_vm:add_nodes_at_ids(tl(List))
+        end,
     ok.
 
 start_first_services() ->
