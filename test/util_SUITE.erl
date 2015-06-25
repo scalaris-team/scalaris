@@ -363,7 +363,7 @@ rrd_combine_timing_slots_handle_empty_rrd(_Config) ->
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
     Dump = rrd:dump(DB0),
     ?equals(Dump, []),
-    ?equals(util:rrd_combine_timing_slots(DB0, 0, 10), undefined),
+    ?equals(util:rrd_combine_timing_slots(DB0, {0,0,0}, 10), undefined),
     ok
     .
 
@@ -416,7 +416,7 @@ rrd_combine_gauge_slots_handle_empty_rrd(_Config) ->
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
     Dump = rrd:dump(DB0),
     ?equals(Dump, []),
-    ?equals(util:rrd_combine_gauge_slots(DB0, 0, 10), undefined),
+    ?equals(util:rrd_combine_gauge_slots(DB0, {0,0,0}, 10), undefined),
     ok
     .
 

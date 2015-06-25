@@ -46,6 +46,7 @@ end_per_suite(Config) ->
 
 % TODO: add tests for simple node lists (the following tests only test functions with neighborhood structures)
 
+-define(PID(Nr), comm:make_global(list_to_pid("<0.0." ++ erlang:integer_to_list(Nr) ++ ">"))).
 -define(KEY(Nr), rt_SUITE:number_to_key(Nr)).
 
 % use macro instead of function so that the output in case of errors is better:
@@ -68,10 +69,10 @@ compare_neighborhood(NeighborhoodStr, N, Node, Pred, Preds, Succ, Succs, RealPre
 %%      getters with what is expected.
 -spec test_new(any()) -> ok.
 test_new(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated its ID to 15 here
-    N33 = node:new(pid3, ?KEY(33), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated its ID to 15 here
+    N33 = node:new(?PID(3), ?KEY(33), 0),
     
     Neighb11 = nodelist:new_neighborhood(N8),
     ?compare_neighborhood(Neighb11, N8, N8, [N8], N8, [N8], false, false),
@@ -123,13 +124,13 @@ test_new(_Config) ->
 %%      getters with what is expected.
 -spec test_mk2(any()) -> ok.
 test_mk2(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated its ID to 15 here
-    N33 = node:new(pid3, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated its ID to 15 here
+    N33 = node:new(?PID(3), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb11 = nodelist:mk_neighborhood([N8], N8),
     Neighb12 = nodelist:mk_neighborhood([], N8),
@@ -211,13 +212,13 @@ test_mk2(_Config) ->
 %%      getters with what is expected.
 -spec test_mk4(any()) -> ok.
 test_mk4(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated its ID to 15 here
-    N33 = node:new(pid3, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated its ID to 15 here
+    N33 = node:new(?PID(3), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb11 = nodelist:mk_neighborhood([N8], N8, 1, 1),
     Neighb12 = nodelist:mk_neighborhood([], N8, 1, 1),
@@ -315,11 +316,11 @@ test_mk4(_Config) ->
 %% @doc Tests truncating neighborhood structures.
 -spec test_trunc(any()) -> ok.
 test_trunc(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N50 = node:new(pid5, ?KEY(50), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N50 = node:new(?PID(5), ?KEY(50), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N33, N50], N20),
     
@@ -381,15 +382,15 @@ test_trunc(_Config) ->
 %% @doc Tests for nodelist:remove/2.
 -spec test_remove2(any()) -> ok.
 test_remove2(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 3, 3),
@@ -409,13 +410,13 @@ test_remove2(_Config) ->
     ?compare_neighborhood(nodelist:remove(N50, Neighb1),
                           N33, N14, [N14, N8, N42], N42, [N42, N8, N14], true, true),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb1),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb1),
                           N33, N14, [N14, N50, N42], N42, [N42, N50, N14], true, true),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb1),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb1),
                           N33, N8, [N8, N50, N42], N42, [N42, N50, N8], true, true),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb1),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb1),
                           N33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb1),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb1),
                           N33, N14, [N14, N8, N42], N42, [N42, N8, N14], true, true),
     % same with an updated node:
     ?compare_neighborhood(nodelist:remove(N9, Neighb1),
@@ -424,8 +425,8 @@ test_remove2(_Config) ->
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb1), Neighb1),
     ?equals(nodelist:remove(N66, Neighb1), Neighb1),
-    ?equals(nodelist:remove(pid3, Neighb1), Neighb1),
-    ?equals(nodelist:remove(pid7, Neighb1), Neighb1),
+    ?equals(nodelist:remove(?PID(3), Neighb1), Neighb1),
+    ?equals(nodelist:remove(?PID(7), Neighb1), Neighb1),
 
     % Neighb2 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 3, 3),
     % remove existing nodes:
@@ -438,13 +439,13 @@ test_remove2(_Config) ->
     ?compare_neighborhood(nodelist:remove(N50, Neighb2),
                           N33, N14, [N14, N8], N42, [N42, N8], true, true),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb2),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb2),
                           N33, N14, [N14, N50], N42, [N42, N50], true, true),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb2),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb2),
                           N33, N8, [N8, N50], N42, [N42, N50, N8], true, true),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb2),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb2),
                           N33, N14, [N14, N8, N50], N50, [N50, N8], true, true),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb2),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb2),
                           N33, N14, [N14, N8], N42, [N42, N8], true, true),
     % same with an updated node:
     ?compare_neighborhood(nodelist:remove(N9, Neighb2),
@@ -453,8 +454,8 @@ test_remove2(_Config) ->
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb2), Neighb2),
     ?equals(nodelist:remove(N66, Neighb2), Neighb2),
-    ?equals(nodelist:remove(pid3, Neighb2), Neighb2),
-    ?equals(nodelist:remove(pid7, Neighb2), Neighb2),
+    ?equals(nodelist:remove(?PID(3), Neighb2), Neighb2),
+    ?equals(nodelist:remove(?PID(7), Neighb2), Neighb2),
 
     % Neighb3 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 2, 2),
     % remove existing nodes:
@@ -467,13 +468,13 @@ test_remove2(_Config) ->
     ?compare_neighborhood(nodelist:remove(N50, Neighb3),
                           N33, N14, [N14, N8], N42, [N42], true, true),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb3),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb3),
                           N33, N14, [N14], N42, [N42, N50], true, true),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb3),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb3),
                           N33, N8, [N8], N42, [N42, N50], true, true),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb3),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb3),
                           N33, N14, [N14, N8], N50, [N50], true, true),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb3),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb3),
                           N33, N14, [N14, N8], N42, [N42], true, true),
     % same with an updated node:
     ?compare_neighborhood(nodelist:remove(N9, Neighb3),
@@ -482,8 +483,8 @@ test_remove2(_Config) ->
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb3), Neighb3),
     ?equals(nodelist:remove(N66, Neighb3), Neighb3),
-    ?equals(nodelist:remove(pid3, Neighb3), Neighb3),
-    ?equals(nodelist:remove(pid7, Neighb3), Neighb3),
+    ?equals(nodelist:remove(?PID(3), Neighb3), Neighb3),
+    ?equals(nodelist:remove(?PID(7), Neighb3), Neighb3),
 
     % Neighb4 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 1, 1),
     % remove existing nodes:
@@ -496,13 +497,13 @@ test_remove2(_Config) ->
     ?compare_neighborhood(nodelist:remove(N50, Neighb4),
                           N33, N14, [N14], N42, [N42], true, true),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb4),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb4),
                           N33, N14, [N14], N42, [N42], true, true),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb4),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb4),
                           N33, N42, [N42], N42, [N42], true, true),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb4),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb4),
                           N33, N14, [N14], N14, [N14], true, true),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb4),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb4),
                           N33, N14, [N14], N42, [N42], true, true),
     % same with an updated node:
     ?compare_neighborhood(nodelist:remove(N9, Neighb4),
@@ -511,15 +512,15 @@ test_remove2(_Config) ->
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb4), Neighb4),
     ?equals(nodelist:remove(N66, Neighb4), Neighb4),
-    ?equals(nodelist:remove(pid3, Neighb4), Neighb4),
-    ?equals(nodelist:remove(pid7, Neighb4), Neighb4),
+    ?equals(nodelist:remove(?PID(3), Neighb4), Neighb4),
+    ?equals(nodelist:remove(?PID(7), Neighb4), Neighb4),
 
     % Neighb5 = nodelist:mk_neighborhood([N14], N33, 1, 1),
     % remove existing nodes:
     ?compare_neighborhood(nodelist:remove(N14, Neighb5),
                           N33, N33, [N33], N33, [N33], false, false),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb5),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb5),
                           N33, N33, [N33], N33, [N33], false, false),
     % same with an updated node:
     ?compare_neighborhood(nodelist:remove(N15, Neighb5),
@@ -528,30 +529,30 @@ test_remove2(_Config) ->
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb5), Neighb5),
     ?equals(nodelist:remove(N9, Neighb5), Neighb5),
-    ?equals(nodelist:remove(pid3, Neighb5), Neighb5),
-    ?equals(nodelist:remove(pid1, Neighb5), Neighb5),
+    ?equals(nodelist:remove(?PID(3), Neighb5), Neighb5),
+    ?equals(nodelist:remove(?PID(1), Neighb5), Neighb5),
 
     % Neighb6 = nodelist:mk_neighborhood([], N33, 1, 1),
     % remove non-existing nodes and pids:
     ?equals(nodelist:remove(N20, Neighb6), Neighb6),
     ?equals(nodelist:remove(N9, Neighb6), Neighb6),
-    ?equals(nodelist:remove(pid3, Neighb6), Neighb6),
-    ?equals(nodelist:remove(pid1, Neighb6), Neighb6),
+    ?equals(nodelist:remove(?PID(3), Neighb6), Neighb6),
+    ?equals(nodelist:remove(?PID(1), Neighb6), Neighb6),
 
     ok.
 
 %% @doc Tests for nodelist:remove/3.
 -spec test_remove3(any()) -> ok.
 test_remove3(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
 
     RemovedNodesTab = ets:new(test_remove3, [duplicate_bag, private]),
     AddNodeToTabFun = fun(Node) -> ets:insert(RemovedNodesTab, {Node}) end,
@@ -582,19 +583,19 @@ test_remove3(_Config) ->
     ?equals(_N14 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb1, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb1, AddNodeToTabFun),
                           N33, N14, [N14, N50, N42], N42, [N42, N50, N14], true, true),
     ?equals(_N15 = ets:tab2list(RemovedNodesTab), [{N8}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb1, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb1, AddNodeToTabFun),
                           N33, N8, [N8, N50, N42], N42, [N42, N50, N8], true, true),
     ?equals(_N16 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb1, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb1, AddNodeToTabFun),
                           N33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
     ?equals(_N17 = ets:tab2list(RemovedNodesTab), [{N42}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb1, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb1, AddNodeToTabFun),
                           N33, N14, [N14, N8, N42], N42, [N42, N8, N14], true, true),
     ?equals(_N18 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
@@ -611,10 +612,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N66, Neighb1, AddNodeToTabFun), Neighb1),
     ?equals(_N111 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb1, AddNodeToTabFun), Neighb1),
+    ?equals(nodelist:remove(?PID(3), Neighb1, AddNodeToTabFun), Neighb1),
     ?equals(_N112 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid7, Neighb1, AddNodeToTabFun), Neighb1),
+    ?equals(nodelist:remove(?PID(7), Neighb1, AddNodeToTabFun), Neighb1),
     ?equals(_N113 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -637,19 +638,19 @@ test_remove3(_Config) ->
     ?equals(_N24 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb2, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb2, AddNodeToTabFun),
                           N33, N14, [N14, N50], N42, [N42, N50], true, true),
     ?equals(_N25 = ets:tab2list(RemovedNodesTab), [{N8}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb2, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb2, AddNodeToTabFun),
                           N33, N8, [N8, N50], N42, [N42, N50, N8], true, true),
     ?equals(_N26 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb2, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb2, AddNodeToTabFun),
                           N33, N14, [N14, N8, N50], N50, [N50, N8], true, true),
     ?equals(_N27 = ets:tab2list(RemovedNodesTab), [{N42}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb2, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb2, AddNodeToTabFun),
                           N33, N14, [N14, N8], N42, [N42, N8], true, true),
     ?equals(_N28 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
@@ -666,10 +667,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N66, Neighb2, AddNodeToTabFun), Neighb2),
     ?equals(_N211 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb2, AddNodeToTabFun), Neighb2),
+    ?equals(nodelist:remove(?PID(3), Neighb2, AddNodeToTabFun), Neighb2),
     ?equals(_N212 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid7, Neighb2, AddNodeToTabFun), Neighb2),
+    ?equals(nodelist:remove(?PID(7), Neighb2, AddNodeToTabFun), Neighb2),
     ?equals(_N213 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -692,19 +693,19 @@ test_remove3(_Config) ->
     ?equals(_N34 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb3, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb3, AddNodeToTabFun),
                           N33, N14, [N14], N42, [N42, N50], true, true),
     ?equals(_N35 = ets:tab2list(RemovedNodesTab), [{N8}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb3, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb3, AddNodeToTabFun),
                           N33, N8, [N8], N42, [N42, N50], true, true),
     ?equals(_N36 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb3, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb3, AddNodeToTabFun),
                           N33, N14, [N14, N8], N50, [N50], true, true),
     ?equals(_N37 = ets:tab2list(RemovedNodesTab), [{N42}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb3, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb3, AddNodeToTabFun),
                           N33, N14, [N14, N8], N42, [N42], true, true),
     ?equals(_N38 = ets:tab2list(RemovedNodesTab), [{N50}]),
     ets:delete_all_objects(RemovedNodesTab),
@@ -721,10 +722,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N66, Neighb3, AddNodeToTabFun), Neighb3),
     ?equals(_N311 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb3, AddNodeToTabFun), Neighb3),
+    ?equals(nodelist:remove(?PID(3), Neighb3, AddNodeToTabFun), Neighb3),
     ?equals(_N312 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid7, Neighb3, AddNodeToTabFun), Neighb3),
+    ?equals(nodelist:remove(?PID(7), Neighb3, AddNodeToTabFun), Neighb3),
     ?equals(_N313 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -747,19 +748,19 @@ test_remove3(_Config) ->
     ?equals(_N44 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid1, Neighb4, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(1), Neighb4, AddNodeToTabFun),
                           N33, N14, [N14], N42, [N42], true, true),
     ?equals(_N45 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb4, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb4, AddNodeToTabFun),
                           N33, N42, [N42], N42, [N42], true, true),
     ?equals(_N46 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid5, Neighb4, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(5), Neighb4, AddNodeToTabFun),
                           N33, N14, [N14], N14, [N14], true, true),
     ?equals(_N47 = ets:tab2list(RemovedNodesTab), [{N42}]),
     ets:delete_all_objects(RemovedNodesTab),
-    ?compare_neighborhood(nodelist:remove(pid6, Neighb4, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(6), Neighb4, AddNodeToTabFun),
                           N33, N14, [N14], N42, [N42], true, true),
     ?equals(_N48 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
@@ -776,10 +777,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N66, Neighb4, AddNodeToTabFun), Neighb4),
     ?equals(_N411 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb4, AddNodeToTabFun), Neighb4),
+    ?equals(nodelist:remove(?PID(3), Neighb4, AddNodeToTabFun), Neighb4),
     ?equals(_N412 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid7, Neighb4, AddNodeToTabFun), Neighb4),
+    ?equals(nodelist:remove(?PID(7), Neighb4, AddNodeToTabFun), Neighb4),
     ?equals(_N413 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -790,7 +791,7 @@ test_remove3(_Config) ->
     ?equals(_N51 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
     % same with the node's pids:
-    ?compare_neighborhood(nodelist:remove(pid2, Neighb5, AddNodeToTabFun),
+    ?compare_neighborhood(nodelist:remove(?PID(2), Neighb5, AddNodeToTabFun),
                           N33, N33, [N33], N33, [N33], false, false),
     ?equals(_N52 = ets:tab2list(RemovedNodesTab), [{N14}]),
     ets:delete_all_objects(RemovedNodesTab),
@@ -807,10 +808,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N9, Neighb5, AddNodeToTabFun), Neighb5),
     ?equals(_N511 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb5, AddNodeToTabFun), Neighb5),
+    ?equals(nodelist:remove(?PID(3), Neighb5, AddNodeToTabFun), Neighb5),
     ?equals(_N512 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid1, Neighb5, AddNodeToTabFun), Neighb5),
+    ?equals(nodelist:remove(?PID(1), Neighb5, AddNodeToTabFun), Neighb5),
     ?equals(_N513 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -822,10 +823,10 @@ test_remove3(_Config) ->
     ?equals(nodelist:remove(N9, Neighb6, AddNodeToTabFun), Neighb6),
     ?equals(_N611 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid3, Neighb6, AddNodeToTabFun), Neighb6),
+    ?equals(nodelist:remove(?PID(3), Neighb6, AddNodeToTabFun), Neighb6),
     ?equals(_N612 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
-    ?equals(nodelist:remove(pid1, Neighb6, AddNodeToTabFun), Neighb6),
+    ?equals(nodelist:remove(?PID(1), Neighb6, AddNodeToTabFun), Neighb6),
     ?equals(_N613 = ets:tab2list(RemovedNodesTab), []),
     ets:delete_all_objects(RemovedNodesTab),
 
@@ -835,14 +836,14 @@ test_remove3(_Config) ->
 %% @doc Tests for nodelist:filter/2.
 -spec test_filter2(any()) -> ok.
 test_filter2(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 3, 3),
@@ -930,14 +931,14 @@ test_filter2(_Config) ->
 %% @doc Tests for nodelist:filter/3.
 -spec test_filter3(any()) -> ok.
 test_filter3(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
 
     RemovedNodesTab = ets:new(test_filter3, [duplicate_bag, private]),
     AddNodeToTabFun = fun(Node) -> ets:insert(RemovedNodesTab, {Node}) end,
@@ -1092,13 +1093,13 @@ test_filter3(_Config) ->
 %% @doc Tests for nodelist:filter_min_length/4.
 -spec test_filter_min_length4(any()) -> ok.
 test_filter_min_length4(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N42, N50], N33, 3, 3),
@@ -1224,16 +1225,16 @@ test_filter_min_length4(_Config) ->
 -spec test_merge(any()) -> ok.
 test_merge(_Config) ->
     % use the same tests as in test_add_nodes/1 and let mk_beighborhood create the appropriate neighborhood structures:
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N21 = node:new(pid3, ?KEY(21), 1), % N20 updated
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N21 = node:new(?PID(3), ?KEY(21), 1), % N20 updated
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N50], N33, 3, 3),
@@ -1581,15 +1582,15 @@ test_merge(_Config) ->
 %% @doc Tests adding single nodes to a neighborhood structure.
 -spec test_add_node(any()) -> ok.
 test_add_node(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N50], N33, 3, 3),
@@ -1812,16 +1813,16 @@ test_add_node(_Config) ->
 %% @doc Tests adding nodes to a neighborhood structure.
 -spec test_add_nodes(any()) -> ok.
 test_add_nodes(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N21 = node:new(pid3, ?KEY(21), 1), % N20 updated
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N21 = node:new(?PID(3), ?KEY(21), 1), % N20 updated
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N50], N33, 3, 3),
@@ -2361,15 +2362,15 @@ test_add_nodes(_Config) ->
 %% @doc Tests adding nodes to a neighborhood structure.
 -spec test_update_ids(any()) -> ok.
 test_update_ids(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), % N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N15 = node:new(pid2, ?KEY(15), 1), % N14 updated
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N42 = node:new(pid5, ?KEY(42), 0),
-    N50 = node:new(pid6, ?KEY(50), 0),
-    N66 = node:new(pid7, ?KEY(66), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), % N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N15 = node:new(?PID(2), ?KEY(15), 1), % N14 updated
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N42 = node:new(?PID(5), ?KEY(42), 0),
+    N50 = node:new(?PID(6), ?KEY(50), 0),
+    N66 = node:new(?PID(7), ?KEY(66), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
     Neighb5 = nodelist:mk_neighborhood([N14], N33, 1, 1),
@@ -2456,11 +2457,11 @@ test_update_ids(_Config) ->
 %% @doc Tests converting neighborhood structures to node lists.
 -spec test_to_list(any()) -> ok.
 test_to_list(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N50 = node:new(pid5, ?KEY(50), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N50 = node:new(?PID(5), ?KEY(50), 0),
     
     Neighb1 = nodelist:mk_neighborhood([N8, N14, N33, N50], N20),
     Neighb2 = nodelist:mk_neighborhood([N8, N14, N33, N50], N20, 3, 3),
@@ -2493,13 +2494,13 @@ test_to_list(_Config) ->
 %% @doc Tests updating node IDs in two node lists.
 -spec test_lupdate_ids(any()) -> ok.
 test_lupdate_ids(_Config) ->
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), %N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N21 = node:new(pid3, ?KEY(21), 1), %N20 updated
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N50 = node:new(pid5, ?KEY(50), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), %N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N21 = node:new(?PID(3), ?KEY(21), 1), %N20 updated
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N50 = node:new(?PID(5), ?KEY(50), 0),
 
     ?equals(nodelist:lupdate_ids([N8, N14, N20, N33, N50], []), {[N8, N14, N20, N33, N50], []}),
     ?equals(nodelist:lupdate_ids([N8, N9, N14, N20, N33, N50], []), {[N9, N9, N14, N20, N33, N50], []}),
@@ -2534,13 +2535,13 @@ test_lupdate_ids(_Config) ->
 -spec test_lremove_outdated(any()) -> ok.
 test_lremove_outdated(_Config) ->
     Null = node:null(),
-    N8 = node:new(pid1,   ?KEY(8), 0),
-    N9 = node:new(pid1,   ?KEY(9), 1), %N8 updated
-    N14 = node:new(pid2, ?KEY(14), 0),
-    N20 = node:new(pid3, ?KEY(20), 0),
-    N21 = node:new(pid3, ?KEY(21), 1), %N20 updated
-    N33 = node:new(pid4, ?KEY(33), 0),
-    N50 = node:new(pid5, ?KEY(50), 0),
+    N8 = node:new(?PID(1),   ?KEY(8), 0),
+    N9 = node:new(?PID(1),   ?KEY(9), 1), %N8 updated
+    N14 = node:new(?PID(2), ?KEY(14), 0),
+    N20 = node:new(?PID(3), ?KEY(20), 0),
+    N21 = node:new(?PID(3), ?KEY(21), 1), %N20 updated
+    N33 = node:new(?PID(4), ?KEY(33), 0),
+    N50 = node:new(?PID(5), ?KEY(50), 0),
 
     ?equals(nodelist:lremove_outdated([]), []),
     ?equals(nodelist:lremove_outdated([Null]), []),

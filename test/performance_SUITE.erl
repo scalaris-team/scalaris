@@ -85,7 +85,7 @@ end_per_suite(_Config) ->
 init_per_group(GroupName, Config) ->
     case GroupName of
         with_config ->
-            unittest_helper:start_minimal_procs(Config, [], false);
+            unittest_helper:start_minimal_procs(Config, [], true);
         _ -> Config
     end.
 
@@ -418,26 +418,28 @@ md5(_Config) ->
     iter(count(), fun () -> erlang:md5("42") end, "erlang:md5"),
     ok.
 
+-define(PID(Nr), comm:make_global(list_to_pid("<0.0." ++ erlang:integer_to_list(Nr) ++ ">"))).
+
 next_hop_setup() ->
     pid_groups:join_as("performance_SUITE", dht_node),
-    Pred = node:new(pred, 1, 0),
-    Me = node:new(me, 2, 0),
-    Succ = node:new(succ, 3, 0),
+    Pred = node:new(?PID(1021), 1, 0),
+    Me = node:new(?PID(2), 2, 0),
+    Succ = node:new(?PID(3), 3, 0),
     RT = gb_trees:enter(1, Pred,
-          gb_trees:enter(4, node:new(succ2, 4, 0),
-           gb_trees:enter(5, node:new(succ3, 5, 0),
-            gb_trees:enter(6, node:new(succ4, 6, 0),
-             gb_trees:enter(100, node:new(rt5, 100, 0),
-              gb_trees:enter(101, node:new(rt6, 101, 0),
-               gb_trees:enter(102, node:new(rt7, 102, 0),
-                gb_trees:enter(103, node:new(rt8, 103, 0),
+          gb_trees:enter(4, node:new(?PID(4), 4, 0),
+           gb_trees:enter(5, node:new(?PID(5), 5, 0),
+            gb_trees:enter(6, node:new(?PID(6), 6, 0),
+             gb_trees:enter(100, node:new(?PID(100), 100, 0),
+              gb_trees:enter(101, node:new(?PID(101), 101, 0),
+               gb_trees:enter(102, node:new(?PID(102), 102, 0),
+                gb_trees:enter(103, node:new(?PID(103), 103, 0),
                  rt_chord:empty_ext(Succ))))))))),
     RMState = rm_loop:unittest_create_state(
                nodelist:add_nodes(
                 nodelist:new_neighborhood(Pred, Me, Succ),
-                 [node:new(list_to_atom("succ" ++ integer_to_list(Id)), Id + 2, 0)
+                 [node:new(?PID(Id + 2), Id + 2, 0)
                   || Id <- lists:seq(2, config:read(succ_list_length))] ++
-                     [node:new(list_to_atom("pred" ++ integer_to_list(Id)), 1022 - Id, 0)
+                     [node:new(?PID(1022 - Id), 1022 - Id, 0)
                       || Id <- lists:seq(2, config:read(pred_list_length))],
                  config:read(succ_list_length), config:read(pred_list_length)),
                 false),

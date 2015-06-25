@@ -35,8 +35,7 @@ groups() ->
                                        get_load_and_middle,
                                        split_data,
                                        update_entries,
-                                       changed_keys,
-                                       various_tests
+                                       changed_keys
                                       ]},
      {tester_tests, [sequence], [
                                  tester_new, tester_set_entry, tester_update_entry,
@@ -278,14 +277,6 @@ changed_keys(_Config) ->
     ?equals(db_dht:get_changes(DB3), {[], []}),
 
     db_dht:close(DB3).
-
-%% @doc Tests that previously failed with tester-generated values or otherwise
-%%      manually generated test cases.
-various_tests(_Config) ->
-    prop_changed_keys_split_data2([create_db_entry(?KEY("3"), 1, false, 0, -1),
-                                   create_db_entry(?KEY("0"), 2, false, 0, -1)],
-                                 intervals:new('[', ?KEY("3"), minus_infinity,']'),
-                                 intervals:new(plus_infinity)).
 
 % tester-based functions below:
 
@@ -1346,11 +1337,13 @@ tester_get_chunk4(_Config) ->
             prop_get_chunk4([30, 20, 8, 4], 9, intervals:union(intervals:new('[',0,10,']'), intervals:new('[',28,32,')')), all),
             prop_get_chunk4([321412035892863292970556376746395450950,178033137068077382596514331220271255735,36274679037320551674149151592760931654,24467032062604602002936599440583551943],
                             39662566533623950601697671725795532001,
-                            [{'[',0,117488216920678280505356111701746995698,']'},{161901968021578670353994653229245016552},{'[',225156471921460939006161924022031177737,340282366920938463463374607431768211456,')'}],
+                            intervals:union([intervals:new('[', 0, 117488216920678280505356111701746995698, ']'),
+                                             intervals:new(161901968021578670353994653229245016552),
+                                             intervals:new('[', 225156471921460939006161924022031177737, 340282366920938463463374607431768211456, ')')]),
                             all),
             prop_get_chunk4([12, 13, 14, 15, 16],0,intervals:new('[', 10, 0, ']'),2),
             prop_get_chunk4([12, 8, 6, 4], 4, intervals:new('[', 10, 0, ']'), 1),
-            prop_get_chunk4([3, 4], 10, [{'[',0,9,']'}], 1),
+            prop_get_chunk4([3, 4], 10, intervals:new('[', 0, 9, ']'), 1),
             prop_get_chunk4([2, 6, 7], 5, intervals:new(4), 3),
             prop_get_chunk4([2, 6, 7], 5, intervals:new('[',5,9,']'), 3);
         _ -> ok
@@ -1599,7 +1592,7 @@ check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
     true.
 
 -spec check_key_in_deleted_internal(
-        DeletedKeys::intervals:interval(), ChangesInterval::intervals:interval(),
+        DeletedKeys::[?RT:key()], ChangesInterval::intervals:interval(),
         Key::?RT:key(), OldExists::boolean(), Note::string()) -> true.
 check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note) ->
     case intervals:in(Key, ChangesInterval) andalso OldExists of

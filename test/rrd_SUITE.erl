@@ -201,7 +201,7 @@ round_us_time(Time, SlotLength, StartTime) ->
 %% @doc Merges consecutive data for a 'counter' rrd into a single date item.
 %%      PRE: Data_us2 must be sorted (by its time components) using a stable
 %%           sort.
--spec merge_conseq_data(Data_us2::rrd_data_us(), gauge | counter, rrd_data_us()) -> rrd_data_us().
+-spec merge_conseq_data(Data_us2::rrd_data_us(), gauge | counter, [] | rrd_data_us()) -> rrd_data_us().
 merge_conseq_data([], _, Result) ->
     lists:reverse(Result);
 merge_conseq_data([X | TD], Type, []) ->

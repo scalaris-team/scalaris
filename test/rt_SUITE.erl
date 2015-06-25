@@ -71,7 +71,7 @@ tester_hash_key(_Config) ->
 number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
 next_hop(_Config) ->
-    MyNode = node:new(self(), number_to_key(0), 0),
+    MyNode = node:new(comm:make_global(self()), number_to_key(0), 0),
     pid_groups:join_as("rt_SUITE", dht_node),
     Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
     Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
@@ -97,15 +97,15 @@ next_hop(_Config) ->
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 65, lists:nth(6, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1000, lists:nth(6, DHTNodes)]),
     
-    [exit(Node, kill) || Node <- DHTNodes],
+    [exit(comm:make_local(GPid), kill) || GPid <- DHTNodes],
 %%     exit(node:pidX(MyNode), kill),
-    exit(node:pidX(Succ), kill),
-    exit(node:pidX(Pred), kill),
+    exit(comm:make_local(node:pidX(Succ)), kill),
+    exit(comm:make_local(node:pidX(Pred)), kill),
     db_dht:close(DB),
     ok.
 
 next_hop2(_Config) ->
-    MyNode = node:new(self(), number_to_key(0), 0),
+    MyNode = node:new(comm:make_global(self()), number_to_key(0), 0),
     pid_groups:join_as("rt_SUITE", dht_node),
     Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
     SuccSucc = node:new(fake_dht_node(".succ.succ"), number_to_key(2), 0),
@@ -133,11 +133,11 @@ next_hop2(_Config) ->
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 65, lists:nth(6, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1000, lists:nth(6, DHTNodes)]),
 
-    [exit(Node, kill) || Node <- DHTNodes],
+    [exit(comm:make_local(GPid), kill) || GPid <- DHTNodes],
 %%     exit(node:pidX(MyNode), kill),
-    exit(node:pidX(Succ), kill),
-    exit(node:pidX(SuccSucc), kill),
-    exit(node:pidX(Pred), kill),
+    exit(comm:make_local(node:pidX(Succ)), kill),
+    exit(comm:make_local(node:pidX(SuccSucc)), kill),
+    exit(comm:make_local(node:pidX(Pred)), kill),
     db_dht:close(DB),
     ok.
 
@@ -203,9 +203,11 @@ additional_tests(Config) ->
 
 %% helpers
 
+-spec fake_dht_node(Suffix::string()) -> comm:mypid().
 fake_dht_node(Suffix) ->
-    element(1, unittest_helper:start_subprocess(
-              fun() -> pid_groups:join_as("rt_SUITE" ++ Suffix, dht_node) end)).
+    comm:make_global(
+      element(1, unittest_helper:start_subprocess(
+                fun() -> pid_groups:join_as("rt_SUITE" ++ Suffix, dht_node) end))).
 
 -spec call_helper_fun(Fun::atom(), Args::list()) -> term().
 call_helper_fun(Fun, Args) ->

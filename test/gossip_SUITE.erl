@@ -227,9 +227,9 @@ init_histo(DHTNodeState, NoOfBuckets) ->
 -spec get_load_for_interval(BucketInterval::intervals:interval(),
     MyRange::intervals:interval(), DB::db_dht:db()) -> {non_neg_integer(), 1}.
 get_load_for_interval(BucketInterval, MyRange, DB) ->
-    case intervals:intersection(BucketInterval, MyRange) of
-        [] -> unknown;
-        _NonEmptyIntersection ->
+    case intervals:is_empty(intervals:intersection(BucketInterval, MyRange)) of
+        true -> unknown;
+        false ->
             Load = db_dht:get_load(DB, BucketInterval),
             {Load, 1}
     end.
@@ -241,18 +241,19 @@ get_load_for_interval(BucketInterval, MyRange, DB) ->
 compare(LoadInfo1, LoadInfo2) when is_tuple(LoadInfo1) andalso is_tuple(LoadInfo2) ->
     %% log:log("LoadInfo1: ~w~n", [LoadInfo1]),
     %% log:log("LoadInfo2: ~w~n", [LoadInfo2]),
-    Fun = fun (Key) ->
-            Value1 = gossip_load:load_info_get(Key, LoadInfo1),
-            Value2 = gossip_load:load_info_get(Key, LoadInfo2),
-            calc_diff(Value1, Value2) < 5.0
+    Fun = fun(Key, {Acc, LI1, LI2}) ->
+            Value1 = gossip_load:load_info_get(Key, LI1),
+            Value2 = gossip_load:load_info_get(Key, LI2),
+            {Acc andalso calc_diff(Value1, Value2) < 5.0, LI1, LI2}
     end,
     % merged counter is excluded from comparison
-    lists:all(Fun, [avgLoad, stddev, size_ldr, size_kr, minLoad, maxLoad]);
+    element(1, lists:foldl(Fun, {true, LoadInfo1, LoadInfo2},
+                           [avgLoad, stddev, size_ldr, size_kr, minLoad, maxLoad]));
 
 compare(Histo1, Histo2) when is_list(Histo1) andalso is_list(Histo2) ->
     Fun = fun(Val1, Val2) -> calc_diff(Val1, Val2) < 5.0 end,
     ComparisonResult = lists:zipwith(Fun, Histo1, Histo2),
-    lists:foldl(fun (Bool, Acc) -> Bool andalso Acc end, true, ComparisonResult).
+    lists:all(fun(X) -> X end, ComparisonResult).
 
 
 %% @doc Calculates the difference in percent from one value to another value.
