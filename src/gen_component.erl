@@ -878,11 +878,11 @@ on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) -
     process_flag(priority, normal),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', remove_monitor, Pid, Source} = Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', remove_monitor, Pid, Source} = _Msg, UState, GCState) ->
     MonRef = erlang:get({'$gen_component_monitor_ref', Pid}),
     erlang:demonitor(MonRef),
     comm:send_local(Source, {'$gen_component', monitor, MonRef}),
-    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
 on_gc_msg({'$gen_component', get_state, Pid, Cookie} = _Msg, UState, GCState) ->
     comm:send_local(
