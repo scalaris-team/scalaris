@@ -151,7 +151,7 @@ prop_fpr(ItemCount, ItemType) ->
     ct:pal("ItemCount=~p ; ItemType=~p ; Tests=~p ; Functions=~p ; CompressionRate=~.2f~n"
                "DestFpr, Measured, Diff in %, Status~n~p",
                [ItemCount, ItemType, ?Fpr_Test_NumTests, HFCount,
-                ?BLOOM:calc_least_size(ItemCount, DestFpr) / ItemCount, FPs2]),
+                ?BLOOM:calc_least_size_opt(ItemCount, DestFpr) / ItemCount, FPs2]),
     true.
 
 measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->

@@ -32,7 +32,7 @@
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/2, calc_HF_numEx/2,
-         calc_least_size/3,
+         calc_least_size_opt/2, calc_least_size/3,
          calc_FPR/3]).
 
 % for tests:
