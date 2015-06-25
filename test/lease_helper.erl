@@ -159,16 +159,18 @@ get_leases(Pid) ->
 check_leases_per_node() ->
     lists:all(fun (B) -> B end, [ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
 
+-spec is_disjoint([intervals:interval()]) -> boolean().
 is_disjoint([]) ->
     true;
 is_disjoint([H | T]) ->
     is_disjoint(H, T) andalso
         is_disjoint(T).
 
+-spec is_disjoint(intervals:interval(), [intervals:interval()]) -> boolean().
 is_disjoint(_I, []) ->
     true;
-is_disjoint(I, [H|T]) ->
-    intervals:is_empty(intervals:intersection([I],[H]))
+is_disjoint(I, [H | T]) ->
+    intervals:is_empty(intervals:intersection(I, H))
         andalso is_disjoint(I, T).
 
 
@@ -192,9 +194,8 @@ lease_checker(TargetSize) ->
             LeaseLists = get_all_leases(),
             ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
             PassiveLeases = lists:flatten([lease_list:get_passive_leases(LL) || LL <- LeaseLists]),
-            ActiveIntervals =   lists:flatten(
-                                  [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty]),
-            NormalizedActiveIntervals = intervals:tester_create_interval(ActiveIntervals),
+            ActiveIntervals = [l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty],
+            NormalizedActiveIntervals = intervals:union(ActiveIntervals),
             %log:log("Lease-Checker: ~w ~w ~w", [ActiveLeases, ActiveIntervals, PassiveLeases]),
             %ct:pal("ActiveIntervals: ~p", [ActiveIntervals]),
             %ct:pal("PassiveLeases: ~p", [PassiveLeases]),
