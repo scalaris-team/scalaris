@@ -30,26 +30,10 @@
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
 -define(assert(Boolean),
-        % wrap in function so that the internal variables are out of the calling function's scope
-        fun() ->
-                case Boolean of
-                    true  -> true;
-                    UnittestAny ->
-                        unittest_helper:macro_equals_failed(
-                          UnittestAny, true, "=:=", ??Boolean, "true", null)
-                end
-        end()).
+        unittest_helper:macro_equals(Boolean, true, ??Boolean, "true", null)).
 
 -define(assert_w_note(Boolean, Note),
-        % wrap in function so that the internal variables are out of the calling function's scope
-        fun() ->
-                case Boolean of
-                    true  -> true;
-                    UnittestAny ->
-                        unittest_helper:macro_equals_failed(
-                          UnittestAny, true, "=:=", ??Boolean, "true", Note)
-                end
-        end()).
+        unittest_helper:macro_equals(Boolean, true, ??Boolean, "true", Note)).
 
 -define(equals(Actual, Expected),
         unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, null)).
