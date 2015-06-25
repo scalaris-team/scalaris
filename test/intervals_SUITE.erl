@@ -26,6 +26,8 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+-dialyzer([no_opaque, no_return]).
+
 groups() ->
     [{hand_written_tests, [sequence], [
                                        new, is_empty, intersection, tc1, 

@@ -35,6 +35,8 @@
 -export([get_renewal_counter/0, get_lease_list/0,
          set_message_filter/2, reset_message_filter/0]).
 
+-dialyzer({no_opaque, init/1}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

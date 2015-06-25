@@ -109,6 +109,8 @@
 
 -type send_local_options() :: [{?quiet}].
 
+-dialyzer({no_contracts, [unpack_cookie/2, get_plain_pid/1]}).
+
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
 send(Pid, Msg) -> send(Pid, Msg, []).

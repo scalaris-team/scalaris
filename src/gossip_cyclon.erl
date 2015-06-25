@@ -83,6 +83,8 @@
 -type state() :: {Nodes::cyclon_cache:cache(), %% the cache of random nodes
                   MyNode::node:node_type() | null}. %% the scalaris node of this process
 
+-dialyzer({no_return, print_cache_dot/2}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

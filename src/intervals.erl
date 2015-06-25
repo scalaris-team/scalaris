@@ -96,6 +96,8 @@
 % implementation. Therefore it is not possible e.g. to use intervals
 % over integer ranges and strings at the same time!
 
+-dialyzer({no_contracts, split2_feeder/7}).
+
 %% @doc Creates an empty interval.
 -spec empty() -> interval().
 empty() -> [].

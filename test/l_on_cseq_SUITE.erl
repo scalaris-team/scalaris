@@ -26,6 +26,8 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
+-dialyzer([no_opaque, no_return]).
+
 groups() ->
     [{tester_tests, [sequence], [
                               tester_type_check_l_on_cseq

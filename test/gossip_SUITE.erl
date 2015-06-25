@@ -26,6 +26,8 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+-dialyzer({no_contracts, test_request_histogram1/1}).
+
 -define(NO_OF_NODES, 5).
 
 all() ->
