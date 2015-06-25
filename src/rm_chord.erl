@@ -68,7 +68,7 @@ unittest_create_state(Neighbors) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
-        -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
+        -> {ChangeReason::{unknown} | {node_discovery}, state()} | unknown_event.
 handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),

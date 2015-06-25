@@ -80,7 +80,7 @@ unittest_create_state(Neighbors) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
-        -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
+        -> {ChangeReason::{unknown} | {node_discovery}, state()} | unknown_event.
 % got empty cyclon cache
 handle_custom_message({rm, once, {cy_cache, [] = NewCache}}, State) ->
     % loop with msg_delay until a non-empty cache is received
