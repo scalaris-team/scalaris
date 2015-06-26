@@ -300,21 +300,21 @@ handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
 %% msg from admin:print_ages()
 %% request needs to be sent to the gossip module in the following form:
 %% {cb_msg, instance(), {get_ages, Pid}}
-handle_msg({get_ages, Pid}, {Cache, Node}) ->
+handle_msg({get_ages, Pid}, {Cache, _Node} = State) ->
     comm:send_local(Pid, {cy_ages, cyclon_cache:get_ages(Cache)}),
-    {ok, {Cache, Node}};
+    {ok, State};
 
 %% msg from get_subset_random() (api)
 %% also directly requested from api_vm:get_other_vms() (change?)
-handle_msg({get_subset_rand, N, Pid}, {Cache, Node}) ->
+handle_msg({get_subset_rand, N, Pid}, {Cache, _Node} = State) ->
     comm:send_local(Pid, {cy_cache, cyclon_cache:get_random_nodes(N, Cache)}),
-    {ok, {Cache, Node}};
+    {ok, State};
 
 %% Response to a get_node_details message from self (via request_node_details()).
 %% The node details are used to possibly update Me and the succ and pred are
 %% possibly used to populate the cache.
 %% Request_node_details() is called in check_state() (i.e. in on_active({cy_shuffle})).
-handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
+handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node} = State) ->
     case cyclon_cache:size(OldCache) =< 2 of
         true  ->
             Pred = node_details:get(NodeDetails, pred),
@@ -364,7 +364,7 @@ handle_msg({add_nodes_to_cache, Nodes}, {OldCache, Node}) ->
 %% This happens (i.a.?) when only one node is present. In this case the
 %% get_node_details and the get_dht_nodes request are repeated every cycle
 %% (TODO is this the intended behaviour?)
-handle_msg({get_dht_nodes_response, Nodes}, {Cache, _Node}=State) ->
+handle_msg({get_dht_nodes_response, Nodes}, {Cache, _Node} = State) ->
     Size = cyclon_cache:size(Cache),
     case Nodes of
         [] ->
