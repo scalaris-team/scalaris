@@ -90,10 +90,10 @@ prop_sum_test(N0, P1, P2) ->
 
 tester_sum_test(_) ->
     prop_sum_test(20, 816034, 257824),
-    tester:register_value_creator({typedef, random_bias, generator},
+    tester:register_value_creator({typedef, random_bias, generator, []},
                                   random_bias, tester_create_generator, 3),
     tester:test(?MODULE, prop_sum_test, 3, 100, [{threads, 4}]),
-    tester:unregister_value_creator({typedef, random_bias, generator}).
+    tester:unregister_value_creator({typedef, random_bias, generator, []}).
 
 -spec prop_value_count(1..100000) -> true.
 prop_value_count(Count) ->

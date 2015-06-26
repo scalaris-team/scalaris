@@ -104,12 +104,13 @@ is_empty(_Config) ->
 intersection(_Config) ->
     NotEmpty = intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'),
     Empty = intervals:empty(),
+    All = intervals:all(),
     ?assert(intervals:is_empty(intervals:intersection(NotEmpty, Empty))),
     ?assert(intervals:is_empty(intervals:intersection(Empty, NotEmpty))),
     ?assert(intervals:is_empty(intervals:intersection(NotEmpty, Empty))),
     ?assert(not intervals:is_empty(intervals:intersection(NotEmpty, NotEmpty))),
-    ?assert(intervals:intersection(NotEmpty, NotEmpty) =:= NotEmpty),
-    ?assert(intervals:intersection(all, all) =:= all),
+    ?equals(intervals:intersection(NotEmpty, NotEmpty), NotEmpty),
+    ?equals(intervals:intersection(All, All), All),
     ok.
 
 tc1(_Config) ->
@@ -587,8 +588,8 @@ tester_is_left_right_of(_Config) ->
 
 is_left_right_of(_Config) ->
     MiddleKey = ?RT:hash_key("17"),
-    X = [{'[', MiddleKey, ?PLUS_INFINITY, ')'}],
-    Y = [{'[', ?MINUS_INFINITY, MiddleKey, ')'}],
+    X = intervals:new('[', MiddleKey, ?PLUS_INFINITY, ')'),
+    Y = intervals:new('[', ?MINUS_INFINITY, MiddleKey, ')'),
     ?equals(intervals:is_adjacent(X, Y), true), % @17
     ?equals(intervals:is_left_of(X, Y), true),
     ?equals(intervals:is_left_of(Y, X), true),

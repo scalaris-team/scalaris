@@ -149,5 +149,5 @@ tester_create_generator(N, P1, P2) when P2 > P1 ->
 tester_create_generator(N, P1, P2) when P2 < P1 ->
     tester_create_generator(N, P2, P1);
 tester_create_generator(N, P, P) ->
-    tester_create_generator(N, 9999999999, 10000000000).
+    tester_create_generator(N, 999999, 1000000).
 

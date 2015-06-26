@@ -433,7 +433,7 @@ next_hop_setup() ->
               gb_trees:enter(101, node:new(?PID(101), 101, 0),
                gb_trees:enter(102, node:new(?PID(102), 102, 0),
                 gb_trees:enter(103, node:new(?PID(103), 103, 0),
-                 rt_chord:empty_ext(Succ))))))))),
+                 rt_chord:empty_ext(nodelist:new_neighborhood(Me, Succ)))))))))),
     RMState = rm_loop:unittest_create_state(
                nodelist:add_nodes(
                 nodelist:new_neighborhood(Pred, Me, Succ),

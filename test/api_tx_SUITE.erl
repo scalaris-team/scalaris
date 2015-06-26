@@ -300,8 +300,7 @@ tester_encode_decode(_Config) ->
 prop_read_not_existing(Key) ->
     case api_tx:read(Key) of
         {fail, not_found} -> true;
-        {ok, _Value} -> true; % may happen as we do not clear the ring after every op
-        _ -> false
+        {ok, _Value} -> true % may happen as we do not clear the ring after every op
     end.
 
 tester_read_not_existing(_Config) ->
@@ -683,7 +682,7 @@ same_result_if_not_random(Req, [ORes], Res, ExpRes, Note) ->
     end.
 
 -spec check_op_on_tlog(tx_tlog:tlog(), api_tx:request_on_key(), tx_tlog:tlog(),
-                       [api_tx:result(),...], none | client_value) -> true | no_return().
+                       [api_tx:result(),...], none | client_value()) -> true | no_return().
 check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
     ReqKey = element(2, Req),
     case tx_tlog:find_entry_by_key(TLog, ReqKey) of

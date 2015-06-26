@@ -134,7 +134,7 @@ read(Config) ->
                                                 {start_type, recover}]}]),
   util:wait_for(fun admin:check_leases/0),
   % ring restored -> checking KV data integrity
-  [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
+  _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

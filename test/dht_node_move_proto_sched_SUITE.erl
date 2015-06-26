@@ -53,7 +53,7 @@ additional_ring_config() ->
      {tman_cyclon_interval, 100} % s
     ].
 
--spec proto_sched_fun(start | stop) -> ok.
+-spec proto_sched_fun(start | stop | fun(() -> ok)) -> ok.
 proto_sched_fun(start) ->
     %% ct:pal("Starting proto scheduler"),
     proto_sched:thread_num(1),

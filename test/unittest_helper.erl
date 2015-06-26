@@ -157,7 +157,7 @@ make_ring_with_ids(Ids, Options) when is_list(Ids) ->
   test_server:timetrap_cancel(TimeTrap),
   Pid.
 
--spec make_ring_recover([Options::kv_opts()]) -> pid().
+-spec make_ring_recover(Options::kv_opts()) -> pid().
 make_ring_recover(Options) ->
   ct:pal("Trying to recover ring."),
   TimeTrap = test_server:timetrap(60000),
