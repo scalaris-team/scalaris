@@ -553,9 +553,11 @@ tags: TAGS.root TAGS.contrib
 	@cat TAGS.contrib TAGS.root >> TAGS ; true
 
 TAGS.contrib:
+	@echo "making TAGS.contrib"
 	@$(ERL) -noinput -noshell -eval 'tags:subdir("contrib", [{outfile, "TAGS.contrib"}]), halt(0).' ; true
 
 TAGS.root:
+	@echo "making TAGS.root"
 	@$(ERL) -noinput -noshell -eval 'tags:root([{outfile, "TAGS.root"}]), halt(0).' ; true
 
 doc: .make-doc
