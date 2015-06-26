@@ -25,7 +25,7 @@ VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.12
 COMMONS_CLI_VERSION=1.2
 
-.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
+.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
 
 APP_NAME = @PACKAGE_TARNAME@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
@@ -572,12 +572,6 @@ dialyzer: compile
 
 dialyzer-col:
 	$(MAKE) dialyzer | sed -f contrib/dialyzer-col.sed
-
-%_SUITE-dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Werror_handling -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl test/$*_SUITE.erl --no_native
-
-%_SUITE-dialyzer-col:
-	$(MAKE) $*_SUITE-dialyzer | sed -f contrib/dialyzer-col.sed
 
 plt: compile
 	$(DIALYZER) --plt_info > /dev/null ; \
