@@ -16,6 +16,8 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Nico Kruber <kruber@zib.de>
 
+-dialyzer({no_fail_call, write_2/1}).
+
 %% deliver list of all test cases defined in here:
 proto_sched_ready_tests() ->
     [ new_tlog_0,

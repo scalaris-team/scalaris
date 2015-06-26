@@ -25,6 +25,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+-dialyzer({[no_opaque, no_return], init/1}).
+
 -export([on/2, init/1, start_link/0]).
 
 % lease mgmt.
@@ -34,8 +36,6 @@
 % public api
 -export([get_renewal_counter/0, get_lease_list/0,
          set_message_filter/2, reset_message_filter/0]).
-
--dialyzer({no_opaque, init/1}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % public API

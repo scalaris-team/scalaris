@@ -26,6 +26,9 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
+-dialyzer([{no_return, [next_hop_setup/0, next_hop_no_neighbors/1, next_hop_with_neighbors/1]},
+           {no_fail_call, next_hop_setup/0}]).
+
 all() ->
     [empty,
      intervals_in,

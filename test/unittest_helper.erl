@@ -52,6 +52,8 @@
 -include("client_types.hrl").
 -include("unittest.hrl").
 
+-dialyzer({no_match, get_processes/0}).
+
 -type kv_opts() :: [{Key::atom(), Value::term()}].
 
 %% @doc Sets the app environment to point to the correct config file paths

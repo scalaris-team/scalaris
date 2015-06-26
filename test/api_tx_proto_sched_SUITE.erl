@@ -26,6 +26,8 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
+-dialyzer({no_match, concurrent_2/1}).
+
 %% start proto scheduler for this suite
 -define(proto_sched(Action), proto_sched_fun(Action)).
 -include("api_tx_SUITE.hrl").

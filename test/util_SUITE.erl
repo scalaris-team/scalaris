@@ -24,6 +24,9 @@
 
 -include("unittest.hrl").
 
+-dialyzer([{[no_opaque, no_return], largest_smaller_than/1},
+           {no_fail_call, lists_remove_at_indices/1}]).
+
 all() ->
     [min_max, largest_smaller_than, gb_trees_foldl,
      repeat, repeat_collect, repeat_accumulate,

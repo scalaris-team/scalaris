@@ -100,7 +100,8 @@
                          collect |
                          {accumulate, accumulatorFun(any(), R), R}. %{accumulate, fun, accumulator init value}
 
--dialyzer([{no_opaque, gb_trees_largest_smaller_than/2}, {no_return, lists_takewith_iter_feeder/3}]).
+-dialyzer([{[no_opaque, no_contracts], gb_trees_largest_smaller_than/2},
+           {no_return, lists_takewith_iter_feeder/3}]).
 
 %% @doc Executes wait_for/2 with a WaitTime of 10ms.
 -spec wait_for(fun(() -> boolean())) -> ok.

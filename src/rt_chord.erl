@@ -37,6 +37,8 @@
 
 -export([add_range/2]).
 
+-dialyzer({no_opaque, next_hop/2}).
+
 % Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("rt_beh.hrl").

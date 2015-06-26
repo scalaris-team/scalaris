@@ -26,7 +26,13 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--dialyzer([no_opaque, no_return]).
+-dialyzer({[no_opaque, no_return],
+           [test_renew_with_concurrent_range_change/1,
+            test_renew_with_concurrent_aux_change_invalid_split/1,
+            test_renew_with_concurrent_aux_change_valid_split/1,
+            test_renew_with_concurrent_aux_change_invalid_merge/1,
+            test_renew_with_concurrent_aux_change_valid_merge/1,
+            test_handover_with_concurrent_aux_change/1]}).
 
 groups() ->
     [{tester_tests, [sequence], [

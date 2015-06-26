@@ -26,6 +26,9 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
+-dialyzer([{[no_fail_call, no_return], basic_begin_after_running/1},
+           {no_return, basic_start_bench_and_kill_it/1}]).
+
 %%-define(TRACE(X,Y), log:log("proto_sched_SUITE: " ++ X,Y)).
 -define(TRACE(X,Y), ok).
 

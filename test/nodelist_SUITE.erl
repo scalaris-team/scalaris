@@ -26,7 +26,8 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--dialyzer([no_opaque, no_return]).
+-dialyzer({[no_opaque, no_return], [tester_largest_smaller_than2/1,
+                                    tester_largest_smaller_than3/1]}).
 
 all() ->
     [test_new, test_mk2, test_mk4, test_trunc,

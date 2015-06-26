@@ -26,7 +26,7 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--dialyzer([no_opaque, no_return]).
+-dialyzer({[no_opaque, no_return], [tc1/1, normalize/1]}).
 
 groups() ->
     [{hand_written_tests, [sequence], [
