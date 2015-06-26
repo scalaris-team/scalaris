@@ -142,18 +142,16 @@ read_2(_Config) ->
 write_3(_Config) ->
     ?proto_sched(start),
     %% write new key
-    ?equals_pattern(api_tx:write(api_tx:new_tlog(), "write_3_newkey", 7),
-                    {_, {ok}}),
+    {_, {ok}} = api_tx:write(api_tx:new_tlog(), "write_3_newkey", 7),
     %% modify existing key
-    ?equals_pattern(api_tx:write(api_tx:new_tlog(), "write_3_newkey", 8),
-                    {_, {ok}}),
+    {_, {ok}} = api_tx:write(api_tx:new_tlog(), "write_3_newkey", 8),
     %% write a key that is already in tlog
     {TLogA, _} = api_tx:read(api_tx:new_tlog(), "write_3_newkey"),
-    ?equals_pattern(api_tx:write(TLogA, "write_3_newkey", 9), {_, {ok}}),
+    {_, {ok}} = api_tx:write(TLogA, "write_3_newkey", 9),
     %% write key that does not exist and the read in tlog failed
     {TLogB, {fail, not_found}} =
         api_tx:read(api_tx:new_tlog(), "write_3_newkey2"),
-    ?equals_pattern(api_tx:write(TLogB, "write_3_newkey2", 9), {_, {ok}}),
+    {_, {ok}} = api_tx:write(TLogB, "write_3_newkey2", 9),
     ?proto_sched(stop),
     ok.
 
