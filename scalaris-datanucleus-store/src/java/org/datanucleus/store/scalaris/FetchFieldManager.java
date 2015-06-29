@@ -25,9 +25,13 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 
 import org.datanucleus.ClassLoaderResolver;
@@ -39,6 +43,7 @@ import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ColumnMetaData;
 import org.datanucleus.metadata.FieldRole;
+import org.datanucleus.metadata.JdbcType;
 import org.datanucleus.metadata.MetaDataUtils;
 import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
@@ -325,6 +330,7 @@ public class FetchFieldManager extends AbstractFieldManager {
         }
     }
 
+    @SuppressWarnings("unchecked")
     protected Object fetchObjectFieldInternal_RelationTypeNone(
             AbstractMemberMetaData mmd, String memberName,
             ClassLoaderResolver clr) throws JSONException {
@@ -362,6 +368,16 @@ public class FetchFieldManager extends AbstractFieldManager {
             return result.getLong(memberName);
         } else if (Double.class.isAssignableFrom(mmd.getType())) {
             return result.getDouble(memberName);
+        } else if (Date.class.isAssignableFrom(mmd.getType())) {
+            String dateValue = result.getString(memberName);
+            try {
+                // if a Date is processed by StoreFieldManager the date.toString() method
+                // is used for conversion. This converts the date to the format seen here.
+                return new SimpleDateFormat("EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH).
+                        parse(dateValue);
+            } catch (ParseException e) {
+                throw new NucleusException("Could not parse " + dateValue  + " as a date", e);
+            }
         } else if (Enum.class.isAssignableFrom(mmd.getType())) {
             ColumnMetaData[] colmds = mmd.getColumnMetaData();
             // boolean useNumeric = MetaDataUtils
@@ -507,11 +523,14 @@ public class FetchFieldManager extends AbstractFieldManager {
             boolean useLong = false;
             ColumnMetaData[] colmds = mmd.getColumnMetaData();
             if (colmds != null && colmds.length == 1) {
-                String jdbc = colmds[0].getJdbcType().name();
-                if (jdbc != null
-                        && (jdbc.equalsIgnoreCase("INTEGER") || jdbc
-                                .equalsIgnoreCase("NUMERIC"))) {
-                    useLong = true;
+                JdbcType jdbcType = colmds[0].getJdbcType();
+                if (jdbcType != null) {
+                    String jdbc = jdbcType.name();
+                    if (jdbc != null
+                            && (jdbc.equalsIgnoreCase("INTEGER") || jdbc
+                                    .equalsIgnoreCase("NUMERIC"))) {
+                        useLong = true;
+                    }
                 }
             }
             TypeConverter strConv = ec.getNucleusContext().getTypeManager()
