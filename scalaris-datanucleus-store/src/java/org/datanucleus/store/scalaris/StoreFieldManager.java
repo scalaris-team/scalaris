@@ -34,6 +34,7 @@ import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ColumnMetaData;
+import org.datanucleus.metadata.JdbcType;
 import org.datanucleus.metadata.MetaDataUtils;
 import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
@@ -289,11 +290,14 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                 boolean useLong = false;
                 ColumnMetaData[] colmds = mmd.getColumnMetaData();
                 if (colmds != null && colmds.length == 1) {
-                    String jdbc = colmds[0].getJdbcType().name();
-                    if (jdbc != null
-                            && (jdbc.equalsIgnoreCase("INTEGER") || jdbc
-                                    .equalsIgnoreCase("NUMERIC"))) {
-                        useLong = true;
+                    JdbcType jdbcType = colmds[0].getJdbcType();
+                    if (jdbcType != null) {
+                        String jdbc = jdbcType.name();
+                        if (jdbc != null
+                                && (jdbc.equalsIgnoreCase("INTEGER") || jdbc
+                                        .equalsIgnoreCase("NUMERIC"))) {
+                            useLong = true;
+                        }
                     }
                 }
                 TypeConverter strConv = op.getExecutionContext()
