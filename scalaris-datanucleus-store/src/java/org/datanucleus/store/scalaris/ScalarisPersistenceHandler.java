@@ -178,6 +178,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             // IdentityType (yet)
 
             int[] pkFieldNumbers = cmd.getPKMemberPositions();
+            long idKey = 0;
             for (int i = 0; i < pkFieldNumbers.length; i++) {
                 AbstractMemberMetaData mmd = cmd
                         .getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
@@ -194,10 +195,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         throw new NucleusUserException(
                                 "Any field using IDENTITY value generation with Scalaris should be of type long/Long or int/Integer");
                     }
-                    long idKey = generateNextIdentity(op);
+                    idKey = generateNextIdentity(op);
                     if (mType.equals(Integer.class) || mType.equals(int.class)) {
                         if (idKey > Integer.MAX_VALUE) {
-                            throw new NucleusException("We run out of integer IDs!");
+                            throw new NucleusException("We ran out of integer IDs!");
                         }
                         op.replaceField(mmd.getAbsoluteFieldNumber(), (int) idKey);
                     } else {
@@ -208,7 +209,15 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             String identity = getPersistableIdentity(op);
-            op.setPostStoreNewObjectId(identity);
+            // TODO is this right?
+            // DataNucleus expects as internal object id an integer value if there is only one
+            // primary key member which is an integer. Otherwise it can be an arbitrary
+            // object.
+            if (pkFieldNumbers.length == 1) {
+                op.setPostStoreNewObjectId(idKey);
+            } else {
+                op.setPostStoreNewObjectId(identity);
+            }
             return identity;
         } else {
             // nothing must be done
@@ -892,6 +901,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         Map<String, String> options = new HashMap<String, String>();
         // options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
+
         ManagedConnection mconn = storeMgr.getConnection(ec, options);
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
@@ -906,6 +916,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             {
                 try {
                     Transaction t1 = new Transaction(conn);
+
                     result = new JSONObject(t1.read(key).stringValue());
                     if (isADeletedRecord(result)) {
                         throw new NucleusObjectNotFoundException(
@@ -923,6 +934,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         throw new NucleusObjectNotFoundException(
                                 "Type found in db not compatible with requested type");
                     }
+
+                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
 
                     t1.commit();
                 } catch (NotFoundException e) {
@@ -947,8 +960,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 ec.getStatistics().incrementNumReads();
                 ec.getStatistics().incrementFetchCount();
             }
-
-            op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
 
             if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
