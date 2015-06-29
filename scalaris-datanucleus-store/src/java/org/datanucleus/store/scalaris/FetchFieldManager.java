@@ -26,6 +26,7 @@ import java.math.BigInteger;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -58,6 +59,7 @@ import com.orange.org.json.JSONObject;
 /**
  * FieldManager for fetching from JSON.
  */
+@SuppressWarnings("rawtypes")
 public class FetchFieldManager extends AbstractFieldManager {
     protected final ObjectProvider op;
     protected final AbstractClassMetaData acmd;
@@ -65,6 +67,54 @@ public class FetchFieldManager extends AbstractFieldManager {
     protected final JSONObject result;
     protected StoreManager storeMgr;
 
+    /**
+     * FetchCache contains all object references of objects currently fetched
+     * from the data store. This is necessary to prevent StackOverFlowErrors 
+     * in case of circular references of the stored object (e.g. Bidirectional
+     * relationships) which are all in the same fetch group, since 
+     * the PersistenceHandlers fetchObject method is called (indirectly) whenever 
+     * the FetchFieldManager must populate a member referencing to another object
+     * in the store. 
+     * Whenever the (most outer) fetch operation is completed the cache is cleared. 
+     * This is caused by activeCount reaching 0 (see fetchObjectField(int)). 
+     * 
+     * TODO: DataNucleas manages already several caches in which (theoretically) 
+     * each fetched object is inserted into, to handle exactly the same problem
+     * than the ObjectFetchCache. Unfortunately this is not working. This could be
+     * caused by the PersistenceHandlers method to generate new IDs for keys using
+     * IdGeneratorStrategy.Identity.(?)
+    **/
+    private static final ObjectFetchCache fetchCache = new ObjectFetchCache();
+    private static class ObjectFetchCache {
+        private HashMap<String, Object> cache;
+        private int activeCount;
+        
+        private ObjectFetchCache(){
+            cache = new HashMap<String, Object>();
+            activeCount = 0;
+        };
+        
+        void increaseActive() {
+            activeCount++;
+        }
+        void decreaseActive() {
+            activeCount = Math.max(0, activeCount-1);
+            if (activeCount <= 0) {
+                // clear 
+                cache = new HashMap<String, Object>();
+            }
+        }
+        boolean exists(String key) {
+            return cache.containsKey(key);
+        }
+        Object lookUp(String key) {
+            return cache.get(key);
+        }
+        void add(String key, Object value) {
+            cache.put(key, value);
+        }
+    }
+    
     public FetchFieldManager(ExecutionContext ec, AbstractClassMetaData acmd,
             JSONObject result) {
         this.acmd = acmd;
@@ -237,31 +287,41 @@ public class FetchFieldManager extends AbstractFieldManager {
     }
 
     public Object fetchObjectField(int fieldNumber) {
-        AbstractMemberMetaData mmd = acmd
-                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-        String memberName = storeMgr.getNamingFactory().getColumnName(mmd,
-                ColumnType.COLUMN);
-        System.out.println("looking for field " + memberName + " "
-                + acmd.getEntityName());
-        if (result.isNull(memberName)) {
-            return null;
-        }
-
-        // Special cases
-        ClassLoaderResolver clr = ec.getClassLoaderResolver();
-        RelationType relationType = mmd.getRelationType(clr);
-        if (RelationType.isRelationSingleValued(relationType)
-                && mmd.isEmbedded()) {
-            // Persistable object embedded into table of this object TODO
-            // Support this
-            throw new NucleusException(
-                    "Don't currently support embedded fields");
-        }
-
+        fetchCache.increaseActive();
         try {
-            return fetchObjectFieldInternal(mmd, memberName, clr);
-        } catch (JSONException e) {
-            throw new NucleusException(e.getMessage(), e);
+            fetchCache.add(IdentityUtils.getPersistableIdentityForId(
+                    op.getExternalObjectId()), 
+                    op.getObject());
+            
+            AbstractMemberMetaData mmd = acmd
+                    .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+            String memberName = storeMgr.getNamingFactory().getColumnName(mmd,
+                    ColumnType.COLUMN);
+            System.out.println("looking for field " + memberName + " "
+                    + acmd.getEntityName());
+            
+            if (result.isNull(memberName)) {
+                return null;
+            }
+    
+            // Special cases
+            ClassLoaderResolver clr = ec.getClassLoaderResolver();
+            RelationType relationType = mmd.getRelationType(clr);
+            if (RelationType.isRelationSingleValued(relationType)
+                    && mmd.isEmbedded()) {
+                // Persistable object embedded into table of this object TODO
+                // Support this
+                throw new NucleusException(
+                        "Don't currently support embedded fields");
+            }
+    
+            try {
+                return fetchObjectFieldInternal(mmd, memberName, clr);
+            } catch (JSONException e) {
+                throw new NucleusException(e.getMessage(), e);
+            }
+        } finally {
+            fetchCache.decreaseActive();
         }
     }
 
@@ -501,9 +561,10 @@ public class FetchFieldManager extends AbstractFieldManager {
             if (idStr == null) {
                 return null;
             }
-
-            return IdentityUtils.getObjectFromPersistableIdentity(idStr,
+            
+            return getNestedObjectById(idStr,
                     mmd.getAbstractClassMetaData(), ec);
+            
         } else if (RelationType.isRelationMultiValued(relationType)) {
             if (mmd.hasCollection()) {
                 // Collection<PC>
@@ -522,9 +583,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                                 ec.getMetaDataManager());
                 for (int i = 0; i < array.length(); i++) {
                     String idStr = (String) array.get(i);
-                    Object element = IdentityUtils
-                            .getObjectFromPersistableIdentity(idStr,
-                                    elementCmd, ec);
+                    Object element = getNestedObjectById(idStr, elementCmd, ec);
                     coll.add(element);
                 }
 
@@ -544,9 +603,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                                 ec.getMetaDataManager());
                 for (int i = 0; i < array.length(); i++) {
                     String idStr = (String) array.get(i);
-                    Object element = IdentityUtils
-                            .getObjectFromPersistableIdentity(idStr,
-                                    elementCmd, ec);
+                    Object element = getNestedObjectById(idStr, elementCmd, ec);
                     Array.set(arrayField, i, element);
                 }
 
@@ -579,8 +636,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                     if (keyCmd != null) {
                         // The jsonKey is the string form of the identity
                         String idStr = (String) jsonKey;
-                        key = IdentityUtils.getObjectFromPersistableIdentity(
-                                idStr, keyCmd, ec);
+                        key = getNestedObjectById(idStr, keyCmd, ec);
                     } else {
                         Class keyCls = ec.getClassLoaderResolver()
                                 .classForName(mmd.getMap().getKeyType());
@@ -592,8 +648,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                     if (valCmd != null) {
                         // The jsonVal is the string form of the identity
                         String idStr = (String) jsonVal;
-                        val = IdentityUtils.getObjectFromPersistableIdentity(
-                                idStr, valCmd, ec);
+                        val = getNestedObjectById(idStr, valCmd, ec);
                     } else {
                         Class valCls = ec.getClassLoaderResolver()
                                 .classForName(mmd.getMap().getValueType());
@@ -615,6 +670,14 @@ public class FetchFieldManager extends AbstractFieldManager {
                 + mmd.getFullFieldName() + " of type " + mmd.getTypeName());
     }
 
+    private Object getNestedObjectById(String persistableId, AbstractClassMetaData acmd, ExecutionContext ec) {
+        if (fetchCache.exists(persistableId)) {
+            return fetchCache.lookUp(persistableId);
+        }
+        return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
+    }
+    
+    
     /**
      * Deserialise from JSON to a non-persistable object.
      * 
