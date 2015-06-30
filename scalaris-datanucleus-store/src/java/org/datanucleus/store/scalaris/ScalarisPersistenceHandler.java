@@ -1,5 +1,5 @@
 /**********************************************************************
-oCopyright (c) 2008 Erik Bengtson and others. All rights reserved.
+Copyright (c) 2008 Erik Bengtson and others. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -22,6 +22,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -66,7 +67,7 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
     private static final String ALL_ID_PREFIX = "_ALL_IDS";
-    private static final String ID_GEN_KEY = "ID_GEN";
+    private static final String ID_GEN_KEY = "_ID_GEN";
 
     /** Setup localiser for messages. */
     static {
@@ -100,9 +101,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     /**
      * Generate a new ID which can be used to store a value at an unique key.
      * Every time this function is called the value stored at key ID_GEN_KEY is
-     * incremented by one. The value stored there is value which is returned by
-     * this function. All object classes share the same ID generator key. TODO:
-     * use different ID keys for different classes (?).
+     * incremented by one. The value stored there is the value which is returned by
+     * this function. All object classes share the same ID generator key.
      * 
      * @param op
      *            ObjectProvider of the object this ID is generated for.
@@ -110,22 +110,22 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      */
     private long generateNextIdentity(ObjectProvider op) {
         ExecutionContext ec = op.getExecutionContext();
+        String keyName = getIDGeneratorKeyName(op.getClassMetaData().getFullClassName());
         ManagedConnection mConn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
                 .getConnection();
 
         long newID = 0l;
-
         Transaction t = new Transaction(conn);
         try {
             try {
-                ErlangValue storedVal = t.read(ID_GEN_KEY);
+                ErlangValue storedVal = t.read(keyName);
                 newID = storedVal.longValue() + 1l;
-                t.addOnNr(ID_GEN_KEY, new OtpErlangLong(1l));
+                t.addOnNr(keyName, new OtpErlangLong(1l));
             } catch (NotFoundException e) {
                 // No ID was generated yet
                 newID = 1l;
-                t.write(ID_GEN_KEY, newID);
+                t.write(keyName, newID);
             }
 
             t.commit();
@@ -204,7 +204,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     } else {
                         op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
                     }
-                    System.out.println("RANDOMLY GENERATED KEY: " + idKey);
+                    System.out.println("GENERATED KEY: " + idKey);
                 }
             }
 
@@ -280,13 +280,17 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         return String.format("%s%s", className, ALL_ID_PREFIX);
     }
 
+    private String getIDGeneratorKeyName(String className) {
+        return String.format("%s%s", className, ID_GEN_KEY);
+    }
+    
     /**
      * To support queries it is necessary to have the possibility to iterate
      * over all stored objects of a specific type. Since Scalaris stores only
      * key-value pairs without structured tables, this is not "natively"
      * supported. Therefore an extra key is added to the store containing all
      * keys of available objects of a type. This key has the structure
-     * <full-class-name><ALL_KEY_PREFIX>. The value is an JSON-array containing
+     * <full-class-name><ALL_ID_PREFIX>. The value is an JSON-array containing
      * all keys of <full-class-name> instances.
      * 
      * This methods adds another entry to such a key based on the passed
@@ -440,8 +444,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             // retrieve all values from the management key
             for (int i = 0; i < json.length(); i++) {
                 String s = json.getString(i);
-                results.add(IdentityUtils.getObjectFromPersistableIdentity(s,
-                        cmd, ec));
+                results.add(IdentityUtils.getObjectFromPersistableIdentity(s,cmd, ec));
             }
 
             t.commit();
@@ -606,10 +609,11 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     }
 
     public void updateObject(ObjectProvider op, int[] fieldNumbers) {
-        System.out.println("UPDATE");
+        System.out.println("UPDATE " + getPersistableIdentity(op));
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
+        
         Map<String, String> options = new HashMap<String, String>();
         // options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
@@ -620,17 +624,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
         try {
 
-            // // Check if read-only so update not permitted
-            // assertReadOnlyForUpdateOfObject(op);
-            //
-            // Map<String, String> options = new HashMap<String, String>();
-            // // options.put(ConnectionFactoryImpl.STORE_JSON_URL,
-            // getURLPath(op));
-            // options.put("Content-Type", "application/json");
-            // ExecutionContext ec = op.getExecutionContext();
-            // ManagedConnection mconn = storeMgr.getConnection(ec, options);
-            // URLConnection conn = (URLConnection) mconn.getConnection();
-            // try {
             AbstractClassMetaData cmd = op.getClassMetaData();
             int[] updatedFieldNums = fieldNumbers;
             Object currentVersion = op.getTransactionalVersion();
@@ -747,24 +740,29 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 NucleusLogger.DATASTORE_NATIVE.debug("PUT "
                         + jsonobj.toString());
             }
-            { // TRANSACTION
-                Transaction t1 = new Transaction(conn); // Transaction()
 
-                try {
-                    // t1.write(jsonobj.getString("id"), jsonobj.toString());
-                    t1.write(id, jsonobj.toString());
-                    System.out.println("json!!!!" + jsonobj.toString());
-                    t1.commit();
-                } catch (ConnectionException e) {
-                    throw new NucleusException(e.getMessage(), e);
-                    // } catch (TimeoutException e) {
-                    // throw new NucleusException(e.getMessage(), e);
-                } catch (UnknownException e) {
-                    throw new NucleusException(e.getMessage(), e);
-                } catch (AbortException e) {
-                    throw new NucleusException(e.getMessage(), e);
+
+            Transaction t1 = new Transaction(conn);
+            try {
+                JSONObject stored = new JSONObject(t1.read(id).stringValue());
+
+                // update stored object
+                Iterator<String> keyIter = jsonobj.keys();
+                while (keyIter.hasNext()) {
+                    String key = keyIter.next();
+                    stored.put(key, jsonobj.get(key));
                 }
 
+                t1.write(id, stored.toString());
+                System.out.println("json!!!!" + stored.toString());
+                t1.commit();
+            } catch (ConnectionException | UnknownException | AbortException  e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (NotFoundException e) {
+                // if we have an update we should already have this object stored
+                throw new NucleusException("Could not update object since its original value was not found", e);
+            } catch (ClassCastException | JSONException e) {
+                throw new NucleusException("The stored object has a broken structure", e);
             }
 
             if (ec.getStatistics() != null) {
@@ -911,7 +909,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final long startTime = System.currentTimeMillis();
 
             final String key = getPersistableIdentity(op);
-
+            System.out.println("FETCH KEY: " + key);
             final JSONObject result;
             {
                 try {
