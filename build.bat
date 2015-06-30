@@ -24,6 +24,7 @@ if not exist Emakefile (
         set "line=%%a"
         if defined line (
             call set "line=echo.%%line:  @EMAKEFILEDEFINES@=%%"
+            call set "line=%%line:  @YAWS_OPTIONS@=%%"
             for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
         ) ELSE echo.
     )
