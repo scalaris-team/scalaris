@@ -60,13 +60,17 @@ get_number_of_vms() ->
 add_vms(N) ->
     BaseScalarisPort = config:read(port),
     BaseYawsPort = config:read(yaws_port),
-    {Mega, Secs, _} = now(),
-    Time = Mega * 1000000 + Secs,
+    MyPidStr = [case C of
+                    $. -> $-;
+                    _ -> C
+                end || C <- erlang:pid_to_list(self()),
+                       C =/= $<, C=/= $>],
+    NewNodesBase = format("autoscale_~s_~B", [MyPidStr, uid:get_pids_uid()]),
     SpawnFun = 
         fun (X) -> 
                 Port = find_free_port(BaseScalarisPort),
                 YawsPort = find_free_port(BaseYawsPort),
-                NodeName = format("autoscale_~p_~p", [Time, X]),
+                NodeName = format("~s_~B_~s", [NewNodesBase, X, node()]),
                 Cmd = format("./../bin/scalarisctl -e -detached -s -p ~p -y ~p -n ~s start", 
                              [Port, YawsPort, NodeName]),
                 ?TRACE("Executing: ~p~n", [Cmd]),

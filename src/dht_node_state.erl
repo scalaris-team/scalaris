@@ -113,7 +113,7 @@
 new(RT, RMState, DB) ->
     #state{rt = RT,
            rm_state = RMState,
-           join_time = now(),
+           join_time = os:timestamp(),
            db = DB,
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
@@ -145,7 +145,7 @@ new_on_recover(RT, RMState,
                LeaseList) ->
     #state{rt = RT,
            rm_state = RMState,
-           join_time = now(),
+           join_time = os:timestamp(),
            db = db_dht:new(db_dht),
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
