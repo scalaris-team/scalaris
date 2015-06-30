@@ -52,10 +52,7 @@ sed -e "s/pkgver=.*/pkgver=${VERSION}/g" \
 
 ##########
 
-echo "Checking configure scripts"
+echo "Creating configure script"
 aclocal -Wobsolete
 autoconf -Wobsolete
-echo "Creating configure script"
-aclocal
-autoconf
 echo "done"
