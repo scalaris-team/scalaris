@@ -580,9 +580,8 @@ public class FetchFieldManager extends AbstractFieldManager {
             if (idStr == null) {
                 return null;
             }
-            
-            return getNestedObjectById(idStr,
-                    mmd.getAbstractClassMetaData(), ec);
+            AbstractClassMetaData acmd = ec.getMetaDataManager().getMetaDataForClass(mmd.getType(), clr);
+            return getNestedObjectById(idStr,acmd, ec);
             
         } else if (RelationType.isRelationMultiValued(relationType)) {
             if (mmd.hasCollection()) {
@@ -695,7 +694,6 @@ public class FetchFieldManager extends AbstractFieldManager {
         }
         return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
     }
-    
     
     /**
      * Deserialise from JSON to a non-persistable object.
