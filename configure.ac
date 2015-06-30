@@ -144,7 +144,7 @@ AC_ARG_ENABLE([debug],
 # check erlang
 #
 ###########################################################
-AC_LANG_ERLANG
+AC_LANG([Erlang])
 
 AC_ERLANG_NEED_ERLC
 AC_ERLANG_NEED_ERL
