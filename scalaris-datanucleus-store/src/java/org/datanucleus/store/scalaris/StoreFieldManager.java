@@ -358,10 +358,8 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                 }
                 System.out.println("name=" + name + " idColl.size()="
                         + idColl.size() + " idColl=" + idColl);
-                if (idColl.size() > 0) {
-                    // ORANGE: test added because code fails on empty collection
-                    jsonobj.put(name, idColl);
-                }
+
+                jsonobj.put(name, idColl);
                 return;
             } else if (mmd.hasArray()) {
                 Collection ids = new ArrayList(Array.getLength(value));
