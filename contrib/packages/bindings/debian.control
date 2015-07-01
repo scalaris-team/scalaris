@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, openjdk-7-jdk | java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
-Homepage: http://code.google.com/p/scalaris
+Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
 Package: scalaris-java

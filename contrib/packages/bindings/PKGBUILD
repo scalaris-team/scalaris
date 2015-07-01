@@ -5,7 +5,7 @@ pkgver=0.7.2+git
 pkgrel=1
 pkgdesc="Bindings and clients for Scalaris."
 arch=('i686' 'x86_64')
-url="http://code.google.com/p/scalaris/"
+url="http://scalaris.zib.de"
 license=('Apache')
 depends=('java-runtime>=1.6.0' 'python2>=2.6' 'python>=3.0' 'ruby>=1.8')
 makedepends=('java-environment>=1.6.0' 'apache-ant' 'glib2' 'erlang>=R13B01')

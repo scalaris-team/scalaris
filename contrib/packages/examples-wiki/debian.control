@@ -3,7 +3,7 @@ Section: web
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), ant, openjdk-7-jdk | java6-sdk, scalaris-java (>> 0.7.2)
-Homepage: http://code.google.com/p/scalaris
+Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
 Package: scalaris-examples-wiki-tomcat5

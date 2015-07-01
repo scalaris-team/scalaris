@@ -17,7 +17,7 @@
 %% @doc Generic component framework. This component and its usage
 %%      are described in more detail in the 'User and Developers Guide'
 %%      which can be found in user-dev-guide/main.pdf and online at
-%%      [http://code.google.com/p/scalaris/wiki/UsersDevelopersGuide].
+%%      [http://scalaris.zib.de].
 %% @end
 %% @version $Id$
 -module(gen_component).
