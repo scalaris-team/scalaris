@@ -68,7 +68,8 @@ if [ ${result} -eq 0 ]; then
   cp  "${sourcefolder}/debian.rules"                   ./debian.rules && \
   cp  "${sourcefolder}/debian.scalaris.prerm"          ./debian.scalaris.prerm && \
   cp  "${sourcefolder}/debian.scalaris.postrm"         ./debian.scalaris.postrm && \
-  cp  "${sourcefolder}/debian.scalaris.postinst"       ./debian.scalaris.postinst
+  cp  "${sourcefolder}/debian.scalaris.postinst"       ./debian.scalaris.postinst && \
+  cp  "${folder}/LICENSE"                              ./debian.copyright
   result=$?
 fi
 

@@ -65,7 +65,8 @@ if [ ${result} -eq 0 ]; then
       < "${sourcefolder}/debian.changelog"               > ./debian.changelog && \
   cp  "${sourcefolder}/debian.compat"                      ./debian.compat && \
   cp  "${sourcefolder}/debian.control"                     ./debian.control && \
-  cp  "${sourcefolder}/debian.rules"                       ./debian.rules
+  cp  "${sourcefolder}/debian.rules"                       ./debian.rules && \
+  cp  "${folder}/LICENSE"                                  ./debian.copyright
   result=$?
 fi
 

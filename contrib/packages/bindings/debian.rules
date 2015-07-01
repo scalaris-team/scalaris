@@ -12,6 +12,8 @@ PYTHON3_SITELIB:=$(shell python3 -c 'from distutils.sysconfig import get_python_
 WITH_PYTHON:=$(shell python -c "import sys; a,b=sys.version_info[:2]; print a >= 2 and b >= 6 and '1' or '0'")
 WITH_PYTHON3:=$(shell python3 -c 'print('1');'  2>/dev/null || echo 0)
 
+build-arch: build
+build-indep: build
 build: build-stamp
 build-stamp:
 	dh_testdir
@@ -62,10 +64,6 @@ install: build
 
 # Build architecture-independent files here.
 binary-indep: build install
-	# We have nothing to do by default.
-
-# Build architecture-dependent files here.
-binary-arch: build install
 	dh_testdir
 	dh_testroot
 #	dh_installdebconf
@@ -93,6 +91,10 @@ binary-arch: build install
 	dh_gencontrol
 	dh_md5sums
 	dh_builddeb
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	# We have nothing to do by default.
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install
