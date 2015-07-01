@@ -1402,7 +1402,8 @@ sets_map(Fun, Set) ->
         end, [], Set)).
 
 %% @doc Compare two sets for equality.
--spec sets_equal(sets:set(), sets:set()) -> boolean().
+-spec sets_equal(sets:set(V), sets:set(V)) -> boolean()
+     when is_subtype(V, any()).
 sets_equal(Set1, Set2) ->
     sets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1).
 
