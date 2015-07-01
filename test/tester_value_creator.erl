@@ -121,6 +121,9 @@ create_value_({builtin_type, gb_sets_set, ValueType}, Size, ParseState) ->
                        end
                end, T, L)
     end;
+create_value_({builtin_type, set_set, ValueType}, Size, ParseState) ->
+    L = create_value({list, ValueType}, Size, ParseState),
+    sets:from_list(L);
 create_value_({builtin_type, maybe_improper_list}, Size, ParseState) ->
     create_value_({list, {typedef, tester, test_any, []}}, Size, ParseState);
 create_value_({builtin_type, module}, _Size, _ParseState) ->
