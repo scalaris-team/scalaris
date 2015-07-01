@@ -99,28 +99,10 @@ create_value_({builtin_type, gb_trees_tree, KeyType, ValueType}, Size, ParseStat
     L = create_value({list,
                       {tuple,
                        [KeyType, ValueType]}}, Size, ParseState),
-    T = gb_trees:empty(),
-    case L of
-        [] -> T;
-        _ -> lists:foldl(
-               fun(X, Acc) ->
-                       try gb_trees:insert(element(1, X), element(2,X), Acc)
-                       catch _:_ -> Acc
-                       end
-               end, T, L)
-    end;
+    gb_trees:from_orddict(orddict:from_list(L));
 create_value_({builtin_type, gb_sets_set, ValueType}, Size, ParseState) ->
     L = create_value({list, ValueType}, Size, ParseState),
-    T = gb_sets:empty(),
-    case L of
-        [] -> T;
-        _ -> lists:foldl(
-               fun(X, Acc) ->
-                       try gb_sets:insert(X, Acc)
-                       catch _:_ -> Acc
-                       end
-               end, T, L)
-    end;
+    gb_sets:from_list(L);
 create_value_({builtin_type, set_set, ValueType}, Size, ParseState) ->
     L = create_value({list, ValueType}, Size, ParseState),
     sets:from_list(L);
