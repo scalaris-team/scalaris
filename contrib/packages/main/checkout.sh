@@ -59,17 +59,18 @@ if [ ${result} -eq 0 ]; then
   sed -e "s/Version: .*-.*/Version: ${pkg_version}-1/g" \
       -e "s/scalaris\\.orig\\.tar\\.gz/scalaris-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris\\.diff\\.tar\\.gz/scalaris-${pkg_version}\\.diff\\.tar\\.gz/g" \
-      < "${sourcefolder}/scalaris.dsc"               > ./scalaris.dsc && \
+      < "${sourcefolder}/scalaris.dsc"                > ./scalaris.dsc && \
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
       -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
-      < "${sourcefolder}/debian.changelog"           > ./debian.changelog && \
-  cp  "${sourcefolder}/debian.compat"                  ./debian.compat && \
-  cp  "${sourcefolder}/debian.control"                 ./debian.control && \
-  cp  "${sourcefolder}/debian.rules"                   ./debian.rules && \
-  cp  "${sourcefolder}/debian.scalaris.prerm"          ./debian.scalaris.prerm && \
-  cp  "${sourcefolder}/debian.scalaris.postrm"         ./debian.scalaris.postrm && \
-  cp  "${sourcefolder}/debian.scalaris.postinst"       ./debian.scalaris.postinst && \
-  cp  "${folder}/LICENSE"                              ./debian.copyright
+      < "${sourcefolder}/debian.changelog"            > ./debian.changelog && \
+  cp  "${sourcefolder}/debian.compat"                   ./debian.compat && \
+  cp  "${sourcefolder}/debian.control"                  ./debian.control && \
+  cp  "${sourcefolder}/debian.rules"                    ./debian.rules && \
+  cp  "${sourcefolder}/debian.scalaris.prerm"           ./debian.scalaris.prerm && \
+  cp  "${sourcefolder}/debian.scalaris.postrm"          ./debian.scalaris.postrm && \
+  cp  "${sourcefolder}/debian.scalaris.postinst"        ./debian.scalaris.postinst && \
+  cp  "${sourcefolder}/debian.source.lintian-overrides" ./debian.source.lintian-overrides && \
+  cp  "${folder}/LICENSE"                               ./debian.copyright
   result=$?
 fi
 

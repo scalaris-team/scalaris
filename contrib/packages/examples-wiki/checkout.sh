@@ -59,18 +59,19 @@ if [ ${result} -eq 0 ]; then
   sed -e "s/Version: .*-.*/Version: ${pkg_version}-1/g" \
       -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.diff\\.tar\\.gz/g" \
-      < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
+      < ${sourcefolder}/scalaris-examples-wiki.dsc    > ./scalaris-examples-wiki.dsc && \
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
       -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
-      < "${sourcefolder}/debian.changelog"          > ./debian.changelog && \
-  cp  "${sourcefolder}/debian.compat"                 ./debian.compat && \
-  cp  "${sourcefolder}/debian.control"                ./debian.control && \
-  cp  "${sourcefolder}/debian.rules"                  ./debian.rules && \
+      < "${sourcefolder}/debian.changelog"            > ./debian.changelog && \
+  cp  "${sourcefolder}/debian.compat"                   ./debian.compat && \
+  cp  "${sourcefolder}/debian.control"                  ./debian.control && \
+  cp  "${sourcefolder}/debian.rules"                    ./debian.rules && \
   cp  "${sourcefolder}/debian.scalaris-examples-wiki-tomcat5.conffiles" \
-                                                      ./debian.scalaris-examples-wiki-tomcat5.conffiles && \
+                                                        ./debian.scalaris-examples-wiki-tomcat5.conffiles && \
   cp  "${sourcefolder}/debian.scalaris-examples-wiki-tomcat6.conffiles" \
-                                                      ./debian.scalaris-examples-wiki-tomcat6.conffiles && \
-  cp  "${folder}/LICENSE"                             ./debian.copyright
+                                                        ./debian.scalaris-examples-wiki-tomcat6.conffiles && \
+  cp  "${sourcefolder}/debian.source.lintian-overrides" ./debian.source.lintian-overrides && \
+  cp  "${folder}/LICENSE"                               ./debian.copyright
 
   result=$?
 fi
