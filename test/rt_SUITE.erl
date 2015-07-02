@@ -54,7 +54,7 @@ prop_client_key_to_binary(Key1, Key2) ->
     Bin1 = ?RT:client_key_to_binary(Key1),
     Bin2 = ?RT:client_key_to_binary(Key2),
     ?implies(Key1 =/= Key2, Bin1 =/= Bin2).
-    
+
 tester_client_key_to_binary(_Config) ->
     tester:test(?MODULE, prop_client_key_to_binary, 2, 50000, [{threads, 2}]).
 
@@ -63,7 +63,7 @@ prop_hash_key(Key) ->
     % only verify that no exception is thrown during hashing
     ?RT:hash_key(Key),
     true.
-    
+
 tester_hash_key(_Config) ->
     tester:test(?MODULE, prop_hash_key, 1, 100000, [{threads, 2}]).
 
@@ -85,9 +85,13 @@ next_hop(_Config) ->
     DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 0),
-    
+
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, lists:nth(6, DHTNodes)]),
-    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
+
+    %% the aux -> fin conversion is moved to dht_node_lookup, so the following
+    %% check doesn't work anymore for next_hop
+    %% call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
+
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 2, node:pidX(Succ)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 3, lists:nth(1, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 7, lists:nth(2, DHTNodes)]),
@@ -96,8 +100,8 @@ next_hop(_Config) ->
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 64, lists:nth(5, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 65, lists:nth(6, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1000, lists:nth(6, DHTNodes)]),
-    
-    [exit(comm:make_local(GPid), kill) || GPid <- DHTNodes],
+
+    [exit(comm:make_local(Node), kill) || Node <- DHTNodes],
 %%     exit(node:pidX(MyNode), kill),
     exit(comm:make_local(node:pidX(Succ)), kill),
     exit(comm:make_local(node:pidX(Pred)), kill),
@@ -121,9 +125,13 @@ next_hop2(_Config) ->
     DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 10),
-    
+
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
-    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
+
+    %% the aux -> fin conversion is moved to dht_node_lookup, so the following
+    %% check doesn't work anymore for next_hop
+    %% call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
+
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 2, node:pidX(Succ)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 3, node:pidX(SuccSucc)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 7, lists:nth(2, DHTNodes)]),
@@ -148,11 +156,11 @@ prop_get_split_key_half(Begin, End_) ->
               _             -> End_
           end,
     SplitKey = ?RT:get_split_key(Begin, End, {1, 2}),
-    
+
     I = case Begin =:= End of
             true -> intervals:all(); % full range
             _    -> intervals:new('[', Begin, End, ')')
-        
+
         end,
     ?equals_w_note(intervals:in(SplitKey, I), true,
                    {"SplitKey", SplitKey}),
@@ -173,10 +181,10 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
                         true -> {SplitFracA, SplitFracB};
                         _    -> {SplitFracB, SplitFracA}
                     end,
-    
+
 %%     ct:pal("Begin: ~.0p, End: ~.0p, SplitFactor: ~.0p", [Begin, End, SplitFraction]),
     SplitKey = ?RT:get_split_key(Begin, End, SplitFraction),
-    
+
     case erlang:element(1, SplitFraction) =:= 0 of
         true -> ?equals(SplitKey, Begin);
         _ ->
@@ -187,7 +195,7 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
                     _ when SplitFracA =:= SplitFracB ->
                         intervals:new('[', Begin, End, ']');
                     _    -> intervals:new('[', Begin, End, ')')
-                
+
                 end,
             ?equals_w_note(intervals:in(SplitKey, I), true,
                            {"SplitKey", SplitKey}),

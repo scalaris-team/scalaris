@@ -20,6 +20,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-export([next_hop/3]).
+
 -behaviour(rt_beh).
 -include("scalaris.hrl").
 
@@ -467,32 +469,34 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 -spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
-    case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true ->
-            {succ, node:pidX(nodelist:succ(Neighbors))};
-        _ ->
-            % check routing table:
-            RT = dht_node_state:get(State, rt),
-            RTSize = get_size(RT),
-            NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
-                         {value, _Key, N} ->
-                             N;
-                         nil when RTSize =:= 0 ->
-                             nodelist:succ(Neighbors);
-                         nil -> % forward to largest finger
-                             {_Key, N} = gb_trees:largest(RT),
-                             N
-                     end,
-            FinalNode =
-                case RTSize < config:read(rt_size_use_neighbors) of
-                    false -> NodeRT;
-                    _     ->
-                        % check neighborhood:
-                        nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
-                end,
-            {other, node:pidX(FinalNode)}
-    end.
+    RT = dht_node_state:get(State, rt),
+    next_hop(Neighbors, RT, Id).
+
 %% userdevguide-end rt_chord:next_hop
+
+
+-spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> {succ | other, comm:mypid()}.
+next_hop(Neighbors, RT, Id) ->
+    % check routing table:
+    RTSize = get_size(RT),
+    NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
+                 {value, _Key, N} ->
+                     N;
+                 nil when RTSize =:= 0 ->
+                     nodelist:succ(Neighbors);
+                 nil -> % forward to largest finger
+                     {_Key, N} = gb_trees:largest(RT),
+                     N
+             end,
+    FinalNode =
+    case RTSize < config:read(rt_size_use_neighbors) of
+        false -> NodeRT;
+        _     ->
+            % check neighborhood:
+            nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
+    end,
+    node:pidX(FinalNode).
+
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().

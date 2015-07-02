@@ -63,10 +63,15 @@ end.
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_chord(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
-    case ?RT:next_hop(State, Key) of
-        {succ, P} -> % found node -> terminate
+    Neighbors = dht_node_state:get(State, neighbors),
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
+        true ->
+            P = node:pidX(nodelist:succ(Neighbors)),
             comm:send(P, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg}, [{shepherd, self()}]);
-        {other, P} ->
+        _ ->
+            RT = dht_node_state:get(State, rt),
+            %% P = ?RT:next_hop(Neighbors, RT, Key),
+            P = rt_chord:next_hop(Neighbors, RT, Key),
             comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
     end.
 
