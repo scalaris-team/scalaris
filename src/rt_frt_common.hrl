@@ -61,7 +61,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key() :: rt_chord:key().
--type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::node:node_type()).
+-type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), NodePid::comm:mypid()).
 -type external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
 
 % define the possible types of nodes in the routing table:
@@ -71,8 +71,9 @@
 -type entry_type() :: normal | source | sticky.
 -type custom_info() :: undefined | term().
 
+-type(mynode() :: {Id::key(), Pid::comm:mypid()}).
 -record(rt_entry, {
-        node :: node:node_type(),
+        node :: mynode(),
         type :: entry_type(),
         adjacent_fingers = {undefined, undefined} :: {key() |
                                                       'undefined', key() |
@@ -99,7 +100,7 @@
                         | {get_rt_reply, RT::rt()}
                         | {trigger_random_lookup}
                         | {rt_get_node, From :: comm:mypid()}
-                        | {rt_learn_node, NewNode :: node:node_type()}
+                        | {rt_learn_node, NewNode :: mynode()}
                         .
 
 -include("scalaris.hrl").
@@ -129,7 +130,8 @@ init(Neighbors) ->
     % request approximated ring size
     gossip_load:get_values_best([]),
 
-    update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
+    MyNode = node2mynode(nodelist:node(Neighbors)),
+    update_entries(Neighbors, add_source_entry(MyNode, #rt_t{})).
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key() | binary()) -> key().
@@ -222,8 +224,9 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 -spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 filter_dead_node(RT, DeadPid, _Reason) ->
     % find the node id of DeadPid and delete it from the RT
-    case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
-        [Node] -> entry_delete(node:id(Node), RT);
+    case [N || N <- internal_to_list(RT), pidX(N) =:= DeadPid] of
+        %% TODO fix, can return more than one node! (same pid, different id)
+        [Node] -> entry_delete(id(Node), RT);
         [] -> RT
     end
     .
@@ -232,7 +235,7 @@ filter_dead_node(RT, DeadPid, _Reason) ->
 %% userdevguide-begin rt_frtchord:to_pid_list
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt()) -> [comm:mypid()].
-to_pid_list(RT) -> [node:pidX(N) || N <- internal_to_list(RT)].
+to_pid_list(RT) -> [pidX(N) || N <- internal_to_list(RT)].
 %% userdevguide-end rt_frtchord:to_pid_list
 
 %% @doc Get the size of the RT excluding entries which are not tagged as normal entries.
@@ -322,7 +325,7 @@ dump_to_csv(RT) ->
             , io_lib:format("0,~p~n", [MyId])
         ] ++
         [
-            io_lib:format("~p,~p~n",[Index,node:id(Finger)])
+            io_lib:format("~p,~p~n",[Index,id(Finger)])
             || {Index, Finger} <- IndexedFingers
         ]
     )
@@ -430,19 +433,20 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
 handle_custom_message({rt_get_node, From}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(From, {rt_learn_node, MyNode}),
+    comm:send(From, {rt_learn_node, node2mynode(MyNode)}),
     State
     ;
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
-    NewRT = case rt_lookup_node(node:id(NewNode), OldRT) of
-        none -> RT = add_normal_entry(NewNode, OldRT),
-                check(OldRT, RT, rt_loop:get_neighb(State), true),
-                RT
-            ;
-        {value, _RTEntry} -> OldRT
-    end,
+    NewRT = case rt_lookup_node(id(NewNode), OldRT) of
+                none ->
+                    RT = add_normal_entry(NewNode, OldRT),
+                    check(OldRT, RT, rt_loop:get_neighb(State), true),
+                    RT
+                    ;
+                {value, _RTEntry} -> OldRT
+            end,
     rt_loop:set_rt(State, NewRT);
 
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
@@ -510,7 +514,7 @@ check_helper(OldRT, NewRT, ReportToFD) ->
 %% @doc Filter the source node's pid from a list.
 -spec filter_source_pid(rt(), [comm:mypid()]) -> [comm:mypid()].
 filter_source_pid(RT, ListOfPids) ->
-    SourcePid = node:pidX(rt_entry_node(get_source_node(RT))),
+    SourcePid = pidX(rt_entry_node(get_source_node(RT))),
     [P || P <- ListOfPids, P =/= SourcePid].
 
 %% @doc Set up a set of subscriptions from a routing table
@@ -543,34 +547,39 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_node(dht_node_state:state(), key()) -> {succ | other, node:node_type()}.
+-spec next_hop_node(dht_node_state:state(), key()) -> {succ | other, mynode()}.
 next_hop_node(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true ->
-            {succ, nodelist:succ(Neighbors)};
+            {succ, node2mynode(nodelist:succ(Neighbors))};
         _ -> ExtRT = dht_node_state:get(State, rt),
              RT = external_rt_get_tree(ExtRT),
              RTSize = get_size(ExtRT),
-             NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
-                 {value, _Key, N} -> N;
-                 nil when RTSize =:= 0 -> nodelist:succ(Neighbors);
-                 nil -> % forward to largest finger
-                     {_Key, N} = gb_trees:largest(RT),
-                     N
-             end,
-             Node = case RTSize < config:read(rt_size_use_neighbors) of
-                        false -> NodeRT;
-                        _     -> % check neighborhood:
-                            nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
-                    end,
-             {other, Node}
+             {NextHopId, NextHop} = case util:gb_trees_largest_smaller_than(Id, RT) of
+                                        {value, Id1, Node} ->
+                                            {Id1, Node};
+                                        nil when RTSize =:= 0 ->
+                                            node2mynode(nodelist:succ(Neighbors));
+                                        nil -> % forward to largest finger
+                                            gb_trees:largest(RT)
+                                    end,
+                 case RTSize < config:read(rt_size_use_neighbors) of
+                     false ->
+                         {other, {NextHopId, NextHop}};
+                     _     -> % check neighborhood:
+                         % create a fake LastFound node:node_type() for largest_smaller_than
+                         % (only Id is used in largest_smaller_than)
+                         BestSoFar = node:new(NextHop, NextHopId, 0),
+                         NextHopNew = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
+                         {other, node2mynode(NextHopNew)}
+                 end
     end.
 
 -spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
-    {Tag, Node} = next_hop_node(State, Id),
-    {Tag, node:pidX(Node)}.
+    {Tag, {_NextHopId, Pid}} = next_hop_node(State, Id),
+    {Tag, Pid}.
 %% userdevguide-end rt_frtchord:next_hop
 
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
@@ -590,7 +599,7 @@ export_rt_to_dht_node_helper(RT) ->
                     case entry_type(V) of
                         source -> Acc;
                         _Else -> Node = rt_entry_node(V),
-                            gb_trees:enter(node:id(Node), Node, Acc)
+                            gb_trees:enter(id(Node), pidX(Node), Acc)
                     end
             end, gb_trees:empty(),get_rt_tree(RT))}.
 
@@ -617,7 +626,7 @@ to_list(State) -> % match external RT
 internal_to_list(#rt_t{} = RT) ->
     SourceNode = get_source_node(RT),
     ListOfNodes = [rt_entry_node(N) || N <- gb_trees:values(get_rt_tree(RT))],
-    sorted_nodelist(ListOfNodes, node:id(rt_entry_node(SourceNode)))
+    sorted_nodelist(ListOfNodes, id(rt_entry_node(SourceNode)))
     .
 
 % @doc Helper to do the actual work of converting a list of node:node_type() records
@@ -625,10 +634,10 @@ internal_to_list(#rt_t{} = RT) ->
 -spec sorted_nodelist(nodelist:snodelist(), SourceNode::key()) -> nodelist:snodelist().
 sorted_nodelist(ListOfNodes, SourceNode) ->
     % sort
-    Sorted = lists:sort(fun(A, B) -> node:id(A) =< node:id(B) end,
+    Sorted = lists:sort(fun(A, B) -> id(A) =< id(B) end,
         ListOfNodes),
     % rearrange elements: all until the source node must be attached at the end
-    {Front, Tail} = lists:splitwith(fun(N) -> node:id(N) =< SourceNode end, Sorted),
+    {Front, Tail} = lists:splitwith(fun(N) -> id(N) =< SourceNode end, Sorted),
     Tail ++ Front
     .
 %% userdevguide-end rt_frtchord:to_list
@@ -659,7 +668,7 @@ entry_filtering(RT, [_|_] = AllowedNodes) ->
             end, Spacings)
     ),
     FilteredNode = rt_entry_node(FilterEntry),
-    entry_delete(node:id(FilteredNode), RT)
+    entry_delete(id(FilteredNode), RT)
     .
 
 % @doc Delete an entry from the routing table
@@ -708,12 +717,12 @@ rt_entry_from(Node, Type, PredId, SuccId) ->
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
--spec create_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) ->
+-spec create_entry(Node :: mynode(), Type :: entry_type(), RT :: rt()) ->
     {rt_entry(), rt_entry(), rt_entry()}.
 create_entry(Node, Type, RT) ->
-    NodeId = node:id(Node),
+    NodeId = id(Node),
     Tree = get_rt_tree(RT),
-    FirstNode = node:id(Node) =:= get_source_id(RT),
+    FirstNode = id(Node) =:= get_source_id(RT),
     case util:gb_trees_largest_smaller_than(NodeId, Tree)of
         nil when FirstNode -> % this is the first entry of the RT
             NewEntry = rt_entry_from(Node, Type, NodeId, NodeId),
@@ -727,13 +736,13 @@ create_entry(Node, Type, RT) ->
 
 % Get the tuple of adjacent finger ids with Node being in the middle:
 % {Predecessor, Node, Successor}
--spec get_adjacent_fingers_from(Pred::rt_entry(), Node::node:node_type(),
+-spec get_adjacent_fingers_from(Pred::rt_entry(), Node::mynode(),
     Type::entry_type(), RT::rt()) -> {rt_entry(), rt_entry(), rt_entry()}.
 get_adjacent_fingers_from(Pred, Node, Type, RT) ->
     PredId = entry_nodeid(Pred),
     Succ = successor_node(RT, Pred),
     SuccId = entry_nodeid(Succ),
-    NodeId = node:id(Node),
+    NodeId = id(Node),
     NewEntry = rt_entry_from(Node, Type, PredId, SuccId),
     case PredId =:= SuccId of
         false ->
@@ -749,12 +758,12 @@ get_adjacent_fingers_from(Pred, Node, Type, RT) ->
 
 % @doc Add a new entry to the routing table. A source node is only allowed to be added
 % once.
--spec entry_learning(Entry :: node:node_type(), Type :: entry_type(), RT :: rt()) -> RefinedRT :: rt().
+-spec entry_learning(Entry :: mynode(), Type :: entry_type(), RT :: rt()) -> RefinedRT :: rt().
 entry_learning(Entry, Type, RT) ->
     % only add the entry if it doesn't exist yet or if it is a sticky node. If its a
     % stickynode, RM told us about a new neighbour -> if the neighbour was already added
     % as a normal node, convert it to a sticky node now.
-    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) of
+    case gb_trees:lookup(id(Entry), get_rt_tree(RT)) of
         none ->
             % change the type to 'sticky' if the node is between the neighbors of the source
             % node
@@ -768,12 +777,12 @@ entry_learning(Entry, Type, RT) ->
                             case Pred =< Succ of
                                 true ->
                                     Interval = intervals:new('[', Pred, Succ, ']'),
-                                    intervals:in(node:id(Entry), Interval);
+                                    intervals:in(id(Entry), Interval);
                                 false ->
                                     Interval = intervals:new('[', Pred, 0, ']'),
                                     Interval2 = intervals:new('[', 0, Succ, ']'),
-                                    intervals:in(node:id(Entry), Interval) orelse
-                                        intervals:in(node:id(Entry), Interval2)
+                                    intervals:in(id(Entry), Interval) orelse
+                                        intervals:in(id(Entry), Interval2)
                             end;
                         false ->
                             % Only two nodes are existing in the ring (otherwise, Pred == Succ
@@ -814,8 +823,8 @@ entry_learning(Entry, Type, RT) ->
             % maintenance.
             case Type of
                 sticky -> % update entry
-                    StickyEntry = rt_get_node(node:id(Entry), RT),
-                    Nodes = gb_trees:enter(node:id(Entry),
+                    StickyEntry = rt_get_node(id(Entry), RT),
+                    Nodes = gb_trees:enter(id(Entry),
                         StickyEntry#rt_entry{type=sticky},
                         get_rt_tree(RT)),
                     rt_set_nodes(RT, Nodes);
@@ -832,7 +841,7 @@ entry_learning(Entry, Type, RT) ->
     end.
 
 % @doc Combines entry learning and entry filtering.
--spec entry_learning_and_filtering(node:node_type(), entry_type(), rt()) -> rt().
+-spec entry_learning_and_filtering(mynode(), entry_type(), rt()) -> rt().
 entry_learning_and_filtering(Entry, Type, RT) ->
     IntermediateRT = entry_learning(Entry, Type, RT),
 
@@ -843,7 +852,7 @@ entry_learning_and_filtering(Entry, Type, RT) ->
             NewRT = entry_filtering(IntermediateRT),
             %% only delete the subscription if the newly added node was not filtered;
             %otherwise, there isn't a subscription yet
-            case rt_lookup_node(node:id(Entry), NewRT) of
+            case rt_lookup_node(id(Entry), NewRT) of
                 none -> ok;
                 {value, _RTEntry} -> update_fd(RT, NewRT)
             end,
@@ -919,9 +928,9 @@ add_entry(Node, Type, RT) ->
 add_sticky_entry(Entry, RT) -> add_entry(Entry, sticky, RT).
 
 % @doc Add the source entry to the routing table
--spec add_source_entry(Entry :: node:node_type(), rt()) -> rt().
+-spec add_source_entry(Entry :: mynode(), rt()) -> rt().
 add_source_entry(Entry, #rt_t{source=undefined} = RT) ->
-    IntermediateRT = set_source_node(node:id(Entry), RT),
+    IntermediateRT = set_source_node(id(Entry), RT),
     % only learn; the RT must be empty, so there is no filtering needed afterwards
     NewRT = entry_learning(Entry, source, IntermediateRT),
     add_fd(NewRT),
@@ -943,7 +952,7 @@ rt_entry_set_node(#rt_entry{} = Entry, Node) -> Entry#rt_entry{node=Node}.
 % @doc Calculate the distance between two nodes in the routing table
 -spec rt_entry_distance(From :: rt_entry(), To :: rt_entry()) -> non_neg_integer().
 rt_entry_distance(From, To) ->
-    get_range(node:id(rt_entry_node(From)), node:id(rt_entry_node(To))).
+    get_range(id(rt_entry_node(From)), id(rt_entry_node(To))).
 
 % @doc Get all nodes within the routing table
 -spec rt_get_nodes(RT :: rt()) -> [rt_entry()].
@@ -984,7 +993,7 @@ rt_lookup_node(NodeId, RT) -> gb_trees:lookup(NodeId, get_rt_tree(RT)).
 
 % @doc Get the id of a given node
 -spec rt_entry_id(Entry :: rt_entry()) -> key().
-rt_entry_id(Entry) -> node:id(rt_entry_node(Entry)).
+rt_entry_id(Entry) -> id(rt_entry_node(Entry)).
 
 %% @doc Check if the given routing table entry is of the given entry type.
 -spec entry_is_of_type(rt_entry(), Type::entry_type()) -> boolean().
@@ -1004,7 +1013,7 @@ entry_type(Entry) -> Entry#rt_entry.type.
 
 %% @doc Get the node id of a routing table entry
 -spec entry_nodeid(Node :: rt_entry()) -> key().
-entry_nodeid(#rt_entry{node=Node}) -> node:id(Node).
+entry_nodeid(#rt_entry{node=Node}) -> id(Node).
 
 % @doc Get the adjacent fingers from a routing table entry
 -spec adjacent_fingers(rt_entry()) -> {key(), key()}.
@@ -1068,7 +1077,7 @@ canonical_spacing(SourceId, NodeId, SuccId) ->
 % @doc Check that all entries in an rt are well connected by their adjacent fingers
 -spec check_rt_integrity(RT :: rt()) -> boolean().
 check_rt_integrity(#rt_t{} = RT) ->
-    Nodes = [node:id(N) || N <- internal_to_list(RT)],
+    Nodes = [id(N) || N <- internal_to_list(RT)],
 
     %  make sure that the entries are well-connected
     Currents = Nodes,
@@ -1091,22 +1100,25 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
 -spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
                    Hops::non_neg_integer()) ->
-    {'$wrapped', comm:mypid(), comm:message()} | comm:message().
-wrap_message(_Key, Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
+    {'$wrapped', mynode(), comm:message()} | comm:message().
+wrap_message(_Key, Msg, State, 0) ->
+    MyNode = dht_node_state:get(State, node),
+    {'$wrapped', node2mynode(MyNode), Msg};
+
 wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
     %% The reduction ratio is only useful if this is not the last hop
     case intervals:in(Key, nodelist:succ_range(dht_node_state:get(State, neighbors))) of
         true -> ok;
         false ->
             MyId = dht_node_state:get(State, node_id),
-            SenderId = node:id(Issuer),
-            SenderPid = node:pidX(Issuer),
-            NextHop = element(2, next_hop_node(State, Key)),
+            SenderId = id(Issuer),
+            SenderPid = pidX(Issuer),
+            {_Tag, {NextHopId, NextHop}} = next_hop_node(State, Key),
             SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
                 unknown -> true;
                 RingSize ->
                     FirstDist = get_range(SenderId, MyId),
-                    TotalDist = get_range(SenderId, node:id(NextHop)),
+                    TotalDist = get_range(SenderId, NextHopId),
                     % reduction ratio > optimal/convergent ratio?
                     1 - FirstDist / TotalDist >
                     case config:read(rt_frt_reduction_ratio_strategy) of
@@ -1117,7 +1129,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
 
             case SendMsg of
                 true -> comm:send(SenderPid, {?send_to_group_member, routing_table,
-                                              {rt_learn_node, NextHop}});
+                                              {rt_learn_node, {NextHopId, NextHop}}});
                 false -> ok
             end
     end,
@@ -1134,7 +1146,7 @@ best_rt_reduction_ratio(RingSize) ->
 convergent_rt_reduction_ratio(RingSize) ->
     1 - math:pow(1 / RingSize, 4 / (maximum_entries() - 2)).
 
--spec learn_on_forward(Issuer::node:node_type()) -> ok.
+-spec learn_on_forward(Issuer::mynode()) -> ok.
 learn_on_forward(Issuer) ->
     comm:send_local(self(), {?send_to_group_member, routing_table,
                              {rt_learn_node, Issuer}}).
@@ -1183,3 +1195,16 @@ check_well_connectedness(RT) ->
         _:_ -> false
     end
     .
+
+%% @doc Transform a node:node_type() to mynode().
+-spec node2mynode(Node::node:node_type()) -> mynode().
+node2mynode(Node) -> {node:id(Node), node:pidX(Node)}.
+
+%% @doc Get the Pid from an mynode().
+-spec pidX(Node::mynode()) -> comm:mypid().
+pidX({_Id, Pid}) -> Pid.
+
+%% @doc Get the id from a mynode().
+-spec id(Node::mynode()) -> key().
+id({Id, _Pid}) -> Id.
+
