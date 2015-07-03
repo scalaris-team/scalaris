@@ -87,11 +87,7 @@ next_hop(_Config) ->
     config:write(rt_size_use_neighbors, 0),
 
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
-
-    %% the aux -> fin conversion is moved to dht_node_lookup, so the following
-    %% check doesn't work anymore for next_hop
-    %% call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
-
+    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, succ]), % succ is responsible
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 2, node:pidX(Succ)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 3, lists:nth(1, DHTNodes)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 7, lists:nth(2, DHTNodes)]),
@@ -128,11 +124,7 @@ next_hop2(_Config) ->
     config:write(rt_size_use_neighbors, 10),
 
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
-
-    %% the aux -> fin conversion is moved to dht_node_lookup, so the following
-    %% check doesn't work anymore for next_hop
-    %% call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, node:pidX(Succ)]), % succ is responsible
-
+    call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, succ]), % succ is responsible
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 2, node:pidX(Succ)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 3, node:pidX(SuccSucc)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 7, lists:nth(2, DHTNodes)]),

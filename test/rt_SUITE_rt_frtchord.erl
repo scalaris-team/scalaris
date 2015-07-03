@@ -31,10 +31,11 @@ create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes, Neighbors) ->
     RT1 = gb_trees:from_orddict(
             [begin
                  Key = number_to_key(N),
-                 {Key, lists:nth(Idx, Nodes)}
+                 {Key, {Key, lists:nth(Idx, Nodes), none}}
              end || {N, Idx} <- RT_Keys]),
-    RT2 = lists:foldl(fun(Node, AccIn) -> gb_trees:enter(node:id(Node), node:pidX(Node), AccIn) end,
-                      RT1, nodelist:succs(Neighbors) ++ nodelist:preds(Neighbors)),
+    RT2 = lists:foldl( fun(Node, AccIn) -> Id = node:id(Node),
+                                           gb_trees:enter(Id, {Id, node:pidX(Node), none}, AccIn)
+                       end, RT1, nodelist:succs(Neighbors) ++ nodelist:preds(Neighbors)),
     {length(Nodes), RT2}.
 
 check_next_hop(State, _Succ, N, NodeExp) ->

@@ -29,7 +29,7 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
          check_config/0,
-         get_neighb/1, get_rt/1, set_rt/2, get_ert/1, set_ert/2,
+         get_neighb/1, get_pid_dht/1, get_rt/1, set_rt/2, get_ert/1, set_ert/2,
          rm_neighbor_change/3, rm_send_update/5]).
 
 -export_type([state_active/0]).
@@ -162,13 +162,11 @@ on_active({deactivate_rt}, {Neighbors, _OldRT, _ERT, DHTPid})  ->
 on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, OldERT, DHTPid}) ->
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
-            %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             NewERT = ?RT:check(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true),
             % trigger immediate rebuild
             gen_component:post_op({periodic_rt_rebuild}, {NewNeighbors, NewRT, NewERT, DHTPid})
         ;
         {ok, NewRT} ->
-            %% ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             NewERT = ?RT:check(OldRT, NewRT, OldERT, OldNeighbors, NewNeighbors, true),
             {NewNeighbors, NewRT, NewERT, DHTPid}
     end;
@@ -185,7 +183,6 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT, OldERT, DHTPid}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
-    %% ?RT:check(OldRT, NewRT, Neighbors, true),
     NewERT = ?RT:check(OldRT, NewRT, OldERT, Neighbors, true),
     {Neighbors, NewRT, NewERT, DHTPid};
 %% userdevguide-end rt_loop:trigger
@@ -287,6 +284,9 @@ lookup_aux_leases(Neighbors, ERT, DHTPid, Key, Hops, Msg) ->
 -spec get_neighb(State::state_active()) -> nodelist:neighborhood().
 get_neighb({Neighbors, _RT, _ERT, _DHTPid}) ->
     Neighbors.
+
+-spec get_pid_dht(State::state_active()) -> comm:mypid().
+get_pid_dht({_Neighbors, _RT, _ERT, DHTPid}) -> DHTPid.
 
 -spec get_rt(State::state_active()) -> ?RT:rt().
 get_rt({_Neighbors, RT, _ERT, _DHTPid}) -> RT.

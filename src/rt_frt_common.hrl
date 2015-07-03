@@ -56,12 +56,12 @@
 % Functions which are to be implemented in modules including this header
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% RT Implementation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key() :: rt_chord:key().
--type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), NodePid::comm:mypid()).
+-type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::mynode()).
 -type external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
 
 % define the possible types of nodes in the routing table:
@@ -71,7 +71,7 @@
 -type entry_type() :: normal | source | sticky.
 -type custom_info() :: undefined | term().
 
--type(mynode() :: {Id::key(), Pid::comm:mypid()}).
+-type(mynode() :: {Id::key(), DHTNodePid::comm:mypid(), RTLoopPid::comm:mypid()}).
 -record(rt_entry, {
         node :: mynode(),
         type :: entry_type(),
@@ -101,7 +101,8 @@
                         | {trigger_random_lookup}
                         | {rt_get_node, From :: comm:mypid()}
                         | {rt_learn_node, NewNode :: mynode()}
-                        .
+                        | {rt_get_neighbor, From :: comm:mypid()}
+                        | {rt_learn_neighbor, NewNode :: mynode()}.
 
 -include("scalaris.hrl").
 -include("rt_beh.hrl").
@@ -151,13 +152,15 @@ get_random_node_id() -> rt_chord:get_random_node_id().
 %% userdevguide-begin rt_frtchord:init_stabilize
 %% @doc Triggered by a new stabilization round, renews the routing table.
 %% Check:
+%% - if node id didn't change, i.e. only preds/succs changed, update sticky entries
 %% - if node id changed, just renew the complete table and maybe tell known nodes
 %%  that something changed (async and optimistic -> if they don't care, we don't care)
-%% - if pred/succ changed, update sticky entries
 -spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) ->
+    %% log:pal("[~w] init_stabilize", [self()]),
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
-        true -> update_entries(Neighbors, RT) ;
+        true ->
+            update_entries(Neighbors, RT) ;
         false -> % source node changed, replace the complete table
             init(Neighbors)
     end
@@ -169,35 +172,60 @@ init_stabilize(Neighbors, RT) ->
 %% anymore to normal nodes. Afterwards it adds new nodes from the neighborhood.
 -spec update_entries(NewNeighborhood::nodelist:neighborhood(), RT::rt()) -> rt().
 update_entries(NewNeighborhood, RT) ->
-    %% neighborhood nodes (sticky ndoes) from RT
-    OldNeighbors = sets:from_list(lists:map(fun rt_entry_node/1, get_sticky_entries(RT))),
+    %% neighborhood nodes (sticky nodes) from RT
+    OldNeighbors1 = lists:map(fun rt_entry_node/1, get_sticky_entries(RT)),
+    OldNeighbors2 = lists:map(fun(Node) -> {id(Node), pid_dht(Node)} end, OldNeighbors1),
+    OldNeighbors3 = sets:from_list(OldNeighbors2),
+    %% OldNeighbors = sets:from_list(tl(nodelist:to_list(OldNeighborhood))),
 
     %% neighborhood nodes (succs + preds w/o self) from new neighborhood from rm
-    NewNeighbors = sets:from_list(tl(nodelist:to_list(NewNeighborhood))),
+    NewNeighbors1 = tl(nodelist:to_list(NewNeighborhood)),
+    NewNeighbors2 = lists:map(fun(Node) -> {node:id(Node), node:pidX(Node)} end, NewNeighbors1),
+    NewNeighbors3 = sets:from_list(NewNeighbors2),
 
     %% former neighborhood nodes which aren't neighboorhod nodes anymore
-    ConvertNodes = sets:subtract(OldNeighbors, NewNeighbors),
-    ConvertNodesIds = util:sets_map(fun node:id/1, ConvertNodes),
+    ConvertNodes = sets:subtract(OldNeighbors3, NewNeighbors3),
+    ConvertNodesIds = util:sets_map(fun({Id, _Pid}) -> Id end, ConvertNodes),
 
     %% new neighboorhod nodes
-    ToBeAddedNodes = sets:subtract(NewNeighbors, OldNeighbors),
+    ToBeAddedNodes1 = sets:subtract(NewNeighbors3, OldNeighbors3),
+    %% Add PidRTs to the nodes to be added. There might be PidRTs in the old RT
+    %% even for "new" nodes, e.g. for nodes added through get_rt_reply (i.e. for
+    %% normal nodes are converted to sticky nodes)
+    OldNodes = lists:map(fun rt_entry_node/1, gb_trees:values(get_rt_tree(RT))),
+    ToBeAddedNodes2 =
+        util:sets_map(fun({Id, PidDHT}) ->
+                              case lists:keyfind(Id, 1, OldNodes) of
+                                  {Id, PidDHT, PidRT} -> {Id, PidDHT, PidRT};
+                                  _else -> {Id, PidDHT, none}
+                              end
+                      end, ToBeAddedNodes1),
 
     %% uncomment for debugging
-    %% case sets:size(ConvertNodes) > 0 orelse sets:size(ToBeAddedNodes) > 0 of
+    %% case sets:size(ConvertNodes) > 0 orelse sets:size(ToBeAddedNodes1) > 0 of
     %%     true ->
     %%         log:pal("~w~nOldNeighbors:~n~190.2p~nNewNeighors:~n~190.2p~n" ++
     %%                 "ConvertNodes:~n~190.2p~nToBeAddedNodes~n~190.2p~n",
-    %%                 [self(), sets:to_list(OldNeighbors), sets:to_list(NewNeighbors),
-    %%                  sets:to_list(ConvertNodes), sets:to_list(ToBeAddedNodes)]);
+    %%                 [self(), OldNeighbors1, NewNeighbors1, sets:to_list(ConvertNodes),
+    %%                  ToBeAddedNodes2]);
     %%     false -> ok
     %% end,
 
-    % convert former neighboring nodes to normal nodes and add sticky nodes
+    %% convert former neighboring nodes to normal nodes and add sticky nodes
     FilteredRT = lists:foldl(fun sticky_entry_to_normal_node/2, RT, ConvertNodesIds),
-    NewRT = sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes),
+    NewRT = lists:foldl(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes2),
+
+    %% request rt_loop pids of new neighbours with unknown PidRTs
+    ToBeAddedNodes3 = lists:filter(fun({_Id, _PidDHT, PidRT}) ->
+                                           PidRT =:= none
+                                   end, ToBeAddedNodes2),
+    lists:foreach(fun(Node) -> comm:send(pid_dht(Node),
+                                         {?send_to_group_member, routing_table,
+                                          {rt_get_neighbor, comm:this()}})
+                  end, ToBeAddedNodes3),
+
     check_helper(RT, NewRT, true),
-    NewRT
-    .
+    NewRT.
 
 %% userdevguide-begin rt_frtchord:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
@@ -210,8 +238,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
     case nodelist:node(OldNeighbors) =:= nodelist:node(NewNeighbors) of
         true -> % source node didn't change
             % update the sticky nodes: delete old nodes and add new nodes
-            {ok, update_entries(NewNeighbors, OldRT)}
-            ;
+            {ok, update_entries(NewNeighbors, OldRT)};
         _Else -> % source node changed, rebuild the complete table
             {trigger_rebuild, OldRT}
     end
@@ -224,7 +251,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 -spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 filter_dead_node(RT, DeadPid, _Reason) ->
     % find the node id of DeadPid and delete it from the RT
-    case [N || N <- internal_to_list(RT), pidX(N) =:= DeadPid] of
+    case [N || N <- internal_to_list(RT), pid_dht(N) =:= DeadPid] of
         %% TODO fix, can return more than one node! (same pid, different id)
         [Node] -> entry_delete(id(Node), RT);
         [] -> RT
@@ -235,7 +262,7 @@ filter_dead_node(RT, DeadPid, _Reason) ->
 %% userdevguide-begin rt_frtchord:to_pid_list
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt()) -> [comm:mypid()].
-to_pid_list(RT) -> [pidX(N) || N <- internal_to_list(RT)].
+to_pid_list(RT) -> [pid_dht(N) || N <- internal_to_list(RT)].
 %% userdevguide-end rt_frtchord:to_pid_list
 
 %% @doc Get the size of the RT excluding entries which are not tagged as normal entries.
@@ -396,8 +423,9 @@ handle_custom_message({get_rt_reply, RT}, State) ->
     NewRT = case OldRT =/= RT of
         true ->
             % - add each entry from the other RT if it doesn't already exist
-            % - entries to be added have to be normal entries as RM invokes adding sticky
-            % nodes
+            % - entries are added as normal entries. RM (-> update()) invokes
+            %   adding sticky nodes or converting normal nodes to sticky nodes
+            %   respectively
             util:gb_trees_foldl(
                 fun(Key, Entry, Acc) ->
                         case entry_exists(Key, Acc) of
@@ -406,8 +434,6 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                         end
                 end,
                 OldRT, get_rt_tree(RT));
-
-
         false -> OldRT
     end,
     NewERT = check(OldRT, NewRT, rt_loop:get_ert(State),
@@ -435,9 +461,8 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
 handle_custom_message({rt_get_node, From}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(From, {rt_learn_node, node2mynode(MyNode)}),
-    State
-    ;
+    comm:send(From, {rt_learn_node, {node:id(MyNode), node:pidX(MyNode), comm:this()}}),
+    State;
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
@@ -452,12 +477,49 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
         end,
     rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 
+handle_custom_message({rt_get_neighbor, From}, State) ->
+    MyNode = nodelist:node(rt_loop:get_neighb(State)),
+    MyId = node:id(MyNode),
+    PidDHT = node:pidX(MyNode),
+    PidRT = comm:this(),
+    comm:send(From, {rt_learn_neighbor, MyId, PidDHT, PidRT}),
+    State;
+
+handle_custom_message({rt_learn_neighbor, Id, PidDHT, PidRT}, State) ->
+    OldRT = rt_loop:get_rt(State),
+    {NewRT, NewERT} =
+        case rt_lookup_node(Id, OldRT) of
+            %% if no entry exists: don't add
+            %% this could be due to
+            %% 1) nodes which were neighbors when sending the rt_get_neighbor
+            %%    request, but aren't neighbors anymore and have been filtered
+            %%    out of the rt since
+            %% 2) Interleavings of requesting the rt pids and crashing nodes
+            none -> {OldRT, rt_loop:get_ert(State)};
+
+            %% only update the RT if the PidRT is unknown
+            {value, OldEntry} ->
+                OldNode = rt_entry_node(OldEntry),
+                case OldNode =:= {Id, PidDHT, none} of
+                    true ->
+                        RT = rt_update_pid(OldRT, {id(OldNode), PidDHT, PidRT}),
+                        ERT = check(OldRT, RT, rt_loop:get_ert(State),
+                                    rt_loop:get_neighb(State), true),
+                        %% print_debug(true, OldNode, {Id, PidDHT, PidRT}, ERT),
+                        {RT, ERT};
+                    false ->
+                        %% print_debug(false, OldNode, {Id, PidDHT, PidRT}, rt_loop:get_ert(State)),
+                        {OldRT, rt_loop:get_ert(State)}
+                end
+        end,
+    rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
+
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
     NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
     gossip_load:get_values_best([{msg_delay, config:read(rt_frt_gossip_interval)}]),
     ERT = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
-    comm:send_local(pid_groups:get_my(dht_node), {rt_update, ERT}),
+    comm:send_local(rt_loop:get_pid_dht(State), {rt_update, ERT}),
     rt_loop:set_ert(rt_loop:set_rt(State, NewRT), ERT);
 
 handle_custom_message(_Message, _State) -> unknown_event.
@@ -519,7 +581,7 @@ check_helper(OldRT, NewRT, ReportToFD) ->
 %% @doc Filter the source node's pid from a list.
 -spec filter_source_pid(rt(), [comm:mypid()]) -> [comm:mypid()].
 filter_source_pid(RT, ListOfPids) ->
-    SourcePid = pidX(rt_entry_node(get_source_node(RT))),
+    SourcePid = pid_dht(rt_entry_node(get_source_node(RT))),
     [P || P <- ListOfPids, P =/= SourcePid].
 
 %% @doc Set up a set of subscriptions from a routing table
@@ -541,9 +603,9 @@ update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
 
 %% userdevguide-end rt_frtchord:check
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Communication with dht_node
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Communication with routing_table and dht_node
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_frtchord:empty_ext
 -spec empty_ext(nodelist:neighborhood()) -> external_rt().
@@ -558,23 +620,22 @@ next_hop_node(Neighbors, ERT, Id) ->
         true ->
             succ;
         _ ->
-             RT = external_rt_get_tree(ERT),
-             RTSize = get_size(ERT),
-             {NextHopId, NextHop} = case util:gb_trees_largest_smaller_than(Id, RT) of
-                                        {value, Id1, Node} ->
-                                            {Id1, Node};
-                                        nil when RTSize =:= 0 ->
-                                            node2mynode(nodelist:succ(Neighbors));
-                                        nil -> % forward to largest finger
-                                            gb_trees:largest(RT)
-                                    end,
+            RT = external_rt_get_tree(ERT),
+            RTSize = get_size(ERT),
+            NextHop = case util:gb_trees_largest_smaller_than(Id, RT) of
+                          {value, _Id1, Node} -> Node;
+                          nil when RTSize =:= 0 ->
+                              node2mynode(nodelist:succ(Neighbors));
+                          nil -> % forward to largest finger
+                              {_Id, Node} = gb_trees:largest(RT),
+                              Node
+                      end,
                  case RTSize < config:read(rt_size_use_neighbors) of
-                     false ->
-                         {NextHopId, NextHop};
+                     false -> NextHop;
                      _     -> % check neighborhood:
                          % create a fake LastFound node:node_type() for largest_smaller_than
                          % (only Id is used in largest_smaller_than)
-                         BestSoFar = node:new(NextHop, NextHopId, 0),
+                         BestSoFar = node:new(pid_dht(NextHop), id(NextHop), 0),
                          NextHopNew = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
                          node2mynode(NextHopNew)
                  end
@@ -583,16 +644,18 @@ next_hop_node(Neighbors, ERT, Id) ->
 -spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, ERT, Id) ->
     case next_hop_node(Neighbors, ERT, Id) of
-    {_NextHopId, Pid} -> Pid;
-        succ -> succ
+        succ -> succ;
+        Node -> case pid_rt(Node) of
+                    none -> pid_dht(Node);
+                    Pid -> Pid
+                end
     end.
 %% userdevguide-end rt_frtchord:next_hop
 
 %% @doc Return the succ
 %% TODO: lookup succ in ERT (if changing to rt_loop pids in RT)
 -spec succ(ERT::external_rt(), Neighbors::nodelist:neighborhood()) -> comm:mypid().
-succ(_ERT, Neighbors) ->
-    node:pidX(nodelist:succ(Neighbors)).
+succ(_ERT, Neighbors) -> node:pidX(nodelist:succ(Neighbors)).
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node.
@@ -607,7 +670,7 @@ export_rt_to_dht_node_helper(RT) ->
                     case entry_type(V) of
                         source -> Acc;
                         _Else -> Node = rt_entry_node(V),
-                            gb_trees:enter(id(Node), pidX(Node), Acc)
+                            gb_trees:enter(id(Node), Node, Acc)
                     end
             end, gb_trees:empty(),get_rt_tree(RT))}.
 
@@ -624,7 +687,7 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 to_list(State) -> % match external RT
     {_, ERT} = dht_node_state:get(State, rt),
     KVList = gb_trees:to_list(ERT),
-    FakeNodes = lists:map(fun ({Id, Pid}) -> node:new(Pid, Id, 0) end, KVList),
+    FakeNodes = lists:map(fun ({Id, Node}) -> node:new(pid_dht(Node), Id, 0) end, KVList),
     Neighbors = dht_node_state:get(State, neighbors),
     NodeList = nodelist:mk_nodelist([nodelist:succ(Neighbors) | FakeNodes],
         nodelist:node(Neighbors)),
@@ -653,9 +716,9 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
     .
 %% userdevguide-end rt_frtchord:to_list
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FRT specific algorithms and functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Filter one element from a set of nodes. Do it in a way that filters such a node
 % that the resulting routing table is the best one under all _possible_ routing tables.
@@ -869,9 +932,9 @@ entry_learning_and_filtering(Entry, Type, RT) ->
             IntermediateRT
     end.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RT and RT entry record accessors
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Get the source node of a routing table
 -spec get_source_node(RT :: rt()) -> rt_entry().
@@ -973,6 +1036,14 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 % @doc Set the size estimate of the ring
 -spec rt_set_ring_size(RT :: rt(), Size :: unknown | float()) -> rt().
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
+
+-spec rt_update_pid(RT::rt(), NewNode::mynode()) -> rt().
+rt_update_pid(OldRT, NewNode) ->
+    OldEntry= rt_get_node(id(NewNode), OldRT),
+    NewEntry = rt_entry_set_node(OldEntry, NewNode),
+    OldNodeTree = get_rt_tree(OldRT),
+    NewNodeTree = gb_trees:update(id(NewNode), NewEntry, OldNodeTree),
+    rt_set_nodes(OldRT, NewNodeTree).
 
 % @doc Get the ring size estimate from the external routing table
 -spec external_rt_get_ring_size(RT :: external_rt()) -> Size :: float() | unknown.
@@ -1111,7 +1182,8 @@ check_rt_integrity(#rt_t{} = RT) ->
                                                 comm:message()} | comm:message().
 wrap_message(_Key, Msg, _ERT, Neighbors, 0) ->
     MyNode = nodelist:node(Neighbors),
-    {'$wrapped', node2mynode(MyNode), Msg};
+    RTLoopPid = comm:make_global(pid_groups:get_my(routing_table)),
+    {'$wrapped', {node:id(MyNode), node:pidX(MyNode), RTLoopPid}, Msg};
 
 wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
     %% The reduction ratio is only useful if this is not the last hop
@@ -1119,15 +1191,12 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
         true -> ok;
         false ->
             MyNode = nodelist:node(Neighbors),
-            MyId = node:id(MyNode),
-            SenderId = id(Issuer),
-            SenderPid = pidX(Issuer),
-            {NextHopId, NextHop} = next_hop_node(Neighbors, ERT, Key),
+            NextHop = next_hop_node(Neighbors, ERT, Key),
             SendMsg = case external_rt_get_ring_size(ERT) of
                 unknown -> true;
                 RingSize ->
-                    FirstDist = get_range(SenderId, MyId),
-                    TotalDist = get_range(SenderId, NextHopId),
+                    FirstDist = get_range(id(Issuer), node:id(MyNode)),
+                    TotalDist = get_range(id(Issuer), id(NextHop)),
                     % reduction ratio > optimal/convergent ratio?
                     1 - FirstDist / TotalDist >
                     case config:read(rt_frt_reduction_ratio_strategy) of
@@ -1137,8 +1206,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
             end,
 
             case SendMsg of
-                true -> comm:send(SenderPid, {?send_to_group_member, routing_table,
-                                              {rt_learn_node, {NextHopId, NextHop}}});
+                true -> send2rt(Issuer, {rt_learn_node, NextHop});
                 false -> ok
             end
     end,
@@ -1157,8 +1225,7 @@ convergent_rt_reduction_ratio(RingSize) ->
 
 -spec learn_on_forward(Issuer::mynode()) -> ok.
 learn_on_forward(Issuer) ->
-    comm:send_local(self(), {?send_to_group_member, routing_table,
-                             {rt_learn_node, Issuer}}).
+    comm:send_local(self(), {rt_learn_node, Issuer}).
 
 %% userdevguide-end rt_frtchord:wrap_message
 
@@ -1207,13 +1274,38 @@ check_well_connectedness(RT) ->
 
 %% @doc Transform a node:node_type() to mynode().
 -spec node2mynode(Node::node:node_type()) -> mynode().
-node2mynode(Node) -> {node:id(Node), node:pidX(Node)}.
+node2mynode(Node) -> {node:id(Node), node:pidX(Node), none}.
 
 %% @doc Get the Pid from an mynode().
--spec pidX(Node::mynode()) -> comm:mypid().
-pidX({_Id, Pid}) -> Pid.
+-spec pid_dht(Node::mynode()) -> comm:mypid().
+pid_dht({_Id, PidDHT, _PidRT}) -> PidDHT.
+
+%% @doc Get the Pid from an mynode().
+-spec pid_rt(Node::mynode()) -> comm:mypid().
+pid_rt({_Id, _PidDHT, PidRT}) -> PidRT.
 
 %% @doc Get the id from a mynode().
 -spec id(Node::mynode()) -> key().
-id({Id, _Pid}) -> Id.
+id({Id, _PidDHT, _PidRT}) -> Id.
 
+%% @doc Send Msg to the routing table.
+%%      Send directly if rt_loop pid is known, otherwise as group_member msg.
+-spec send2rt(Node::mynode(), Msg::comm:msg()) -> ok.
+send2rt(Node, Msg) ->
+    {Pid, NewMsg} = case pid_rt(Node) of
+                        none ->
+                            MsgNew = {?send_to_group_member, routing_table, Msg},
+                            {pid_dht(Node), MsgNew};
+                        PidDHT ->
+                            {PidDHT, Msg}
+                    end,
+    comm:send(Pid, NewMsg).
+
+%% print_debug(Case, OldNode, NewNode, ERT) ->
+%%     OldPidDHT = comm:make_local(pid_dht(OldNode)),
+%%     OldPidRT = comm:make_local(pid_rt(OldNode)),
+%%     NewPidDHT = comm:make_local(pid_dht(NewNode)),
+%%     NewPidRT = comm:make_local(pid_rt(NewNode)),
+%%     log:pal("{~w, ~w} Update Neighbor: ~w. KnownNode: ~w. NewNode: ~w~n",
+%%             [pid_groups:get_my(dht_node), self(), Case, {OldPidDHT, OldPidRT},
+%%              {NewPidDHT, NewPidRT}]).
