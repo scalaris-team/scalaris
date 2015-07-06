@@ -245,8 +245,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_unitdir}/scalaris.service
 %{_unitdir}/scalaris-first.service
 %dir %{_sysconfdir}/conf.d
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris-first
+%config(noreplace) %{_sysconfdir}/conf.d/scalaris
+%config(noreplace) %{_sysconfdir}/conf.d/scalaris-first
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %attr(0600,root,root) %{_datadir}/selinux/packages/scalaris.pp
 %endif
@@ -254,14 +254,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/scalaris
 %{_sysconfdir}/init.d/scalaris-first
 %{_sbindir}/rcscalaris
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd.conf
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd-first.conf
+%config(noreplace) %{_sysconfdir}/scalaris/initd.conf
+%config(noreplace) %{_sysconfdir}/scalaris/initd-first.conf
 %endif
-%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
-%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.cfg
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
-%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
+%dir %{_sysconfdir}/scalaris
+%config %{_sysconfdir}/scalaris/scalaris.cfg
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
+%config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
+%config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
 
 %files doc
 %defattr(-,root,root,-)
