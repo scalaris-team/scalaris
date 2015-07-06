@@ -44,26 +44,29 @@ wait_for_correct_leases(TargetSize) ->
 
 -spec wait_for_ring_size(pos_integer()) -> ok.
 wait_for_ring_size(Size) ->
-    wait_for(fun () -> 
-                     Nodes = api_vm:number_of_nodes(),
-                     log:log("expected ~w, found ~w", [Size, Nodes]),
-                     Nodes == Size end).
+    util:wait_for(fun () ->
+                          Nodes = api_vm:number_of_nodes(),
+                          log:log("ring size: expected ~w, found ~w", [Size, Nodes]),
+                          Nodes == Size end).
 
 -spec wait_for_correct_ring() -> ok.
 wait_for_correct_ring() ->
-    wait_for(fun () -> ct:pal("->admin:check_ring_deep()"),
-                       Res = admin:check_ring_deep(),
-                       ct:pal("<-admin:check_ring_deep()"),
-                       Res == ok
+    util:wait_for(fun () -> ct:pal("->admin:check_ring_deep()"),
+                            Res = admin:check_ring_deep(),
+                            ct:pal("<-admin:check_ring_deep()"),
+                            Res == ok
              end).
 
 -spec wait_for_number_of_valid_active_leases(integer()) -> ok.
 wait_for_number_of_valid_active_leases(Count) ->
-    wait_for(fun () ->
-                     AllLeases = get_all_leases(),
-                     ActiveLeases = [ lease_list:get_active_lease(LL) || LL <- AllLeases ],
-                     Count =:= length(lists:filter(fun l_on_cseq:is_valid/1, ActiveLeases))
-             end).
+    util:wait_for(fun () ->
+                          AllLeases = get_all_leases(),
+                          ActiveLeases = [ lease_list:get_active_lease(LL) || LL <- AllLeases ],
+                          ValidLeases = [ L || L <- ActiveLeases, l_on_cseq:is_valid(L)],
+                          NrOfValidLeases = length(ValidLeases),
+                          log:log("active leases: expected ~w, found ~w", [Count, NrOfValidLeases]),
+                          Count =:= NrOfValidLeases
+                  end).
 
 -spec print_all_active_leases() -> ok.
 print_all_active_leases() ->
@@ -84,17 +87,6 @@ print_all_passive_leases() ->
 % wait helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-wait_for(F) ->
-    case F() of
-        true ->
-            ok;
-        false ->
-            wait_for(F);
-        X ->
-            ct:pal("error in wait_for ~p", [X]),
-            wait_for(F)
-    end,
-    ok.
 
 get_dht_node_state(Pid, What) ->
     comm:send_local(Pid, {get_state, comm:this(), What}),
