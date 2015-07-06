@@ -39,6 +39,13 @@ get_load_for_interval(BucketInterval, MyRange, DB) ->
     case intervals:is_empty(Intersection) of
         true -> unknown;
         false ->
-            Load = db_dht:get_load(DB, BucketInterval),
-            {float(Load), 1.0}
+            try
+                Load = db_dht:get_load(DB, BucketInterval),
+                {float(Load), 1.0}
+            catch
+                Level:Reason ->
+                    log:pal("[ gossip ~p ] error while accessing DB: thrown ~s, reason:~.2p",
+                            [self(), Level, Reason]),
+                    unknown
+            end
     end.
