@@ -18,6 +18,7 @@ import org.datanucleus.transaction.NucleusTransactionException;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.orange.org.json.JSONArray;
 import com.orange.org.json.JSONException;
+import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
@@ -32,6 +33,7 @@ import de.zib.scalaris.UnknownException;
  * Scalaris. For example generating identities, managing all primary keys of a class to "iterate" over all stored 
  * instances, or ensuring uniqueness. 
  */
+@SuppressWarnings("rawtypes")
 public class ScalarisUtils {
     
     /**
@@ -39,13 +41,18 @@ public class ScalarisUtils {
      * type is stored. This is necessary for queries which need access to all stored
      * instances of the same type.
      */
-    private static final String ALL_ID_PREFIX = "_ALL_IDS";
+    private static final String ALL_ID_PREFIX = "ALL_IDS";
     
     /**
      * Key prefix used to signal a key which is used for identity generation. Its value
      * is an integer which is incremented every time an ID is generated.
      */
-    private static final String ID_GEN_KEY = "_ID_GEN";
+    private static final String ID_GEN_KEY = "ID_GEN";
+    
+    /**
+     * Key prefix used to store all values of members which are marked as "@Unique".
+     */
+    private static final String UNIQUE_MEMBER_PREFIX = "UNIQUE";
     
     /**
      * Generate a new ID which can be used to store a value at an unique key.
@@ -217,6 +224,20 @@ public class ScalarisUtils {
         }
     }
 
+    static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json) {
+        insertObjectToAllKey(op);
+        updateUniqueMemberKey(op, json);
+    }
+    
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json) {
+        updateUniqueMemberKey(op, json);
+    }
+    
+    static void performScalarisManagementForDelete(ObjectProvider op) {
+        removeObjectFromAllKey(op);
+        removeObjectFromUniqueMemberKey(op);
+    }
+    
     /**
      * Convenience method which returns the key containing all stored identities
      * of the given class.
@@ -230,11 +251,15 @@ public class ScalarisUtils {
     }
 
     private static String getManagementKeyName(String className) {
-        return String.format("%s%s", className, ALL_ID_PREFIX);
+        return String.format("%s_%s", className, ALL_ID_PREFIX);
     }
 
     private static String getIDGeneratorKeyName(String className) {
-        return String.format("%s%s", className, ID_GEN_KEY);
+        return String.format("%s_%s", className, ID_GEN_KEY);
+    }
+    
+    private static String getUniqueMemberKeyName(String className, String memberName) {
+        return String.format("%s_%s_%s", className, memberName, UNIQUE_MEMBER_PREFIX);
     }
     
     /**
@@ -252,7 +277,7 @@ public class ScalarisUtils {
      * @param op
      *            The data source
      */
-    static void insertObjectToAllKey(final ObjectProvider op) {
+    private static void insertObjectToAllKey(ObjectProvider op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -323,7 +348,7 @@ public class ScalarisUtils {
      * @param op
      *            The data source
      */
-    static void removeObjectFromAllKey(ObjectProvider op) {
+    private static void removeObjectFromAllKey(ObjectProvider op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -375,7 +400,15 @@ public class ScalarisUtils {
             mConn.release();
         }
     }
-
+    
+    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json) {
+        
+    }
+    
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider op) {
+        
+    }
+    
     /**
      * Convenience method to get all objects of the candidate type from the
      * specified connection. Objects of subclasses are ignored.

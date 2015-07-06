@@ -198,9 +198,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 try {
                     t1.write(id, jsonobj.toString());
                     t1.commit();
-
-                    // update reference on successful insert
-                    ScalarisUtils.insertObjectToAllKey(op);
+                    ScalarisUtils.performScalarisManagementForInsert(op, jsonobj);
                 } catch (ConnectionException e) {
                     e.printStackTrace();
                 } catch (UnknownException e) {
@@ -379,6 +377,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
                 t1.commit();
+                ScalarisUtils.performScalarisManagementForUpdate(op, stored);
             } catch (ConnectionException | UnknownException | AbortException  e) {
                 throw new NucleusException(e.getMessage(), e);
             } catch (NotFoundException e) {
@@ -452,10 +451,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     t1.write(id, jsonobj.toString());
                     t1.commit();
                     System.out.println("deleted id=" + id);
-                    // on success remove the corresponding entry in its
-                    // account key
-                    ScalarisUtils.removeObjectFromAllKey(op);
-
+                    ScalarisUtils.performScalarisManagementForDelete(op);
                 } catch (ConnectionException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                     // } catch (TimeoutException e) {
