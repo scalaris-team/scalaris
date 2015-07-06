@@ -85,8 +85,8 @@ Exceptions are made for RHEL-based distributions, SLE, openSUSE 11.4
 and Arch Linux:
 
   * For older openSUSE or SLE distributions, we provide Erlang R14B04.
-  * For RHEL-based distributions (CentOS~5,6,7, RHEL~5,6,7) we included the Erlang
-package from the EPEL repository of RHEL~6 and RHEL~7, respectively.
+  * For RHEL-based distributions (CentOS 5, 6 & 7, RHEL 5, 6 & 7) we included the Erlang
+package from the EPEL repository of RHEL 6 and RHEL 7, respectively.
 
 #### How to add our repository to openSUSE-based distributions (openSUSE, SLE)?
 
