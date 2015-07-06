@@ -589,7 +589,7 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, _Options) ->
                                       {column_names, rr_eval_point:mp_column_names()}]),
     NOptions = [{ep_file, EPFile}, {mp_file, MPFile} | Options],
     
-    StartT = erlang:now(),
+    StartT = os:timestamp(),
     
     lists:foldl(
       fun({Scenario, _RingP, _ReconP}, EPId) ->
@@ -614,7 +614,7 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, _Options) ->
               NextEPId
       end, StartEPId, Setups),
     
-    TimeDiff = erlang:round(timer:now_diff(erlang:now(), StartT) / (1000*1000)),
+    TimeDiff = erlang:round(timer:now_diff(os:timestamp(), StartT) / (1000*1000)),
     {_, {NH, NM, NS}} = erlang:localtime(),
     io:format("~n~cFinished at ~p:~p:~p~c in ~c~p:~p:~p~n~n~n",
               [?TAB, NH, NM, NS, ?TAB, ?TAB,
@@ -681,7 +681,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
               [StepCount, ?EVAL_REPEATS, ?TAB, StepValue, ?TAB, rc_conf_comment(StepRC)]),
     _ = [io:format("~c~s~n", [?TAB, X]) || X <- eval_setup_comment(Scen, StepRing, IncParam, StepValue, ?EVAL_REPEATS)],
     io:format("-----------------------------------------------------------------------~n"),
-    StartT = erlang:now(),
+    StartT = os:timestamp(),
     
     TraceName = rr_eval_trace,
     %Trace Export Parameter
@@ -721,7 +721,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
                                     MP
                             end),
     
-    TimeDiff = erlang:round(timer:now_diff(erlang:now(), StartT) / (1000*1000)),
+    TimeDiff = erlang:round(timer:now_diff(os:timestamp(), StartT) / (1000*1000)),
     io:format("~n~c~c~cSTEP TIME=~ph ~pm ~ps~n~n", [?TAB, ?TAB, ?TAB,
                                                       TimeDiff div (60*60),
                                                       (TimeDiff div 60) rem 60,
@@ -754,7 +754,7 @@ system_sync({Scen, RingP, ReconP}, Options, Rounds, EPId) ->
     io:format(">EVALUATE IN ROUNDS Repeats: ~p - Rounds=~p - ~s~n", [?EVAL_REPEATS, Rounds, rc_conf_comment(ReconP)]),
     _ = [io:format("~c~s~n", [?TAB, X]) || X <- eval_setup_comment(Scen, RingP, rounds, Rounds, ?EVAL_REPEATS)],
     io:format("-----------------------------------------------------------------------~n"),
-    StartT = erlang:now(),
+    StartT = os:timestamp(),
     TraceName = rr_eval_trace,
     
     Results = util:for_to_ex(1, ?EVAL_REPEATS,
@@ -790,7 +790,7 @@ system_sync({Scen, RingP, ReconP}, Options, Rounds, EPId) ->
     MPList = lists:flatten([element(1, X) || X <- Results]),
     NullMP = element(2, hd(Results)),
     
-    TimeDiff = erlang:round(timer:now_diff(erlang:now(), StartT) / (1000*1000)),
+    TimeDiff = erlang:round(timer:now_diff(os:timestamp(), StartT) / (1000*1000)),
     io:format("~n~c~c~cSTEP TIME=~p:~p:~p~n~n", [?TAB, ?TAB, ?TAB,
                                                  TimeDiff div (60*60),
                                                  (TimeDiff div 60) rem 60,
