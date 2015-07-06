@@ -94,7 +94,7 @@ test_crash_recovery_one_new_node(_Config) ->
                 erase_lease_dbs(hd(DHTNodes))
         end,
 
-    generic_crash_recovery_test(F, 3).
+    generic_crash_recovery_test(F, 4).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
