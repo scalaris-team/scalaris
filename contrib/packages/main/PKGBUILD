@@ -27,6 +27,7 @@ build() {
 package() {
   cd "$srcdir/$pkgname-$pkgver"
   make DESTDIR="$pkgdir/" install
+  rmdir $pkgdir/var/run
   make DESTDIR="$pkgdir/" install-doc
   
   # put the LICENSE file to the licenses
