@@ -457,8 +457,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
-                    t1.write(id, jsonobj.toString());
                     ScalarisUtils.performScalarisManagementForDelete(op, t1);
+                    t1.write(id, jsonobj.toString());
                     t1.commit();
                     System.out.println("deleted id=" + id);
                 } catch (ConnectionException e) {

@@ -10,6 +10,10 @@ import org.datanucleus.exceptions.NucleusUserException;
 import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
+import org.datanucleus.metadata.ElementMetaData;
+import org.datanucleus.metadata.EmbeddedMetaData;
+import org.datanucleus.metadata.ExtensionMetaData;
+import org.datanucleus.metadata.UniqueMetaData;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
@@ -231,7 +235,8 @@ public class ScalarisUtils {
         updateUniqueMemberKey(op, json, t);
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) {
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
         updateUniqueMemberKey(op, json, t);
     }
     
@@ -262,8 +267,12 @@ public class ScalarisUtils {
         return String.format("%s_%s", className, ID_GEN_KEY);
     }
     
-    private static String getUniqueMemberKeyName(String className, String memberName) {
-        return String.format("%s_%s_%s", className, memberName, UNIQUE_MEMBER_PREFIX);
+    private static String getUniqueMemberValueToIdKeyName(String className, String memberName, String memberValue) {
+        return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
+    }
+    
+    private static String geIdToUniqueMemberValueKeyName(String objectId, String memberName) {
+        return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
     }
     
     /**
@@ -368,12 +377,97 @@ public class ScalarisUtils {
        t.write(key, json.toString());
     }
     
-    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) {
+    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String objectStringIdentity = getPersistableIdentity(op);
+        String className = cmd.getFullClassName();
         
+        for (int field : cmd.getAllMemberPositions()) {
+            AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
+            UniqueMetaData umd = mmd.getUniqueMetaData();
+            if (umd != null) {
+                // this member has @Unique annotation -> lookup all stored values for this member
+                String fieldName = mmd.getName();
+                String fieldValue = null;
+                try {
+                    fieldValue = json.getString(fieldName);
+                } catch (JSONException e) {
+                    // unique members can be null which means they are not found in the JSON
+                    fieldValue = "";
+                }
+                    
+                String idToValueKey = geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
+                String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, fieldValue);
+
+                String idStoringThisValue = null;
+                String oldValueByThisId = null;
+                try {
+                    idStoringThisValue = t.read(valueToIdKey).stringValue();
+                } catch (NotFoundException e) {} // handled below
+                try {
+                    oldValueByThisId = t.read(idToValueKey).stringValue();
+                } catch(NotFoundException e) {} // handled below 
+
+                if (!fieldValue.isEmpty() && idStoringThisValue != null && !idStoringThisValue.isEmpty()) {
+                    // the unique value we try to store already exist
+                    if (idStoringThisValue.equals(objectStringIdentity)) {
+                        // .. but the current object is the one storing this value
+                        // This can happen if the current object was updated but this field
+                        // was unchanged. We don't need to do anything here.
+                    } else {
+                        // another object has stored this value -> violation of uniqueness
+                        throw new NucleusDataStoreException("The value '" + fieldValue + "' of unique member '" + 
+                                fieldName + "' of class '" + className + "' already exists");
+                    }
+                } else {
+                    // the unique value does not exist
+
+                    if (oldValueByThisId != null && !idStoringThisValue.isEmpty()) {
+                        // the current object has a value of this member stored -> delete the old entry
+                        String oldValueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
+                        // overwrite with "empty" value to signal deletion
+                        t.write(oldValueToIdKey, "");
+                    }
+                    
+                    // store the new value
+                    if (!fieldValue.isEmpty()) {
+                        t.write(idToValueKey, fieldValue);
+                        t.write(valueToIdKey, objectStringIdentity);
+                    }
+                }
+            }
+        }
     }
     
-    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, Transaction t) {
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException {
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String objectStringIdentity = getPersistableIdentity(op);
+        String className = cmd.getFullClassName();
         
+        for (int field : cmd.getAllMemberPositions()) {
+            AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
+            UniqueMetaData umd = mmd.getUniqueMetaData();
+            if (umd != null) {
+                // this member has @Unique annotation -> lookup all stored values for this member
+                String fieldName = mmd.getName();
+
+                String idToValueKey = geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
+                String oldValueByThisId = null;
+                try {
+                    oldValueByThisId = t.read(idToValueKey).stringValue();
+                } catch (NotFoundException e) {
+                    // should not happen but is not breaking anything
+                }
+                
+                if (oldValueByThisId != null && !oldValueByThisId.isEmpty()) {
+                    String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
+                    t.write(valueToIdKey, "");
+                }
+                t.write(idToValueKey, "");
+            }
+        }
     }
     
     /**
