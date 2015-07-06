@@ -224,18 +224,22 @@ public class ScalarisUtils {
         }
     }
 
-    static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json) {
-        insertObjectToAllKey(op);
-        updateUniqueMemberKey(op, json);
+    static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+        
+        insertObjectToAllKey(op, t);
+        updateUniqueMemberKey(op, json, t);
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json) {
-        updateUniqueMemberKey(op, json);
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) {
+        updateUniqueMemberKey(op, json, t);
     }
     
-    static void performScalarisManagementForDelete(ObjectProvider op) {
-        removeObjectFromAllKey(op);
-        removeObjectFromUniqueMemberKey(op);
+    static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+        
+        removeObjectFromAllKey(op, t);
+        removeObjectFromUniqueMemberKey(op, t);
     }
     
     /**
@@ -276,61 +280,42 @@ public class ScalarisUtils {
      * 
      * @param op
      *            The data source
+     * @throws JSONException 
+     * @throws UnknownException 
+     * @throws ClassCastException 
+     * @throws ConnectionException 
      */
-    private static void insertObjectToAllKey(ObjectProvider op) {
-        StoreManager storeMgr = op.getExecutionContext().getStoreManager();
+    private static void insertObjectToAllKey(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = getManagementKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mConn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
-                .getConnection();
-
         // retrieve the existing value (null if it does not exist).
         JSONArray json = null;
         try {
-            try {
-                Transaction t = new Transaction(conn);
-                json = new JSONArray(t.read(key).stringValue());
-                t.commit();
-            } catch (NotFoundException e) {
-                // the key does not exist.
-            }
-
-            // add the new identity if it does not already exists
-            if (json == null) {
-                json = new JSONArray();
-            }
-            for (int i = 0; i < json.length(); i++) {
-                String s = json.getString(i);
-                if (s != null && s.equals(objectStringIdentity)) {
-                    // This object identity is already stored here
-                    // It is not necessary to write since nothing changed.
-                    return;
-                }
-            }
-            json.put(objectStringIdentity);
-
-            // commit changes
-            Transaction t1 = new Transaction(conn);
-            t1.write(key, json.toString());
-            t1.commit();
-
-        } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (JSONException e) {
-            // the value has an invalid structure
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } finally {
-            mConn.release();
+            json = new JSONArray(t.read(key).stringValue());
+        } catch (NotFoundException e) {
+            // the key does not exist.
         }
+
+        // add the new identity if it does not already exists
+        if (json == null) {
+            json = new JSONArray();
+        }
+        for (int i = 0; i < json.length(); i++) {
+            String s = json.getString(i);
+            if (s != null && s.equals(objectStringIdentity)) {
+                // This object identity is already stored here
+                // It is not necessary to write since nothing changed.
+                return;
+            }
+        }
+        json.put(objectStringIdentity);
+
+        // commit changes
+        t.write(key, json.toString());
     }
 
     /**
@@ -347,65 +332,47 @@ public class ScalarisUtils {
      * 
      * @param op
      *            The data source
+     * @throws JSONException 
+     * @throws UnknownException 
+     * @throws ClassCastException 
+     * @throws ConnectionException 
      */
-    private static void removeObjectFromAllKey(ObjectProvider op) {
-        StoreManager storeMgr = op.getExecutionContext().getStoreManager();
+    private static void removeObjectFromAllKey(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = getManagementKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mConn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
-                .getConnection();
-
         // retrieve the existing value (null if it does not exist).
         JSONArray json = null;
         try {
-            try {
-                Transaction t = new Transaction(conn);
-                json = new JSONArray(t.read(key).stringValue());
-                t.commit();
-            } catch (NotFoundException e) {
-                // the key does not exist, therefore there is nothing to do
-                // here.
-                return;
-            }
-
-            // remove all occurrences of the key
-            ArrayList<String> list = new ArrayList<String>(json.length());
-            for (int i = 0; i < json.length(); i++) {
-                String s = json.getString(i);
-                if (s != null && !s.equals(objectStringIdentity)) {
-                    list.add(s);
-                }
-            }
-            json = new JSONArray(list);
-
-            // commit changes
-            Transaction t1 = new Transaction(conn);
-            t1.write(key, json.toString());
-            t1.commit();
-        } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (JSONException e) {
-            // the value has an invalid structure
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } finally {
-            mConn.release();
+            json = new JSONArray(t.read(key).stringValue());
+        } catch (NotFoundException e) {
+            // the key does not exist, therefore there is nothing to do
+            // here.
+            return;
         }
+
+        // remove all occurrences of the key
+        ArrayList<String> list = new ArrayList<String>(json.length());
+        for (int i = 0; i < json.length(); i++) {
+            String s = json.getString(i);
+            if (s != null && !s.equals(objectStringIdentity)) {
+                list.add(s);
+            }
+        }
+        json = new JSONArray(list);
+
+       // commit changes
+       t.write(key, json.toString());
     }
     
-    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json) {
+    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) {
         
     }
     
-    private static void removeObjectFromUniqueMemberKey(ObjectProvider op) {
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, Transaction t) {
         
     }
     

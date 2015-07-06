@@ -197,11 +197,15 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
                 try {
                     t1.write(id, jsonobj.toString());
+                    ScalarisUtils.performScalarisManagementForInsert(op, jsonobj, t1);
                     t1.commit();
-                    ScalarisUtils.performScalarisManagementForInsert(op, jsonobj);
                 } catch (ConnectionException e) {
                     e.printStackTrace();
                 } catch (UnknownException e) {
+                    e.printStackTrace();
+                } catch (ClassCastException e) {
+                    e.printStackTrace();
+                } catch (JSONException e) {
                     e.printStackTrace();
                 }
 
@@ -376,14 +380,20 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
+                ScalarisUtils.performScalarisManagementForUpdate(op, stored, t1);
                 t1.commit();
-                ScalarisUtils.performScalarisManagementForUpdate(op, stored);
-            } catch (ConnectionException | UnknownException | AbortException  e) {
+            } catch (ConnectionException e) {
                 throw new NucleusException(e.getMessage(), e);
-            } catch (NotFoundException e) {
+            } catch (AbortException e) {
+                throw new NucleusException(e.getMessage(), e);
+            }catch (UnknownException e) {
+                throw new NucleusException(e.getMessage(), e);
+            }catch (NotFoundException e) {
                 // if we have an update we should already have this object stored
                 throw new NucleusException("Could not update object since its original value was not found", e);
-            } catch (ClassCastException | JSONException e) {
+            } catch (ClassCastException e) {
+                throw new NucleusException("The stored object has a broken structure", e);
+            } catch (JSONException e) {
                 throw new NucleusException("The stored object has a broken structure", e);
             }
 
@@ -447,18 +457,19 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
-                    // t1.write(jsonobj.getString("id"), jsonobj.toString());
                     t1.write(id, jsonobj.toString());
+                    ScalarisUtils.performScalarisManagementForDelete(op, t1);
                     t1.commit();
                     System.out.println("deleted id=" + id);
-                    ScalarisUtils.performScalarisManagementForDelete(op);
                 } catch (ConnectionException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
-                    // } catch (TimeoutException e) {
-                    // throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (UnknownException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (AbortException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (ClassCastException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (JSONException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 }
             }
@@ -467,11 +478,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 ec.getStatistics().incrementNumWrites();
                 ec.getStatistics().incrementDeleteCount();
             }
-            //
-            // if (http.getResponseCode() == 404) {
-            // throw new NucleusObjectNotFoundException();
-            // }
-            // handleHTTPErrorCode(http);
 
             if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_PERSIST.debug(Localiser.msg(
