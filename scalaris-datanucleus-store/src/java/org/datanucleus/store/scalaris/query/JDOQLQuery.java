@@ -33,6 +33,7 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
 import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
+import org.datanucleus.store.scalaris.ScalarisUtils;
 
 /**
  * JDOQL query for scalaris datastores.
@@ -96,8 +97,7 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
             // get all stored instances of class candidateClass
             List candidates;
             if (candidateCollection == null) {
-                candidates = ((ScalarisPersistenceHandler) getStoreManager()
-                        .getPersistenceHandler()).getObjectsOfCandidateType(ec,
+                candidates = ScalarisUtils.getObjectsOfCandidateType(ec,
                         mconn, candidateClass, cmd);
             } else {
                 candidates = new ArrayList<Object>(candidateCollection);
