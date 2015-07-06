@@ -34,8 +34,8 @@ DOCROOTDIR=$SCALARISDIR/docroot
 DOCDIR=@docdir@
 # /share/java
 JAVADIR=@datarootdir@/java
-# /var/log/scalaris
-LOGDIR=@localstatedir@/log/scalaris
+# may be overridden with the -l parameter
+LOGDIR="$HOME/.scalaris/log"
 # /usr/bin/scalaris
 SCALARISCLIENT_JAVA=${exec_prefix}/bin/scalaris
 SCALARISCLIENT_PYTHON=${exec_prefix}/bin/scalaris-python
@@ -124,10 +124,6 @@ fix_paths() {
         SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris"
         SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris"
         SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris"
-    else
-        if [ ! -d "$LOGDIR" -o ! -w "$LOGDIR" ] ; then
-            LOGDIR="$HOME/.scalaris/log"
-        fi
     fi
 }
 
