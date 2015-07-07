@@ -348,6 +348,7 @@ checkinstallation() {
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
          -scalaris config \"$ETCDIR/scalaris.cfg\" \
          -scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+         -scalaris start_type nostart \
          -s scalaris load -eval "config:init([]), halt(0)." 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -356,9 +357,10 @@ checkinstallation() {
         echo "ERROR: some parameters in the config files are wrong or missing"
         echo "We were trying to run: \
           $ERL -noinput -pa $BEAMDIR \
-          -scalaris config \"$ETCDIR/scalaris.cfg\" \
-          -scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
-          -s scalaris load -eval \"config:init([]), halt(0).\""
+-scalaris config \"$ETCDIR/scalaris.cfg\" \
+-scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+-scalaris start_type nostart \
+-s scalaris load -eval \"config:init([]), halt(0).\""
         exit 1
     fi
 
