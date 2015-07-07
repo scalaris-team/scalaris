@@ -28,7 +28,10 @@ import java.util.Map;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.query.evaluator.JDOQLEvaluator;
+import org.datanucleus.query.evaluator.JDOQLResultClassMapper;
 import org.datanucleus.query.evaluator.JavaQueryEvaluator;
+import org.datanucleus.query.expression.CreatorExpression;
+import org.datanucleus.query.expression.Expression;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
@@ -95,7 +98,7 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
 
         try {
             // get all stored instances of class candidateClass
-            List candidates;
+            Collection candidates;
             if (candidateCollection == null) {
                 candidates = ScalarisUtils.getObjectsOfCandidateType(ec,
                         mconn, candidateClass, cmd);
@@ -103,16 +106,31 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
                 candidates = new ArrayList<Object>(candidateCollection);
             }
 
+            // JDOQLEvaluator's ResultClassMapper (needed when using JDOQLs INTO keyword)
+            // does not support 
+            
             // execute query
             JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this,
                     candidates, compilation, parameters,
                     ec.getClassLoaderResolver());
-            Collection results = resultMapper.execute(true, true, true, true,
+            Collection result = resultMapper.execute(true, true, true, false,
                     true);
-
-            return results;
+            
+            // apply a custom ResultClassMapper because the mapper used by 
+            // DataNucleus does not support alias' while wrapping
+            
+            Expression[] expResult = compilation.getExprResult();
+            if (expResult != null && getResultClass() != null && !(expResult[0] instanceof CreatorExpression)){
+                return mapResultClass(result, expResult);
+            }
+            
+            return result;
         } finally {
             mconn.release();
         }
+    }
+    
+    Collection<?> mapResultClass(Collection<?> result, Expression[] expResult) {
+        return new ScalarisJDOQLResultClassMapper(getResultClass()).map(result, expResult);
     }
 }
