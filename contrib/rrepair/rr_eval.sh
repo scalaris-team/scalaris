@@ -30,6 +30,10 @@ while getopts a:g:c:t:d:p:s:n:r: option ; do
   esac
 done
 DIRECTORY=${DIRECTORY:-${ALGO}}
+if [ "${DIRECTORY:0:1}" != "/" ]; then
+  # relative directory
+  DIRECTORY="${scriptdir_abs}/${DIRECTORY}"
+fi
 mkdir -p "${DIRECTORY}"
 
 # GPSCRIPT_REL=$(realpath --relative-to="${DIRECTORY}" ${GPSCRIPT})
@@ -47,7 +51,7 @@ echo "---$ALGO evaluation----"
 echo ">run evaluation - $CONFIG"
 SCALARIS_PORT=$((14000+${PORT_DIFF}))
 YAWS_PORT=$((8000+${PORT_DIFF}))
-EVALCMD="rr_eval_admin:${ALGO}(\"${scriptdir_abs}/${DIRECTORY}\", \"${ALGO}.dat\", ${SYSTEM_SIZE}, ${EVAL_REPEATS}, ${CONFIG}), halt(0)."
+EVALCMD="rr_eval_admin:${ALGO}(\"${DIRECTORY}\", \"${ALGO}.dat\", ${SYSTEM_SIZE}, ${EVAL_REPEATS}, ${CONFIG}), halt(0)."
 
 # set the following config options:
 # {monitor_perf_interval, 0}. % deactivate micro-benchmarks
