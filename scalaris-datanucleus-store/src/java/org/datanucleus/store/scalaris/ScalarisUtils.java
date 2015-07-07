@@ -248,6 +248,7 @@ public class ScalarisUtils {
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
+        
         removeObjectFromAllKey(op, t);
         removeObjectFromUniqueMemberKey(op, t);
     }
@@ -399,7 +400,6 @@ public class ScalarisUtils {
                     fieldValue = json.getString(fieldName);
                 } catch (JSONException e) {
                     // unique members can be null which means they are not found in the JSON
-                    fieldValue = "";
                 }
                     
                 String idToValueKey = geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
@@ -414,7 +414,7 @@ public class ScalarisUtils {
                     oldValueByThisId = t.read(idToValueKey).stringValue();
                 } catch(NotFoundException e) {} // handled below 
 
-                if (!fieldValue.isEmpty() && idStoringThisValue != null && !idStoringThisValue.isEmpty()) {
+                if (fieldValue != null && !isDeletedRecord(idStoringThisValue)) {
                     // the unique value we try to store already exist
                     if (idStoringThisValue.equals(objectStringIdentity)) {
                         // .. but the current object is the one storing this value
@@ -428,7 +428,7 @@ public class ScalarisUtils {
                 } else {
                     // the unique value does not exist
 
-                    if (oldValueByThisId != null && !idStoringThisValue.isEmpty()) {
+                    if (!isDeletedRecord(oldValueByThisId)) {
                         // the current object has a value of this member stored -> delete the old entry
                         String oldValueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
                         // overwrite with "empty" value to signal deletion
@@ -436,7 +436,7 @@ public class ScalarisUtils {
                     }
                     
                     // store the new value
-                    if (!fieldValue.isEmpty()) {
+                    if (fieldValue != null) {
                         t.write(idToValueKey, fieldValue);
                         t.write(valueToIdKey, objectStringIdentity);
                     }
@@ -466,7 +466,7 @@ public class ScalarisUtils {
                     // should not happen but is not breaking anything
                 }
                 
-                if (oldValueByThisId != null && !oldValueByThisId.isEmpty()) {
+                if (!isDeletedRecord(oldValueByThisId)) {
                     String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
                     t.write(valueToIdKey, DELETED_RECORD_VALUE);
                 }
@@ -474,6 +474,7 @@ public class ScalarisUtils {
             }
         }
     }
+
     
     /**
      * Scalaris does not support deletion (in a usable way). Therefore, deletion
