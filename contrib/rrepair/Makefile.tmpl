@@ -1,0 +1,24 @@
+MAKEFLAGS=-k $MAKEFLAGS
+SUBDIRS := $(shell ls -d */)
+SUBDIRS_DIR := $(patsubst %/,%-dir,$(SUBDIRS))
+SUBDIRS_DIR_CLEAN := $(patsubst %/,%-dir-clean,$(SUBDIRS))
+
+.PHONY: all clean subdirs
+
+all: subdirs
+
+clean: $(SUBDIRS_DIR_CLEAN)
+
+subdirs: $(SUBDIRS_DIR)
+
+# % replaces any name
+# within a rule: $@ inserts the target
+#                $< inserts the first dependency (source)
+#                $+ inserts a list of all dependencies
+#                $^ inserts a list of all unique dependencies
+#                $* inserts the stem an implicit rule matches with
+%-dir: %
+	$(MAKE) -C $<
+
+%-dir-clean: %
+	$(MAKE) clean -C $<

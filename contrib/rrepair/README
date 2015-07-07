@@ -1,0 +1,21 @@
+This folder contains several utility scripts to evaluate replica repair
+(rrepair) algorithms. The Makefile defines several targets running experiments
+with Scalaris. The results are then plotted with gnuplot.
+
+Note that Scalaris itself needs to be configured (best with disabled debug mode
+for faster executions) and made. The latter can be repeated with
+> make scalaris
+
+The EVAL_REPEATS variable sets the number of repetitions (100 by default).
+Parallel builds are supported.
+
+Example:
+
+> make trivial_single-all.unaligned/0.001/trivial.dat EVAL_REPEATS=10
+
+
+These targets run the most important pre-defined tests in parallel (2 jobs):
+> make -j2 trivial shash bloom merkle
+
+Manual tests can be run with the help of rr_eval.sh. Please refer to the
+examples in the Makefile to create own targets and manual tests.
