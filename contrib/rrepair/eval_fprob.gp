@@ -70,7 +70,7 @@ if (exists("absoluteRedundancy") && absoluteRedundancy == 1) {
 plot_boxwidth = (0.8 / plotCount)
 
 # OUTPUT
-set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,5
+set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,4.5
 fileEx = "pdf"
 
 system "echo 'PLOT " . files . "'"
@@ -106,7 +106,6 @@ if (regenAccInPercent == 1) {
   acc_reg_avg=(acc_reg_max+acc_reg_min)/2.0
   acc_reg_max=max(abs(acc_reg_avg-acc_reg_min), abs(acc_reg_max-acc_reg_avg))
 } else {
-  acc_reg_max=0.5
   do for [i=1:plotCount] {
     stats "<awk '$" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\"' " . get_file(i) u (column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)+stderrSum(column(col_sd_regen),column(col_sd_updated))) nooutput
     if (STATS_max > acc_upd_max) {acc_upd_max = STATS_max}
@@ -166,13 +165,13 @@ set multiplot
 
 all_width_r = 0.545
 all_width_l = all_width_r
-bw_height_full = 0.65
-bw_height = (plotCount > 1) ? (bw_height_full - 0.02) : bw_height_full
-red_height = 0.175
-red_pos_y = bw_height_full - 0.02
-acc_height_full = 0.225
-acc_height = (plotCount > 1) ? (acc_height_full - 0.02) : acc_height_full
-acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height) : (red_pos_y + red_height - 0.02)
+bw_height_full = 0.700
+bw_height = (plotCount > 1) ? (bw_height_full - 0.018) : bw_height_full
+red_height = 0.170
+red_pos_y = bw_height_full - 0.032
+acc_height_full = 0.195
+acc_height = (plotCount > 1) ? (acc_height_full - 0.012) : acc_height_full
+acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height - 0.006) : (red_pos_y + red_height - 0.02)
 
 # accuracy
 
@@ -180,11 +179,11 @@ set size all_width_l,acc_height
 set origin -0.002,acc_pos_y
 unset xlabel
 set format x ""
-set ylabel "|Δ| not found" font ",16"
+set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
 set format y "%2.1f"
 if (plotCount > 1) {
-  set key at screen 0.512,acc_pos_y center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -266,7 +265,7 @@ set y2range [0:bw_max]
 set format y "%3.0f"
 set mytics 2
 if (plotCount > 1) {
-  set key at screen 0.512,red_pos_y center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(red_pos_y + 0.006) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
 } else {
   if (srcFile1_title[1:6] eq "merkle" || (exists("srcFile3_title") && srcFile3_title[1:6] eq "merkle") || (exists("srcFile4_title") && srcFile4_title[1:6] eq "merkle")) {
     set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"

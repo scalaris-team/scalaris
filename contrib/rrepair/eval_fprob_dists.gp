@@ -27,7 +27,7 @@ if (exists("absoluteRedundancy") && absoluteRedundancy == 1) {
 plot_boxwidth = (0.8 / 3)
 
 # OUTPUT
-set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,5
+set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,4.5
 fileEx = "pdf"
 
 system "echo 'PLOT ".srcFile1."'"
@@ -117,11 +117,11 @@ set multiplot
 
 all_width_r = 0.545
 all_width_l = all_width_r
-bw_height_full = 0.65
+bw_height_full = 0.700
 bw_height = bw_height_full - 0.02
-red_height = 0.185
-red_pos_y = bw_height_full - 0.02
-acc_height_full = 0.235
+red_height = 0.180
+red_pos_y = bw_height_full - 0.032
+acc_height_full = 0.205
 acc_height = acc_height_full
 acc_pos_y = red_pos_y + red_height - 0.04
 
@@ -131,7 +131,7 @@ set size all_width_l,acc_height
 set origin -0.002,acc_pos_y
 unset xlabel
 set format x ""
-set ylabel "|Δ| not found" font ",16"
+set ylabel "|Δ| missed " font ",16"
 set yrange [-acc_max_abs:acc_max_abs]
 set ytics mirror offset -2,0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") scale 0.8
 unset key
@@ -212,7 +212,7 @@ set ylabel "RC costs (phase 1+2)" font ",16"
 set yrange [bw_min:bw_max]
 set y2range [bw_min:bw_max]
 set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
-set key at screen 0.512,red_pos_y center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
+set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
 
 plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(100*($3/$2)-100) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 12 lc 1, \

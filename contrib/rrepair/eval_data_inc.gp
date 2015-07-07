@@ -68,7 +68,7 @@ if (exists("absoluteRedundancy") && absoluteRedundancy == 1) {
 plot_boxwidth = (0.8 / plotCount)
 
 # OUTPUT
-set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,5
+set terminal pdfcairo dashed enhanced font ",15" fontscale 0.5 size 6,4.5
 fileEx = "pdf"
 
 system "echo 'PLOT " . files . "'"
@@ -104,7 +104,6 @@ if (regenAccInPercent == 1) {
   acc_reg_avg=(acc_reg_max+acc_reg_min)/2.0
   acc_reg_max=max(abs(acc_reg_avg-acc_reg_min), abs(acc_reg_max-acc_reg_avg))
 } else {
-  acc_reg_max=0.5
   do for [i=1:plotCount] {
     stats "<awk '$" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\"' " . get_file(i) u (column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)+stderrSum(column(col_sd_regen),column(col_sd_updated))) nooutput
     if (STATS_max > acc_upd_max) {acc_upd_max = STATS_max}
@@ -168,13 +167,13 @@ set multiplot
 
 all_width_r = 0.545
 all_width_l = all_width_r
-bw_height_full = 0.65
-bw_height = 0.025 + ((plotCount > 1) ? (bw_height_full - 0.02) : bw_height_full)
-red_height = 0.175
-red_pos_y = bw_height_full - 0.02
-acc_height_full = 0.225
-acc_height = (plotCount > 1) ? (acc_height_full - 0.02) : acc_height_full
-acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height) : (red_pos_y + red_height - 0.02)
+bw_height_full = 0.700
+bw_height = 0.023 + ((plotCount > 1) ? (bw_height_full - 0.018) : bw_height_full)
+red_height = (plotCount > 1) ? 0.170 : 0.174
+red_pos_y = (plotCount > 1) ? bw_height_full - 0.033 : bw_height_full - 0.035
+acc_height_full = (plotCount > 1) ? 0.200 : 0.204
+acc_height = (plotCount > 1) ? (acc_height_full - 0.012) : acc_height_full
+acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height - 0.007) : (red_pos_y + red_height - 0.025)
 
 # accuracy
 
@@ -182,11 +181,11 @@ set size all_width_l,acc_height
 set origin -0.002,acc_pos_y
 unset xlabel
 set format x ""
-set ylabel "|Δ| not found" font ",16"
+set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
 set format y " %2.1f"
 if (plotCount > 1) {
-  set key at screen 0.512,acc_pos_y center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -273,13 +272,13 @@ set logscale y2 2
 set format y "%4.0f"
 set format x
 if (plotCount > 1) {
-  set key at screen 0.512,red_pos_y center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(red_pos_y + 0.006) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 
 LABEL = "naïve approach"
-set label 10 at 16,112000*(128+32)/8/1024 LABEL front center font ",12" textcolor rgb "#777777"
+set label 10 at 22,112000*(128+32)/8/1024 LABEL front center font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.3, \
@@ -288,7 +287,7 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorlines notitle ls (plotCount > 1 ? (100+i) : 100), \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
+ u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
 
 set size all_width_r,bw_height
 set origin 0.49,-0.025
@@ -306,4 +305,4 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorlines notitle ls (plotCount > 1 ? (100+i) : 100), \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
+ u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
