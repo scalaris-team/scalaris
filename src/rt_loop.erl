@@ -213,8 +213,7 @@ on_active({dump, Pid}, {_Neighbors, RT, _ERT} = State) ->
 on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, _RT, ERT} = State) ->
     case config:read(leases) of
         true ->
-            %% TODO : lookup_aux_leases expects a dht_node_state
-            lookup_aux_leases(State, Key, Hops, Msg);
+            lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg);
         _ ->
             lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg)
     end,
@@ -226,7 +225,7 @@ on_active({send_error, _Target, {?send_to_group_member, routing_table, {?lookup_
     State;
 
 on_active({send_error, _Target, {?lookup_aux, Key, Hops, Msg} = _Message, _Reason}, State) ->
-    log:log(warn, "[routing_table] lookup_aux failed 2. Target: ~p. Msg: ~p.", [_Target, _Message]),
+    log:log(warn, "[routing_table] lookup_aux failed 2. Target: ~p~nMsg: ~.2p.", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State;
 
@@ -256,13 +255,29 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
             comm:send(NextHop, NewMsg, [{shepherd, self()}])
     end.
 
--spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
-                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux_leases(_State, _Key, _Hops, _Msg) ->
-    log:fatal("leases not yet implemented"),
-    erlang:exit('not yet implemented').
-
-
+-spec lookup_aux_leases(Neighbors::nodelist:neighborhood(), ERT::?RT:external_rt(),
+                        Key::intervals:key(), Hops::non_neg_integer(),
+                        Msg::comm:message()) -> ok.
+lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
+    %% TODO implement WrappedMsg
+    WrappedMsg = ?RT:wrap_message(Key, Msg, no_dht_node_state, Hops),
+    case intervals:in(Key, nodelist:node_range(Neighbors)) of
+        true ->
+            comm:send_local(pid_groups:get_my(dht_node),
+                            {lookup_decision, Key, Hops, WrappedMsg});
+        false ->
+            %% next_hop and nodelist:succ(Neighbors) return different nodes if
+            %% key is in the interval of the succ. TODO: fix this
+            NextHop =
+            case intervals:in(Key, nodelist:succ_range(Neighbors)) of
+                true ->
+                    node:pidX(nodelist:succ(Neighbors));
+                false ->
+                    ?RT:next_hop(Neighbors, ERT, Key)
+            end,
+            NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+            comm:send(NextHop, NewMsg, [{shepherd, self()}])
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rt_loop:state_active() handling

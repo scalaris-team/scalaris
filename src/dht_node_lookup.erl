@@ -47,20 +47,28 @@ envelope(Nth, Msg) ->
 -endif.
 
 %% userdevguide-begin dht_node_lookup:routing
-%% @doc Find the node responsible for Key and send him the message Msg.
+%% @doc Adapter for deprecated lookup_aux.
+%% TODO: remove
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
-    case config:read(leases) of
-        true ->
-            lookup_aux_leases(State, Key, Hops, Msg);
-        _ ->
-            lookup_decision(State, Key, Hops, Msg)
-end.
+    lookup_decision(State, Key, Hops, Msg).
 
+%% @doc Decide, whether a lookup_aux message should be translated into a lookup_fin
+%%      message
 -spec lookup_decision(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_decision(State, Key, Hops, Msg) ->
+    case config:read(leases) of
+        true ->
+            lookup_decision_leases(State, Key, Hops, Msg);
+        _ ->
+            lookup_decision_chord(State, Key, Hops, Msg)
+end.
+
+-spec lookup_decision_chord(State::dht_node_state:state(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_decision_chord(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     Neighbors = dht_node_state:get(State, neighbors),
     Succ = node:pidX(nodelist:succ(Neighbors)),
@@ -75,41 +83,51 @@ lookup_decision(State, Key, Hops, Msg) ->
             comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
     end.
 
--spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
+-spec lookup_decision_leases(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux_leases(State, Key, Hops, Msg) ->
+lookup_decision_leases(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     case leases:is_responsible(State, Key) of
         true ->
             comm:send_local(dht_node_state:get(State, monitor_proc),
                             {lookup_hops, Hops}),
-            DHTNode = pid_groups:find_a(dht_node),
-            %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
-            comm:send_local(DHTNode,
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
+            comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         maybe ->
-            DHTNode = pid_groups:find_a(dht_node),
-            %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
-            comm:send_local(DHTNode,
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
+            %% TODO: Why no monitor_proc here?
+            comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         false ->
-            MyRange = dht_node_state:get(State, my_range),
-            case intervals:in(Key, MyRange) of
-                true ->
-                    % @doc we are here because leases and rm disagree
-                    % over responsibility. One cause for this case can
-                    % be join/sliding. Our successor still has the
-                    % lease for our range. But rm already believes
-                    % that we are responsible for our range. The
-                    % solution is to forward the lookup to our
-                    % successor instead of asking rt.
-                    Succ = node:pidX(dht_node_state:get(State, succ)),
-                    comm:send(Succ, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
-                false ->
-                    {Node, _RTLoop} = element(2, ?RT:next_hop(State, Key)),
-                    comm:send(Node, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
-            end
+            %% We are here because the neighborhood information from rm in rt_loop
+            %% and leases disagree over responsibility. One cause for this case
+            %% can be join/sliding. Our successor still has the lease for our range.
+            %% But rm already believes that we are responsible for our range. The
+            %% solution is to forward the lookup to our successor instead of asking rt.
+            %% We can not use a lookup_aux message though: rt_loop thinks (bases
+            %% on the neighborhood from rm) that the node is responsible, forwards
+            %% the message as a lookup_decision to here. The dht_node decides
+            %% (based on the lease) that the node is not responsible and forwards
+            %% the message to the next node. When the message arrives again at
+            %% the node, the same steps repeat. As joining/sliding needs lookup
+            %% messages, the new leases are never established and the message
+            %% circle endlessly.
+            Succ = node:pidX(dht_node_state:get(State, succ)),
+            comm:send(Succ, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg},
+                      [{shepherd, self()}])
     end.
+
+%% check_local_leases(DHTNodeState, MyRange) ->
+%%     LeaseList = dht_node_state:get(DHTNodeState, lease_list),
+%%     ActiveLease = lease_list:get_active_lease(LeaseList),
+%%     PassiveLeases = lease_list:get_passive_leases(LeaseList),
+%%     ActiveInterval = case ActiveLease of
+%%                          empty ->
+%%                              intervals:empty();
+%%                          _ ->
+%%                              l_on_cseq:get_range(ActiveLease)
+%%                      end,
+%%     LocalCorrect = MyRange =:= ActiveInterval,
+%%     log:pal("~p rm =:= leases: ~w. lease=~w. my_range=~w",
+%%               [self(), LocalCorrect, ActiveInterval, MyRange]).
+
 
 %% @doc Find the node responsible for Key and send him the message Msg.
 -spec lookup_fin(State::dht_node_state:state(), Key::intervals:key(),
