@@ -27,9 +27,9 @@
 
 -spec is_first_vm() -> boolean().
 is_first_vm() ->
-    util:is_unittest()
-        orelse
     config:read(start_type) =:= first
+        orelse
+    config:read(start_type) =:= first_nostart
         orelse
     (config:read(start_type) =:= quorum andalso has_first_quorum()).
 

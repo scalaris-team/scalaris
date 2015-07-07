@@ -85,7 +85,7 @@ usage(){
     echo "                - (single) port distributed erlang listens on"
     echo "    --nodes-per-vm <number>"
     echo "                - number of Scalaris nodes to start inside the VM"
-    echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart"
+    echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart|first_nostart"
     echo "    -m          - start global Scalaris management server"
     echo " <cmd>:"
     echo "    checkinstallation"

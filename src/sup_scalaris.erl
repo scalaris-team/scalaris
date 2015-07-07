@@ -218,6 +218,7 @@ childs(Options) ->
         end,
     DHTNodeServer = case config:read(start_type) of
                         nostart -> []; %% no dht node requested
+                        first_nostart -> []; %% no dht node requested
                         failed -> [];
                         _ -> DHTNodes
                     end,
