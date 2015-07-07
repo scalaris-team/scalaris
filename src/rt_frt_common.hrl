@@ -1220,11 +1220,11 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
             end
     end,
 
-    learn_on_forward(Issuer),
+    learn_on_forward(Issuer, nodelist:node(Neighbors)),
     Msg;
 
-wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _ERT, _Neighbors, _Hops) ->
-    learn_on_forward(Issuer),
+wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _ERT, Neighbors, _Hops) ->
+    learn_on_forward(Issuer, nodelist:node(Neighbors)),
     Msg.
 
 best_rt_reduction_ratio(RingSize) ->
@@ -1232,9 +1232,15 @@ best_rt_reduction_ratio(RingSize) ->
 convergent_rt_reduction_ratio(RingSize) ->
     1 - math:pow(1 / RingSize, 4 / (maximum_entries() - 2)).
 
--spec learn_on_forward(Issuer::mynode()) -> ok.
-learn_on_forward(Issuer) ->
-    comm:send_local(self(), {rt_learn_node, Issuer}).
+-spec learn_on_forward(Issuer::mynode(), MyNode::node:node_type()) -> ok.
+learn_on_forward(Issuer, MyNode) ->
+    PidDHT = comm:make_local(node:pidX(MyNode)),
+    case self() of
+        PidDHT ->
+            comm:send_local(pid_groups:get_my(routing_table), {rt_learn_node, Issuer});
+        _else ->
+            comm:send_local(self(), {rt_learn_node, Issuer})
+    end.
 
 %% userdevguide-end rt_frtchord:wrap_message
 
