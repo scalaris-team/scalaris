@@ -22,8 +22,7 @@
 
 -include("scalaris.hrl").
 
--export([lookup_aux/4, lookup_fin/4,
-         lookup_aux_failed/3, lookup_fin_failed/3]).
+-export([lookup_decision/4, lookup_aux/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
 
 -export([envelope/2]).
 
@@ -56,23 +55,24 @@ lookup_aux(State, Key, Hops, Msg) ->
         true ->
             lookup_aux_leases(State, Key, Hops, Msg);
         _ ->
-            lookup_aux_chord(State, Key, Hops, Msg)
+            lookup_decision(State, Key, Hops, Msg)
 end.
 
--spec lookup_aux_chord(State::dht_node_state:state(), Key::intervals:key(),
+-spec lookup_decision(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_aux_chord(State, Key, Hops, Msg) ->
+lookup_decision(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     Neighbors = dht_node_state:get(State, neighbors),
+    Succ = node:pidX(nodelist:succ(Neighbors)),
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true ->
-            P = node:pidX(nodelist:succ(Neighbors)),
-            comm:send(P, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg}, [{shepherd, self()}]);
+            %% log:log(warn, "[dht_node] lookup_fin on lookup_decision"),
+            NewMsg = {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg},
+            comm:send(Succ, NewMsg, [{shepherd, self()}]);
         _ ->
-            RT = dht_node_state:get(State, rt),
-            %% P = ?RT:next_hop(Neighbors, RT, Key),
-            P = rt_chord:next_hop(Neighbors, RT, Key),
-            comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
+            log:log(warn, "[dht_node] lookup_aux on lookup_decision"),
+            NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+            comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
     end.
 
 -spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
@@ -106,8 +106,8 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
                     Succ = node:pidX(dht_node_state:get(State, succ)),
                     comm:send(Succ, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
                 false ->
-                    P = element(2, ?RT:next_hop(State, Key)),
-                    comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
+                    {Node, _RTLoop} = element(2, ?RT:next_hop(State, Key)),
+                    comm:send(Node, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
             end
     end.
 
@@ -198,14 +198,14 @@ lookup_fin_leases(State, Key, Data, Msg) ->
 -spec lookup_aux_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::{?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}) -> ok.
 lookup_aux_failed(State, _Target, {?lookup_aux, Key, Hops, Msg} = _Message) ->
-    %io:format("lookup_aux_failed(State, ~p, ~p)~n", [_Target, _Message]),
+    log:log(warn, "[dht_node] lookup_aux_failed. Target: ~p. Msg: ~p.", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
 
 -spec lookup_fin_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::{?lookup_fin, Key::?RT:key(), Data::data(), Msg::comm:message()}) -> ok.
 lookup_fin_failed(State, _Target, {?lookup_fin, Key, Data, Msg} = _Message) ->
-    %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
+    log:log(warn, "[dht_node] lookup_aux_failed. Target: ~p. Msg: ~p.", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, ?HOPS_FROM_DATA(Data) + 1, Msg}),
     State.
 

@@ -34,6 +34,17 @@
 
 -export_type([state_active/0]).
 
+-ifdef(enable_debug).
+% add source information to debug routing damaged messages
+-define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
+-define(HOPS_FROM_DATA(Data), element(2, Data)).
+-type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
+-else.
+-define(HOPS_TO_DATA(Hops), Hops).
+-define(HOPS_FROM_DATA(Data), Data).
+-type data() :: Hops::non_neg_integer().
+-endif.
+
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
 -opaque(state_active() :: {Neighbors    :: nodelist:neighborhood(),
@@ -193,9 +204,70 @@ on_active({dump, Pid}, {_Neighbors, RTState} = State) ->
     comm:send_local(Pid, {dump_response, RTState}),
     State;
 
+%% on_active({lookup_aux, Pid}, {_Neighbors, RTState} = State) ->
+on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, RT} = State) ->
+    case config:read(leases) of
+        true ->
+            %% TODO : lookup_aux_leases expects a dht_node_state
+            lookup_aux_leases(State, Key, Hops, Msg);
+        _ ->
+            lookup_aux_chord(Neighbors, RT, Key, Hops, Msg)
+    end,
+    State;
+
+
+on_active({send_error, _Target, {?send_to_group_member, routing_table, {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
+    log:log(warn, "[routing_table] lookup_aux failed 1. Target: ~p. Msg: ~p.", [_Target, _Message]),
+    _ = comm:send_local_after(1000, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    State;
+
+on_active({send_error, _Target, {?lookup_aux, Key, Hops, Msg} = _Message, _Reason}, State) ->
+    log:log(warn, "[routing_table] lookup_aux failed 2. Target: ~p. Msg: ~p.", [_Target, _Message]),
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    State;
+
+on_active({send_error, Target, {?lookup_fin, Key, Data, Msg} = _Message, _Reason}, State) ->
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, ?HOPS_FROM_DATA(Data) + 1, Msg}),
+    State;
+
 % unknown message
 on_active(Message, State) ->
     ?RT:handle_custom_message(Message, State).
+
+
+-spec lookup_aux_chord(Neighbors::nodelist:neighborhood(), RT::?RT:rt(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_aux_chord(Neighbors, RT, Key, Hops, Msg) ->
+    %% TODO : wrap_message expects a dht_node_state
+    %% Noop in chord, simple
+    %% frt_common: Neighbours, node_id, external_rt,
+    %% WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
+    WrappedMsg = Msg,
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
+        true ->
+            %% log:log(warn, "[routing_table] lookup_aux succ in interval"),
+            %% TODO: do I need a WrappedMsg here ??!
+            comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
+        _ ->
+            ExtRT = rt_chord:export_rt_to_dht_node(RT, Neighbors),
+            case rt_chord:next_hop(Neighbors, ExtRT, Key) of
+                {Node, undefined} ->
+                    %% log:log(warn, "[routing_table] lookup_aux next_hop undefined"),
+                    NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+                    comm:send(Node, NewMsg, [{shepherd, self()}, {group_member, routing_table}]);
+                {_Node, RTLoop} ->
+                    NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
+                    comm:send(RTLoop, NewMsg, [{shepherd, self()}])
+            end
+    end.
+
+-spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_aux_leases(State, Key, Hops, Msg) ->
+    log:fatal("leases not yet implemented"),
+    erlang:exit('not yet implemented').
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rt_loop:state_active() handling

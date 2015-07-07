@@ -479,7 +479,7 @@ next_hop(State, Id) ->
 next_hop(Neighbors, RT, Id) ->
     % check routing table:
     RTSize = get_size(RT),
-    {NodeRT, _RTLoop} = case util:gb_trees_largest_smaller_than(Id, RT) of
+    {NodeRT, RTLoop} = case util:gb_trees_largest_smaller_than(Id, RT) of
                  {value, _Key, N} ->
                      N;
                  nil when RTSize =:= 0 ->
@@ -495,7 +495,7 @@ next_hop(Neighbors, RT, Id) ->
             % check neighborhood:
             nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
     end,
-    node:pidX(FinalNode).
+    {node:pidX(FinalNode), RTLoop}.
 
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node

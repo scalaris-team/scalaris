@@ -170,8 +170,14 @@ on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, Snap
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see api_dht_raw.erl and dht_node_lookup.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({?lookup_aux, Key, Hops, Msg}, State) ->
-    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
+
+%% route lookup_aux msg to the routing_table (rt_loop)
+on({?lookup_aux, Key, Hops, Msg}=FullMsg, State) ->
+    comm:send_local(pid_groups:get_my(routing_table), FullMsg),
+    State;
+
+on({lookup_decision, Key, Hops, Msg}=FullMsg, State) ->
+    dht_node_lookup:lookup_decision(State, Key, Hops, Msg),
     State;
 
 on({?lookup_fin, Key, Data, Msg}, State) ->
