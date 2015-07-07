@@ -65,6 +65,7 @@ lookup_decision_chord(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     Neighbors = dht_node_state:get(State, neighbors),
     Succ = node:pidX(nodelist:succ(Neighbors)),
+    % NOTE: re-evaluate that the successor is really (still) responsible:
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true ->
             %% log:log(warn, "[dht_node] lookup_fin on lookup_decision"),
@@ -76,17 +77,19 @@ lookup_decision_chord(State, Key, Hops, Msg) ->
             comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
     end.
 
+% TODO: remove - only use lookup_fin for leases (merge "false" case!)
 -spec lookup_decision_leases(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_decision_leases(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     case leases:is_responsible(State, Key) of
         true ->
+            % TODO: handle directly (deliver/4)!, also no monitor required (lookup_fin does that!)
             comm:send_local(dht_node_state:get(State, monitor_proc),
                             {lookup_hops, Hops}),
             comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         maybe ->
-            %% TODO: Why no monitor_proc here?
+            % TODO: handle directly (deliver/4)!
             comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         false ->
             %% We are here because the neighborhood information from rm in rt_loop

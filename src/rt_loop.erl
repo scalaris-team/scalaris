@@ -244,10 +244,13 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
     %% Noop in chord, simple
     %% frt_common: Neighbours, node_id, external_rt,
     %% WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
+    % ==> change wrap_message/4: instead of State, use Neighbors and RT-State!
     WrappedMsg = Msg,
+    % NOTE: chord-like routing requires routing through predecessor -> only decide at pred:
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true ->
             %% TODO: do I need a WrappedMsg here ??!
+            % TODO: check efficients of pid_groups:get_my/1 vs. caching the PID or retrieving from Neighbors - caching is probably the best
             comm:send_local(pid_groups:get_my(dht_node), {lookup_decision, Key, Hops, WrappedMsg});
         _ ->
             NextHop = rt_chord:next_hop(Neighbors, ERT, Key), % TODO change rt_chord
@@ -261,8 +264,10 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
 lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
     %% TODO implement WrappedMsg
     WrappedMsg = ?RT:wrap_message(Key, Msg, no_dht_node_state, Hops),
+    % NOTE: leases do not require routing through predecessor -> let the own node decide:
     case intervals:in(Key, nodelist:node_range(Neighbors)) of
         true ->
+            % TODO: use lookup_fin
             comm:send_local(pid_groups:get_my(dht_node),
                             {lookup_decision, Key, Hops, WrappedMsg});
         false ->

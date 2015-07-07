@@ -498,6 +498,11 @@ next_hop(Neighbors, RT, Id) ->
         nil -> % forward to largest finger
             gb_trees:largest(RT)
     end,
+    % TODO: better create a separate gb_tree for the neighbourhood nodes (dht_node pids!) and always look there, too
+    %       but beware to prefer rt_loop pids if an entry with the same Id is found!
+    %       -> this is faster and more generic
+    %       -> remove rt_size_use_neighbors config parameter
+    %       -> need to update neighbourhood gb_tree when neigbours change!
     case RTSize < config:read(rt_size_use_neighbors) of
         false ->
             NextHop1;
