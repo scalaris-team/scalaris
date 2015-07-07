@@ -68,9 +68,11 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             FullMsg = {?lookup_aux, Key, Hops, Msg},
             comm:send_local(pid_groups:get_my(routing_table), FullMsg);
         _ ->
+            ERT = dht_node_state:get(State, rt),
+            Neighbors = dht_node_state:get(State, neighbors),
+            WrappedMsg = ?RT:wrap_message(Key, Msg, ERT, Neighbors, Hops),
             comm:send_local(self(),
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops), Msg})
-            %% lookup_fin_leases(State, Key, Hops, Msg)
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops), WrappedMsg})
     end.
 
 %% @doc Decide, whether a lookup_aux message should be translated into a lookup_fin
