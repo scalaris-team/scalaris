@@ -59,6 +59,11 @@ public class ScalarisUtils {
     private static final String UNIQUE_MEMBER_PREFIX = "UNIQUE";
     
     /**
+     * Value which will be used to signal a deleted key.
+     */
+    public static final String DELETED_RECORD_VALUE = new JSONObject().toString();
+    
+    /**
      * Generate a new ID which can be used to store a value at an unique key.
      * Every time this function is called the value stored at key ID_GEN_KEY is
      * incremented by one. The value stored there is the value which is returned by
@@ -427,7 +432,7 @@ public class ScalarisUtils {
                         // the current object has a value of this member stored -> delete the old entry
                         String oldValueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
                         // overwrite with "empty" value to signal deletion
-                        t.write(oldValueToIdKey, "");
+                        t.write(oldValueToIdKey, DELETED_RECORD_VALUE);
                     }
                     
                     // store the new value
@@ -463,11 +468,28 @@ public class ScalarisUtils {
                 
                 if (oldValueByThisId != null && !oldValueByThisId.isEmpty()) {
                     String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
-                    t.write(valueToIdKey, "");
+                    t.write(valueToIdKey, DELETED_RECORD_VALUE);
                 }
-                t.write(idToValueKey, "");
+                t.write(idToValueKey, DELETED_RECORD_VALUE);
             }
         }
+    }
+    
+    /**
+     * Scalaris does not support deletion (in a usable way). Therefore, deletion
+     * is simulated by overwriting an object with a "deleted" value.
+     * 
+     * This method returns true if json is a json of a deleted record.
+     * 
+     * @param record
+     * @return
+     */
+    public static boolean isDeletedRecord(final JSONObject record) {
+        return record == null || isDeletedRecord(record.toString());
+    }
+    
+    public static boolean isDeletedRecord(final String record) {
+        return record == null || record.isEmpty() || record.equals(DELETED_RECORD_VALUE);
     }
     
     /**

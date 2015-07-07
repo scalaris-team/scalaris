@@ -451,14 +451,12 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final String id = ScalarisUtils.getPersistableIdentity(op);
             System.out.println("deleting object with key=" + id);
 
-            final JSONObject jsonobj = new JSONObject();
-
             { // TRANSACTION
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
                     ScalarisUtils.performScalarisManagementForDelete(op, t1);
-                    t1.write(id, jsonobj.toString());
+                    t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
                     t1.commit();
                     System.out.println("deleted id=" + id);
                 } catch (ConnectionException e) {
@@ -487,19 +485,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         } finally {
             mconn.release();
         }
-    }
-
-    /**
-     * Scalaris does not support deletion (in a usable way). Therefore, deletion
-     * is simulated by overwriting an object with a "deleted" value.
-     * 
-     * This method returns true if json is a json of a deleted record.
-     * 
-     * @param record
-     * @return
-     */
-    public static boolean isADeletedRecord(final JSONObject record) {
-        return record == null || record.length() == 0;
     }
 
     /**
@@ -541,7 +526,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     Transaction t1 = new Transaction(conn);
 
                     result = new JSONObject(t1.read(key).stringValue());
-                    if (isADeletedRecord(result)) {
+                    if (ScalarisUtils.isDeletedRecord(result)) {
                         throw new NucleusObjectNotFoundException(
                                 "Record has been deleted");
                     }
