@@ -350,7 +350,7 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
     _ = [ begin
               log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                       [This, X, pid_groups:group_and_name_of(comm:get_plain_pid(X))]),
-              comm:send_local(X, {fd_notify, crash, WatchedPid, Reason})
+              comm:send_local(X, {fd_notify, crash, WatchedPid, Reason}, [{?quiet}])
           end
           || X <- Subscriptions ],
     %% delete from remote_pids
