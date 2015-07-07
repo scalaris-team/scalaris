@@ -38,6 +38,7 @@ import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.exceptions.NucleusException;
+import org.datanucleus.exceptions.NucleusObjectNotFoundException;
 import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
@@ -692,7 +693,18 @@ public class FetchFieldManager extends AbstractFieldManager {
         if (fetchCache.exists(persistableId)) {
             return fetchCache.lookUp(persistableId);
         }
-        return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
+        try {
+            return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
+        } catch (NucleusObjectNotFoundException e) {
+            // TODO Is this a bad idea (Probably yes...)?
+            // Instead to update references on deletion check when retrieving an object
+            // if it still exists. If not, than it was deleted
+            // What happens if this is a data store error and it is not found because
+            // of other reasons?
+            // TODO If this turns out to be OK, updates must be handled in a similar manner
+            
+            return null;
+        }
     }
     
     /**
