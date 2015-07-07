@@ -308,4 +308,5 @@ check_config() ->
                           "is not different from log_file_name_errorlogger") and
     config:cfg_is_integer(nodes_per_vm) and
     config:cfg_is_port(yaws_port) and
-    config:cfg_is_string(docroot).
+    config:cfg_is_string(docroot) and
+    config:cfg_is_in(start_type, [first, joining, quorum, recover, nostart, first_nostart]).
