@@ -31,6 +31,17 @@
 
 -export_type([message/0]).
 
+-ifdef(enable_debug).
+% add source information to debug routing damaged messages
+-define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
+-define(HOPS_FROM_DATA(Data), element(2, Data)).
+-type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
+-else.
+-define(HOPS_TO_DATA(Hops), Hops).
+-define(HOPS_FROM_DATA(Data), Data).
+-type data() :: Hops::non_neg_integer().
+-endif.
+
 -type(database_message() ::
       {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
@@ -171,17 +182,28 @@ on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, Snap
 % Lookup (see api_dht_raw.erl and dht_node_lookup.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?lookup_aux, _Key, _Hops, _Msg}=FullMsg, State) ->
-    % forward msg to the routing_table (rt_loop)
-    % if possible it should be sent directly to routing_table (rt_loop)
-    % TODO: check efficients of pid_groups:get_my/1 vs. caching the PID
-    %       (process dictionary for first evaluations but ultimately inside the State)
-    comm:send_local(pid_groups:get_my(routing_table), FullMsg),
+on({?lookup_aux, Key, Hops, Msg}=FullMsg, State) ->
+    %% Forward msg to the routing_table (rt_loop).
+    %% If possible, messages should be sent directly to routing_table (rt_loop).
+    %% Only forward messages for which we aren't responsible (leases).
+    %% TODO: check efficients of pid_groups:get_my/1 vs. caching the PID
+    %%       (process dictionary for first evaluations but ultimately inside the State)
+    %% log:pal("lookup_aux_leases in dht_node"),
+    case config:read(leases) of
+        true ->
+            %% Check lease and translate to lookup_fin or forward to rt_loop
+            %% accordingly.
+            dht_node_lookup:lookup_aux_leases(State, Key, Hops, Msg);
+        _ ->
+            %% simply forward the message to routing_table (rt_loop)
+            comm:send_local(pid_groups:get_my(routing_table), FullMsg)
+    end,
     State;
 
 on({lookup_decision, Key, Hops, Msg}, State) ->
-    % message from rt_loop requesting a decision about a aux-fin transformation
-    dht_node_lookup:lookup_decision(State, Key, Hops, Msg),
+    %% message from rt_loop requesting a decision about a aux-fin transformation
+    %% (chord only)
+    dht_node_lookup:lookup_decision_chord(State, Key, Hops, Msg),
     State;
 
 on({?lookup_fin, Key, Data, Msg}, State) ->

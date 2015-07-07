@@ -487,7 +487,9 @@ next_hop(State, Id) ->
 -spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> succ;
+        true ->
+            %% TODO: find succ in rt and use
+            succ;
         false ->
             % check routing table:
             RTSize = get_size(RT),

@@ -22,7 +22,7 @@
 
 -include("scalaris.hrl").
 
--export([lookup_decision/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
+-export([lookup_aux_leases/4, lookup_decision_chord/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
 
 -export([envelope/2]).
 
@@ -47,18 +47,34 @@ envelope(Nth, Msg) ->
 -endif.
 
 %% userdevguide-begin dht_node_lookup:routing
+
+%% @doc Check the lease and translate to lookup_fin or forward to rt_loop
+%%      accordingly.
+-spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_aux_leases(State, Key, Hops, Msg) ->
+    %% When the neighborhood information from rm in rt_loop and leases disagree
+    %% over responsibility, the lookup is forwared to the successor instead of
+    %% asking rt. We can not simply forward this message to rt_loop though:
+    %% rt_loop thinks (based on the neighborhood from rm) that the node is
+    %% responsible and forwards the msg as a lookup_fin msg to its dht_node. The
+    %% dht_node decides (based on the lease, see lookup_fin_leases) that the
+    %% node is not responsible and forwards the message to the next node. When
+    %% the message arrives again at the node, the same steps repeat. As
+    %% joining/sliding needs lookup messages, the new leases are never
+    %% established and the message circle endlessly.
+    case leases:is_responsible(State, Key) of
+        false ->
+            FullMsg = {?lookup_aux, Key, Hops, Msg},
+            comm:send_local(pid_groups:get_my(routing_table), FullMsg);
+        _ ->
+            comm:send_local(self(),
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops), Msg})
+            %% lookup_fin_leases(State, Key, Hops, Msg)
+    end.
+
 %% @doc Decide, whether a lookup_aux message should be translated into a lookup_fin
 %%      message
--spec lookup_decision(State::dht_node_state:state(), Key::intervals:key(),
-                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_decision(State, Key, Hops, Msg) ->
-    case config:read(leases) of
-        true ->
-            lookup_decision_leases(State, Key, Hops, Msg);
-        _ ->
-            lookup_decision_chord(State, Key, Hops, Msg)
-end.
-
 -spec lookup_decision_chord(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_decision_chord(State, Key, Hops, Msg) ->
@@ -75,39 +91,6 @@ lookup_decision_chord(State, Key, Hops, Msg) ->
             log:log(warn, "[dht_node] lookup_aux on lookup_decision"),
             NewMsg = {?lookup_aux, Key, Hops + 1, WrappedMsg},
             comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
-    end.
-
-% TODO: remove - only use lookup_fin for leases (merge "false" case!)
--spec lookup_decision_leases(State::dht_node_state:state(), Key::intervals:key(),
-                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
-lookup_decision_leases(State, Key, Hops, Msg) ->
-    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
-    case leases:is_responsible(State, Key) of
-        true ->
-            % TODO: handle directly (deliver/4)!, also no monitor required (lookup_fin does that!)
-            comm:send_local(dht_node_state:get(State, monitor_proc),
-                            {lookup_hops, Hops}),
-            comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
-        maybe ->
-            % TODO: handle directly (deliver/4)!
-            comm:send_local(self(), {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
-        false ->
-            %% We are here because the neighborhood information from rm in rt_loop
-            %% and leases disagree over responsibility. One cause for this case
-            %% can be join/sliding. Our successor still has the lease for our range.
-            %% But rm already believes that we are responsible for our range. The
-            %% solution is to forward the lookup to our successor instead of asking rt.
-            %% We can not use a lookup_aux message though: rt_loop thinks (bases
-            %% on the neighborhood from rm) that the node is responsible, forwards
-            %% the message as a lookup_decision to here. The dht_node decides
-            %% (based on the lease) that the node is not responsible and forwards
-            %% the message to the next node. When the message arrives again at
-            %% the node, the same steps repeat. As joining/sliding needs lookup
-            %% messages, the new leases are never established and the message
-            %% circle endlessly.
-            Succ = node:pidX(dht_node_state:get(State, succ)),
-            comm:send(Succ, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg},
-                      [{shepherd, self()}])
     end.
 
 %% check_local_leases(DHTNodeState, MyRange) ->
@@ -186,7 +169,7 @@ lookup_fin_chord(State, Key, Data, Msg) ->
                                      nodelist:node(Neighbors), nodelist:succ(Neighbors)])
                     end,
                     %% TODO: replace with lookup_aux msg?
-                    lookup_decision(State, Key, Hops, Msg),
+                    lookup_decision_chord(State, Key, Hops, Msg),
                     State
             end;
         [Pid] -> comm:send(Pid, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg}),
@@ -203,9 +186,16 @@ lookup_fin_leases(State, Key, Data, Msg) ->
         maybe ->
             deliver(State, Msg, false, Hops);
         false ->
-            log:log("lookup_fin fail: ~p", [self()]),
-            %% TODO: replace with lookup_aux msg?
-            lookup_decision(State, Key, Hops, Msg),
+            %% We are here because the neighborhood information from rm in rt_loop
+            %% and leases disagree over responsibility. One cause for this case
+            %% can be join/sliding. Our successor still has the lease for our range.
+            %% But rm already believes that we are responsible for our range. The
+            %% solution is to forward the lookup to our successor instead of asking rt.
+            %% Simply forwarding a lookup_fin msg would lead to linear routing,
+            %% therefore we use lookup_aux. See also lookup_aux().
+            %% log:log("lookup_fin fail: ~p", [self()]),
+            NewMsg = {?lookup_aux, Key, Hops + 1, Msg},
+            comm:send(dht_node_state:get(State, succ_pid), NewMsg),
             State
     end.
 %% userdevguide-end dht_node_lookup:routing

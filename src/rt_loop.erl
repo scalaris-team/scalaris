@@ -261,6 +261,7 @@ lookup_aux_chord(Neighbors, ERT, Key, Hops, Msg) ->
                         Key::intervals:key(), Hops::non_neg_integer(),
                         Msg::comm:message()) -> ok.
 lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
+    %% log:pal("lookup_aux_leases in rt_loop"),
     %% TODO implement WrappedMsg
     WrappedMsg = ?RT:wrap_message(Key, Msg, no_dht_node_state, Hops),
     % NOTE: leases do not require routing through predecessor -> let the own node decide:
@@ -268,7 +269,7 @@ lookup_aux_leases(Neighbors, ERT, Key, Hops, Msg) ->
         true ->
             % TODO: use lookup_fin
             comm:send_local(pid_groups:get_my(dht_node),
-                            {lookup_decision, Key, Hops, WrappedMsg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         false ->
             %% next_hop and nodelist:succ(Neighbors) return different nodes if
             %% key is in the interval of the succ.
