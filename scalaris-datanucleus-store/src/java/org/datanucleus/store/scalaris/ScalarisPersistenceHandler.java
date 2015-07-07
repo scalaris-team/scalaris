@@ -196,8 +196,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
-                    t1.write(id, jsonobj.toString());
                     ScalarisUtils.performScalarisManagementForInsert(op, jsonobj, t1);
+                    t1.write(id, jsonobj.toString());
                     t1.commit();
                 } catch (ConnectionException e) {
                     e.printStackTrace();
@@ -378,9 +378,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     stored.put(key, jsonobj.get(key));
                 }
 
+                ScalarisUtils.performScalarisManagementForUpdate(op, stored, t1);
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
-                ScalarisUtils.performScalarisManagementForUpdate(op, stored, t1);
                 t1.commit();
             } catch (ConnectionException e) {
                 throw new NucleusException(e.getMessage(), e);
