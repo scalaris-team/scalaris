@@ -122,7 +122,6 @@
 
 -define(DBSizeKey, rr_eval_admin_dbsize).    %Process Dictionary Key for generated db size
 -define(REP_FACTOR, 4).
--define(EVAL_DIR, "../../eval"). %execution path is ~/scalaris/bin/
 -define(TAB, 9).
 
 -define(BINOM, 0.2).       %binomial(N, p) - this is p
@@ -157,7 +156,7 @@ ring_build() ->
 default_dir_and_name(Alg) ->
     {{YY, MM, DD}, {Hour, Min, Sec}} = erlang:localtime(),
     SubDir = io_lib:format("~p-~p-~p_~p-~p-~p_~p", [YY, MM, DD, Hour, Min, Sec, Alg]),
-    {filename:join([?EVAL_DIR, SubDir]), "results.dat"}.
+    {filename:join([config:read(log_path), "rr_eval", SubDir]), "results.dat"}.
 
 -spec gen_setup(DDists::[data_distribution()],
                 FTypes::[db_generator:failure_type()],
@@ -530,8 +529,7 @@ art_scale(Dir, FileName, MBranch, MBucket, ACorrFactor) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec system(atom()) -> ok.
 system(EvalName) ->
-    {{YY, MM, DD}, {Hour, Min, Sec}} = erlang:localtime(),
-    Dir = io_lib:format("~s/~p-~p-~p_~p-~p-~p_System", [?EVAL_DIR, YY, MM, DD, Hour, Min, Sec]),
+    {Dir, _FileName} = default_dir_and_name(system),
     system(Dir, EvalName).
 
 -spec system(DestDir::string(), atom()) -> ok.
@@ -556,7 +554,8 @@ system(Dir, EvalName) ->
         a0 -> eval(sys,
                    gen_setup([uniform], ?EVAL_FTYPES, [random],
                              Scenario, Ring, [Bloom0]),
-                   rounds, 2*Nodes, 2*Nodes, 0, [{eval_dir, Dir}, {file_suffix, atom_to_list(EvalName)}, {start_ep_id, 1}])
+                   rounds, 2*Nodes, 2*Nodes, 0,
+                   [{eval_dir, Dir}, {file_suffix, atom_to_list(EvalName)}, {start_ep_id, 1}])
     end,
     ok.
 
@@ -576,7 +575,7 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, _Options) ->
     Options = [{eval_time, {Hour, Min, Sec}} | _Options],
     
     StartEPId = proplists:get_value(start_ep_id, Options, 0),
-    Dir = proplists:get_value(eval_dir, Options, ?EVAL_DIR),
+    Dir = proplists:get_value(eval_dir, Options, element(1, default_dir_and_name(unknown))),
     FileName = proplists:get_value(filename, Options, io_lib:format("~p.dat", [StepParam])),
     
     EPFile = rr_eval_export:create_file([{filename, FileName},
