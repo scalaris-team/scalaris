@@ -73,6 +73,7 @@ lookup_aux_chord(State, Key, Hops, Msg) ->
 -spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_leases(State, Key, Hops, Msg) ->
+    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     case leases:is_responsible(State, Key) of
         true ->
             comm:send_local(dht_node_state:get(State, monitor_proc),
@@ -80,12 +81,12 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             DHTNode = pid_groups:find_a(dht_node),
             %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
             comm:send_local(DHTNode,
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         maybe ->
             DHTNode = pid_groups:find_a(dht_node),
             %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
             comm:send_local(DHTNode,
-                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg});
         false ->
             MyRange = dht_node_state:get(State, my_range),
             case intervals:in(Key, MyRange) of
@@ -98,10 +99,8 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
                     % solution is to forward the lookup to our
                     % successor instead of asking rt.
                     Succ = node:pidX(dht_node_state:get(State, succ)),
-                    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
                     comm:send(Succ, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
                 false ->
-                    WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
                     P = element(2, ?RT:next_hop(State, Key)),
                     comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
             end
