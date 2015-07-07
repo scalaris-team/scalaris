@@ -72,7 +72,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
             JSONObject result = new JSONObject(t1.read(id.toString())
                     .stringValue());
 
-            if (ScalarisPersistenceHandler.isADeletedRecord(result)) {
+            if (ScalarisUtils.isDeletedRecord(result)) {
                 throw new NucleusObjectNotFoundException(
                         "Record has been deleted");
             }
