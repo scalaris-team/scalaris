@@ -82,7 +82,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%
 
--define(implies(A, B), (not (A)) orelse (B)).
+-define(implies(A, B), ((not (A)) orelse (B))).
 
 % for debugging:
 -ifdef(have_ctline_support).
