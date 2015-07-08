@@ -278,6 +278,12 @@ subscriptions() ->
     _ = case FD of
             failed -> [];
             FD ->
+                TranslatePid = fun(Pid) ->
+                                       case pid_groups:group_and_name_of(Pid) of
+                                           failed       -> Pid;
+                                           GroupAndName -> GroupAndName
+                                       end
+                               end,
                 {dictionary, Dictionary} = process_info(FD, dictionary),
                 All_HBS = [ X || {{_,_,fd},{{_,_,fd},X}} <- Dictionary ],
                 io:format("Remote nodes watched: ~p~n", [length(All_HBS)]),
@@ -286,18 +292,21 @@ subscriptions() ->
                       {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
                       [ begin
                             PlainPid = comm:get_plain_pid(LSub),
-                            SubPid = case pid_groups:group_and_name_of(PlainPid) of
-                                         failed ->
-                                             LSub;
-                                         GroupAndName ->
-                                             GroupAndName
-                                     end,
+                            SubPid = TranslatePid(PlainPid),
+                            Watched = case comm:is_local(WPid) of
+                                          true ->
+                                              TranslatePid(comm:make_local(WPid));
+                                          false ->
+                                              WPid
+                                      end,
                             case PlainPid of
-                                LSub -> io:format("  ~p ~p~n", [SubPid, Count]);
-                                _ -> io:format("  ~p ~p - subscribed as ~p~n", [SubPid, Count, LSub])
+                                LSub -> io:format("  ~p -> ~p ~p~n",
+                                                  [SubPid, Watched, Count]);
+                                _ -> io:format("  ~p -> ~p ~p~n    (subscribed as ~p)~n",
+                                               [SubPid, Watched, Count, LSub])
                             end
                         end
-                        || {{LSub,{_,_,_}} = Key, {Key, Count}} <- FD_HBS_Dict ]
+                        || {{LSub, {_,_,_} = WPid} = Key, {Key, Count}} <- FD_HBS_Dict ]
                   end || X <- All_HBS ]
         end,
     ok.
