@@ -92,8 +92,11 @@ on({get_list_length, SourcePid}, Nodes) ->
 
 on({register, Node}, Nodes) ->
     NodePid = node:pidX(Node),
-    fd:subscribe(self(), [NodePid]),
-    gb_trees:enter(NodePid, Node, Nodes);
+    case gb_trees:lookup(NodePid, Nodes) of
+        {value, _OldNode} -> gb_trees:update(NodePid, Node, Nodes);
+        none              -> fd:subscribe(self(), [NodePid]),
+                             gb_trees:insert(NodePid, Node, Nodes)
+    end;
 
 % dead-node-cache reported dead node to be alive again
 on({zombie, Node}, Nodes) ->
