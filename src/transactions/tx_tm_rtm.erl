@@ -1163,7 +1163,7 @@ get_failed_keys(TxState, State) ->
                   length(Result), '=/=', NumAbort}),
     Result.
 
--spec handle_crash(pid(), Reason::fd:reason(), Cookie::tx_tm_rtm | pid_groups:pidname(),
+-spec handle_crash(comm:mypid(), Reason::fd:reason(), Cookie::tx_tm_rtm | pid_groups:pidname(),
                    state(), on | on_init)
                   -> state() |
                      {'$gen_component',
