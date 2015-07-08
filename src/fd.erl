@@ -38,7 +38,7 @@
 -export([subscriptions/0]).
 
 -type reason() :: 'DOWN' | noconnection | term().
--type event() :: crash | atom().
+-type event() :: crash | jump | leave.
 -type state() :: [HBPid::pid()]. % a list of all hbs processes launched by this fd
 
 -define(SEND_OPTIONS, [{channel, prio}]).

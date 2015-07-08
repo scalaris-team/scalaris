@@ -365,8 +365,8 @@ report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
 
 %% @doc Reports a crashed connection to local subscribers.
 %% @private
--spec fd_notify(state(), Event::crash | atom(), Pid::comm:mypid(),
-                Data::term()) -> state().
+-spec fd_notify(state(), Event::fd:event(), Pid::comm:mypid(),
+                Data::fd:reason()) -> state().
 fd_notify(State, crash, WatchedPid, Reason) ->
     report_crashed_remote_pid(State, WatchedPid, Reason, nowarn);
 fd_notify(State, Event, WatchedPid, Data) ->
