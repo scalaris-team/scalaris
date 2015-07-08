@@ -285,18 +285,19 @@ subscriptions() ->
                       io:format("fd_hbs: ~p~n", [pid_groups:group_and_name_of(X)]),
                       {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
                       [ begin
-                            Sub = case pid_groups:group_and_name_of(LSub) of
-                                failed ->
-                                          LSub;
-                                GroupAndName ->
-                                    GroupAndName
-                            end,
-                            io:format("  ~p ~p ~p~n",
-                                      [Sub, Cookies, Count])
+                            PlainPid = comm:get_plain_pid(LSub),
+                            SubPid = case pid_groups:group_and_name_of(PlainPid) of
+                                         failed ->
+                                             LSub;
+                                         GroupAndName ->
+                                             GroupAndName
+                                     end,
+                            case PlainPid of
+                                LSub -> io:format("  ~p ~p~n", [SubPid, Count]);
+                                _ -> io:format("  ~p ~p - subscribed as ~p~n", [SubPid, Count, LSub])
+                            end
                         end
-                        || {{LSub,{_,_,_}},
-                            {{LSub,{_,_,_}}, Cookies, Count}}
-                               <- FD_HBS_Dict ]
+                        || {{LSub,{_,_,_}} = Key, {Key, Count}} <- FD_HBS_Dict ]
                   end || X <- All_HBS ]
         end,
     ok.
