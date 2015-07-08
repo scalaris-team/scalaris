@@ -118,7 +118,7 @@
 
 -dialyzer([{no_match, [get_param_value/2, set_params/3,
                        init_rc_conf/3, init_ring_conf/3]},
-           {no_return, [system/1, system/2]}]).
+           {no_return, [system/3, system/4]}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
