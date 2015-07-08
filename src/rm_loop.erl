@@ -390,7 +390,8 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
                 Data::term()) -> state().
 fd_notify(State, Event, DeadPid, Data) ->
     RMFun = fun(RM_State) -> ?RM:fd_notify(RM_State, Event, DeadPid, Data) end,
-    NewState = update_state(State, RMFun, DeadPid),
+    % note: only a crashed pid is unsubscribed by fd itself!
+    NewState = update_state(State, RMFun, ?IIF(Event =:= crash, DeadPid, null)),
     % do rrepair in case of non-graceful leaves only
     case config:read(rrepair_after_crash) andalso
              Event =:= crash of
