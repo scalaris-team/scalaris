@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc    Re-register with boot nodes
+%% @doc    Re-register with mgmt_server nodes
 %% @end
 %% @version $Id$
 -module(dht_node_reregister).
@@ -84,7 +84,7 @@ on_inactive({web_debug_info, Requestor}, State) ->
     State;
 
 on_inactive({register_trigger}, State) ->
-    msg_delay:send_trigger(get_base_interval(), {register}),
+    msg_delay:send_trigger(get_base_interval(), {register_trigger}),
     State;
 
 on_inactive(_Msg, State) ->
@@ -97,7 +97,7 @@ on_active({deactivate_reregister}, _State)  ->
     gen_component:change_handler(inactive, fun ?MODULE:on_inactive/2);
 
 on_active({register_trigger}, State) ->
-    msg_delay:send_trigger(get_base_interval(), {register}),
+    msg_delay:send_trigger(get_base_interval(), {register_trigger}),
     gen_component:post_op({register}, State);
 
 on_active({register}, State) ->
@@ -127,10 +127,11 @@ on_active({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
-%% @doc Gets the interval to trigger re-registering the node set in scalaris.cfg.
--spec get_base_interval() -> pos_integer().
+%% @doc Gets the interval to trigger re-registering the node set in
+%%      scalaris.cfg and converts it to seconds.
+-spec get_base_interval() -> Seconds::pos_integer().
 get_base_interval() ->
-    config:read(reregister_interval).
+    config:read(reregister_interval) div 1000.
 
 %% @doc pid of the mgmt server (may be invalid)
 -spec mgmtServer() -> comm:mypid() | any().
