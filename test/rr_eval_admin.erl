@@ -369,7 +369,7 @@ bloom(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec bloom_scale(N::pos_integer, EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec bloom_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
 bloom_scale(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(bloom),
     bloom_scale(Dir, FileName, N, EvalRepeats, P1E, false).
