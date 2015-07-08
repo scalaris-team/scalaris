@@ -181,7 +181,11 @@ unset xlabel
 set format x ""
 set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
-set format y "%2.1f"
+if (bw_max > 1000) {
+  set format y " %2.1f"
+} else {
+  set format y "%2.1f"
+}
 if (plotCount > 1) {
   set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles box maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
 } else {
@@ -197,8 +201,14 @@ unset ylabel
 unset ytics
 set grid y2tics
 if (regenAccInPercent == 1) {
-  set size (all_width_r+0.01),acc_height
-  set y2tics mirror format "%-2.0f_{ }%%" offset 0 scale 0.8
+  set y2tics mirror offset 0 scale 0.8
+  if (bw_max > 1000) {
+    set size (all_width_r + 0.028),acc_height
+    set format y2 "%-2.1f_{ }%%"
+  } else {
+    set size (all_width_r + 0.01),acc_height
+    set format y2 "%-2.0f_{ }%%"
+  }
   set y2range [(acc_reg_avg-acc_reg_max):(acc_reg_avg+acc_reg_max)]
 } else {
   set size all_width_r,acc_height
@@ -225,8 +235,13 @@ set ylabel "rel. Red." font ",16" # transferred / updated
 }
 set yrange [0:red_max]
 set y2range [0:red_max]
-set format y "%2.1f"
-set format y2 "%-2.1f"
+if (bw_max > 1000) {
+  set format y " %2.1f"
+  set format y2 "%-2.1f "
+} else {
+  set format y "%2.1f"
+  set format y2 "%-2.1f"
+}
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
