@@ -1169,11 +1169,6 @@ get_failed_keys(TxState, State) ->
                      {'$gen_component',
                       [{on_handler, fun((comm:message(), state()) -> state())}],
                       state()}.
-handle_crash(Pid, jump, Cookie, State, _Handler) ->
-    % subscribe again (subscription was removed at fd)
-    Self = comm:reply_as(self(), 3, {fd, Cookie, '_'}),
-    fd:subscribe_refcount(Self, [Pid]),
-    State;
 handle_crash(Pid, _Reason, _Cookie, State, Handler) ->
     %% tm: update rtms
     %% rtm: take over tx

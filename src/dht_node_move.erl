@@ -332,8 +332,6 @@ process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, My
                        (is_tuple(Operation) andalso element(1, Operation) =:= finish_delta_ack2));
 
 % failure detector reported dead node
-process_move_msg({move, _MoveFullId, {fd_notify, crash, _DeadPid, jump}} = _Msg, MyState) ->
-    MyState; % failure detectors are reused after jump
 process_move_msg({move, MoveFullId, {fd_notify, crash, _DeadPid, _Reason}} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =

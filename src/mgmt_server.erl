@@ -70,19 +70,15 @@ node_list(UseShepherd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({fd_notify, crash, PID, jump}, Nodes) ->
-    % subscribe again (subscription was removed at fd)
-    fd:subscribe(self(), [PID]),
-    Nodes;
-on({fd_notify, crash, PID, leave}, Nodes) ->
-    % graceful leave - do not add as zombie candidate!
-    gb_trees:delete_any(PID, Nodes);
 on({fd_notify, crash, PID, _Reason}, Nodes) ->
     case gb_trees:lookup(PID, Nodes) of
         {value, Node} -> dn_cache:add_zombie_candidate(Node),
                          gb_trees:delete(PID, Nodes);
         none          -> Nodes
     end;
+on({fd_notify, leave, PID, _Reason}, Nodes) ->
+    % graceful leave - prevent the node being added as a zombie candidate by removing now:
+    gb_trees:delete_any(PID, Nodes);
 on({fd_notify, _Event, _PID, _Reason}, Nodes) ->
     Nodes;
 
