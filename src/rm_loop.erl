@@ -483,12 +483,14 @@ update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid) ->
                            nodelist:succs(OldNeighborhood)),
     NewView = lists:append(nodelist:preds(NewNeighborhood),
                            nodelist:succs(NewNeighborhood)),
+    OldNodePid = node:pidX(nodelist:node(OldNeighborhood)),
+    NewNodePid = node:pidX(nodelist:node(NewNeighborhood)),
     OldPids = [node:pidX(Node) || Node <- OldView,
-                                  not node:same_process(Node, nodelist:node(OldNeighborhood)),
+                                  not node:same_process(Node, OldNodePid),
                                   % note: crashed pid already unsubscribed by fd, do not unsubscribe again
                                   not node:same_process(Node, CrashedPid)],
     NewPids = [node:pidX(Node) || Node <- NewView,
-                                  not node:same_process(Node, nodelist:node(NewNeighborhood))],
+                                  not node:same_process(Node, NewNodePid)],
     fd:update_subscriptions(self(), OldPids, NewPids),
     ok.
 
