@@ -41,7 +41,7 @@
 %%         end).
 -define(TRACE_STATE(OldState, NewState, Reason), ok).
 
--export([send_trigger/0, init_first/0, init/4, on/2,
+-export([send_trigger/0, init_first/0, init/4, cleanup/1, on/2,
          leave/1, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
@@ -241,6 +241,19 @@ init(Me, Pred, Succ, OldSubscrTable) ->
     NewState = {RM_State, false, SubscrTable},
     ?TRACE_STATE({null, null, null}, NewState, init),
     NewState.
+
+%% @doc Cleans up before the state is deleted, e.g. removes fd subscriptions
+%%      for a rejoin operation.
+%%      NOTE: only valid when HasLeft is set in the state!
+-spec cleanup(State::state()) -> ok.
+cleanup({RM_State, true, _SubscrTable} = _State) ->
+    Neighborhood = ?RM:get_neighbors(RM_State),
+    View = lists:append(nodelist:preds(Neighborhood),
+                        nodelist:succs(Neighborhood)),
+    Pids = [node:pidX(Node) || Node <- View,
+                               not node:same_process(Node, nodelist:node(Neighborhood))],
+    fd:update_subscriptions(self(), Pids, []),
+    ok.
 
 %% @doc Creates a state() object for a unit test.
 %%      Pre: the process must have joined a group. See pid_groups:join_as/2.

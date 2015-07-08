@@ -477,6 +477,8 @@ on({local_snapshot_is_done}, State) ->
     snapshot:on_local_snapshot_is_done(State);
 
 on({rejoin, Id, Options, {get_move_state_response, MoveState}}, State) ->
+    % clean up RM, e.g. fd subscriptions:
+    rm_loop:cleanup(dht_node_state:get(State, rm_state)),
     %% start new join
     comm:send_local(self(), {join, start}),
     JoinOptions = [{move_state, MoveState} | Options],
