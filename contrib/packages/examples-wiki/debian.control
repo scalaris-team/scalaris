@@ -2,20 +2,20 @@ Source: scalaris-examples-wiki
 Section: web
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), ant, openjdk-7-jdk | java6-sdk, scalaris-java (>> 0.7.2)
+Build-Depends: debhelper (>= 4.1.16), ant, openjdk-7-jdk | java6-sdk, scalaris-java (>= 0.8.0)
 Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
 Package: scalaris-examples-wiki-tomcat5
 Architecture: all
-Depends: ${misc:Depends}, tomcat5, scalaris-java (>> 0.7.2)
+Depends: ${misc:Depends}, tomcat5, scalaris-java (>= 0.8.0)
 Description: Wikipedia on Scalaris example
  This web application demonstrates the use of Scalaris as a data-store
  back-end for a Wikipedia-like application.
 
 Package: scalaris-examples-wiki-tomcat6
 Architecture: all
-Depends: ${misc:Depends}, tomcat6, scalaris-java (>> 0.7.2)
+Depends: ${misc:Depends}, tomcat6, scalaris-java (>= 0.8.0)
 Description: Wikipedia on Scalaris example
  This web application demonstrates the use of Scalaris as a data-store
  back-end for a Wikipedia-like application.
