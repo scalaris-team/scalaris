@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.2+git"
+SCALARIS_VERSION="0.8.0+git"
 date=`date +"%Y%m%d.%H%M"`
 name="scalaris-bindings" # folder base name (without version)
 url="https://github.com/scalaris-team/scalaris.git"

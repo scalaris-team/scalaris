@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris-bindings
-Version: 0.7.2+git-1
+Version: 0.8.0+git-1
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all
 Standards-Version: 3.9.6

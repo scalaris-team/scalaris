@@ -19,7 +19,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.7.2+git").
+-define(SCALARIS_VERSION, "0.8.0+git").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the

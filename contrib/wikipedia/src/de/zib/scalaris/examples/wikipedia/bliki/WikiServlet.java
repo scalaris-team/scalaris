@@ -96,7 +96,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * Version of the "Wikipedia on Scalaris" example implementation.
      */
-    public static final String version = "0.7.2+git";
+    public static final String version = "0.8.0+git";
 
     protected SiteInfo siteinfo = null;
     protected MyNamespace namespace = null;
