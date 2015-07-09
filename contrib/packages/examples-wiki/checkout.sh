@@ -12,7 +12,7 @@ MODE=snapshot
 #####
 
 if [ "$MODE" = "snapshot" ] ; then
-  folder="./${name}"
+  folder="${name}"
   if [ ! -d "${folder}" ]; then
     echo "checkout ${url} -> ${folder} ..."
     git clone "${url}" "${folder}"
@@ -34,11 +34,9 @@ if [ "$MODE" = "snapshot" ] ; then
   fi
 else
   pkg_version="${SCALARIS_VERSION}"
-  folder="${folder}-${pkg_version}"
-  tarfile="${folder}.tar.gz"
+  folder="${name}-${pkg_version}"
   echo "downloading archive ${url%.git}/archive/${SCALARIS_VERSION}.tar.gz ..."
-  wget "${url%.git}/archive/${SCALARIS_VERSION}.tar.gz" && \
-  tar -xzf "${SCALARIS_VERSION}.tar.gz" && rm "${SCALARIS_VERSION}.tar.gz"
+  wget "${url%.git}/archive/${SCALARIS_VERSION}.tar.gz" -O - | tar -xz 
   result=$?
   if [ ! -d "${folder}" ]; then
     echo "wrong archive contents, expecting folder ${folder}"

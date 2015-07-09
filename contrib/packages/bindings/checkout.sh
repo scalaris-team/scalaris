@@ -12,7 +12,7 @@ MODE=snapshot
 #####
 
 if [ "$MODE" = "snapshot" ] ; then
-  folder="./${name}"
+  folder="${name}"
   if [ ! -d "${folder}" ]; then
     echo "checkout ${url} -> ${folder} ..."
     git clone "${url}" "${folder}"
@@ -34,11 +34,10 @@ if [ "$MODE" = "snapshot" ] ; then
   fi
 else
   pkg_version="${SCALARIS_VERSION}"
-  folder="${folder}-${pkg_version}"
+  folder="${name}-${pkg_version}"
   tarfile="${folder}.tar.gz"
   echo "downloading archive ${url%.git}/archive/${SCALARIS_VERSION}.tar.gz ..."
-  wget "${url%.git}/archive/${SCALARIS_VERSION}.tar.gz" && \
-  mv "${SCALARIS_VERSION}.tar.gz" "${tarfile}" && \
+  wget "${url%.git}/archive/${SCALARIS_VERSION}.tar.gz" -O "${tarfile}" && \
   tar -xzf "${tarfile}"
   result=$?
   if [ ! -d "${folder}" ]; then
