@@ -87,6 +87,7 @@ if [ ${result} -eq 0 ]; then
   cp  "${sourcefolder}/debian.compat"                   ./debian.compat && \
   cp  "${sourcefolder}/debian.control"                  ./debian.control && \
   cp  "${sourcefolder}/debian.rules"                    ./debian.rules && \
+  cp  "${sourcefolder}/debian.source.lintian-overrides" ./debian.source.lintian-overrides && \
   cp  "${folder}/LICENSE"                               ./debian.copyright
   result=$?
 fi
