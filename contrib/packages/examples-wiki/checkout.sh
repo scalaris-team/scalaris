@@ -2,24 +2,48 @@
 
 SCALARIS_VERSION="0.8.0+git"
 date=`date +"%Y%m%d.%H%M"`
-name="scalaris-examples-wiki" # folder base name (without version)
+name="scalaris" # folder base name (without version)
+pkg_name="scalaris-examples-wiki" # package name
 url="https://github.com/scalaris-team/scalaris.git"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
+# MODE: snapshot | tag
+MODE=snapshot
 
 #####
 
-folder="./${name}"
+if [ "$MODE" = "snapshot" ] ; then
+  folder="./${name}"
+  if [ ! -d "${folder}" ]; then
+    echo "checkout ${url} -> ${folder} ..."
+    git clone "${url}" "${folder}"
+    result=$?
+  else
+    echo "update ${url} -> ${folder} ..."
+    cd "${folder}"
+    git pull
+    result=$?
+    cd - >/dev/null
+  fi
 
-if [ ! -d "${folder}" ]; then
-  echo "checkout ${url} -> ${folder} ..."
-  git clone "${url}" "${folder}"
-  result=$?
+  if [ ${result} -eq 0 ]; then
+    echo -n "get git revision ..."
+    revision=`cd "${folder}" && git log --pretty=format:'%h' -n 1`
+    result=$?
+    echo " ${revision}"
+    pkg_version="${SCALARIS_VERSION}${date}.${revision}"
+  fi
 else
-  echo "update ${url} -> ${folder} ..."
-  cd "${folder}"
-  git pull
+  pkg_version="${SCALARIS_VERSION}"
+  folder="${folder}-${pkg_version}"
+  tarfile="${folder}.tar.gz"
+  echo "downloading archive ${url%.git}/archive/${SCALARIS_VERSION}.tar.gz ..."
+  wget "${url%.git}/archive/${SCALARIS_VERSION}.tar.gz" && \
+  tar -xzf "${SCALARIS_VERSION}.tar.gz" && rm "${SCALARIS_VERSION}.tar.gz"
   result=$?
-  cd - >/dev/null
+  if [ ! -d "${folder}" ]; then
+    echo "wrong archive contents, expecting folder ${folder}"
+    exit 1
+  fi
 fi
 
 if ! diff -q checkout.sh "${folder}/contrib/packages/examples-wiki/checkout.sh" > /dev/null ; then
@@ -28,16 +52,8 @@ if ! diff -q checkout.sh "${folder}/contrib/packages/examples-wiki/checkout.sh" 
 fi
 
 if [ ${result} -eq 0 ]; then
-  echo -n "get git revision ..."
-  revision=`cd "${folder}" && git log --pretty=format:'%h' -n 1`
-  result=$?
-  echo " ${revision}"
-  pkg_version="${SCALARIS_VERSION}${date}.${revision}"
-fi
-
-if [ ${result} -eq 0 ]; then
-  tarfile="${folder}-${pkg_version}.tar.gz"
-  newfoldername="${folder}-${pkg_version}"
+  tarfile="${pkg_name}-${pkg_version}.tar.gz"
+  newfoldername="${pkg_name}-${pkg_version}"
   echo "making ${tarfile} ..."
   mv "${folder}/contrib/wikipedia" "${newfoldername}" && tar -czf "${tarfile}" "${newfoldername}" --exclude-vcs && mv "${newfoldername}" "${folder}/contrib/wikipedia"
   result=$?
@@ -47,9 +63,9 @@ if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder="${folder}/contrib/packages/examples-wiki"
   sed -e "s/%define pkg_version .*/%define pkg_version ${pkg_version}/g" \
-      < "${sourcefolder}/scalaris-examples-wiki.spec"  > ./scalaris-examples-wiki.spec && \
-  cp  "${sourcefolder}/scalaris-examples-wiki.changes"   ./scalaris-examples-wiki.changes && \
-  cp  "${sourcefolder}/scalaris-examples-wiki-rpmlintrc" ./scalaris-examples-wiki-rpmlintrc
+      < "${sourcefolder}/${pkg_name}.spec"           > "./${pkg_name}.spec" && \
+  cp  "${sourcefolder}/${pkg_name}.changes"            "./${pkg_name}.changes" && \
+  cp  "${sourcefolder}/${pkg_name}-rpmlintrc"          "./${pkg_name}-rpmlintrc"
   result=$?
 fi
 
@@ -57,12 +73,15 @@ if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder="${folder}/contrib/packages/examples-wiki"
   sed -e "s/Version: .*-.*/Version: ${pkg_version}-1/g" \
-      -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.orig\\.tar\\.gz/g" \
-      -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.diff\\.tar\\.gz/g" \
-      < ${sourcefolder}/scalaris-examples-wiki.dsc    > ./scalaris-examples-wiki.dsc && \
-  sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
-      -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
-      < "${sourcefolder}/debian.changelog"            > ./debian.changelog && \
+      -e "s/scalaris.*\\.orig\\.tar\\.gz/${pkg_name}-${pkg_version}\\.orig\\.tar\\.gz/g" \
+      -e "s/scalaris.*\\.diff\\.tar\\.gz/${pkg_name}-${pkg_version}\\.diff\\.tar\\.gz/g" \
+      < "${sourcefolder}/${pkg_name}.dsc"             > "./${pkg_name}.dsc" && \
+  ( ( test "$MODE" != "snapshot" && \
+      sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
+      < "${sourcefolder}/debian.changelog"            > ./debian.changelog ) || \
+    sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
+        -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
+      < "${sourcefolder}/debian.changelog"            > ./debian.changelog ) && \
   cp  "${sourcefolder}/debian.compat"                   ./debian.compat && \
   cp  "${sourcefolder}/debian.control"                  ./debian.control && \
   cp  "${sourcefolder}/debian.rules"                    ./debian.rules && \
@@ -72,7 +91,6 @@ if [ ${result} -eq 0 ]; then
                                                         ./debian.scalaris-examples-wiki-tomcat6.conffiles && \
   cp  "${sourcefolder}/debian.source.lintian-overrides" ./debian.source.lintian-overrides && \
   cp  "${folder}/LICENSE"                               ./debian.copyright
-
   result=$?
 fi
 

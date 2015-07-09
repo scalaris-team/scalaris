@@ -8,7 +8,7 @@ Release:        1
 License:        Apache-2.0
 Group:          Productivity/Databases/Servers
 URL:            http://scalaris.zib.de
-Source0:        %{name}-%{version}.tar.gz
+Source0:        scalaris-%{version}.tar.gz
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
