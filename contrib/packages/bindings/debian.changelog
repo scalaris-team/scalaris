@@ -2,7 +2,35 @@ scalaris-bindings (0.8.0+git-1) unstable; urgency=low
 
   * git snapshot from master
 
- -- Nico Kruber <kruber@zib.de>  Mon, 23 Oct 2014 18:15:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 10 Jul 2015 12:00:00 +0200
+
+scalaris (0.8.0-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Packaging:
+    - also install docs on Arch Linux
+    - fix lintian errors and warnings for Debian-based packages
+    - fix permissions on the log directory (owned by the 'scalaris' user)
+      and the config files (not owned by the 'scalaris' user anymore!)
+    - adapt packages for newer distributions
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.12 from Erlang 17.4)
+    - Python-API: do not include a shebang with a pre-defined path to python
+                  anymore
+    - Python-API: fix unclosed sockets in various tests
+    - Python-API: increase python{2,3} test speed
+    - Ruby-API: try to fallback to the normal json module if the gem is missing
+    - Ruby-API: considerably increase the ruby test speed
+    - remove the Publish/Subscribe API
+  * Infrastructure:
+    - move sources to github: https://github.com/scalaris-team/scalaris
+    - new project homepage: http://scalaris.zib.de
+  * Bugs:
+    - JSON-API: fix test_and_set not working correctly inside req_list
+    - fix numerous more bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 10 Jul 2015 12:00:00 +0200
 
 scalaris-bindings (0.7.2-1) stable; urgency=low
 

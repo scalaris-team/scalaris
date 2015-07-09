@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Jul 10 10:00:00 UTC 2015 - kruber@zib.de
+
+- Scalaris 0.8.0
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Infrastructure:
+    - move sources to github: https://github.com/scalaris-team/scalaris
+    - new project homepage: http://scalaris.zib.de
+
+-------------------------------------------------------------------
 Mon Otc 23 16:15:00 UTC 2014 - kruber@zib.de
 
 - Scalaris 0.7.2

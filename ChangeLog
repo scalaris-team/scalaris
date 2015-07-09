@@ -1,3 +1,89 @@
+Scalaris 0.8.0 (codename "Picoides scalaris") - July 10, 2015
+============================================================
+(partly supported by the EU project IES Cities http://iescities.eu/
+and the EIT ICT Labs project MCData)
+
+Packaging:
+
+- also install docs on Arch Linux
+- fix lintian errors and warnings for Debian-based packages
+- fix permissions on the log directory (owned by the 'scalaris' user)
+  and the config files (not owned by the 'scalaris' user anymore!)
+- adapt packages for newer distributions
+
+API:
+
+- Java-API: integrate new OtpErlang library (1.5.12 from Erlang 17.4)
+- Python-API: do not include a shebang with a pre-defined path to python
+              anymore
+- Python-API: fix unclosed sockets in various tests
+- Python-API: increase python{2,3} test speed
+- Ruby-API: try to fallback to the normal json module if the gem is missing
+- Ruby-API: considerably increase the ruby test speed
+- remove the Publish/Subscribe API
+
+Business Logic:
+
+- rrepair: faster and more accurate bloom filter repair protocol
+- rrepair: faster, more accurate and less bandwidth-consuming merkle tree
+           repair protocol
+- rrepair: reduce memory footprint of merkle_tree
+- rrepair: more accurate and less bandwidth-consuming trivial repair
+           protocol
+- rrepair: add a new simple hash ('shash') algorithm
+- rrepair: switch to (the more efficient) push-only resolve phase for
+           synchronisation
+- rrepair: add replica repair algorithm evaluation scripts
+- RM: faster cyclon cache integration, especially during node jumps
+- comm_layer: envelops can be nested
+- comm_layer: allow send options for comm:send_local/3 and msg_delay
+              (currently only ?quiet supported)
+
+Infrastructure:
+
+- FD: simplify the API, support envelopes and remove own cookie handling
+- FD: extend the failure detector with generic notifications (not just
+      crashes) to subscribed nodes
+- DB: add an (experimental) mnesia back-end
+- DB: add an (experimental) hanoidb back-end
+- DB: make the back-end configurable via the scalaris.cfg option
+      'db_backend'
+- improve the speed of several utility functions
+- scalarisctl: add '-l' parameter for specifying the logdir
+- scalarisctl: do not use the '-s' parameter anymore, instead specify the
+               start type with the new '-t' parameter
+- scalarisctl: allow starting several dht_nodes per vm with given keys via
+               the new parameter '-j'
+- update yaws to version 1.99
+- make "$HOME/.scalaris/log" the default log dir
+- support for Erlang R14B04 up to 18.0.2 and current otp master
+- add example scripts for running Scalaris on a SLURM cluster
+- move sources to github: https://github.com/scalaris-team/scalaris
+- new project homepage: http://scalaris.zib.de
+
+Tests:
+
+- reduce log spam in proto_sched tests and only print proto_sched results
+  when the tests fail
+- extended and improved various test suites
+
+Tools:
+
+- proto_sched: support callbacks
+- proto_sched: add support for user msg shepherds
+- proto_sched: better error handling when sending messages to dead
+               (local) processes
+- tester: add value creator and type checker for orddict:orddict()
+- tester: full support for Erlang 18.0
+- let 'make dialyzer' run over test as well and ignore some false-positives
+  for Erlang >= 18.0 using the '-dialyzer()' attribute
+
+Bugs:
+
+- slide: fix some race conditions with 'jump' operations
+- JSON-API: fix test_and_set not working correctly inside req_list
+- fix numerous more bugs
+
 Scalaris 0.7.2 - October 23, 2014
 ============================================================
 (partly supported by the EU project IES Cities http://iescities.eu/
