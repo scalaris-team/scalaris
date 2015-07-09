@@ -1,9 +1,6 @@
 # norootforbuild
 
 %define pkg_version 0.7.2+git
-%define scalaris_user scalaris
-%define scalaris_group scalaris
-%define scalaris_home /var/lib/scalaris
 Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -119,14 +116,6 @@ Requires:   jre >= 1.6.0
 %else
 BuildArch:  noarch
 %endif
-%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-Requires(pre):  shadow-utils
-Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%endif
-%if 0%{?suse_version}
-Requires(pre):  pwdutils
-PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%endif
 
 %description -n scalaris-java
 Java Bindings and command line client for scalaris
@@ -228,22 +217,16 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
 
-%pre -n scalaris-java
-# note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
-getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
-getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
-exit 0
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files -n scalaris-java
 %defattr(-,root,root,-)
 %{_javadir}/scalaris
-%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
-%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
+%dir %{_sysconfdir}/scalaris
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
+%config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
 %{_bindir}/scalaris
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
