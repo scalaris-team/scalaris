@@ -272,20 +272,25 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
     %log:pal("on renew ~w (~w, ~w)~n", [Old, Mode, self()]),
     Self = comm:this(),
     {New, Renew} = 
-        case get_aux(Old) of
-            % change owner to self -> remove aux
-            {change_owner, Self} ->
-                {Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()}, renew};
-            _ ->
-                case comm:this() of
-                    Owner ->
-                        {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
+        case Mode of
+            passive -> % passive lease are only renewed
+                {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
+            active ->
+                case get_aux(Old) of
+                    % change owner to self -> remove aux
+                    {change_owner, Self} ->
+                        {Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()}, renew};
                     _ ->
-                        % we are trying to recover
-                        log:log("trying to recover: owner=~p id=~p, self=~p", 
-                                [Owner, get_id(Old), comm:this()]),
-                        {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0, 
-                                  timeout=new_timeout()}, renew_recover}
+                        case comm:this() of
+                            Owner ->
+                                {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
+                            _ ->
+                                % we are trying to recover
+                                log:log("~s: trying to recover: owner=~p id=~p, self=~p",
+                                        [pid_groups:my_groupname(), Owner, get_id(Old), comm:this()]),
+                                {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0,
+                                           timeout=new_timeout()}, renew_recover}
+                        end
                 end
           end,
     ContentCheck = generic_content_check(Old, New, Renew),
