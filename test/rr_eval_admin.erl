@@ -79,6 +79,7 @@
                       recon_p1e | merkle_bucket | merkle_branch | art_corr_factor |
                       art_leaf_fpr | art_inner_fpr.
 -type step_size() :: pos_integer() | float().
+-type p1e() :: float() | pos_integer().
 
 -record(ring_config, {
                       node_count         = ?required(rc_config, node_count)   :: integer(),
@@ -91,7 +92,7 @@
 
 -record(rc_config, {
                     recon_method    = ?required(rc_config, recon_method) :: rr_recon:method(),
-                    recon_p1e       = 0.1                                :: float(),
+                    recon_p1e       = 0.1                                :: p1e(),
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art
                     art_corr_factor = 2                                  :: non_neg_integer(),
@@ -173,31 +174,31 @@ gen_setup(DDists, FTypes, FDists, Scen, Ring, RCList) ->
 %% TRIVIAL EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec trivial(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec trivial(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 trivial(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(trivial),
     trivial(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
-              EvalRepeats::pos_integer(), P1E::float(),
+              EvalRepeats::pos_integer(), P1E::p1e(),
               AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 trivial(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     trivial(Dir, FileName, N, EvalRepeats, P1E, [random], [random], AlignToBytes, StepSize).
 
--spec trivial_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec trivial_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 trivial_ddists_fdists(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(trivial),
     trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec trivial_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                            EvalRepeats::pos_integer(), P1E::float(),
+                            EvalRepeats::pos_integer(), P1E::p1e(),
                             AlignToBytes::boolean(),
                             StepSize::step_size() | power) -> ok.
 trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     trivial(Dir, FileName, N, EvalRepeats, P1E, ?EVAL_DDISTS, ?EVAL_FDISTS, AlignToBytes, StepSize).
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
-              EvalRepeats::pos_integer(), P1E::float(),
+              EvalRepeats::pos_integer(), P1E::p1e(),
               DDists::[data_distribution()], FDists::[fail_distribution()],
               AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 trivial(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize) ->
@@ -218,13 +219,13 @@ trivial(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSi
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec trivial_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec trivial_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 trivial_scale(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(trivial),
     trivial_scale(Dir, FileName, N, EvalRepeats, P1E, false).
 
 -spec trivial_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                    EvalRepeats::pos_integer(), P1E::float(),
+                    EvalRepeats::pos_integer(), P1E::p1e(),
                     AlignToBytes::boolean()) -> ok.
 trivial_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
     Scenario = #scenario{ ring_type = uniform,
@@ -249,31 +250,31 @@ trivial_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
 %% SHASH EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec shash(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec shash(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 shash(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(shash),
     shash(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::float(),
+            EvalRepeats::pos_integer(), P1E::p1e(),
             AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 shash(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     shash(Dir, FileName, N, EvalRepeats, P1E, [random], [random], AlignToBytes, StepSize).
 
--spec shash_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec shash_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 shash_ddists_fdists(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(shash),
     shash_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec shash_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                          EvalRepeats::pos_integer(), P1E::float(),
+                          EvalRepeats::pos_integer(), P1E::p1e(),
                           AlignToBytes::boolean(),
                           StepSize::step_size() | power) -> ok.
 shash_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     shash(Dir, FileName, N, EvalRepeats, P1E, ?EVAL_DDISTS, ?EVAL_FDISTS, AlignToBytes, StepSize).
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::float(),
+            EvalRepeats::pos_integer(), P1E::p1e(),
             DDists::[data_distribution()], FDists::[fail_distribution()],
             AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 shash(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize) ->
@@ -294,13 +295,13 @@ shash(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec shash_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec shash_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 shash_scale(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(shash),
     shash_scale(Dir, FileName, N, EvalRepeats, P1E, false).
 
 -spec shash_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                  EvalRepeats::pos_integer(), P1E::float(),
+                  EvalRepeats::pos_integer(), P1E::p1e(),
                   AlignToBytes::boolean()) -> ok.
 shash_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
     Scenario = #scenario{ ring_type = uniform,
@@ -325,30 +326,30 @@ shash_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
 %% BLOOM EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec bloom(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec bloom(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 bloom(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(bloom),
     bloom(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::float(),
+            EvalRepeats::pos_integer(), P1E::p1e(),
             AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 bloom(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     bloom(Dir, FileName, N, EvalRepeats, P1E, [random], [random], AlignToBytes, StepSize).
 
--spec bloom_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec bloom_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 bloom_ddists_fdists(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(bloom),
     bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, false, 2).
 
 -spec bloom_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                          EvalRepeats::pos_integer(), P1E::float(),
+                          EvalRepeats::pos_integer(), P1E::p1e(),
                           AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes, StepSize) ->
     bloom(Dir, FileName, N, EvalRepeats, P1E, ?EVAL_DDISTS, ?EVAL_FDISTS, AlignToBytes, StepSize).
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::float(),
+            EvalRepeats::pos_integer(), P1E::p1e(),
             DDists::[data_distribution()], FDists::[fail_distribution()],
             AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 bloom(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize) ->
@@ -369,13 +370,13 @@ bloom(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, AlignToBytes, StepSize
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec bloom_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::float()) -> ok.
+-spec bloom_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 bloom_scale(N, EvalRepeats, P1E) ->
     {Dir, FileName} = default_dir_and_name(bloom),
     bloom_scale(Dir, FileName, N, EvalRepeats, P1E, false).
 
 -spec bloom_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                  EvalRepeats::pos_integer(), P1E::float(),
+                  EvalRepeats::pos_integer(), P1E::p1e(),
                   AlignToBytes::boolean()) -> ok.
 bloom_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
     Scenario = #scenario{ ring_type = uniform,
@@ -401,14 +402,14 @@ bloom_scale(Dir, FileName, N, EvalRepeats, P1E, AlignToBytes) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec merkle(N::pos_integer(), EvalRepeats::pos_integer(),
-             MBranch::pos_integer(), MBucket::pos_integer(), P1E::float()) -> ok.
+             MBranch::pos_integer(), MBucket::pos_integer(), P1E::p1e()) -> ok.
 merkle(N, EvalRepeats, MBranch, MBucket, P1E) ->
     {Dir, FileName} = default_dir_and_name(merkle),
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, false, 2).
 
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
-             MBucket::pos_integer(), P1E::float(), AlignToBytes::boolean(),
+             MBucket::pos_integer(), P1E::p1e(), AlignToBytes::boolean(),
              StepSize::step_size() | power) -> ok.
 merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes, StepSize) ->
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, [random], [random],
@@ -416,7 +417,7 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes, StepS
 
 -spec merkle_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(),
                            MBranch::pos_integer(), MBucket::pos_integer(),
-                           P1E::float()) -> ok.
+                           P1E::p1e()) -> ok.
 merkle_ddists_fdists(N, EvalRepeats, MBranch, MBucket, P1E) ->
     {Dir, FileName} = default_dir_and_name(merkle),
     merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, false, 2).
@@ -424,7 +425,7 @@ merkle_ddists_fdists(N, EvalRepeats, MBranch, MBucket, P1E) ->
 -spec merkle_ddists_fdists(DestDir::string(), FileName::string(),
                            N::pos_integer(), EvalRepeats::pos_integer(),
                            MBranch::pos_integer(), MBucket::pos_integer(),
-                           P1E::float(), AlignToBytes::boolean(),
+                           P1E::p1e(), AlignToBytes::boolean(),
                            StepSize::step_size() | power) -> ok.
 merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes, StepSize) ->
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ?EVAL_DDISTS, ?EVAL_FDISTS,
@@ -432,7 +433,7 @@ merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, Align
 
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
-             MBucket::pos_integer(), P1E::float(),
+             MBucket::pos_integer(), P1E::p1e(),
              DDists::[data_distribution()], FDists::[fail_distribution()],
              AlignToBytes::boolean(), StepSize::step_size() | power) -> ok.
 merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, DDists, FDists, AlignToBytes, StepSize) ->
@@ -456,14 +457,14 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, DDists, FDists, Ali
 
 -spec merkle_scale(N::pos_integer(), EvalRepeats::pos_integer(),
                    MBranch::pos_integer(), MBucket::pos_integer(),
-                   P1E::float()) -> ok.
+                   P1E::p1e()) -> ok.
 merkle_scale(N, EvalRepeats, MBranch, MBucket, P1E) ->
     {Dir, FileName} = default_dir_and_name(merkle),
     merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, false).
 
 -spec merkle_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                    EvalRepeats::pos_integer(), MBranch::pos_integer(),
-                   MBucket::pos_integer(), P1E::float(), AlignToBytes::boolean())
+                   MBucket::pos_integer(), P1E::p1e(), AlignToBytes::boolean())
         -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes) ->
     Scenario = #scenario{ ring_type = uniform,
@@ -991,7 +992,17 @@ set_config(#rc_config{ recon_method = Method,
     config:write(rr_trigger_probability, TriggerProb),
     config:write(rr_align_to_bytes, AlignToBytes),
     config:write(rr_recon_method, Method),
-    config:write(rr_recon_p1e, P1E),
+    % interpret the algorithm's max hash sizes set as P1E as a fixed signature size:
+    case {Method, P1E} of
+        {merkle_tree, 160} ->
+            config:write(rr_recon_min_sig_size, P1E),
+            config:write(rr_recon_p1e, 1.0e-128);
+        {_, 128} ->
+            config:write(rr_recon_min_sig_size, P1E),
+            config:write(rr_recon_p1e, 1.0e-128);
+        _ ->
+            config:write(rr_recon_p1e, P1E)
+    end,
     config:write(rr_art_inner_fpr, ArtInnerFpr),
     config:write(rr_art_leaf_fpr, ArtLeafFpr),
     config:write(rr_art_correction_factor, ArtCorrF),
