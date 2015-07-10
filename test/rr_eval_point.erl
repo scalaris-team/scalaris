@@ -239,8 +239,8 @@ mean_w_error(ElementPos, [_|_] = TList) ->
                                       {X1 + E, X2 + E * E}
                               end, {0, 0}, TList),
     Len = length(TList),
-    Mean = Sum / Len,
-    {Mean, math:sqrt(Sum2 / Len - Mean * Mean)}.
+    % pay attention to possible loss of precision here:
+    {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len))}.
 
 -spec min_max_element(Element::integer(), [tuple()])
         -> {Min::integer(), Max::integer()}.
