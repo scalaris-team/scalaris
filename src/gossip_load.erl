@@ -1127,15 +1127,23 @@ merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
 
 %% @doc Helper function. Merges the given type of average from the given
 %%      load_data records.
--spec merge_avg(AvgType:: avg | avg2, Data1::load_data(), Data2::load_data())
-                -> load_data();
-               (AvgType:: size_inv | avg_kr, Data1::ring_data(), Data2::ring_data())
-                -> ring_data().
+-spec merge_avg(AvgType:: avg | avg2, Data1::load_data_uninit(), Data2::load_data_uninit())
+                -> load_data_uninit();
+               (AvgType:: size_inv | avg_kr, Data1::ring_data_uninit(), Data2::ring_data_uninit())
+                -> ring_data_uninit().
 merge_avg(AvgType, Data1, Data2) ->
-    {AvgLoad1, AvgWeight1} = data_get(AvgType, Data1),
-    {AvgLoad2, AvgWeight2} = data_get(AvgType, Data2),
-    NewAvg = {AvgLoad1+AvgLoad2, AvgWeight1+AvgWeight2},
+    %% avg values can be 'unknown' instead of {Load, Weight}
+    %% unknown values are ignored
+    NewAvg = case {data_get(AvgType, Data1), data_get(AvgType, Data2)} of
+                 {unknown, unknown} -> unknown;
+                 {Avg1,    unknown} -> Avg1;
+                 {unknown, Avg2   } -> Avg2;
+                 {Avg1,    Avg2   } -> {AvgLoad1, AvgWeight1} = Avg1,
+                                       {AvgLoad2, AvgWeight2} = Avg2,
+                                       {AvgLoad1 + AvgLoad2, AvgWeight1 + AvgWeight2}
+             end,
     data_set(AvgType, NewAvg, Data1).
+
 
 %% @doc Returns the previous load data if the current load data has not
 %%      sufficiently converged, otherwise returns the current load data.
