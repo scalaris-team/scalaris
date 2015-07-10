@@ -128,8 +128,8 @@ update_coordinate(Coord1x, Coord1y, Conf1, Latency, Coord2x, Coord2y, Conf2) ->
     Ret = gossip_vivaldi:handle_msg({update_vivaldi_coordinate,
                                      Latency, {Coord1, Conf1}}, {Coord2, Conf2}),
     ?expect_message({integrated_data, {gossip_vivaldi, default},  cur_round}),
-    case Latency == 0 orelse (Conf1 == 0 andalso Conf2 == 0) of
-        true when Coord1 =/= Coord2 ->
+    case Latency == 0 of
+        true ->
             ?expect_exception(gossip_vivaldi:update_coordinate(Coord1, Conf1, Latency, Coord2, Conf2),
                               error, badarith);
         _ ->

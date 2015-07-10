@@ -259,7 +259,9 @@ update_coordinate(Coordinate, _RemoteError, _Latency, Coordinate, Error) ->
 update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     Cc = 0.5, Ce = 0.5,
     % sample weight balances local and remote error
-    W = Error/(Error + RemoteError),
+    W = if (Error + RemoteError) =:= 0.0 -> 0.0;
+           (Error + RemoteError) =/= 0.0 -> Error/(Error + RemoteError)
+        end,
     % relative error of sample
     Es = abs(mathlib:euclideanDistance(RemoteCoordinate, Coordinate) - Latency) / Latency,
     % update weighted moving average of local error
