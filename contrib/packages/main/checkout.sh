@@ -1,13 +1,13 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.8.0"
+SCALARIS_VERSION="0.8.0+git"
 date=`date +"%Y%m%d.%H%M"`
 name="scalaris" # folder base name (without version)
 pkg_name="scalaris" # package name
 url="https://github.com/scalaris-team/scalaris.git"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 # MODE: snapshot | tag
-MODE=tag
+MODE=snapshot
 
 #####
 
