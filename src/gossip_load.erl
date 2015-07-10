@@ -1132,17 +1132,16 @@ merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
                (AvgType:: size_inv | avg_kr, Data1::ring_data_uninit(), Data2::ring_data_uninit())
                 -> ring_data_uninit().
 merge_avg(AvgType, Data1, Data2) ->
-    %% avg values can be unknown instead of {Load, Weight}
-    %% unknown values are ignored my setting them to {0.0, 0.0}
-    {AvgLoad1, AvgWeight1} = case data_get(AvgType, Data1) of
-                                 unknown -> {0.0, 0.0};
-                                 Avg1 -> Avg1
-                             end,
-    {AvgLoad2, AvgWeight2} = case data_get(AvgType, Data2) of
-                                 unknown -> {0.0, 0.0};
-                                 Avg2 -> Avg2
-                             end,
-    NewAvg = {AvgLoad1+AvgLoad2, AvgWeight1+AvgWeight2},
+    %% avg values can be 'unknown' instead of {Load, Weight}
+    %% unknown values are ignored
+    NewAvg = case {data_get(AvgType, Data1), data_get(AvgType, Data2)} of
+                 {unknown, unknown} -> unknown;
+                 {Avg1,    unknown} -> Avg1;
+                 {unknown, Avg2   } -> Avg2;
+                 {Avg1,    Avg2   } -> {AvgLoad1, AvgWeight1} = Avg1,
+                                       {AvgLoad2, AvgWeight2} = Avg2,
+                                       {AvgLoad1 + AvgLoad2, AvgWeight1 + AvgWeight2}
+             end,
     data_set(AvgType, NewAvg, Data1).
 
 
