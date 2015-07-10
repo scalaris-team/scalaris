@@ -1006,7 +1006,7 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
     % => use Taylor expansion of math:log(1 / (1-P1E))  at P1E = 0
     %    (small terms first)
     P = lists:sum([math:pow(P1E, X) / X || X <- lists:seq(5, 1, -1)]), % +O[p^6]
-    min_max(util:ceil(util:log2(NT * (2 * NT - 1) / P)), 1, MaxSize).
+    min_max(util:ceil(util:log2(NT * (2 * NT - 1) / P)), get_min_hash_bits(), MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
@@ -1407,12 +1407,12 @@ merkle_next_signature_sizes(
                min_max(
                  util:ceil(
                    util:log2(erlang:max(1, MyMaxItemsCount + OtherMaxItemsCount)
-                                 / P1E_I)), 1, 160);
+                                 / P1E_I)), get_min_hash_bits(), 160);
            true -> 0
         end,
 
     NextSigSizeL = min_max(util:ceil(util:log2((2 * BucketSize) / P1E_L)),
-                           1, 160),
+                           get_min_hash_bits(), 160),
 
 %%     log:pal("merkle [ ~p ] MyMI: ~B, \tOtMI: ~B~n"
 %%             "P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B",
@@ -1428,14 +1428,15 @@ min_max_feeder(X, Min, Max) -> {X, Min, Max}.
 
 %% @doc Sets min and max boundaries for X and returns either Min, Max or X.
 -spec min_max(X::number(), Min::number(), Max::number()) -> number().
-min_max(X, Min, _Max) when X =< Min ->
-    ?DBG_ASSERT(Min =< _Max),
-    Min;
 min_max(X, _Min, Max) when X >= Max ->
-    ?DBG_ASSERT(_Min =< Max),
+    ?DBG_ASSERT(_Min =< Max orelse _Min =:= get_min_hash_bits()),
     Max;
+min_max(X, Min, _Max) when X =< Min ->
+    ?DBG_ASSERT(Min =< _Max orelse Min =:= get_min_hash_bits()),
+    Min;
 min_max(X, _Min, _Max) ->
-    ?DBG_ASSERT(_Min =< _Max),
+    % dbg_assert must be true:
+    %?DBG_ASSERT(_Min =< _Max orelse _Min =:= get_min_hash_bits()),
     X.
 
 %% @doc Transforms a list of merkle keys, i.e. hashes, into a compact binary
@@ -2553,6 +2554,8 @@ check_config() ->
                                   fun(variable) -> true;
                                      (X) -> erlang:is_integer(X) andalso X > 0
                                   end, "is not 'variable' or an integer > 0"),
+        config:cfg_is_integer(rr_recon_min_sig_size) andalso
+        config:cfg_is_greater_than(rr_recon_min_sig_size, 0) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
@@ -2570,6 +2573,11 @@ get_p1e() ->
 -spec get_min_version_bits() -> pos_integer() | variable.
 get_min_version_bits() ->
     config:read(rr_recon_version_bits).
+
+%% @doc Use at least these many bits for hashes.
+-spec get_min_hash_bits() -> pos_integer().
+get_min_hash_bits() ->
+    config:read(rr_recon_min_sig_size).
 
 %% @doc Specifies how many items to retrieve from the DB at once.
 %%      Tries to reduce the load of a single request in the dht_node process.
