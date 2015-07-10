@@ -2126,7 +2126,7 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
             SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
             % note: we have n one-to-one comparisons
             VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
-            VSize0 = min_max(util:ceil(util:log2(1 / VP)), get_min_version_bits(), 128),
+            VSize0 = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
             ok;
         VSize0 ->
             SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
