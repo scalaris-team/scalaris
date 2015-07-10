@@ -165,7 +165,7 @@ Python3 bindings and Python3 command line client for scalaris
 %endif
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n scalaris-%{version}
 
 %build
 export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"

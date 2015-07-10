@@ -14,7 +14,7 @@ optdepends=('java-runtime: Java API and client'
             'python: Python3 API and client'
             'ruby: Ruby API and client')
 backup=('etc/scalaris/scalaris-java.conf' 'etc/scalaris/scalaris.properties')
-source=($pkgname-$pkgver.tar.gz)
+source=(scalaris-$pkgver.tar.gz)
 md5sums=('f188e12f4cf893022a87a1b29971aa81')
 
 build() {
@@ -22,7 +22,7 @@ build() {
   source /etc/profile.d/jre.sh
   export JAVA_HOME=/usr/lib/jvm/default
   RUBY_SITELIB=$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["sitelibdir"]')
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/scalaris-$pkgver"
   ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
     --with-ruby-sitelibdir=$RUBY_SITELIB
   ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
@@ -33,7 +33,7 @@ build() {
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/scalaris-$pkgver"
   make install-java DESTDIR="$pkgdir"
   make install-java-doc DESTDIR="$pkgdir"
   make install-python DESTDIR="$pkgdir"
