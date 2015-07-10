@@ -9,9 +9,81 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
+## Scalaris 0.8.0 (codename "Picoides scalaris") - July 10, 2015 - [scalaris-0.8.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.8.0.tar.gz/download)
+
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/) and the EIT ICT Labs project MCData)
+
+#### Packaging:
+
+ * also install docs on Arch Linux
+ * fix lintian errors and warnings for Debian-based packages
+ * fix permissions on the log directory (owned by the 'scalaris' user) and the config files (not owned by the 'scalaris' user anymore!)
+ * adapt packages for newer distributions
+
+#### API:
+
+ * Java-API: integrate new OtpErlang library (1.5.12 from Erlang 17.4)
+ * Python-API: do not include a shebang with a pre-defined path to python anymore
+ * Python-API: fix unclosed sockets in various tests
+ * Python-API: increase python{2,3} test speed
+ * Ruby-API: try to fallback to the normal json module if the gem is missing
+ * Ruby-API: considerably increase the ruby test speed
+ * remove the Publish/Subscribe API
+
+#### Business Logic:
+
+ * rrepair: faster and more accurate bloom filter repair protocol
+ * rrepair: faster, more accurate and less bandwidth-consuming merkle tree repair protocol
+ * rrepair: reduce memory footprint of merkle_tree
+ * rrepair: more accurate and less bandwidth-consuming trivial repair protocol
+ * rrepair: add a new simple hash ('shash') algorithm
+ * rrepair: switch to (the more efficient) push-only resolve phase for synchronisation
+ * rrepair: add replica repair algorithm evaluation scripts
+ * RM: faster cyclon cache integration, especially during node jumps
+ * comm_layer: envelops can be nested
+ * comm_layer: allow send options for comm:send_local/3 and msg_delay (currently only ?quiet supported)
+
+#### Infrastructure:
+
+ * FD: simplify the API, support envelopes and remove own cookie handling
+ * FD: extend the failure detector with generic notifications (not just crashes) to subscribed nodes
+ * DB: add an (experimental) mnesia back-end
+ * DB: add an (experimental) hanoidb back-end
+ * DB: make the back-end configurable via the scalaris.cfg option 'db_backend'
+ * improve the speed of several utility functions
+ * scalarisctl: add '-l' parameter for specifying the logdir
+ * scalarisctl: do not use the '-s' parameter anymore, instead specify the start type with the new '-t' parameter
+ * scalarisctl: allow starting several dht_nodes per vm with given keys via the new parameter '-j'
+ * update yaws to version 1.99
+ * make "$HOME/.scalaris/log" the default log dir
+ * support for Erlang R14B04 up to 18.0.2 and current otp master
+ * add example scripts for running Scalaris on a SLURM cluster
+ * move sources to github: [https://github.com/scalaris-team/scalaris](https://github.com/scalaris-team/scalaris)
+ * new project homepage: [http://scalaris.zib.de](http://scalaris.zib.de)
+
+#### Tests:
+
+ * reduce log spam in proto_sched tests and only print proto_sched results when the tests fail
+ * extended and improved various test suites
+
+#### Tools:
+
+ * proto_sched: support callbacks
+ * proto_sched: add support for user msg shepherds
+ * proto_sched: better error handling when sending messages to dead (local) processes
+ * tester: add value creator and type checker for orddict:orddict()
+ * tester: full support for Erlang 18.0
+ * let 'make dialyzer' run over test as well and ignore some false-positives for Erlang >= 18.0 using the '-dialyzer()' attribute
+
+#### Bugs:
+
+ * slide: fix some race conditions with 'jump' operations
+ * JSON-API: fix test_and_set not working correctly inside req_list
+ * fix numerous more bugs
+
 ## Scalaris 0.7.2 - October 23, 2014 - [scalaris-0.7.2.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.2.tar.gz/download)
 
-(partly supported by the EU project IES Cities [http://iescities.eu/]()
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/)
 and the EIT ICT Labs project MCData)
 
 #### Packaging
@@ -34,7 +106,7 @@ and the EIT ICT Labs project MCData)
  * fix a few minor bugs
 
 ## Scalaris 0.7.1 - September 30, 2014 - [scalaris-0.7.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.7.1.tar.gz/download)
-(partly supported by the EU project IES Cities [http://iescities.eu/]()
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/)
 and the EIT ICT Labs project MCData)
 
 #### Packaging
@@ -86,12 +158,12 @@ and the EIT ICT Labs project MCData)
  * Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
 
 ##### Demonstrator "Wiki on Scalaris"
-(supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
+(supported by 4CaaSt [http://iescities.eu/](http://iescities.eu/) and Contrail [http://contrail-project.eu](http://contrail-project.eu)):
 
  * add support for reading 7z dumps
 
 ##### Business Logic
-(partly supported by the EU project IES Cities [http://iescities.eu/]() and the EIT ICT Labs project MCData):
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/) and the EIT ICT Labs project MCData):
 
  * add an experimental Map-Reduce framework on top of Scalaris
  * add experimental support for active load balancing with Karger and Ruhl's algorithm including more flexible "load" definitions
@@ -161,7 +233,7 @@ and the EIT ICT Labs project MCData)
  * api_monitor: return the latency and stddev values of the micro-benchmark executed by monitor_perf for node and service performance
 
 ##### Demonstrator "Wiki on Scalaris"
-(supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
+(supported by 4CaaSt [http://www.4caast.eu/](http://www.4caast.eu/) and Contrail [http://contrail-project.eu](http://contrail-project.eu)):
 
  * separate list counters from their list partitions for a better data layout
  * fix high memory use of the Scalaris import if the import is slow
@@ -241,7 +313,7 @@ and the EIT ICT Labs project MCData)
 
 
 ##### Demonstrator "Wiki on Scalaris"
-(supported by 4CaaSt [http://www.4caast.eu/]() and Contrail [http://contrail-project.eu]()):
+(supported by 4CaaSt [http://www.4caast.eu/](http://www.4caast.eu/) and Contrail [http://contrail-project.eu](http://contrail-project.eu)):
 
  * allow monitoring via JMX in the FourCaastMonitoringPlugin
  * support for getting random articles via the new partial read op
@@ -294,7 +366,7 @@ and the EIT ICT Labs project MCData)
  * more smooth node joins by also reporting when a join is not possible due to a running slide at the existing node
  * passive load balancing: random selection of (equally qualified) nodes
  * add new routing algorithms FRT-Chord (flexible routing tables) and GFRT-Chord (supports proximity routing and data centers) as alternatives to Chord (see rt_frtchord and rt_gfrtchord modules)
- * add auto-scale framework, e.g. for cloud environments (supported by Contrail [http://contrail-project.eu/]()) which is able to scale the deployment to maintain a given target latency of executed transactions
+ * add auto-scale framework, e.g. for cloud environments (supported by Contrail [http://contrail-project.eu/](http://contrail-project.eu)) which is able to scale the deployment to maintain a given target latency of executed transactions
  * cache config reads in the process dictionary for better performance
  * cyclon: if the cache is empty, try one of the nodes in known_hosts
  * add support for consistent snapshots (experimental)
@@ -379,7 +451,7 @@ and the EIT ICT Labs project MCData)
    ** do not assure any order of requests, even if on same key!
 
 ##### Demonstrator "Wiki on Scalaris"
-(supported by 4CaaSt [http://www.4caast.eu/]()):
+(supported by 4CaaSt [http://www.4caast.eu/](http://www.4caast.eu/)):
 
  * allow different partitioned data models for better performance and scalability
  * allow logging of user requests
@@ -432,7 +504,7 @@ and the EIT ICT Labs project MCData)
 
 ##### Packaging
 
- * new official ConPaaS packages ([http://www.conpaas.eu/]())
+ * new official ConPaaS packages ([http://www.conpaas.eu/](http://www.conpaas.eu))
  * install rubygem dependencies in Debian postinstall scripts for Ruby API
  * improved Windows start scripts (if set, uses the ERLANG_HOME environment variable to find Erlang, otherwise searches for Erlang in common paths)
 
@@ -454,7 +526,7 @@ and the EIT ICT Labs project MCData)
  * added a connection pool convenience class (Java, Python)
 
 ##### Demonstrator "Wiki on Scalaris"
-(supported by 4CaaSt [http://www.4caast.eu/]())
+(supported by 4CaaSt [http://www.4caast.eu/](http://www.4caast.eu/))
 
  * improved performance of page edits
  * improved performance of Wikipedia dump loading
@@ -475,7 +547,7 @@ and the EIT ICT Labs project MCData)
  * made message sending more flexible (gets an option list)
  * added and corrected several Erlang type specifications
  * added scripts to create Scalaris images for OpenNebula
- * added tools for using Scalaris as the Database as a Service component in ConPaaS ([http://www.conpaas.eu/]()) which is part of the EU project Contrail ([http://contrail-project.eu/]())
+ * added tools for using Scalaris as the Database as a Service component in ConPaaS ([http://www.conpaas.eu/](http://www.conpaas.eu/)) which is part of the EU project Contrail ([http://contrail-project.eu/](http://contrail-project.eu/))
  * added a separate communication channel for priority messages, e.g. fd (reduces falsely reported node crashes under heavy load)
 
 ##### Tests
