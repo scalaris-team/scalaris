@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.0+git
+%define pkg_version 0.8.1+git
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
