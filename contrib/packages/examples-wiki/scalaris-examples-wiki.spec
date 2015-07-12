@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.1+git
+%define pkg_version 0.8.1
 Name:           scalaris-examples-wiki
 Summary:        Wikipedia on Scalaris example
 Version:        %{pkg_version}
