@@ -2,7 +2,20 @@ scalaris (0.8.1+git-1) unstable; urgency=low
 
   * git snapshot from master
 
- -- Nico Kruber <kruber@zib.de>  Fri, 10 Jul 2015 12:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Sun, 12 Jul 2015 12:00:00 +0200
+
+scalaris (0.8.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+  * Business Logic:
+    - rrepair: allow specifying the minimum number of hash bits to use
+               to create non-approximate algorithms
+  * Bugs:
+    - rrepair: fix a badarith if rr_recon_version_bits is set to 'variable'
+    - rrepair: fix a bug in the accuracy of the evaluation
+    - fix two crashes in gossip
+
+ -- Nico Kruber <kruber@zib.de>  Sun, 12 Jul 2015 12:00:00 +0200
 
 scalaris (0.8.0-1) stable; urgency=low
 

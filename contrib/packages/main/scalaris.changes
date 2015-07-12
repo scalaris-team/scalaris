@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Sun Jul 12 10:00:00 UTC 2015 - kruber@zib.de
+
+- Scalaris 0.8.1
+  (partly supported by the EU project IES Cities http://iescities.eu/)
+  * Business Logic:
+    - rrepair: allow specifying the minimum number of hash bits to use
+               to create non-approximate algorithms
+  * Bugs:
+    - rrepair: fix a badarith if rr_recon_version_bits is set to 'variable'
+    - rrepair: fix a bug in the accuracy of the evaluation
+    - fix two crashes in gossip
+
+-------------------------------------------------------------------
 Fri Jul 10 10:00:00 UTC 2015 - kruber@zib.de
 
 - Scalaris 0.8.0
