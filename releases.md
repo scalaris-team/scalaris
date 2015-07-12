@@ -9,6 +9,20 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
+## Scalaris 0.8.1 - July 12, 2015 - [scalaris-0.8.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.8.1.tar.gz/download)
+
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/))
+
+#### Business Logic:
+
+ * rrepair: allow specifying the minimum number of hash bits to use to create non-approximate algorithms
+
+#### Bugs:
+
+ * rrepair: fix a badarith if rr_recon_version_bits is set to 'variable'
+ * rrepair: fix a bug in the accuracy of the evaluation
+ * fix two crashes in gossip
+
 ## Scalaris 0.8.0 (codename "Picoides scalaris") - July 10, 2015 - [scalaris-0.8.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.8.0.tar.gz/download)
 
 (partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/) and the EIT ICT Labs project MCData)
