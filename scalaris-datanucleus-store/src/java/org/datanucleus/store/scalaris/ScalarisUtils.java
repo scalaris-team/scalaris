@@ -6,6 +6,7 @@ import java.util.List;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.exceptions.NucleusException;
+import org.datanucleus.exceptions.NucleusObjectNotFoundException;
 import org.datanucleus.exceptions.NucleusUserException;
 import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
@@ -13,8 +14,12 @@ import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ElementMetaData;
 import org.datanucleus.metadata.EmbeddedMetaData;
 import org.datanucleus.metadata.ExtensionMetaData;
+import org.datanucleus.metadata.ForeignKeyAction;
+import org.datanucleus.metadata.ForeignKeyMetaData;
 import org.datanucleus.metadata.UniqueMetaData;
 import org.datanucleus.state.ObjectProvider;
+import org.datanucleus.state.ObjectProviderFactory;
+import org.datanucleus.state.ObjectProviderFactoryImpl;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.transaction.NucleusTransactionException;
@@ -62,6 +67,10 @@ public class ScalarisUtils {
      * Value which will be used to signal a deleted key.
      */
     public static final String DELETED_RECORD_VALUE = new JSONObject().toString();
+    
+    /* **********************************************************************
+     *                  ID GENERATION
+     * **********************************************************************/
     
     /**
      * Generate a new ID which can be used to store a value at an unique key.
@@ -233,11 +242,15 @@ public class ScalarisUtils {
         }
     }
 
+    /* **********************************************************************
+     *                  HOOKS FOR ScalarisStoreManager
+     * **********************************************************************/
+    
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        
         insertObjectToAllKey(op, t);
         updateUniqueMemberKey(op, json, t);
+        insertToForeignKeyAction(op, json, t);
     }
     
     static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
@@ -247,10 +260,9 @@ public class ScalarisUtils {
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        
-        
         removeObjectFromAllKey(op, t);
         removeObjectFromUniqueMemberKey(op, t);
+        performForeignKeyActionDelete(op, t);
     }
     
     /**
@@ -280,6 +292,10 @@ public class ScalarisUtils {
     private static String geIdToUniqueMemberValueKeyName(String objectId, String memberName) {
         return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
     }
+    
+    /* **********************************************************************
+     *               INDICIES OF ALL OBJECTS OF ONE TYPE (for queries)
+     * **********************************************************************/
     
     /**
      * To support queries it is necessary to have the possibility to iterate
@@ -383,6 +399,10 @@ public class ScalarisUtils {
        t.write(key, json.toString());
     }
     
+    /* **********************************************************************
+     *                  ACTIONS TO GUARANTEE UNIQUENESS
+     * **********************************************************************/
+    
     private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -475,6 +495,145 @@ public class ScalarisUtils {
         }
     }
 
+    /* **********************************************************************
+     *                  FOREIGN KEY ACTIONS
+     * **********************************************************************/
+    
+    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException {       
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String objectStringIdentity = getPersistableIdentity(op);
+        String className = cmd.getFullClassName();
+        
+        for (int field : cmd.getAllMemberPositions()) {
+            AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
+            if (mmd == null) continue;
+            ForeignKeyMetaData fmd = mmd.getForeignKeyMetaData();
+
+            if (fmd != null && fmd.getDeleteAction() == ForeignKeyAction.CASCADE) {
+                String fieldName = mmd.getName();
+                String foreignObjectId = null;
+                try {
+                    foreignObjectId = objToInsert.getString(fieldName);
+                } catch (JSONException e) {
+                    // not found -> this action will be skipped
+                }
+                if (foreignObjectId != null) {
+                    String memberClassName = mmd.getType().getCanonicalName();
+                    String action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className);
+                
+                    JSONArray newRow = new JSONArray();
+                    newRow.put(foreignObjectId);
+                    newRow.put(objectStringIdentity);
+                    
+                    JSONArray actionTable = null;
+                    try {
+                        actionTable = new JSONArray(t.read(action).stringValue());
+                    } catch (NotFoundException e) {
+                        actionTable = new JSONArray();
+                    } catch (JSONException e) {
+                        throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+                    }
+                    
+                    // add new row and store again
+                    actionTable.put(newRow);
+                    t.write(action, actionTable.toString());
+                }
+            }
+        }
+    }
+    
+    private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException {
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String objectStringIdentity = getPersistableIdentity(op);
+        String className = cmd.getFullClassName();
+        
+        ExecutionContext ec = op.getExecutionContext();
+        StoreManager storeMgr = ec.getStoreManager();
+        
+        List<String> attachedActions = findForeignKeyActions(className, t);
+        // now search in every found action entries with op's id and start a delete as sub transaction
+        for (String action : attachedActions) {
+            JSONArray actionTable = null;
+            try {
+                actionTable = new JSONArray(t.read(action).stringValue());
+                
+                JSONArray newTable = new JSONArray();
+                ArrayList<String> objectsToDelete = new ArrayList<String>();
+                for (int i = 0; i < actionTable.length(); i++) {
+                    JSONArray row = (JSONArray) actionTable.get(i);
+                    
+                    if (row.getString(0).equals(objectStringIdentity)) {
+                        objectsToDelete.add(row.getString(1));
+                    } else {
+                        newTable.put(row);
+                    }
+                }
+                // update table if something changed
+                if (actionTable.length() != newTable.length()) {
+                    t.write(action, newTable.toString());
+                }
+                
+                // Start deletion of referenced objects                
+                // TODO: there must be a better way than fetching the object and then deleting it
+                for (int i = 0; i < objectsToDelete.size(); i++) {
+                    String objId = objectsToDelete.get(i);
+                    try {
+                        String toDeleteClassName = storeMgr
+                            .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
+                        AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
+                            .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
+                        Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+                        ec.deleteObject(obj);
+                    } catch (NucleusObjectNotFoundException e) {
+                        // if we land in this catch block, the object we are trying to delete
+                        // is already deleted. Therefore do nothing.
+                    }
+                }
+            } catch (NotFoundException e) {
+                // this can happen
+            } catch (JSONException e) {
+               throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+            }
+        }
+    }
+
+    // retrieve the ForeignKeyAction-index key to check if there are delete actions attached to this 
+    // object
+    // TODO: structure index in some way so that less than O(n) is needed here
+    // TODO: sub transaction?
+    private static ArrayList<String> findForeignKeyActions(String className, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException {
+        
+        String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey();
+        JSONArray fkaIndex = null;
+        ArrayList<String> attachedActions = new ArrayList<String>();
+        try {
+            fkaIndex = new JSONArray(t.read(fkaIndexKey).stringValue());
+            
+            for (int i = 0; i < fkaIndex.length(); i++) {
+                JSONArray row = (JSONArray) fkaIndex.get(i);
+                if (row.getString(0).equals(className)) {
+                    attachedActions.add(ScalarisSchemaHandler
+                            .getForeignKeyActionKey(className, row.getString(1)));
+                }
+            }
+        } catch (NotFoundException e) {
+            // the schema handler should have created this key. something is wrong.
+            throw new NucleusDataStoreException("ForeignKeyAction index, which should have been created by " +
+                    "ScalarisSchemaHandler, is missing.", e);
+        } catch (JSONException e) {
+            throw new NucleusDataStoreException("ForeignKeyAction index has invalid structure.", e);            
+        }
+        
+        return attachedActions;
+    }
+    
+    
+    /* **********************************************************************
+     *                     MISC
+     * **********************************************************************/
     
     /**
      * Scalaris does not support deletion (in a usable way). Therefore, deletion
@@ -534,6 +693,8 @@ public class ScalarisUtils {
         } catch (JSONException e) {
             // management key has invalid format
             throw new NucleusException(e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return results;
     }

@@ -20,21 +20,30 @@ Contributors:
 package org.datanucleus.store.scalaris;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
 import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.exceptions.NucleusObjectNotFoundException;
+import org.datanucleus.metadata.AbstractClassMetaData;
+import org.datanucleus.metadata.ClassMetaData;
+import org.datanucleus.metadata.ClassPersistenceModifier;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
+import org.datanucleus.store.StoreData;
 import org.datanucleus.store.connection.ManagedConnection;
+import org.datanucleus.store.schema.table.CompleteClassTable;
 
 import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
+import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
@@ -47,6 +56,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 
         // Handler for persistence process
         persistenceHandler = new ScalarisPersistenceHandler(this);
+        schemaHandler = new ScalarisSchemaHandler(this);
         connectionMgr.disableConnectionPool();
 
         logConfiguration();
@@ -109,4 +119,55 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 
         return myType;
     }
+
+    @Override
+    public void manageClasses(ClassLoaderResolver clr, String... classNames) {
+        if (classNames == null) {
+            return;
+        }
+
+        ManagedConnection mconn = getConnection(-1);
+        try{
+           Connection conn = (Connection) mconn.getConnection();
+           manageClasses(classNames, clr, conn);
+        } finally {
+            mconn.release();
+        }
+    }
+
+    /*
+     * Checks if the classes and all references classes are already managed by this store,
+     * for all which are not managed yet, create the their "schema".
+     * Schema in context of Scalaris means all management keys needed for ForaignkeyActions, or queries 
+     */
+    public void manageClasses(String[] classNames, ClassLoaderResolver clr, Connection conn) {
+        if (classNames == null) {
+            return;
+        }
+
+        // Filter out any "simple" type classes
+        String[] filteredClassNames = getNucleusContext().getTypeManager().filterOutSupportedSecondClassNames(classNames);
+
+        // Find the ClassMetaData for these classes and all referenced by these classes
+        Set<String> clsNameSet = new HashSet<String>();
+        Iterator<AbstractClassMetaData> iter = getMetaDataManager().getReferencedClasses(filteredClassNames, clr).iterator();
+        while (iter.hasNext()) {
+            ClassMetaData cmd = (ClassMetaData) iter.next();
+            if (cmd.getPersistenceModifier() == ClassPersistenceModifier.PERSISTENCE_CAPABLE && !cmd.isAbstract()) {
+                if (!storeDataMgr.managesClass(cmd.getFullClassName())) {
+                    StoreData sd = storeDataMgr.get(cmd.getFullClassName());
+                    if (sd == null) {
+                        CompleteClassTable table = new CompleteClassTable(this, cmd, null);
+                        sd = newStoreData(cmd, clr);
+                        sd.setTable(table);
+                        registerStoreData(sd);
+                    }
+                    clsNameSet.add(cmd.getFullClassName());
+                }
+            }
+        }
+
+        // Create schema for classes
+        schemaHandler.createSchemaForClasses(clsNameSet, null, conn);
+    }    
 }
