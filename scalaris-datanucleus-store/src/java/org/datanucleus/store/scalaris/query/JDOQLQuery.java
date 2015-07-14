@@ -22,20 +22,17 @@ package org.datanucleus.store.scalaris.query;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.query.evaluator.JDOQLEvaluator;
-import org.datanucleus.query.evaluator.JDOQLResultClassMapper;
 import org.datanucleus.query.evaluator.JavaQueryEvaluator;
 import org.datanucleus.query.expression.CreatorExpression;
 import org.datanucleus.query.expression.Expression;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
-import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
 import org.datanucleus.store.scalaris.ScalarisUtils;
 
 /**
@@ -107,7 +104,7 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
             }
 
             // JDOQLEvaluator's ResultClassMapper (needed when using JDOQLs INTO keyword)
-            // does not support 
+            // does not support alias
             
             // execute query
             JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this,
