@@ -39,6 +39,8 @@ import org.datanucleus.store.AbstractPersistenceHandler;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.VersionHelper;
 import org.datanucleus.store.connection.ManagedConnection;
+import org.datanucleus.store.scalaris.fieldmanager.FetchFieldManager;
+import org.datanucleus.store.scalaris.fieldmanager.StoreFieldManager;
 import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
