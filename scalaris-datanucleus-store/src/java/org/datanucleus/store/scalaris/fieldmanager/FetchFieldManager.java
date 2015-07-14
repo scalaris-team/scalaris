@@ -16,7 +16,7 @@ Contributors:
 2013 Orange - port to Scalaris key/value store
     ...
  **********************************************************************/
-package org.datanucleus.store.scalaris;
+package org.datanucleus.store.scalaris.fieldmanager;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
