@@ -11,15 +11,10 @@ import org.datanucleus.exceptions.NucleusUserException;
 import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
-import org.datanucleus.metadata.ElementMetaData;
-import org.datanucleus.metadata.EmbeddedMetaData;
-import org.datanucleus.metadata.ExtensionMetaData;
 import org.datanucleus.metadata.ForeignKeyAction;
 import org.datanucleus.metadata.ForeignKeyMetaData;
 import org.datanucleus.metadata.UniqueMetaData;
 import org.datanucleus.state.ObjectProvider;
-import org.datanucleus.state.ObjectProviderFactory;
-import org.datanucleus.state.ObjectProviderFactoryImpl;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.transaction.NucleusTransactionException;
@@ -46,24 +41,6 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisUtils {
     
     /**
-     * Key prefix used to signal a key where a collection of all key IDs of the same 
-     * type is stored. This is necessary for queries which need access to all stored
-     * instances of the same type.
-     */
-    private static final String ALL_ID_PREFIX = "ALL_IDS";
-    
-    /**
-     * Key prefix used to signal a key which is used for identity generation. Its value
-     * is an integer which is incremented every time an ID is generated.
-     */
-    private static final String ID_GEN_KEY = "ID_GEN";
-    
-    /**
-     * Key prefix used to store all values of members which are marked as "@Unique".
-     */
-    private static final String UNIQUE_MEMBER_PREFIX = "UNIQUE";
-    
-    /**
      * Value which will be used to signal a deleted key.
      */
     public static final String DELETED_RECORD_VALUE = new JSONObject().toString();
@@ -86,7 +63,7 @@ public class ScalarisUtils {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         ExecutionContext ec = op.getExecutionContext();
-        String keyName = getIDGeneratorKeyName(op.getClassMetaData().getFullClassName());
+        String keyName = ScalarisSchemaHandler.getIDGeneratorKeyName(op.getClassMetaData().getFullClassName());
         ManagedConnection mConn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
                 .getConnection();
@@ -264,35 +241,7 @@ public class ScalarisUtils {
         removeObjectFromUniqueMemberKey(op, t);
         performForeignKeyActionDelete(op, t);
     }
-    
-    /**
-     * Convenience method which returns the key containing all stored identities
-     * of the given class.
-     * 
-     * @param clazz
-     *            The class for which the key is generated for.
-     * @return Scalaris key as string.
-     */
-    private static String getManagementKeyName(Class<?> clazz) {
-        return getManagementKeyName(clazz.getCanonicalName());
-    }
-
-    private static String getManagementKeyName(String className) {
-        return String.format("%s_%s", className, ALL_ID_PREFIX);
-    }
-
-    private static String getIDGeneratorKeyName(String className) {
-        return String.format("%s_%s", className, ID_GEN_KEY);
-    }
-    
-    private static String getUniqueMemberValueToIdKeyName(String className, String memberName, String memberValue) {
-        return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
-    }
-    
-    private static String geIdToUniqueMemberValueKeyName(String objectId, String memberName) {
-        return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
-    }
-    
+        
     /* **********************************************************************
      *               INDICIES OF ALL OBJECTS OF ONE TYPE (for queries)
      * **********************************************************************/
@@ -320,7 +269,7 @@ public class ScalarisUtils {
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
         // retrieve the existing value (null if it does not exist).
@@ -372,7 +321,7 @@ public class ScalarisUtils {
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
         // retrieve the existing value (null if it does not exist).
@@ -422,8 +371,8 @@ public class ScalarisUtils {
                     // unique members can be null which means they are not found in the JSON
                 }
                     
-                String idToValueKey = geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
-                String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, fieldValue);
+                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
+                String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, fieldValue);
 
                 String idStoringThisValue = null;
                 String oldValueByThisId = null;
@@ -450,7 +399,7 @@ public class ScalarisUtils {
 
                     if (!isDeletedRecord(oldValueByThisId)) {
                         // the current object has a value of this member stored -> delete the old entry
-                        String oldValueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
+                        String oldValueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
                         // overwrite with "empty" value to signal deletion
                         t.write(oldValueToIdKey, DELETED_RECORD_VALUE);
                     }
@@ -478,7 +427,7 @@ public class ScalarisUtils {
                 // this member has @Unique annotation -> lookup all stored values for this member
                 String fieldName = mmd.getName();
 
-                String idToValueKey = geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
+                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
                 String oldValueByThisId = null;
                 try {
                     oldValueByThisId = t.read(idToValueKey).stringValue();
@@ -487,7 +436,7 @@ public class ScalarisUtils {
                 }
                 
                 if (!isDeletedRecord(oldValueByThisId)) {
-                    String valueToIdKey = getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
+                    String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
                     t.write(valueToIdKey, DELETED_RECORD_VALUE);
                 }
                 t.write(idToValueKey, DELETED_RECORD_VALUE);
@@ -664,7 +613,7 @@ public class ScalarisUtils {
             ManagedConnection mconn, Class<?> candidateClass,
             AbstractClassMetaData cmd) {
         List<Object> results = new ArrayList<Object>();
-        String managementKey = getManagementKeyName(candidateClass);
+        String managementKey = ScalarisSchemaHandler.getManagementKeyName(candidateClass);
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();

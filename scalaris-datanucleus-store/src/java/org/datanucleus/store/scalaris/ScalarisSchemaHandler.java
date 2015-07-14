@@ -11,7 +11,6 @@ import org.datanucleus.metadata.ClassMetaData;
 import org.datanucleus.metadata.ClassPersistenceModifier;
 import org.datanucleus.metadata.ForeignKeyAction;
 import org.datanucleus.metadata.ForeignKeyMetaData;
-import org.datanucleus.metadata.JoinMetaData;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.schema.AbstractStoreSchemaHandler;
 
@@ -28,22 +27,77 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
     
     /**
-     * TODO Doc
+     * This key stores all foreign key actions.
      */
     private static String FKA_INDEX_KEY = "FKA_INDEX";
     
+    /**
+     * Used to signal a key in which all instances of a single foreign key action is stored.
+     */
     private static String FKA_KEY_PREFIX = "FKA";
+    
+    /**
+     * Key prefix used to signal a key in which a collection of all key IDs of the same 
+     * type is stored. This is necessary for queries which need access to all stored
+     * instances of the same type.
+     */
+    private static final String ALL_ID_PREFIX = "ALL_IDS";
+    
+    /**
+     * Key prefix used to signal a key which is used for identity generation. Its value
+     * is an integer which is incremented every time an ID is generated.
+     */
+    private static final String ID_GEN_PREXIF = "ID_GEN";
+    
+    /**
+     * Key prefix used to store values of members which are marked as "@Unique".
+     * For each stored value two of these keys are needed.
+     * 1. classname:member:value -> id-of-instance-storing-this-value 
+     *      When an object with an Unique member is inserted into the data store,
+     *      this key is used to check if this value already exists
+     * 2. id-of-instance-storing-this-value:member -> value 
+     *      Needed to find the first key when updating/deleting the value,
+     *      since the old value might not be accessible anymore
+     */
+    private static final String UNIQUE_MEMBER_PREFIX = "UNIQUE";
+    
     
     public ScalarisSchemaHandler(StoreManager storeMgr) {
         super(storeMgr);
     }
+    /**
+     * The following methods can be used to generate keys with special meaning which are needed
+     * to provide functionality not natively supported by Scalaris. See doc of the constants for meaning of 
+     * these keys.
+     **/
+    
+    static String getManagementKeyName(Class<?> clazz) {
+        return getManagementKeyName(clazz.getCanonicalName());
+    }
 
+    static String getManagementKeyName(String className) {
+        return String.format("%s_%s", className, ALL_ID_PREFIX);
+    }
+
+    static String getIDGeneratorKeyName(String className) {
+        return String.format("%s_%s", className, ID_GEN_PREXIF);
+    }
+    
+    static String getUniqueMemberValueToIdKeyName(String className, String memberName, String memberValue) {
+        return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
+    }
+    
+    static String geIdToUniqueMemberValueKeyName(String objectId, String memberName) {
+        return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
+    }
+    
     public static String getForeignKeyActionIndexKey() {
         return FKA_INDEX_KEY;
     }
     public static String getForeignKeyActionKey(String foreignClassName, String thisClassName) {
         return String.format("%s_%s_%s", foreignClassName, thisClassName, FKA_KEY_PREFIX);
     }
+
     
     @Override
     public void createSchemaForClasses(Set<String> classNames, Properties props, Object connection) {
@@ -64,6 +118,14 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
         }
     }
     
+    /**
+     * This method should only be called once for each class containing foreign key actions.
+     * It will search the passed ClassMetaData for ForeignKeyAction annotations and updates the 
+     * FKA_INDEX_KEY accordingly.
+     * Currently only deleteAction = ForeignKeyACtion.CASCADE is supported (not inside a join) 
+     * @param cmd MetaData of the class used to update the index.
+     * @param conn Scalaris Connection used for the necessary transaction.
+     */
     private void createSchemaForClass(AbstractClassMetaData cmd, Connection conn) {
         if (cmd.isEmbeddedOnly() || cmd.getPersistenceModifier() != ClassPersistenceModifier.PERSISTENCE_CAPABLE) {
             // No action  required here
