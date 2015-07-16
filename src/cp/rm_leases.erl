@@ -184,7 +184,7 @@ on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     case Result of
         {merge, success, __L2, _L1} ->
             State;
-        {merge, fail, Reason, __L1, _L2} ->
+        {merge, fail, _Reason, __L1, __L2} ->
             %% @todo
             State
     end;
