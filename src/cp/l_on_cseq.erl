@@ -528,23 +528,28 @@ on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     ?TRACE_ERROR("merge step1 failed~n~w~n~w~n~w~n~w:~w~n", [Reason, L1, L2, _ReqId, Round]),
     % retry?
     case Reason of
-        %lease_does_not_exist ->
-        %  % cannot happen
-        %    State;
-        %unexpected_id ->
-        %  % cannot happen
-        %    State;
+        lease_does_not_exist ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+            State;
+        unexpected_id ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            State;
         unexpected_owner ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
             State;
         unexpected_aux ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
             State;
         unexpected_range ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
             State;
         unexpected_timeout ->
-            % retry
+            %% retry
             NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
                                                      Round, State),
             gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState);
@@ -593,20 +598,25 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, _Current, _Next]),
     case Reason of
-        %lease_does_not_exist ->
-        %    % cannot happen
-        %    State;
-        %unexpected_id ->
-        %    % cannot happen
-        %    State;
+        lease_does_not_exist ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+            State;
+        unexpected_id ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            State;
         unexpected_owner ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
             State;
         unexpected_aux ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
             State;
         unexpected_range ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
             State;
         unexpected_timeout ->
             % retry
@@ -651,23 +661,28 @@ on({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
-        %lease_does_not_exist ->
-        %  % cannot happen
-        %  State;
-        %unexpected_id ->
-        %  % cannot happen
-        %    State;
+        lease_does_not_exist ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+          State;
+        unexpected_id ->
+            %% cannot happen
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            State;
         unexpected_owner ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
             State;
         unexpected_aux ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
             State;
         unexpected_range ->
-            % give up, there was probably a concurrent merge
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
             State;
         unexpected_timeout ->
-            % retry
+            %% retry
             NextState = lease_list:update_next_round(L1Id,
                                                      Round, State),
             gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState);
