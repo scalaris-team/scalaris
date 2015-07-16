@@ -301,10 +301,15 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Renew}, State) ->
     %% log:pal("successful renew~n~w~n~w~n", [Value, l_on_cseq:get_id(Value)]),
-    lease_list:update_lease_in_dht_node_state(Value,
-                                              lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                                           Round, State),
-                                              Mode, renew);
+    case lease_list:have_lease(Value, State, Mode) of
+        true ->
+            lease_list:update_lease_in_dht_node_state(Value,
+                                                      lease_list:update_next_round(l_on_cseq:get_id(Value),
+                                                                                   Round, State),
+                                                      Mode, renew);
+        false ->
+            State
+    end;
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
