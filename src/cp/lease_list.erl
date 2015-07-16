@@ -175,8 +175,12 @@ have_lease(Lease, State, Mode) ->
     LeaseList = dht_node_state:get(State, lease_list),
     case Mode of
         active ->
-            L = get_active_lease(LeaseList),
-            l_on_cseq:get_id(L) =:= l_on_cseq:get_id(Lease);
+            case get_active_lease(LeaseList) of
+                empty ->
+                    false;
+                L ->
+                    l_on_cseq:get_id(L) =:= l_on_cseq:get_id(Lease)
+            end;
         passive ->
             PassiveLeases = get_passive_leases(LeaseList),
             lists:keyfind(l_on_cseq:get_id(Lease), 2, PassiveLeases) =/= false
