@@ -22,6 +22,7 @@
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
+-include("lookup.hrl").
 
 -behaviour(gen_component).
 
@@ -30,17 +31,6 @@
 -export([is_first/1, is_alive/1, is_alive_no_slide/1, is_alive_fully_joined/1]).
 
 -export_type([message/0]).
-
--ifdef(enable_debug).
-% add source information to debug routing damaged messages
--define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
--define(HOPS_FROM_DATA(Data), element(2, Data)).
--type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
--else.
--define(HOPS_TO_DATA(Hops), Hops).
--define(HOPS_FROM_DATA(Data), Data).
--type data() :: Hops::non_neg_integer().
--endif.
 
 -type(database_message() ::
       {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |

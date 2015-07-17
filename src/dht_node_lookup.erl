@@ -21,6 +21,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("lookup.hrl").
 
 -export([lookup_aux_leases/4, lookup_decision_chord/4, lookup_fin/4, lookup_aux_failed/3, lookup_fin_failed/3]).
 
@@ -35,19 +36,7 @@ envelope(Nth, Msg) ->
     ?DBG_ASSERT('_' =:= element(Nth, Msg)),
     {Nth, f, Msg}.
 
--ifdef(enable_debug).
-% add source information to debug routing damaged messages
--define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
--define(HOPS_FROM_DATA(Data), element(2, Data)).
--type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
--else.
--define(HOPS_TO_DATA(Hops), Hops).
--define(HOPS_FROM_DATA(Data), Data).
--type data() :: Hops::non_neg_integer().
--endif.
-
 %% userdevguide-begin dht_node_lookup:routing
-
 %% @doc Check the lease and translate to lookup_fin or forward to rt_loop
 %%      accordingly.
 -spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),

@@ -23,6 +23,7 @@
 -behaviour(gen_component).
 
 -include("scalaris.hrl").
+-include("lookup.hrl").
 
 % for routing table implementation
 -export([start_link/1]).
@@ -33,17 +34,6 @@
          rm_neighbor_change/3, rm_send_update/5]).
 
 -export_type([state_active/0]).
-
--ifdef(enable_debug).
-% add source information to debug routing damaged messages
--define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
--define(HOPS_FROM_DATA(Data), element(2, Data)).
--type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
--else.
--define(HOPS_TO_DATA(Hops), Hops).
--define(HOPS_FROM_DATA(Data), Data).
--type data() :: Hops::non_neg_integer().
--endif.
 
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
