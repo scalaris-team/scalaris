@@ -50,7 +50,7 @@
 -export([get_passive_leases/1]).
 -export([get_active_range/1]).
 -export([get_next_round/2]).
--export([have_lease/3]).
+-export([contains_lease/3]).
 -export([update_next_round/3]).
 
 -spec empty() -> lease_list().
@@ -169,9 +169,9 @@ update_lease_in_dht_node_state(Lease, State, Mode, Reason) ->
             update_lease_in_dht_node_state(Lease, State, Mode)
     end.
 
--spec have_lease(l_on_cseq:lease_t(), dht_node_state:state(),
-                                     active | passive) -> boolean().
-have_lease(Lease, State, Mode) ->
+-spec contains_lease(l_on_cseq:lease_t(), dht_node_state:state(),
+                     active | passive) -> boolean().
+contains_lease(Lease, State, Mode) ->
     LeaseList = dht_node_state:get(State, lease_list),
     case Mode of
         active ->
