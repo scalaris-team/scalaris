@@ -26,7 +26,7 @@
 %%one that is desired.
 
 %%Standard Chord routingtable
--define(RT, rt_gfrtchord).
+-define(RT, rt_chord).
 % first valid key:
 -define(MINUS_INFINITY, 0).
 -define(MINUS_INFINITY_TYPE, 0).
@@ -38,10 +38,10 @@
 %-define(RT, rt_simple).
 
 %% Flexible Routing Tables
-%% Standard flexible routingtable
-%-define(RT, rt_frtchord).
+%% -define(RT, rt_frt).
 %% Grouped Flexible Routing Table
-%-define(RT, rt_gfrtchord).
+%% (needs to be commented out to deactivate, setting to false isn't enough!)
+%% -define(GFRT, true).
 %% userdevguide-end scalaris:rt
 
 % special parameters to be passed to ets:new/2 (not only used on db_ets!)

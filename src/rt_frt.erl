@@ -13,29 +13,17 @@
 %   limitations under the License.
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%% @doc Flexible routing table. This header file is to be included by modules which want
-%% to implement the RT behaviour and a flexible routing table.
+%% @author Jens Fischer <jensvfischer@gmail.com>
+%% @doc Flexible routing table. Two flexible routing tables (FRTs) are implemented,
+%% FRT-chord and grouped FRT-chord (GFRT). The functions specific to these two
+%% implementations can be found at the end of this file (seperated by ifdefs).
 %%
-%%                   +-----------------------+
-%%                   |    RT Behaviour       |
-%%                   +-----------------------+
-%%                              ^
-%%                              |
-%%                              |
-%%                   +----------+------------+
-%%             +---->|    FRT Common Header |<------+
-%%             |     +----------------------+       |
-%%             |                                    |
-%%    +--------+--------+                   +-------+---------+
-%%    |    FRTChord     |                   |    GFRTChord    |
-%%    +-----------------+                   +-----------------+
 %%
 %% @end
 %% @version $Id$
+-module(rt_frt).
 -author('mamuelle@informatik.hu-berlin.de').
 -behaviour(rt_beh).
-
--export([test/2]).
 
 -export([dump_to_csv/1, get_source_id/1, get_source_node/1]).
 
@@ -44,7 +32,7 @@
 
 %% Make dialyzer stop complaining about unused functions
 
-% The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
+% The following functions are not used when ?GFRT is not defined. Dialyzer should not
 % complain when they are not called.
 -compile({nowarn_unused_function,
           [{get_num_active_learning_lookups, 1},
@@ -55,7 +43,7 @@
            {set_custom_info, 2},
            {get_custom_info, 1}]}).
 
-% Functions which are to be implemented in modules including this header
+% Functions which are specific to the frt/gfrt implementation
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1326,3 +1314,107 @@ send2rt(Node, Msg) ->
 %%     log:pal("{~w, ~w} Update Neighbor: ~w. KnownNode: ~w. NewNode: ~w~n",
 %%             [pid_groups:get_my(dht_node), self(), Case, {OldPidDHT, OldPidRT},
 %%              {NewPidDHT, NewPidRT}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GFRT-chord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(GFRT).
+% Additional information appended to an rt_entry()
+-record(rt_entry_info, {group = other_dc :: other_dc | same_dc}).
+-type rt_entry_info_t() :: #rt_entry_info{}.
+
+
+-spec allowed_nodes(RT :: rt()) -> [rt_entry()].
+allowed_nodes(RT) ->
+    Source = get_source_node(RT),
+    SourceId = rt_entry_id(Source),
+    Nodes = rt_get_nodes(RT),
+
+    % $E_{\bar{G}}$ and $E_{G}$
+    {E_NG, E_G} = lists:partition(fun is_from_other_group/1, Nodes),
+
+    % If $E_G = \emptyset$, we know that we can allow all nodes to be filtered.
+    % Otherwise, check if $E_\text{leap} \neq \emptyset$.
+    {OnlyNonGroupMembers, {E_a, E_b}} = case E_G of
+        [] -> {true, ignore, ignore};
+        [First|_] ->
+            Predecessor = predecessor_node(RT, Source),
+            FirstDist = get_range(SourceId, rt_entry_id(First)),
+
+            % Compute $e_\alpha$, $e_\beta$ and the respective distances
+            {{E_alpha, E_alphaDist}, {E_beta, _E_betaDist}} = lists:foldl(
+                fun (Node, {{MinNode, MinDist}, {MaxNode, MaxDist}}) ->
+                        NodeDist = get_range(SourceId, rt_entry_id(Node)),
+                        NewE_alpha = case erlang:min(MinDist, NodeDist) of
+                            MinDist -> {MinNode, MinDist};
+                            _ -> {Node, NodeDist}
+                        end,
+                        NewE_beta = case erlang:max(MaxDist, NodeDist) of
+                            MinDist -> {MaxNode, MaxDist};
+                            _ -> {Node, NodeDist}
+                        end,
+                        {NewE_alpha, NewE_beta}
+                end, {{First, FirstDist}, {First, FirstDist}}, E_G),
+
+            % Is there any non-group entry $n$ such that $d(s, e_\alpha) \leq d(s, n)$ and
+            % $n \neq s.pred$? The following line basically computes $E_leap$ and checks
+            % if that set is empty.
+            {lists:any(fun(P) when P =:= Predecessor -> false;
+                         (N) -> get_range(SourceId, rt_entry_id(N)) >= E_alphaDist andalso
+                            not is_sticky(N) andalso not is_source(N)
+                      end, E_NG),
+                  {E_alpha, E_beta}}
+    end,
+
+    if OnlyNonGroupMembers -> [N || N <- E_NG, not is_sticky(N),
+                                               not is_source(N)];
+       not OnlyNonGroupMembers andalso E_a =/= ignore andalso E_b =/= ignore ->
+           [N || N <- Nodes, not is_sticky(N), not is_source(N),
+                                               N =/= E_a,
+                                               N =/= E_b]
+    end.
+
+-spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
+                    PredId :: key(), SuccId :: key()) -> rt_entry_info_t().
+rt_entry_info(Node, _Type, _PredId, _SuccId) ->
+    log:pal("Using grouped FRT-chord"),
+    #rt_entry_info{group=case comm:get_ip(pid_dht(Node)) =:= comm:get_ip(comm:this()) of
+            true -> same_dc;
+            false -> other_dc
+        end}.
+
+%% @doc Check if the given node belongs to another group of nodes
+-spec is_from_other_group(rt_entry()) -> boolean().
+is_from_other_group(Node) ->
+    (get_custom_info(Node))#rt_entry_info.group =:= same_dc.
+
+%% @doc Checks whether config parameters of the rt_gfrtchord process exist and are
+%%      valid.
+-spec frt_check_config() -> boolean().
+frt_check_config() -> true.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FRT-chord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-else.
+% Additional information appended to an rt_frt_helpers:rt_entry()
+-type rt_entry_info_t() :: undefined.
+
+-spec allowed_nodes(RT :: rt()) -> [rt_entry()].
+allowed_nodes(RT) ->
+    [N || N <- rt_get_nodes(RT), not is_sticky(N) and not is_source(N)].
+
+-spec rt_entry_info(Node :: mynode(), Type :: entry_type(),
+                    PredId :: key(), SuccId :: key()) -> rt_entry_info_t().
+rt_entry_info(_Node, _Type, _PredId, _SuccId) ->
+    undefined.
+
+%% @doc Checks whether config parameters of the rt_frtchord process exist and are
+%%      valid.
+-spec frt_check_config() -> boolean().
+frt_check_config() -> true.
+
+-endif.
