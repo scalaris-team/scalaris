@@ -1302,7 +1302,7 @@ allowed_nodes(RT) ->
     % If $E_G = \emptyset$, we know that we can allow all nodes to be filtered.
     % Otherwise, check if $E_\text{leap} \neq \emptyset$.
     {OnlyNonGroupMembers, {E_a, E_b}} = case E_G of
-        [] -> {true, ignore, ignore};
+        [] -> {true, {ignore, ignore}};
         [First|_] ->
             Predecessor = predecessor_node(RT, Source),
             FirstDist = get_range(SourceId, rt_entry_id(First)),
