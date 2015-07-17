@@ -14,6 +14,7 @@
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
 %% @author Jens Fischer <jensvfischer@gmail.com>
+
 %% @doc Flexible routing table. Two flexible routing tables (FRTs) are implemented,
 %% FRT-chord and grouped FRT-chord (GFRT). The functions specific to these two
 %% implementations can be found at the end of this file (seperated by ifdefs).
@@ -29,19 +30,6 @@
 
 % exports for unit tests
 -export([check_rt_integrity/1, check_well_connectedness/1, get_random_key_from_generator/3]).
-
-%% Make dialyzer stop complaining about unused functions
-
-% The following functions are not used when ?GFRT is not defined. Dialyzer should not
-% complain when they are not called.
--compile({nowarn_unused_function,
-          [{get_num_active_learning_lookups, 1},
-           {set_num_active_learning_lookups, 2},
-           {inc_num_active_learning_lookups, 1},
-           {rt_entry_distance, 2},
-           {rt_entry_id, 1},
-           {set_custom_info, 2},
-           {get_custom_info, 1}]}).
 
 % Functions which are specific to the frt/gfrt implementation
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
@@ -957,20 +945,6 @@ set_source_node(SourceId, #rt_t{source=undefined}=RT) ->
 -spec get_rt_tree(Nodes::rt()) -> rt_t_tree().
 get_rt_tree(#rt_t{nodes=Nodes}) -> Nodes.
 
-% @doc Get the number of active learning lookups which have happened
--spec get_num_active_learning_lookups(RT :: rt()) -> non_neg_integer().
-get_num_active_learning_lookups(RT) -> RT#rt_t.num_active_learning_lookups.
-
-% @doc Set the number of happened active learning lookups
--spec set_num_active_learning_lookups(RT :: rt(), Num :: non_neg_integer()) -> rt().
-set_num_active_learning_lookups(RT,Num) -> RT#rt_t{num_active_learning_lookups=Num}.
-
-% @doc Increment the number of happened active learning lookups
--spec inc_num_active_learning_lookups(RT :: rt()) -> rt().
-inc_num_active_learning_lookups(RT) ->
-    Inc = get_num_active_learning_lookups(RT) + 1,
-    set_num_active_learning_lookups(RT, Inc).
-
 % @doc Get all sticky entries of a routing table
 -spec get_sticky_entries(rt()) -> [rt_entry()].
 get_sticky_entries(#rt_t{nodes=Nodes}) ->
@@ -1017,11 +991,6 @@ rt_entry_node(#rt_entry{node=N}) -> N.
 % @doc Set the inner node:node_type() of a rt_entry
 -spec rt_entry_set_node(Entry :: rt_entry(), Node :: mynode()) -> rt_entry().
 rt_entry_set_node(#rt_entry{} = Entry, Node) -> Entry#rt_entry{node=Node}.
-
-% @doc Calculate the distance between two nodes in the routing table
--spec rt_entry_distance(From :: rt_entry(), To :: rt_entry()) -> non_neg_integer().
-rt_entry_distance(From, To) ->
-    get_range(id(rt_entry_node(From)), id(rt_entry_node(To))).
 
 % @doc Get all nodes within the routing table
 -spec rt_get_nodes(RT :: rt()) -> [rt_entry()].
@@ -1119,15 +1088,11 @@ set_adjacent_succ(#rt_entry{adjacent_fingers={PredId, _Succ}} = Entry, SuccId) -
 set_adjacent_pred(#rt_entry{adjacent_fingers={_Pred, SuccId}} = Entry, PredId) ->
     set_adjacent_fingers(Entry, PredId, SuccId).
 
-%% @doc Set the custom info field of a rt entry
--spec set_custom_info(rt_entry(), custom_info()) -> rt_entry().
-set_custom_info(#rt_entry{} = Entry, CustomInfo) ->
-    Entry#rt_entry{custom=CustomInfo}.
-
+-ifdef(GFRT).
 %% @doc Get the custom info field of a rt entry
 -spec get_custom_info(rt_entry()) -> custom_info().
-get_custom_info(#rt_entry{custom=CustomInfo}) ->
-    CustomInfo.
+get_custom_info(#rt_entry{custom=CustomInfo}) -> CustomInfo.
+-endif.
 
 %% @doc Get the adjacent predecessor rt_entry() of the given node.
 -spec predecessor_node(RT :: rt(), Node :: rt_entry()) -> rt_entry().
@@ -1378,7 +1343,6 @@ allowed_nodes(RT) ->
 -spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
                     PredId :: key(), SuccId :: key()) -> rt_entry_info_t().
 rt_entry_info(Node, _Type, _PredId, _SuccId) ->
-    log:pal("Using grouped FRT-chord"),
     #rt_entry_info{group=case comm:get_ip(pid_dht(Node)) =:= comm:get_ip(comm:this()) of
             true -> same_dc;
             false -> other_dc
