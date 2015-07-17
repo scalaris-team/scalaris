@@ -76,11 +76,12 @@ lookup_decision_chord(State, Key, Hops, Msg) ->
         true ->
             %% log:log(warn, "[dht_node] lookup_fin on lookup_decision"),
             NewMsg = {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg},
-            comm:send(Succ, NewMsg, [{shepherd, self()}]);
+            comm:send(Succ, NewMsg, [{shepherd, pid_groups:get_my(routing_table)}]);
         _ ->
             log:log(warn, "[dht_node] lookup_aux on lookup_decision"),
             NewMsg = {?lookup_aux, Key, Hops + 1, Msg},
-            comm:send(Succ, NewMsg, [{shepherd, self()}, {group_member, routing_table}])
+            comm:send(Succ, NewMsg, [{shepherd, pid_groups:get_my(routing_table)},
+                                     {group_member, routing_table}])
     end.
 
 %% check_local_leases(DHTNodeState, MyRange) ->
