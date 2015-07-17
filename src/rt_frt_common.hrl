@@ -35,6 +35,8 @@
 -author('mamuelle@informatik.hu-berlin.de').
 -behaviour(rt_beh).
 
+-export([test/2]).
+
 -export([dump_to_csv/1, get_source_id/1, get_source_node/1]).
 
 % exports for unit tests
@@ -42,7 +44,7 @@
 
 %% Make dialyzer stop complaining about unused functions
 
-% The following fsets:is_subset(Set1, Set2) andalso sets:is_subset(Set2, Set1)unctions are only used when ?RT == rt_frtchord. Dialyzer should not
+% The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
 % complain when they are not called.
 -compile({nowarn_unused_function,
           [{get_num_active_learning_lookups, 1},
@@ -62,7 +64,7 @@
 
 -type key() :: rt_chord:key().
 -type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::mynode()).
--type external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
+-opaque external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
 
 % define the possible types of nodes in the routing table:
 %  - normal nodes are nodes which have been added by entry learning
@@ -71,7 +73,7 @@
 -type entry_type() :: normal | source | sticky.
 -type custom_info() :: undefined | term().
 
--type(mynode() :: {Id::key(), DHTNodePid::comm:mypid(), RTLoopPid::comm:mypid()}).
+-type(mynode() :: {Id::key(), DHTNodePid::comm:mypid(), RTLoopPid::comm:mypid() | none}).
 -record(rt_entry, {
         node :: mynode(),
         type :: entry_type(),
@@ -614,7 +616,7 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_node(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | mynode().
+-spec next_hop_node(nodelist:neighborhood(), external_rt(), key()) -> succ | mynode().
 next_hop_node(Neighbors, ERT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true ->
@@ -641,7 +643,7 @@ next_hop_node(Neighbors, ERT, Id) ->
                  end
     end.
 
--spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
+-spec next_hop(nodelist:neighborhood(), external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, ERT, Id) ->
     case next_hop_node(Neighbors, ERT, Id) of
         succ -> succ;
@@ -669,7 +671,7 @@ succ(ERT, Neighbors) ->
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up next_hop/2. For this, it is
-%%  only a gb_tree with keys being node ids and values being of type node:node_type().
+%%  only a gb_tree with keys being node ids and values being of type mynode().
 -spec export_rt_to_dht_node_helper(rt()) -> external_rt().
 export_rt_to_dht_node_helper(RT) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
@@ -694,7 +696,7 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 %%      third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 to_list(State) -> % match external RT
-    {_, ERT} = dht_node_state:get(State, rt),
+    ERT = external_rt_get_tree(dht_node_state:get(State, rt)),
     KVList = gb_trees:to_list(ERT),
     FakeNodes = lists:map(fun ({Id, Node}) -> node:new(pid_dht(Node), Id, 0) end, KVList),
     Neighbors = dht_node_state:get(State, neighbors),
@@ -792,7 +794,7 @@ sticky_entry_to_normal_node(EntryKey, RT) ->
     RT#rt_t{nodes=UpdatedTree}.
 
 
--spec rt_entry_from(Node::node:node_type(), Type :: entry_type(),
+-spec rt_entry_from(Node::mynode(), Type :: entry_type(),
                     PredId :: key(), SuccId :: key()) -> rt_entry().
 rt_entry_from(Node, Type, PredId, SuccId) ->
     #rt_entry{node=Node , type=Type , adjacent_fingers={PredId, SuccId},
@@ -1044,7 +1046,7 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 % @doc Set the size estimate of the ring
 -spec rt_set_ring_size(RT :: rt(), Size :: unknown | float()) -> rt().
-rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
+rt_set_ring_size(#rt_t{}=RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 -spec rt_update_pid(RT::rt(), NewNode::mynode()) -> rt().
 rt_update_pid(OldRT, NewNode) ->
@@ -1296,7 +1298,7 @@ node2mynode(Node) -> {node:id(Node), node:pidX(Node), none}.
 pid_dht({_Id, PidDHT, _PidRT}) -> PidDHT.
 
 %% @doc Get the Pid from an mynode().
--spec pid_rt(Node::mynode()) -> comm:mypid().
+-spec pid_rt(Node::mynode()) -> comm:mypid() | none.
 pid_rt({_Id, _PidDHT, PidRT}) -> PidRT.
 
 %% @doc Get the id from a mynode().
@@ -1305,7 +1307,7 @@ id({Id, _PidDHT, _PidRT}) -> Id.
 
 %% @doc Send Msg to the routing table.
 %%      Send directly if rt_loop pid is known, otherwise as group_member msg.
--spec send2rt(Node::mynode(), Msg::comm:msg()) -> ok.
+-spec send2rt(Node::mynode(), Msg::comm:message()) -> ok.
 send2rt(Node, Msg) ->
     {Pid, NewMsg} = case pid_rt(Node) of
                         none ->

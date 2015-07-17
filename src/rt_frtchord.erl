@@ -31,7 +31,7 @@
 allowed_nodes(RT) ->
     [N || N <- rt_get_nodes(RT), not is_sticky(N) and not is_source(N)].
 
--spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
+-spec rt_entry_info(Node :: mynode(), Type :: entry_type(),
                     PredId :: key(), SuccId :: key()) -> rt_entry_info_t().
 rt_entry_info(_Node, _Type, _PredId, _SuccId) ->
     undefined.

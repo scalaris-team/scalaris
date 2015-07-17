@@ -26,7 +26,7 @@
 %%one that is desired.
 
 %%Standard Chord routingtable
--define(RT, rt_chord).
+-define(RT, rt_gfrtchord).
 % first valid key:
 -define(MINUS_INFINITY, 0).
 -define(MINUS_INFINITY_TYPE, 0).
