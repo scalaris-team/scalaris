@@ -26,9 +26,7 @@
 
 -compile(export_all).
 
--define(NUM_EXECUTIONS, 5).
 -define(CLOSE, close).
--define(RINGSIZE, 16).
 
 num_executions() ->
     5.
@@ -141,21 +139,31 @@ read(Config) ->
 % test remove_node/1 remove a node and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(_Config) ->
+  ct:pal("wait for check_leases"),
   util:wait_for(fun admin:check_leases/0),
   % delete random node from ring
   RandomNode = comm:make_local(lease_checker:get_random_save_node()),
   PidGroup = pid_groups:group_of(RandomNode),
   PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
                            element(2, db_util:parse_table_name(Table)) =:= PidGroup],
+  ct:pal("kill node"),
   {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
   % wait for leases to expire
+  ct:pal("wait for leases to expire"),
   timer:sleep(11000),
   _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
+  ct:pal("wait for check_leases"),
   util:wait_for(fun admin:check_leases/0),
   % check data integrity
+  ct:pal("check data integrity"),
   _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
   % add node to reform ring_size() node ring
+  ct:pal("add node"),
   _ = admin:add_nodes(1),
+  ct:pal("sleep"),
   timer:sleep(3000),
+  ct:pal("check_ring_size_fully_joined"),
   unittest_helper:check_ring_size_fully_joined(ring_size()),
+  ct:pal("wait for check_leases"),
+  util:wait_for(fun admin:check_leases/0),
   true.
