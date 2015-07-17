@@ -31,15 +31,12 @@
 substitute(FunSpecs, Substitutions) when is_list(FunSpecs)->
     [substitute(FunSpec, Substitutions) ||  FunSpec <- FunSpecs];
 % type variable
-substitute({var,_Line,VarName}, Substitutions) ->
+substitute(Var = {var,_Line,VarName}, Substitutions) ->
     case gb_trees:lookup({var,VarName}, Substitutions) of
         {value, Substitution} -> Substitution;
-        none -> {var,VarName}
-    end;
-substitute({var,VarName}, Substitutions) ->
-    case gb_trees:lookup({var,VarName}, Substitutions) of
-        {value, Substitution} -> Substitution;
-        none -> {var,VarName}
+        none ->
+            %% VarName is unknown see e.g. Key at orddict:is_key/2
+            Var
     end;
 
 substitute({type, _Line,bounded_fun, [FunType, _Constraints]}, Substitutions) ->

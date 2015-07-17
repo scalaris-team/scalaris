@@ -282,8 +282,6 @@ parse_type({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
 parse_type({type, _Line, term, []}, _Module, ParseState) ->
     {{typedef, tester, test_any, []}, ParseState};
-parse_type({ann_type, _Line, [{var, _Varname}, Type]}, Module, ParseState) ->
-    parse_type(Type, Module, ParseState);
 parse_type({ann_type, _Line, [{var, _Line, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
 parse_type({atom, _Line, Atom}, _Module, ParseState) ->
@@ -417,8 +415,6 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
             unknown
     end;
 parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
-    {{var, Atom}, ParseState};
-parse_type({var, Atom}, _Module, ParseState) when is_atom(Atom) ->
     {{var, Atom}, ParseState};
 parse_type({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
     {{constraint, nyi}, ParseState};
