@@ -1169,7 +1169,7 @@ compress_key(Key, SigSize) ->
 %% @doc Creates a compressed version of a (key-)position list.
 %% @see shash_compress_k_list/7
 -spec compress_idx_list(SortedIdxList::[non_neg_integer()],
-                        DBChunkLen::non_neg_integer(), ResultIdx::[?RT:key()],
+                        DBChunkLen::non_neg_integer(), ResultIdx::[non_neg_integer()],
                         LastPos::non_neg_integer(), Max::non_neg_integer())
         -> CompressedIndices::bitstring().
 compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
