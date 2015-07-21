@@ -466,6 +466,7 @@ tester_type_check_rrepair(_Config) ->
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
+             {calc_items_in_chunk, 2}, %% needs special input
              {decompress_kv_list, 5}, %% needs a special binary to correspond to a number of bits
              {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
@@ -475,7 +476,7 @@ tester_type_check_rrepair(_Config) ->
              {decompress_k_list_kv, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list_kv, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
-             {shash_bloom_perform_resolve, 7}, %% needs a special binary to correspond to a number of bits
+             {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 8}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 14}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 8}, %% needs matching result and merkle nodes

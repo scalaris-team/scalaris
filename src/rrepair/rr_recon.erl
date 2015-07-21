@@ -266,10 +266,11 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_tree for faster access checks
+            OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize + VSize),
             DBChunkTree =
                 decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkTree, gb_trees:size(DBChunkTree)}}],
+            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen}}],
             Reconcile = resolve,
             Stage = resolve;
         shash ->
@@ -279,11 +280,12 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_set for faster access checks
+            OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize),
             DBChunkSet =
                 shash_decompress_kv_list(DBChunk, [], SigSize),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, DBChunkSet},
-                     {oicount, gb_sets:size(DBChunkSet)}],
+                     {oicount, OrigDBChunkLen}],
             Reconcile = reconcile,
             Stage = reconciliation;
         bloom ->
@@ -608,6 +610,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
                            method = shash,            kv_list = KVList}) ->
     ?TRACE1(_Msg, State),
 
+    OrigDBChunkLen = calc_items_in_chunk(OtherDBChunk, SigSize + VSize),
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize, 0),
     MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList),
@@ -615,7 +618,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
                                                         DBChunkTree)],
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, SigSize, VSize, DestReconPid, MyDiffKeys,
+                  State, DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, MyDiffKeys,
                   % nothing to do if the chunk is empty and no items to send
                   gb_trees:is_empty(DBChunkTree) andalso MyDiffIdx =:= <<>>),
 
@@ -626,10 +629,11 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                            method = bloom}) ->
     ?TRACE1(_Msg, State),
     
+    OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize + VSize),
     DBChunkTree = decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, SigSize, VSize, DestReconPid, [],
+                  State, DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, [],
                   % nothing to do if the chunk is empty
                   gb_trees:is_empty(DBChunkTree)),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
@@ -1019,6 +1023,13 @@ compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
     KBin = compress_key(K0, SigSize),
     compress_kv_list(TL, <<Bin/bitstring, KBin/bitstring, V:VSize>>, SigSize, VSize).
 
+-spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
+-> NrItems::non_neg_integer().
+calc_items_in_chunk(<<>>, 0) -> 0;
+calc_items_in_chunk(DBChunk, BitsPerItem) ->
+    ?DBG_ASSERT(erlang:bit_size(DBChunk) rem BitsPerItem =:= 0),
+    erlang:bit_size(DBChunk) div BitsPerItem.
+
 %% @doc De-compresses the binary from compress_kv_list/4 into a gb_tree with a
 %%      binary key representation and the integer of the (shortened) version.
 -spec decompress_kv_list(CompressedBin::bitstring(),
@@ -1327,20 +1338,19 @@ shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos, Max) ->
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
 %%      processes in phase 2 (trivial RC).
 -spec shash_bloom_perform_resolve(
-        State::state(), DBChunkTree::kvi_tree(),
+        State::state(), DBChunkTree::kvi_tree(), OrigDBChunkLen::non_neg_integer(),
         SigSize::signature_size(), VSize::signature_size(),
         DestReconPid::comm:mypid(), FBItems::[?RT:key()],
         SkipResolve::boolean()) -> rr_recon_stats:stats().
-shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunkTree,
+shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunkTree, _OrigDBChunkLen,
                             _SigSize, _VSize, _DestReconPid, [], true) ->
     Stats;
 shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod},
-  DBChunkTree, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
+  DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    OrigDBChunkLen = gb_trees:size(DBChunkTree),
     {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
@@ -1701,6 +1711,7 @@ merkle_resolve_add_leaf_hash(LeafNode, P1E, OtherMaxItemsCount, BucketSizeBits,
         Hashes::bitstring(), P1E::float(), MyMaxItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer())
         -> {NHashes::bitstring(), OtherBucketTree::kvi_tree(),
+            OrigDBChunkLen::non_neg_integer(),
             SigSize::signature_size(), VSize::signature_size()}.
 merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits) ->
     <<BSize:BucketSizeBits/integer-unit:1, HashesT/bitstring>> = Hashes,
@@ -1708,7 +1719,7 @@ merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
     OBucketTree = decompress_kv_list(OBucketBin, [], SigSize, VSize, 0),
-    {NHashes, OBucketTree, SigSize, VSize}.
+    {NHashes, OBucketTree, BSize, SigSize, VSize}.
 
 %% @doc Gets a compact binary merkle hash list from all leaf-inner node
 %%      comparisons so that the other node can filter its leaf nodes and
@@ -1770,9 +1781,8 @@ merkle_resolve_leaves_noninit([], HashesReply, Stats,
 merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
                                   MyBuckets, NLeafNAcc, Hashes, ToSend, ToReq,
                                   ToResolve, ResolveNonEmptyAcc) ->
-    {NHashes, OBucketTree, SigSize, VSize} =
+    {NHashes, OBucketTree, OrigDBChunkLen, SigSize, VSize} =
         merkle_resolve_retrieve_leaf_hashes(Hashes, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
-    OrigDBChunkLen = gb_trees:size(OBucketTree),
     {ToSend1, ToReqIdx1, OBucketTree1} =
         get_full_diff(MyBuckets, OBucketTree, ToSend, [], SigSize, VSize),
     ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)] ++ ToReqIdx1),
