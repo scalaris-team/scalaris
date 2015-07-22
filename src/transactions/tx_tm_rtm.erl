@@ -569,13 +569,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                 false ->
                     log:log(warn, "Cannot discover my comm:this().~n");
                 true ->
-                    ThisRTMsNumber =
-                        case Role of
-                            tx_rtm0 -> 1;
-                            tx_rtm1 -> 2;
-                            tx_rtm2 -> 3;
-                            tx_rtm3 -> 4
-                        end,
+                    {tx_rtm, ThisRTMsNumber} = Role,
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
@@ -1087,18 +1081,12 @@ send_to_rtms(RTMs, MsgGen) ->
           end || RTM <- RTMs ],
     ok.
 
-%list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
--spec get_nth_rtm_name(0..3) -> tx_rtm0 | tx_rtm1 | tx_rtm2 | tx_rtm3. %% atom(). %% pid_groups:pidname().
-get_nth_rtm_name(0) -> tx_rtm0;
-get_nth_rtm_name(1) -> tx_rtm1;
-get_nth_rtm_name(2) -> tx_rtm2;
-get_nth_rtm_name(3) -> tx_rtm3.
+-spec get_nth_rtm_name(pos_integer()) -> pid_groups:pidname().
+get_nth_rtm_name(N) -> {tx_rtm, N}.
 
 -spec get_my(pid_groups:pidname(), atom()) -> pid() | failed.
 get_my(Role, PaxosRole) ->
-    PidName = list_to_existing_atom(
-                atom_to_list(Role) ++ "_" ++ atom_to_list(PaxosRole)),
-    pid_groups:get_my(PidName).
+    pid_groups:get_my({Role, PaxosRole}).
 
 -compile({inline, [state_get_RTMs/1, state_set_RTMs/2,
                    state_get_tablename/1, state_get_role/1, state_get_lacceptor/1,
