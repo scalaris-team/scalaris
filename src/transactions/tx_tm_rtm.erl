@@ -54,7 +54,7 @@
 
 -type rtm() :: {?RT:key(),
                 {comm:mypid()} | unknown,
-                Role :: 0..3, %% non_neg_integer(),
+                Role :: pos_integer(),
                 {Acceptor :: comm:mypid()} | unknown}.
 
 -type rtms() :: [rtm()].
@@ -1035,7 +1035,7 @@ rtms_of_same_dht_node(InRTMs) ->
                    rtms_get_valid_rtmpids/1, rtms_get_valid_accpids/1]}).
 
 -spec rtm_entry_new(?RT:key(), {comm:mypid()} | unknown,
-                    0..3, {comm:mypid()} | unknown) -> rtm().
+                    pos_integer(), {comm:mypid()} | unknown) -> rtm().
 rtm_entry_new(Key, RTMPid, Nth, AccPid) -> {Key, RTMPid, Nth, AccPid}.
 -spec get_rtmkey(rtm()) -> ?RT:key().
 get_rtmkey(RTMEntry) -> element(1, RTMEntry).
@@ -1043,7 +1043,7 @@ get_rtmkey(RTMEntry) -> element(1, RTMEntry).
 set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
 -spec get_rtmpid(rtm()) -> {comm:mypid()} | unknown.
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
--spec get_nth(rtm()) -> 0..3.
+-spec get_nth(rtm()) -> pos_integer().
 get_nth(RTMEntry)    -> element(3, RTMEntry).
 %% -spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
 %% get_accpid(RTMEntry) -> element(4, RTMEntry).
