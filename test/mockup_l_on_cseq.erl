@@ -58,7 +58,7 @@ create_lease(From, To, Owner) ->
     L = l_on_cseq:unittest_create_lease_with_range(From, To, Owner),
     Range = node:mk_interval_between_ids(From, To),
     Id = l_on_cseq:id(Range),
-    DB = l_on_cseq:get_db_for_id(Id),
+    DB = rbrcseq:get_db_for_id(lease_db, Id),
     rbrcseq:qwrite(DB, self(), Id,
                    fun (_Current, _WriteFile, _Next) ->
                            {true, null}

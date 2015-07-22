@@ -68,8 +68,6 @@
 -export([unittest_clear_lease_list/1]).
 -export([unittest_get_delta/0]).
 
--export([get_db_for_id/1]).
-
 % lease accessors
 -export([get_version/1,set_version/2,
          get_epoch/1, set_epoch/2,
@@ -382,7 +380,7 @@ on({l_on_cseq, unittest_update,
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     %% io:format("renew ~p~n", [Old]),
     ContentCheck = is_valid_update(OldEpoch, OldVersion),
-    DB = get_db_for_id(Id),
+    DB = rbrcseq:get_db_for_id(lease_db, Id),
     %% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, unittest_update_reply, '_',
                                      Old, New, Mode, Caller}),
@@ -774,7 +772,7 @@ on({l_on_cseq, split, Lease, R1, R2, Keep, ReplyTo, PostAux}, State) ->
                  version = 0,
                  timeout = new_timeout()},
     ContentCheck = is_valid_split_step1(),
-    DB = get_db_for_id(Id),
+    DB = rbrcseq:get_db_for_id(lease_db, Id),
     Self = comm:reply_as(self(), 9, {l_on_cseq, split_reply_step1, Lease, R1, R2,
                                      Keep, ReplyTo, PostAux, '_'}),
     %log:log("self in split firststep: ~w", [Self]),
@@ -1241,7 +1239,7 @@ read(Key, Pid) ->
     %% decide which lease db is responsible, ie. if the key is from
     %% the first quarter of the ring, use lease_db1, if from 2nd
     %% quarter -> use lease_db2, ...
-    DB = get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(lease_db, Key),
     %% perform qread
     rbrcseq:qread(DB, Pid, Key).
 
@@ -1249,7 +1247,7 @@ read(Key, Pid) ->
 %%     %% decide which lease db is responsible, ie. if the key is from
 %%     %% the first quarter of the ring, use lease_db1, if from 2nd
 %%     %% quarter -> use lease_db2, ...
-%%     DB = get_db_for_id(Key),
+%%         DB = rbrcseq:get_db_for_id(lease_db, Key),
 %%     rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
 %%     trace_mpath:thread_yield(),
 %%     receive
@@ -1264,7 +1262,7 @@ read(Key, Pid) ->
 -spec add_first_lease_to_db(?RT:key(), dht_node_state:state()) ->
                                   dht_node_state:state().
 add_first_lease_to_db(Id, State) ->
-    DB = get_db_for_id(Id),
+    DB = rbrcseq:get_db_for_id(lease_db, Id),
     Lease = #lease{id      = Id, %% set to 0 in dht_node
                    epoch   = 1,
                    owner   = comm:this(),
@@ -1306,12 +1304,6 @@ unittest_create_lease_with_range(From, To, Owner) ->
            version = 1,
            timeout = new_timeout()
           }.
-
--spec get_db_for_id(?RT:key()) -> atom().
-get_db_for_id(Id) ->
-    erlang:list_to_existing_atom(
-      lists:flatten(
-        io_lib:format("lease_db~p", [?RT:get_key_segment(Id)]))).
 
 -spec new_timeout() -> erlang:timestamp().
 new_timeout() ->
@@ -1467,7 +1459,7 @@ format_utc_timestamp({_,_,Micro} = TS) ->
 update_lease(ReplyTo, ContentCheck, Old, New, State) ->
     ?DBG_ASSERT(New =:= prbr_bottom orelse get_id(Old) =:= get_id(New)), % the lease id may not be changed
     LeaseId = get_id(Old), %% New could prbr_bottom
-    DB = get_db_for_id(LeaseId),
+    DB = rbrcseq:get_db_for_id(lease_db, LeaseId),
     case lease_list:get_next_round(LeaseId, State) of
         failed ->
             rbrcseq:qwrite     (DB, ReplyTo, LeaseId, ContentCheck, New);

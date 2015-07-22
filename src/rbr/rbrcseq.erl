@@ -39,6 +39,7 @@
 -export([qread/3, qread/4]).
 -export([qwrite/5, qwrite/7]).
 -export([qwrite_fast/7, qwrite_fast/9]).
+-export([get_db_for_id/2]).
 
 -export([start_link/3]).
 -export([init/1, on/2]).
@@ -1011,3 +1012,7 @@ get_data_type(_) ->
     %% leases_1-4 -> l_on_cseq
     %% txid_1-4 -> tx_id_on_cseq
     util.
+
+-spec get_db_for_id(atom(), ?RT:key()) -> {atom(), pos_integer()}.
+get_db_for_id(DBName, Key) ->
+    {DBName, ?RT:get_key_segment(Key)}.

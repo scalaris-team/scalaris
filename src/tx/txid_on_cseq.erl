@@ -55,13 +55,13 @@ read(Key, ReplyTo) ->
     %% decide which db is responsible, ie. if the key is from
     %% the first quarter of the ring, use lease_db1, if from 2nd
     %% quarter -> use lease_db2, ...
-    DB = get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(txid_db, Key),
     %% perform qread
     rbrcseq:qread(DB, ReplyTo, Key).
 
 -spec new(txid(), [client_key()], comm:erl_local_pid()) -> ok.
 new(Key, InvolvedKeys, ReplyTo) ->
-    DB = get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(txid_db, Key),
     Value = new_entry(Key, InvolvedKeys, comm:make_global(ReplyTo)),
     RBRCseqPid = comm:make_global(pid_groups:find_a(DB)),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
@@ -71,14 +71,14 @@ new(Key, InvolvedKeys, ReplyTo) ->
 -spec decide(txid(), commit | abort, comm:erl_local_pid(),
              pr:pr(), any()) -> ok.
 decide(Key, Decision, ReplyTo, Round, OldVal) ->
-    DB = get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(txid_db, Key),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
                         fun txid_on_cseq:is_valid_decide/3, Decision,
                         Round, OldVal).
 
 -spec delete(txid(), comm:erl_local_pid()) -> ok.
 delete(Key, ReplyTo) ->
-    DB = get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(Key),
     rbrcseq:qwrite(DB, ReplyTo, Key,
                    fun txid_on_cseq:is_valid_delete/3, prbr_bottom).
 
@@ -129,13 +129,6 @@ is_valid_delete(ExistingEntry, _WriteFilter, prbr_bottom) ->
 -spec wf_decide(txid_entry(), null, commit | abort) -> txid_entry().
 wf_decide(Old, null, Decision) ->
     set_status(Old, Decision).
-
-
--spec get_db_for_id(?RT:key()) -> atom().
-get_db_for_id(Id) ->
-    erlang:list_to_existing_atom(
-      lists:flatten(
-        io_lib:format("txid_db~p", [?RT:get_key_segment(Id)]))).
 
 %% abstract data type: txid_entry
 -spec new_entry(?RT:key(), [client_key()], comm:mypid()) -> txid_entry().
