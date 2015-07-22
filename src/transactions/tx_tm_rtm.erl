@@ -689,7 +689,7 @@ on_init({get_node_details_response, NodeDetails}, State) ->
                 fun(X, {Acc, I}) ->
                   {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
                 end,
-                {[], length(RTM_ids) - 1}, RTM_ids),
+                {[], length(RTM_ids)}, RTM_ids),
     rtm_update_once(NewRTMs),
     state_set_RTMs(State, NewRTMs);
 
