@@ -2388,11 +2388,13 @@ key_dist(Key1, Key2) ->
 
 %% @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
-map_key_to_quadrant(Key, N) ->
-    case lists:sort(?RT:get_replica_keys(Key)) of
-        [?MINUS_INFINITY|TL] -> lists:nth(N, lists:append(TL, [?MINUS_INFINITY]));
-        [_|_] = X            -> lists:nth(N, X)
-    end.
+map_key_to_quadrant(Key, Q) ->
+    RKeys = ?RT:get_replica_keys(Key),
+    SegM = case lists:member(?MINUS_INFINITY, RKeys) of
+               true -> Q + 1;
+               _ -> Q
+           end,
+    hd(lists:dropwhile(fun(K) -> ?RT:get_key_segment(K) =/= SegM end, RKeys)).
 
 %% @doc Gets the quadrant intervals.
 -spec quadrant_intervals() -> [intervals:non_empty_interval(),...].
