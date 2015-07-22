@@ -69,61 +69,21 @@ childs([DHTNodeGroup, Options]) ->
                     _PidGroupsNameKV = kv_rbrcseq,
                     _DBSelectorKV = kv]),
     %% rbrcseq process working on the lease_db1 DB
-    L1_RBRcseq = sup:worker_desc(
-                   l1_rbrcseq, rbrcseq,
+    Lease_RBRcseqs = [sup:worker_desc(
+                   {lease_db, Id}, rbrcseq,
                    start_link,
                    [DHTNodeGroup,
-                    _PidGroupsNameL1 = lease_db1,
-                    _DBSelectorL1 = leases_1]),
-    %% rbrcseq process working on the lease_db2 DB
-    L2_RBRcseq = sup:worker_desc(
-                   l2_rbrcseq, rbrcseq,
+                    _PidGroupsNameL1 = {lease_db, Id},
+                    _DBSelectorL1 = {lease_db, Id}])
+        || Id <- lists:seq(0, config:read(replication_factor)-1)],
+
+    Tx_RBRcseqs = [sup:worker_desc(
+                   {txid_db, Id}, rbrcseq,
                    start_link,
                    [DHTNodeGroup,
-                    _PidGroupsNameL2 = lease_db2,
-                    _DBSelectorL2 = leases_2]),
-    %% rbrcseq process working on the lease_db3 DB
-    L3_RBRcseq = sup:worker_desc(
-                   l3_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameL3 = lease_db3,
-                    _DBSelectorL3 = leases_3]),
-    %% rbrcseq process working on the lease_db4 DB
-    L4_RBRcseq = sup:worker_desc(
-                   l4_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameL4 = lease_db4,
-                    _DBSelectorL4 = leases_4]),
-    %% rbrcseq process working on the txid_db1 DB
-    Tx1_RBRcseq = sup:worker_desc(
-                   txid1_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameT1 = txid_db1,
-                    _DBSelectorT1 = txid_1]),
-    %% rbrcseq process working on the txid_db2 DB
-    Tx2_RBRcseq = sup:worker_desc(
-                   txid2_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameT2 = txid_db2,
-                    _DBSelectorT2 = txid_2]),
-    %% rbrcseq process working on the txid_db3 DB
-    Tx3_RBRcseq = sup:worker_desc(
-                   txid3_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameT3 = txid_db3,
-                    _DBSelectorT3 = txid_3]),
-    %% rbrcseq process working on the txid_db4 DB
-    Tx4_RBRcseq = sup:worker_desc(
-                   txid4_rbrcseq, rbrcseq,
-                   start_link,
-                   [DHTNodeGroup,
-                    _PidGroupsNameT4 = txid_db4,
-                    _DBSelectorT4 = txid_4]),
+                    _PidGroupsNameL1 = {txid_db, Id},
+                    _DBSelectorL1 = {txid_db, Id}])
+                   || Id <- lists:seq(0, config:read(replication_factor)-1)],
 
     DHTNodeMonitor = sup:worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
@@ -131,21 +91,15 @@ childs([DHTNodeGroup, Options]) ->
     TX =
         sup:supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [DHTNodeGroup]),
-    [
+    lists:flatten([
      PaxosProcesses,
      KV_RBRcseq,
-     L1_RBRcseq,
-     L2_RBRcseq,
-     L3_RBRcseq,
-     L4_RBRcseq,
-     Tx1_RBRcseq,
-     Tx2_RBRcseq,
-     Tx3_RBRcseq,
-     Tx4_RBRcseq,
+     Lease_RBRcseqs,
+     Tx_RBRcseqs,
      DHTNodeMonitor,
      DHTNode,
      TX
-    ].
+    ]).
 
 
 %% @doc Checks whether config parameters for the sup_dht_node_core supervisor

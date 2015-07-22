@@ -58,36 +58,27 @@ childs([DHTNodeGroup]) ->
                                  [DHTNodeGroup, tx_tm]),
     TX_TM_Paxos = sup:supervisor_desc(
                     sup_paxos_tm, sup_paxos, start_link,
-                    [{DHTNodeGroup, [{sup_paxos_prefix, tx_tm}]}]),
-    TX_RTM0 = sup:worker_desc(tx_rtm0, tx_tm_rtm, start_link,
-                                   [DHTNodeGroup, tx_rtm0]),
-    TX_RTM0_Paxos = sup:supervisor_desc(
-                sup_paxos_rtm0, sup_paxos, start_link,
-                [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm0}]}]),
-    TX_RTM1 = sup:worker_desc(tx_rtm1, tx_tm_rtm, start_link,
-                                   [DHTNodeGroup, tx_rtm1]),
-    TX_RTM1_Paxos = sup:supervisor_desc(
-                    sup_paxos_rtm1, sup_paxos, start_link,
-                    [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm1}]}]),
-    TX_RTM2 = sup:worker_desc(tx_rtm2, tx_tm_rtm, start_link,
-                                   [DHTNodeGroup, tx_rtm2]),
-    TX_RTM2_Paxos = sup:supervisor_desc(
-                    sup_paxos_rtm2, sup_paxos, start_link,
-                    [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm2}]}]),
-    TX_RTM3 = sup:worker_desc(tx_rtm3, tx_tm_rtm, start_link,
-                                   [DHTNodeGroup, tx_rtm3]),
-    TX_RTM3_Paxos = sup:supervisor_desc(
-                    sup_paxos_rtm3, sup_paxos, start_link,
-                    [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm3}]}]),
+                    [{DHTNodeGroup, [{sup_paxos_parent, tx_tm}]}]),
+
+
+    TX_RTMs = [sup:worker_desc(
+                   {tx_tm_rtm, Id}, tx_tm_rtm,
+                   start_link,
+                   [DHTNodeGroup, {tx_tm_rtm, Id}])
+               || Id <- lists:seq(0, config:read(replication_factor)-1)],
+
+    TX_RTM_Paxi = [sup:supervisor_desc(
+                {sup_paxos_rtm, Id}, sup_paxos, start_link,
+                [{DHTNodeGroup, [{sup_paxos_parent, {tx_rtm, Id}}]}])
+                   || Id <- lists:seq(0, config:read(replication_factor)-1)],
+
     TX_TM_New = sup:worker_desc(tx_tm_new, tx_tm, start_link,
                                  [DHTNodeGroup, tx_tm_new]),
-    [
-     RDHT_tx_read, RDHT_tx_write,
-     %% start paxos supervisors before tx processes to create used atoms
-     TX_TM_Paxos, TX_TM,
-     TX_RTM0_Paxos, TX_RTM0,
-     TX_RTM1_Paxos, TX_RTM1,
-     TX_RTM2_Paxos, TX_RTM2,
-     TX_RTM3_Paxos, TX_RTM3,
-     TX_TM_New
-    ].
+    lists:flatten([
+                   RDHT_tx_read, RDHT_tx_write,
+                   %% start paxos supervisors before tx processes to create used atoms
+                   TX_TM_Paxos, TX_TM,
+                   TX_RTMs,
+                   TX_RTM_Paxi,
+                   TX_TM_New
+    ]).
