@@ -47,10 +47,9 @@ start_link({PidGroup, Options}) ->
                         [ProcessDescr::supervisor:child_spec()]}}.
 init([{PidGroup, Options}] = X) ->
     SupervisorName =
-        case lists:keyfind(sup_paxos_prefix, 1, Options) of
-            {sup_paxos_prefix, Prefix} ->
-                PrefixS = atom_to_list(Prefix),
-                list_to_atom(PrefixS ++ "_" ++ atom_to_list(?MODULE));
+        case lists:keyfind(sup_paxos_parent, 1, Options) of
+            {sup_paxos_parent, Parent} ->
+                {Parent, ?MODULE};
             false -> ?MODULE
         end,
     pid_groups:join_as(PidGroup, SupervisorName),
@@ -65,13 +64,13 @@ supspec(_) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([{PidGroup, Options}]) ->
     {ProposerName, AcceptorName, LearnerName} =
-        case lists:keyfind(sup_paxos_prefix, 1, Options) of
-            {sup_paxos_prefix, Prefix} ->
-                PrefixS = atom_to_list(Prefix),
-                {list_to_atom(PrefixS ++ "_proposer"),
-                 list_to_atom(PrefixS ++ "_acceptor"),
-                 list_to_atom(PrefixS ++ "_learner")};
-            false -> {paxos_proposer, paxos_acceptor, paxos_learner}
+        case lists:keyfind(sup_paxos_parent, 1, Options) of
+            {sup_paxos_parent, Parent} ->
+                {{Parent, proposer},
+                 {Parent, acceptor},
+                 {Parent, learner}};
+            false ->
+                {paxos_proposer, paxos_acceptor, paxos_learner}
         end,
     Proposer = sup:worker_desc(proposer, proposer,
                                     start_link, [PidGroup, ProposerName]),
