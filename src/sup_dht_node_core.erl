@@ -77,7 +77,7 @@ childs([DHTNodeGroup, Options]) ->
                    [DHTNodeGroup,
                     _PidGroupsNameL1 = {lease_db, Id},
                     _DBSelectorL1 = {lease_db, Id}])
-        || Id <- lists:seq(0, config:read(replication_factor)-1)],
+        || Id <- lists:seq(1, config:read(replication_factor))],
 
     Tx_RBRcseqs = [sup:worker_desc(
                    {txid_db, Id}, rbrcseq,
@@ -85,7 +85,7 @@ childs([DHTNodeGroup, Options]) ->
                    [DHTNodeGroup,
                     _PidGroupsNameL1 = {txid_db, Id},
                     _DBSelectorL1 = {txid_db, Id}])
-                   || Id <- lists:seq(0, config:read(replication_factor)-1)],
+                   || Id <- lists:seq(1, config:read(replication_factor))],
 
     DHTNodeMonitor = sup:worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,

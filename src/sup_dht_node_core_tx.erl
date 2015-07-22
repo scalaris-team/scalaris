@@ -62,15 +62,15 @@ childs([DHTNodeGroup]) ->
 
 
     TX_RTMs = [sup:worker_desc(
-                   {tx_tm_rtm, Id}, tx_tm_rtm,
+                   {tx_rtm, Id}, tx_tm_rtm,
                    start_link,
-                   [DHTNodeGroup, {tx_tm_rtm, Id}])
-               || Id <- lists:seq(0, config:read(replication_factor)-1)],
+                   [DHTNodeGroup, {tx_rtm, Id}])
+               || Id <- lists:seq(1, config:read(replication_factor))],
 
     TX_RTM_Paxi = [sup:supervisor_desc(
                 {sup_paxos_rtm, Id}, sup_paxos, start_link,
                 [{DHTNodeGroup, [{sup_paxos_parent, {tx_rtm, Id}}]}])
-                   || Id <- lists:seq(0, config:read(replication_factor)-1)],
+                   || Id <- lists:seq(1, config:read(replication_factor))],
 
     TX_TM_New = sup:worker_desc(tx_tm_new, tx_tm, start_link,
                                  [DHTNodeGroup, tx_tm_new]),
@@ -78,7 +78,7 @@ childs([DHTNodeGroup]) ->
                    RDHT_tx_read, RDHT_tx_write,
                    %% start paxos supervisors before tx processes to create used atoms
                    TX_TM_Paxos, TX_TM,
-                   TX_RTMs,
                    TX_RTM_Paxi,
+                   TX_RTMs,
                    TX_TM_New
     ]).
