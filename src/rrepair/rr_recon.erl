@@ -2360,7 +2360,7 @@ exit_reason_to_rc_status(_) -> abort.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Maps any key (K) into a given interval (I). If K is already in I, K is returned.
-%%      If K has more than one associated keys in I, the closest one is returned.
+%%      If K has more than one associated key in I, the closest one is returned.
 %%      If all associated keys of K are not in I, none is returned.
 -spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key() | none.
 map_key_to_interval(Key, I) ->
