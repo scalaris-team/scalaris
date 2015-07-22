@@ -57,11 +57,13 @@ supspec(_) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([DHTNodeGroup, Options]) ->
     PaxosProcesses = sup:supervisor_desc(sup_paxos, sup_paxos,
-                                              start_link, [{DHTNodeGroup, []}]),
+                                              start_link, [{DHTNodeGroup,
+                                                            [{sup_paxos_parent, dht_node}]}]),
     DHTNodeModule = config:read(dht_node),
     DHTNode = sup:worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
     %% rbrcseq process working on the kv DB
+
     KV_RBRcseq = sup:worker_desc(
                    kv_rbrcseq, rbrcseq,
                    start_link,
