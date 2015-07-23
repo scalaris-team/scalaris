@@ -49,7 +49,8 @@
 -type entry_type() :: normal | source | sticky.
 -type custom_info() :: undefined | term().
 
--type(mynode() :: {Id::key(), DHTNodePid::comm:mypid(), RTLoopPid::comm:mypid() | none}).
+-type(mynode() :: {Id::key(), IdVersion::non_neg_integer(),
+                   DHTNodePid::comm:mypid(), RTLoopPid::comm:mypid() | none}).
 -record(rt_entry, {
         node :: mynode(),
         type :: entry_type(),
@@ -109,7 +110,7 @@ init(Neighbors) ->
     % request approximated ring size
     gossip_load:get_values_best([]),
 
-    MyNode = node2mynode(nodelist:node(Neighbors)),
+    MyNode = node2mynode(nodelist:node(Neighbors), comm:this()),
     update_entries(Neighbors, add_source_entry(MyNode, #rt_t{})).
 
 %% @doc Hashes the key to the identifier space.
@@ -169,14 +170,20 @@ update_entries(NewNeighborhood, RT) ->
     ToBeAddedNodes1 = sets:subtract(NewNeighbors3, OldNeighbors3),
     %% Add PidRTs to the nodes to be added. There might be PidRTs in the old RT
     %% even for "new" nodes, e.g. for nodes added through get_rt_reply (i.e. for
-    %% normal nodes are converted to sticky nodes)
+    %% normal nodes are converted to sticky nodes). Get the VersionIds from the
+    %% list of new nodes.
     OldNodes = lists:map(fun rt_entry_node/1, gb_trees:values(get_rt_tree(RT))),
+    NewNodes = lists:map(fun(Node) -> {node:id(Node), node:id_version(Node),
+                                       node:pidX(Node)}
+                         end, NewNeighbors1),
     ToBeAddedNodes2 =
         util:sets_map(fun({Id, PidDHT}) ->
-                              case lists:keyfind(Id, 1, OldNodes) of
-                                  {Id, PidDHT, PidRT} -> {Id, PidDHT, PidRT};
-                                  _else -> {Id, PidDHT, none}
-                              end
+                              PidRT = case lists:keyfind(Id, 1, OldNodes) of
+                                  {_Id, _IdVersion, _PidDHT, PidRT0} -> PidRT0;
+                                  _else -> none
+                              end,
+                              {_, IdVersion, _} = lists:keyfind(Id, 1, NewNodes),
+                              {Id, IdVersion, PidDHT, PidRT}
                       end, ToBeAddedNodes1),
 
     %% uncomment for debugging
@@ -194,7 +201,7 @@ update_entries(NewNeighborhood, RT) ->
     NewRT = lists:foldl(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes2),
 
     %% request rt_loop pids of new neighbours with unknown PidRTs
-    ToBeAddedNodes3 = lists:filter(fun({_Id, _PidDHT, PidRT}) ->
+    ToBeAddedNodes3 = lists:filter(fun({_Id, _IdVersion, _PidDHT, PidRT}) ->
                                            PidRT =:= none
                                    end, ToBeAddedNodes2),
     lists:foreach(fun(Node) -> comm:send(pid_dht(Node),
@@ -439,7 +446,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
 handle_custom_message({rt_get_node, From}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(From, {rt_learn_node, {node:id(MyNode), node:pidX(MyNode), comm:this()}}),
+    comm:send(From, {rt_learn_node, node2mynode(MyNode, comm:this())}),
     State;
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
@@ -457,13 +464,10 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
 
 handle_custom_message({rt_get_neighbor, From}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    MyId = node:id(MyNode),
-    PidDHT = node:pidX(MyNode),
-    PidRT = comm:this(),
-    comm:send(From, {rt_learn_neighbor, MyId, PidDHT, PidRT}),
+    comm:send(From, {rt_learn_neighbor, node2mynode(MyNode, comm:this())}),
     State;
 
-handle_custom_message({rt_learn_neighbor, Id, PidDHT, PidRT}, State) ->
+handle_custom_message({rt_learn_neighbor, {Id, IdVersion, PidDHT, PidRT}}, State) ->
     OldRT = rt_loop:get_rt(State),
     {NewRT, NewERT} =
         case rt_lookup_node(Id, OldRT) of
@@ -592,6 +596,7 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
+%% Beware: Sometimes called from dht_node
 -spec next_hop_node(nodelist:neighborhood(), external_rt(), key()) -> succ | mynode().
 next_hop_node(Neighbors, ERT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
@@ -988,7 +993,7 @@ add_normal_entry(Entry, RT) ->
 -spec rt_entry_node(N :: rt_entry()) -> mynode().
 rt_entry_node(#rt_entry{node=N}) -> N.
 
-% @doc Set the inner node:node_type() of a rt_entry
+% @doc Set the inner mynode() of a rt_entry
 -spec rt_entry_set_node(Entry :: rt_entry(), Node :: mynode()) -> rt_entry().
 rt_entry_set_node(#rt_entry{} = Entry, Node) -> Entry#rt_entry{node=Node}.
 
@@ -1147,7 +1152,8 @@ check_rt_integrity(#rt_t{} = RT) ->
 wrap_message(_Key, Msg, _ERT, Neighbors, 0) ->
     MyNode = nodelist:node(Neighbors),
     RTLoopPid = comm:make_global(pid_groups:get_my(routing_table)),
-    {'$wrapped', {node:id(MyNode), node:pidX(MyNode), RTLoopPid}, Msg};
+    {'$wrapped', {node:id(MyNode), node:id_version(MyNode), node:pidX(MyNode),
+                  RTLoopPid}, Msg};
 
 wrap_message(Key, {'$wrapped', Issuer, _} = Msg, ERT, Neighbors, 1) ->
     %% The reduction ratio is only useful if this is not the last hop
@@ -1244,19 +1250,28 @@ check_well_connectedness(RT) ->
 
 %% @doc Transform a node:node_type() to mynode().
 -spec node2mynode(Node::node:node_type()) -> mynode().
-node2mynode(Node) -> {node:id(Node), node:pidX(Node), none}.
+node2mynode(Node) -> node2mynode(Node, none).
+
+%% @doc Transform a node:node_type() to mynode().
+-spec node2mynode(Node::node:node_type(), PidRT::comm:mypid()) -> mynode().
+node2mynode(Node={node, _, _, _, _}, PidRT) ->
+    {node:id(Node), node:id_version(Node), node:pidX(Node), PidRT}.
 
 %% @doc Get the Pid from an mynode().
 -spec pid_dht(Node::mynode()) -> comm:mypid().
-pid_dht({_Id, PidDHT, _PidRT}) -> PidDHT.
+pid_dht({_Id, _IdVersion, PidDHT, _PidRT}) -> PidDHT.
 
 %% @doc Get the Pid from an mynode().
 -spec pid_rt(Node::mynode()) -> comm:mypid() | none.
-pid_rt({_Id, _PidDHT, PidRT}) -> PidRT.
+pid_rt({_Id, _IdVersion, _PidDHT, PidRT}) -> PidRT.
 
 %% @doc Get the id from a mynode().
 -spec id(Node::mynode()) -> key().
-id({Id, _PidDHT, _PidRT}) -> Id.
+id({Id, _IdVersion, _PidDHT, _PidRT}) -> Id.
+
+%% @doc Get the id_version from a mynode().
+-spec id_version(Node::mynode()) -> key().
+id_version({_Id, IdVersion, _PidDHT, _PidRT}) when is_integer(_Id), is_integer(IdVersion)  -> IdVersion.
 
 %% @doc Send Msg to the routing table.
 %%      Send directly if rt_loop pid is known, otherwise as group_member msg.
