@@ -1519,7 +1519,7 @@ check_node(Hashes, Tree, SigSizeI, SigSizeL,
                    SigSizeI::signature_size(), SigSizeL::signature_size(),
                    MyMaxItemsCount::non_neg_integer(),
                    OtherMaxItemsCount::non_neg_integer(), Stats, FlagsAcc::bitstring(),
-                   RestTreeAcc::[NodeList], MerkleSyncAcc::[merkle_sync()],
+                   RestTreeAcc::NodeList, MerkleSyncAcc::[merkle_sync()],
                    MerkleSyncIn::[merkle_sync()], AccMIC::Count,
                    AccCmp::Count, AccSkip::Count)
         -> {FlagsOUT::bitstring(), RestTreeOut::NodeList,
@@ -1534,7 +1534,7 @@ p_check_node([], [], _SigSizeI, _SigSizeL,
              MerkleSyncAcc, MerkleSyncIn, AccMIC, AccCmp, AccSkip) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp},
                                  {tree_compareSkipped, AccSkip}], Stats),
-    {FlagsAcc, lists:append(lists:reverse(AccN)),
+    {FlagsAcc, lists:reverse(AccN),
      lists:reverse(MerkleSyncAcc, MerkleSyncIn), NStats, AccMIC};
 p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
              MyMaxItemsCount, OtherMaxItemsCount, Stats, FlagsAcc,
@@ -1560,7 +1560,7 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            Childs = merkle_tree:get_childs(Node),
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, [Childs | AccN],
+                        <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, lists:reverse(Childs, AccN),
                         MerkleSynAcc, MerkleSyncIN, NewAccMIC,
                         AccCmp + 1, AccSkip);
        (not IsLeafNode) andalso IsLeafHash ->
