@@ -657,8 +657,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                    {icount, MyLastMaxItemsCount}]}) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
     {P1E_I, _P1E_L, SigSizeI, SigSizeL} =
-        merkle_next_signature_sizes(Params, LastP1ETotal, OtherMaxItemsCount,
-                                    MyLastMaxItemsCount),
+        merkle_next_signature_sizes(Params, LastP1ETotal, MyLastMaxItemsCount,
+                                    OtherMaxItemsCount),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
     {FlagsBin, RTree, MerkleSyncNew, NStats, MyMaxItemsCount} =
         check_node(ToCheck, Tree, SigSizeI, SigSizeL,
