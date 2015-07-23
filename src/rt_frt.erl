@@ -170,8 +170,8 @@ update_entries(NewNeighborhood, RT) ->
     ToBeAddedNodes1 = sets:subtract(NewNeighbors3, OldNeighbors3),
     %% Add PidRTs to the nodes to be added. There might be PidRTs in the old RT
     %% even for "new" nodes, e.g. for nodes added through get_rt_reply (i.e. for
-    %% normal nodes are converted to sticky nodes). Get the VersionIds from the
-    %% list of new nodes.
+    %% normal nodes that are converted to sticky nodes). Get the VersionIds from
+    %% the list of new nodes.
     OldNodes = lists:map(fun rt_entry_node/1, gb_trees:values(get_rt_tree(RT))),
     NewNodes = lists:map(fun(Node) -> {node:id(Node), node:id_version(Node),
                                        node:pidX(Node)}
@@ -467,7 +467,7 @@ handle_custom_message({rt_get_neighbor, From}, State) ->
     comm:send(From, {rt_learn_neighbor, node2mynode(MyNode, comm:this())}),
     State;
 
-handle_custom_message({rt_learn_neighbor, {Id, IdVersion, PidDHT, PidRT}}, State) ->
+handle_custom_message({rt_learn_neighbor, {Id, _IdVersion, PidDHT, PidRT}}, State) ->
     OldRT = rt_loop:get_rt(State),
     {NewRT, NewERT} =
         case rt_lookup_node(Id, OldRT) of
@@ -969,7 +969,26 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 %-spec add_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) -> rt().
 -spec add_entry(mynode(), 'normal' | 'source' | 'sticky', rt()) -> rt().
 add_entry(Node, Type, RT) ->
-    entry_learning_and_filtering(Node, Type, RT).
+    %% TODO Optimize? Atm linear traversal of the RT
+    RTList = lists:map(fun rt_entry_node/1, rt_get_nodes(RT)),
+    %% check if a node with an identical PidDHT (3 element in mynode tuple)
+    %% already exists.
+    case lists:keyfind(pid_dht(Node), 3, RTList) of
+        false -> %% no node with same PidDHT exists -> add entry
+            entry_learning_and_filtering(Node, Type, RT);
+        OldNode -> %% node already exists in RT -> check id version
+            %% Only nodes with different id but same PidDHT are found here, nodes
+            %% with identical ids are already filtered out higher up. Nodes with
+            %% different id but same DHTPid can occur during slides/jumps.
+            case is_newer(Node, OldNode) of
+                false -> %% ignore node w/ outdated id version
+                    RT;
+                true -> %% remove the old (outdated) entry before adding the new one
+                    RT1 = entry_delete(id(OldNode), RT),
+                    entry_learning_and_filtering(Node, Type, RT1)
+            end
+    end.
+
 
 % @doc Add a sticky entry to the routing table
 -spec add_sticky_entry(Entry :: mynode(), rt()) -> rt().
@@ -1269,9 +1288,19 @@ pid_rt({_Id, _IdVersion, _PidDHT, PidRT}) -> PidRT.
 -spec id(Node::mynode()) -> key().
 id({Id, _IdVersion, _PidDHT, _PidRT}) -> Id.
 
-%% @doc Get the id_version from a mynode().
--spec id_version(Node::mynode()) -> key().
-id_version({_Id, IdVersion, _PidDHT, _PidRT}) when is_integer(_Id), is_integer(IdVersion)  -> IdVersion.
+%% @doc Determines whether Node1 is a newer instance of Node2.
+%%      Note: Both nodes need to share the same PidDHT, otherwise an exception of
+%%      type 'throw' is thrown! PidRT is ignored for the comparison.
+-spec is_newer(Node1::mynode(), Node2::mynode()) -> boolean().
+is_newer(_Node1 = {Id1, IdVersion1, PidDHT, _PidRT1},
+         _Node2 = {Id2, IdVersion2, PidDHT, _PidRT2}) ->
+    if
+        (IdVersion1 > IdVersion2) -> true;
+        IdVersion1 < IdVersion2 -> false;
+        Id1 =:= Id2 -> false;
+        true -> throw('got two nodes with same IDversion but different ID')
+    end.
+
 
 %% @doc Send Msg to the routing table.
 %%      Send directly if rt_loop pid is known, otherwise as group_member msg.
