@@ -917,19 +917,14 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
     Done =
-%%         case entry_num_newest(E3) of
-%%             E3NumAcks when 3 =< E3NumAcks -> %% we have three acks
-%%                 true; %% done
-%%             E3NumAcks -> false;
-%%             _ -> write_through %% 1 or 2 outdated replicas, so write_through
-%%         end,
-        if 3 =< E3NumAcks ->
-               %% we have three acks
-               case entry_num_newest(E3) of
-                   E3NumAcks -> true; %% done
-                   _ -> write_through
-               end;
-           true -> false
+        case (quorum_ok() =< E3NumAcks) of
+            true ->
+                %% we have majority of acks
+                case entry_num_newest(E3) of
+                    E3NumAcks -> true; %% done
+                    _ -> write_through
+                end;
+            _ -> false
         end,
      {Done, E3}.
 
@@ -949,7 +944,7 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    Done = (3 =< entry_num_acks(E2)),
+    Done = (quorum_ok() =< entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
@@ -967,9 +962,18 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = (2 =< entry_num_denies(E2)),
+    Done = (quorum_deny() =< entry_num_denies(E2)),
     {Done, E2}.
 
+-spec quorum_ok() -> pos_integer().
+quorum_ok() ->
+    R = config:read(replication_factor),
+    (R div 2) + 1.
+
+-spec quorum_deny() -> pos_integer().
+quorum_deny() ->
+    R = config:read(replication_factor),
+    (R div 2) + (R rem 2).
 
 -spec inform_client(qread_done | qwrite_done, entry()) -> ok.
 inform_client(Tag, Entry) ->
