@@ -574,7 +574,5 @@ set_or_delete_if_all_replied(Entry, Reps, Table) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(quorum_factor) and
-    config:cfg_is_greater_than(quorum_factor, 0) and
     config:cfg_is_integer(replication_factor) and
     config:cfg_is_greater_than(replication_factor, 0).
