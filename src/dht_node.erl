@@ -130,50 +130,16 @@ on({rt_update, RoutingTable}, State) ->
 % Transactions (see transactions/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_rtm, Source_PID, Key, Process}, State) ->
-    MyGroup = pid_groups:my_groupname(),
-    Pid = pid_groups:get_my(Process),
-    SupTx = pid_groups:get_my(sup_dht_node_core_tx),
-    NewPid =
-        if Pid =:= failed andalso SupTx =:= failed -> failed;
-           Pid =:= failed andalso
-           Process =/= tx_rtm0 andalso
-           Process =/= tx_rtm1 andalso
-           Process =/= tx_rtm2 andalso
-           Process =/= tx_rtm3 ->
-               %% start, if necessary
-               RTM_desc = sup:worker_desc(
-                            Process, tx_tm_rtm, start_link,
-                            [MyGroup, Process]),
-               case supervisor:start_child(SupTx, RTM_desc) of
-                   {ok, TmpPid} -> TmpPid;
-                   {ok, TmpPid, _} -> TmpPid;
-                   {error, {already_started, TmpPid}} -> TmpPid;
-                   {error, Reason} ->
-                       log:log(warn, "[ ~.0p ] tx_tm_rtm start_child failed: ~.0p~n",
-                               [comm:this(), Reason]),
-                       msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process}),
-                       failed
-               end;
-           true -> Pid
-        end,
-    case NewPid of
+    case pid_groups:get_my(Process) of
         failed ->
-            %% we are in the startup phase, processes will come up in a moment
-            if Process =:= tx_rtm0 orelse
-               Process =:= tx_rtm1 orelse
-               Process =:= tx_rtm2 orelse
-               Process =:= tx_rtm3 ->
-                    comm:send_local(self(),
-                                    {get_rtm, Source_PID, Key, Process});
-               true -> ok
-            end,
-            State;
-        _ ->
-            GPid = comm:make_global(NewPid),
+            log:log(warn, "[ ~.0p ] requested non-existing rtm ~.0p~n",
+                    [comm:this(), Process]);
+        Pid ->
+            GPid = comm:make_global(Pid),
             GPidAcc = comm:make_global(tx_tm_rtm:get_my(Process, acceptor)),
-            comm:send(Source_PID, {get_rtm_reply, Key, GPid, GPidAcc}),
-            State
-    end;
+            comm:send(Source_PID, {get_rtm_reply, Key, GPid, GPidAcc})
+    end,
+    State;
 
 %% messages handled as a transaction participant (TP)
 on({?init_TP, {_Tid, _RTMs, _Accs, _TM, _RTLogEntry, _ItemId, _PaxId, SnapNo} = Params}, State) ->
