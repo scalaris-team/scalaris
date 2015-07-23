@@ -215,7 +215,7 @@ on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
     %% the dht_node, the addressed use case is given in the third
     %% element by convention.
     DBKind = element(3, X),
-    PRBRState = dht_node_state:get_prbr_state(State, DBKind),
+    PRBRState = dht_node_state:get(State, DBKind),
     NewRBRState = prbr:on(X, PRBRState),
     dht_node_state:set_prbr_state(State, DBKind, NewRBRState);
 
