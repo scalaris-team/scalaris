@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris-examples-wiki
-Version: 0.8.2+git-1
+Version: 0.8.2-1
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all
 Standards-Version: 3.9.6
