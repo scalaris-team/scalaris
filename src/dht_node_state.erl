@@ -26,7 +26,7 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_MR_SLIDE(X,Y), ?TRACE(X, Y)).
 
--export([new/3, new_on_recover/12,
+-export([new/3, new_on_recover/6,
          delete_for_rejoin/1,
          get/2,
          dump/1,
@@ -44,7 +44,6 @@
          get_split_key/5,
          add_db_range/3, rm_db_range/2]).
 %% prbr DBs and states:
--export([get_prbr_state/2]).
 -export([set_prbr_state/3]).
 %% snapshots
 -export([set_snapshot_state/2]).
@@ -59,9 +58,8 @@
 
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
 
--type db_selector() :: kv |
-                       txid_1 | txid_2 | txid_3 | txid_4 |
-                       leases_1 | leases_2 | leases_3 | leases_4.
+-type db_selector() :: prbr_kv_db | {tx_id, pos_integer()} | {lease_db, pos_integer()}.
+
 -type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
               | succ_pid | predlist | pred | pred_id | pred_pid | node
               | node_id | my_range | db_range | succ_range | join_time
@@ -93,14 +91,8 @@
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
                 prbr_kv_db = ?required(state, prbr_kv_db) :: prbr:state(),
-                txid_db1 = ?required(state, txid_db1) :: prbr:state(),
-                txid_db2 = ?required(state, txid_db2) :: prbr:state(),
-                txid_db3 = ?required(state, txid_db3) :: prbr:state(),
-                txid_db4 = ?required(state, txid_db4) :: prbr:state(),
-                lease_db1 = ?required(state, lease_db1) :: prbr:state(),
-                lease_db2 = ?required(state, lease_db2) :: prbr:state(),
-                lease_db3 = ?required(state, lease_db3) :: prbr:state(),
-                lease_db4 = ?required(state, lease_db4) :: prbr:state(),
+                txid_dbs = ?required(state, txid_dbs) :: tuple(),
+                lease_dbs = ?required(state, lease_dbs) :: tuple(),
                 lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
                 snapshot_state   = null :: snapshot_state:snapshot_state() | null,
                 mr_state   = ?required(state, mr_state)  :: orddict:orddict(),
@@ -111,6 +103,8 @@
 
 -spec new(?RT:external_rt(), RMState::rm_loop:state(), db_dht:db()) -> state().
 new(RT, RMState, DB) ->
+    TxidDBs  = [prbr:init({txid, Id}) || Id <- lists:seq(1, config:read(replication_factor))],
+    LeaseDBs = [prbr:init({lease_db, Id}) || Id <- lists:seq(1, config:read(replication_factor))],
     #state{rt = RT,
            rm_state = RMState,
            join_time = os:timestamp(),
@@ -119,14 +113,8 @@ new(RT, RMState, DB) ->
            proposer = pid_groups:get_my({dht_node, proposer}),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = prbr:init(prbr_kv_db),
-           txid_db1 = prbr:init(txid_db1),
-           txid_db2 = prbr:init(txid_db2),
-           txid_db3 = prbr:init(txid_db3),
-           txid_db4 = prbr:init(txid_db4),
-           lease_db1 = prbr:init(lease_db1),
-           lease_db2 = prbr:init(lease_db2),
-           lease_db3 = prbr:init(lease_db3),
-           lease_db4 = prbr:init(lease_db4),
+           txid_dbs = erlang:make_tuple(config:read(replication_factor), TxidDBs),
+           lease_dbs = erlang:make_tuple(config:read(replication_factor), LeaseDBs),
            lease_list = lease_list:empty(),
            snapshot_state = snapshot_state:new(),
            mr_state = orddict:new(),
@@ -134,14 +122,14 @@ new(RT, RMState, DB) ->
           }.
 
 -spec new_on_recover(?RT:external_rt(), RMState::rm_loop:state(), 
-                     PRBR_KV_DB::prbr:state(), TXID_DB1::prbr:state(), TXID_DB2::prbr:state(), 
-                     TXID_DB3::prbr:state(), TXID_DB4::prbr:state(), Lease_DB1::prbr:state(), 
-                     Lease_DB2::prbr:state(), Lease_DB3::prbr:state(), Lease_DB4::prbr:state(),
+                     PRBR_KV_DB::prbr:state(),
+                     TXID_DBs::list(prbr:state()),
+                     Lease_DBs::list(prbr:state()),
                      LeaseList::lease_list:lease_list()) -> state().
 new_on_recover(RT, RMState, 
                PRBR_KV_DB,
-               TXID_DB1, TXID_DB2, TXID_DB3, TXID_DB4, 
-               Lease_DB1, Lease_DB2, Lease_DB3, Lease_DB4,
+               TXID_DBs,
+               Lease_DBs,
                LeaseList) ->
     #state{rt = RT,
            rm_state = RMState,
@@ -151,14 +139,8 @@ new_on_recover(RT, RMState,
            proposer = pid_groups:get_my({dht_node, proposer}),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = PRBR_KV_DB,
-           txid_db1 = TXID_DB1,
-           txid_db2 = TXID_DB2,
-           txid_db3 = TXID_DB3,
-           txid_db4 = TXID_DB4,
-           lease_db1 = Lease_DB1,
-           lease_db2 = Lease_DB2,
-           lease_db3 = Lease_DB3,
-           lease_db4 = Lease_DB4,
+           txid_dbs  = erlang:make_tuple(config:read(replication_factor), TXID_DBs),
+           lease_dbs = erlang:make_tuple(config:read(replication_factor), Lease_DBs),
            lease_list = LeaseList,
            snapshot_state = snapshot_state:new(),
            mr_state = orddict:new(),
@@ -169,22 +151,14 @@ new_on_recover(RT, RMState,
 -spec delete_for_rejoin(state()) -> ok.
 delete_for_rejoin(
   #state{db = DB, prbr_kv_db=PRBRState,
-         txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
-         lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4}) ->
+         txid_dbs=TXID_DBs, lease_dbs=Lease_DBs}) ->
     % note: rm_state is transferred (ref. move_state in rm_loop)
     % TODO: transfer snapshot state / data?!
     % TODO: transfer MR state / data?!
     db_dht:close_and_delete(DB),
     prbr:close_and_delete(PRBRState),
-    prbr:close_and_delete(TxIdDB1),
-    prbr:close_and_delete(TxIdDB2),
-    prbr:close_and_delete(TxIdDB3),
-    prbr:close_and_delete(TxIdDB4),
-    prbr:close_and_delete(LeaseDB1),
-    prbr:close_and_delete(LeaseDB2),
-    prbr:close_and_delete(LeaseDB3),
-    prbr:close_and_delete(LeaseDB4),
-    
+    [prbr:close_and_delete(element(I,TXID_DBs )) || I <- lists:seq(1,tuple_size(TXID_DBs))],
+    [prbr:close_and_delete(element(I,Lease_DBs)) || I <- lists:seq(1,tuple_size(Lease_DBs))],
     ok.
 
 %% @doc Gets the given property from the dht_node state.
@@ -253,22 +227,15 @@ delete_for_rejoin(
          (state(), rm_state) -> rm_loop:state();
          (state(), monitor_proc) -> pid();
          (state(), prbr_kv_db) -> prbr:state();
-         (state(), txid_db1) -> prbr:state();
-         (state(), txid_db2) -> prbr:state();
-         (state(), txid_db3) -> prbr:state();
-         (state(), txid_db4) -> prbr:state();
-         (state(), lease_db1) -> prbr:state();
-         (state(), lease_db2) -> prbr:state();
-         (state(), lease_db3) -> prbr:state();
-         (state(), lease_db4) -> prbr:state();
+         (state(), {tx_id, pos_integer()}) -> prbr:state();
+         (state(), {lease_db, pos_integer()}) -> prbr:state();
          (state(), lease_list) -> lease_list:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
-           txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
-           lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-		   snapshot_state=SnapState} = State, Key) ->
+           lease_list=LeaseList, txid_dbs = TXID_DBs, lease_dbs = LeaseDBs,
+           snapshot_state=SnapState} = State, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -317,44 +284,18 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load2        -> lb_stats:get_load_metric();
         load3        -> lb_stats:get_request_metric();
         prbr_kv_db   -> PRBRState;
-        txid_db1     -> TxIdDB1;
-        txid_db2     -> TxIdDB2;
-        txid_db3     -> TxIdDB3;
-        txid_db4     -> TxIdDB4;
-        lease_db1    -> LeaseDB1;
-        lease_db2    -> LeaseDB2;
-        lease_db3    -> LeaseDB3;
-        lease_db4    -> LeaseDB4;
+        {tx_id, I}   -> element(I, TXID_DBs);
+        {lease_db, I}-> element(I, LeaseDBs);
         lease_list   -> LeaseList
     end.
 
--spec get_prbr_state(state(), db_selector()) -> prbr:state().
-get_prbr_state(State, WhichDB) ->
-    case WhichDB of
-        kv -> get(State, prbr_kv_db);
-        txid_1 -> get(State, txid_db1);
-        txid_2 -> get(State, txid_db2);
-        txid_3 -> get(State, txid_db3);
-        txid_4 -> get(State, txid_db4);
-        leases_1 -> get(State, lease_db1);
-        leases_2 -> get(State, lease_db2);
-        leases_3 -> get(State, lease_db3);
-        leases_4 -> get(State, lease_db4)
-    end.
-
 -spec set_prbr_state(state(), db_selector(), prbr:state()) -> state().
-set_prbr_state(State, WhichDB, Value) ->
+set_prbr_state(State = #state{txid_dbs=TXID_DBs, lease_dbs = LeaseDBs}, 
+               WhichDB, Value) ->
     case WhichDB of
-        kv -> State#state{prbr_kv_db = Value};
-        %% tx_id ->    State#state{tx_id = Value};
-        txid_1 -> State#state{txid_db1 = Value};
-        txid_2 -> State#state{txid_db2 = Value};
-        txid_3 -> State#state{txid_db3 = Value};
-        txid_4 -> State#state{txid_db4 = Value};
-        leases_1 -> State#state{lease_db1 = Value};
-        leases_2 -> State#state{lease_db2 = Value};
-        leases_3 -> State#state{lease_db3 = Value};
-        leases_4 -> State#state{lease_db4 = Value}
+        prbr_kv_db -> State#state{prbr_kv_db = Value};
+        {tx_id, I} -> State#state{txid_dbs = setelement(I, TXID_DBs, Value)};
+        {lease_db, I} -> State#state{lease_dbs = setelement(I, LeaseDBs, Value)}
     end.
 
 -spec set_lease_list(state(), lease_list:lease_list()) -> state().
@@ -509,6 +450,12 @@ details(State) ->
     RTSize = get(State, rt_size),
     node_details:new(PredList, Node, SuccList, Load, Load2, Load3, Hostname, RTSize, erlang:memory(total)).
 
+-spec get_prbr_selectors() -> list(db_selector()).
+get_prbr_selectors() ->
+    TXIDs    = [{tx_id   , I} || I <- lists:seq(1, config:read(replication_factor))],
+    LeaseDBs = [{lease_db, I} || I <- lists:seq(1, config:read(replication_factor))],
+    [prbr_kv_db | lists:flatten(TXIDs, LeaseDBs)].
+
 %% @doc Gets all entries to transfer (slide) in the given range and starts delta
 %%      recording on the DB for changes in this interval.
 -spec slide_get_data_start_record(state(), MovingInterval::intervals:interval())
@@ -518,15 +465,13 @@ slide_get_data_start_record(State, MovingInterval) ->
     {T1State, MoveRBRData} =
         lists:foldl(
           fun(X, {AccState, AccData}) ->
-                  Old = get_prbr_state(State, X),
+                  Old = get(State, X),
                   MoveData = db_prbr:get_entries(Old, MovingInterval),
                   New = db_prbr:record_changes(Old, MovingInterval),
                   {set_prbr_state(AccState, X, New), [{X, MoveData} | AccData]}
           end,
           {State, []},
-          [kv,
-           txid_1, txid_2, txid_3, txid_4,
-           leases_1, leases_2, leases_3, leases_4]
+          get_prbr_selectors()
          ),
 
     %% snapshot state and db
@@ -571,7 +516,7 @@ slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     %% all prbr dbs
     lists:foldl(
       fun({X, XData}, AccState) ->
-              DB = get_prbr_state(AccState, X),
+              DB = get(AccState, X),
               NewDB = db_prbr:add_data(DB, XData),
               set_prbr_state(AccState, X, NewDB)
       end,
@@ -587,14 +532,12 @@ slide_take_delta_stop_record(State, MovingInterval) ->
     DeltaRBR =
         lists:foldl(
           fun(X, AccData) ->
-                  DB = get_prbr_state(State, X),
+                  DB = get(State, X),
                   Delta = db_prbr:get_changes(DB, MovingInterval),
                   [{X, Delta} | AccData]
           end,
           [],
-          [kv,
-           txid_1, txid_2, txid_3, txid_4,
-           leases_1, leases_2, leases_3, leases_4]
+          get_prbr_selectors()
          ),
 
     %% db
@@ -622,7 +565,7 @@ slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
     %% all prbr dbs
     lists:foldl(
       fun({X, {XData, DelKeys}}, AccState) ->
-              DB = get_prbr_state(AccState, X),
+              DB = get(AccState, X),
               TDB = db_prbr:add_data(DB, XData),
               NewDB = db_prbr:delete_entries(
                         TDB,
@@ -641,7 +584,7 @@ slide_stop_record(State, MovingInterval, Remove) ->
     T1State =
         lists:foldl(
           fun(X, AccState) ->
-                  DB = get_prbr_state(AccState, X),
+                  DB = get(AccState, X),
                   TDB = db_prbr:stop_record_changes(DB, MovingInterval),
                   XDB =
                       if Remove -> db_prbr:delete_entries(TDB, MovingInterval);
@@ -650,9 +593,7 @@ slide_stop_record(State, MovingInterval, Remove) ->
                   set_prbr_state(AccState, X, XDB)
           end,
           State,
-          [kv,
-           txid_1, txid_2, txid_3, txid_4,
-           leases_1, leases_2, leases_3, leases_4]
+          get_prbr_selectors()
          ),
 
     NewDB1 = db_dht:stop_record_changes(get(T1State, db), MovingInterval),
