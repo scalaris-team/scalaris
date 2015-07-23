@@ -2,7 +2,21 @@ scalaris (0.8.2+git-1) unstable; urgency=low
 
   * git snapshot from master
 
- -- Nico Kruber <kruber@zib.de>  Sun, 12 Jul 2015 12:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 24 Jul 2015 12:00:00 +0200
+
+scalaris (0.8.2-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+  * Business Logic:
+    - rrepair: minor performance improvements
+  * Bugs:
+    - rrepair: fix a rare crash due to hash collisions
+    - rrepair: fix calculation of the next MaxItemCount in the merkle tree
+               repair protocol (was one level behind)
+    - tests: fix rare crashes in some unit tests
+    - fix a few more minor bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 24 Jul 2015 12:00:00 +0200
 
 scalaris (0.8.1-1) stable; urgency=low
 

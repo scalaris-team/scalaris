@@ -1,3 +1,18 @@
+Scalaris 0.8.2 - July 24, 2015
+============================================================
+(partly supported by the EU project IES Cities http://iescities.eu/)
+
+Business Logic:
+- rrepair: minor performance improvements
+
+Bugs:
+
+- rrepair: fix a rare crash due to hash collisions
+- rrepair: fix calculation of the next MaxItemCount in the merkle tree
+           repair protocol (was one level behind)
+- tests: fix rare crashes in some unit tests
+- fix a few more minor bugs
+
 Scalaris 0.8.1 - July 12, 2015
 ============================================================
 (partly supported by the EU project IES Cities http://iescities.eu/)
