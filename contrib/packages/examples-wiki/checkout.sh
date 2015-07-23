@@ -6,10 +6,13 @@ name="scalaris" # folder base name (without version)
 pkg_name="scalaris-examples-wiki" # package name
 url="https://github.com/scalaris-team/scalaris.git"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
-# MODE: snapshot | tag
-MODE=snapshot
 
 #####
+if [[ "$SCALARIS_VERSION" == *git* ]]; then
+  MODE="unstable"
+else
+  MODE="tag"
+fi
 
 if [ "$MODE" = "snapshot" ] ; then
   folder="${name}"
