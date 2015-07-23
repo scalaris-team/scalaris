@@ -27,9 +27,11 @@
          get_recoverable_dbs/0, parse_table_name/1]).
 
 %% @doc Initializes a new database.
--spec get_name(DBName::nonempty_string() | atom()) -> nonempty_string().
+-spec get_name(DBName::nonempty_string() | atom() | tuple()) -> nonempty_string().
 get_name(DBName) when is_atom(DBName) ->
     get_name(erlang:atom_to_list(DBName));
+get_name(DBName = {Name, Id}) when is_tuple(DBName) ->
+    get_name(erlang:atom_to_list(Name) ++ "-" ++ erlang:integer_to_list(Id));
 get_name(DBName) ->
     ?DBG_ASSERT(not lists:member($+, DBName)),
     RandomName = randoms:getRandomString(),

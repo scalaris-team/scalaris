@@ -81,7 +81,7 @@
 %%%%%%
 
 %% @doc Initializes a new database.
--spec new(nonempty_string() | atom()) -> db().
+-spec new(nonempty_string() | atom() | tuple()) -> db().
 new(DBName) ->
   DBNameNew = db_util:get_name(DBName),
   SubscrName = db_util:get_subscriber_name(DBNameNew),
