@@ -1,4 +1,4 @@
-%% @copyright 2009-2014 Zuse Institute Berlin
+%% @copyright 2009-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -72,11 +72,13 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo}, DHT_Node_S
                         rdht_tx_write:validate(DB, LocalSnapNumber, RTLogEntry)
                 end,
             %% initiate a paxos proposer round 0 with the proposal
+            R = config:read(replication_factor),
             Proposer = comm:make_global(dht_node_state:get(DHT_Node_State,
                                                            proposer)),
             proposer:start_paxosid(Proposer, PaxId,
                                    _Acceptors = Accs, Proposal,
-                                   _Maj = 3, _MaxProposers = 5,
+                                   _Maj = quorum:majority_for_accept(R),
+                                   _MaxProposers = R + 1, %% rtms + client
                                    0),
             %% send registerTP to each RTM (send with it the learner id)
             This = comm:this(),
