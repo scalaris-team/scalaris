@@ -122,7 +122,7 @@ noop_read_filter(X) -> X.
 noop_write_filter(_, _, X) -> X.
 
 %% initialize: return initial state.
--spec init(atom()) -> state().
+-spec init(atom() | tuple()) -> state().
 init(DBName) -> ?PDB:new(DBName).
 
 %% @doc Closes the given DB (it may be recoverable using open/1 depending on
