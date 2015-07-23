@@ -916,8 +916,9 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
+    R = config:read(replication_factor),
     Done =
-        case (quorum_ok() =< E3NumAcks) of
+        case (quorum:majority_for_accept(R) =< E3NumAcks) of
             true ->
                 %% we have majority of acks
                 case entry_num_newest(E3) of
@@ -944,12 +945,14 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    Done = (quorum_ok() =< entry_num_acks(E2)),
+    R = config:read(replication_factor),
+    Done = (quorum:majority_for_accept(R) =< entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), entry()}.
 add_write_deny(Entry, Round, _Cons) ->
+    R = config:read(replication_factor),
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
@@ -962,18 +965,8 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = (quorum_deny() =< entry_num_denies(E2)),
+    Done = (quorum:majority_for_deny(R) =< entry_num_denies(E2)),
     {Done, E2}.
-
--spec quorum_ok() -> pos_integer().
-quorum_ok() ->
-    R = config:read(replication_factor),
-    (R div 2) + 1.
-
--spec quorum_deny() -> pos_integer().
-quorum_deny() ->
-    R = config:read(replication_factor),
-    (R div 2) + (R rem 2).
 
 -spec inform_client(qread_done | qwrite_done, entry()) -> ok.
 inform_client(Tag, Entry) ->
