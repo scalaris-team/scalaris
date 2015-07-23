@@ -174,21 +174,18 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 erase_lease_dbs(Node) ->
     F = fun(State) ->
-                State1 = dht_node_state:set_prbr_state(State , leases_1, prbr:init(lease_db1)),
-                State2 = dht_node_state:set_prbr_state(State1, leases_2, prbr:init(lease_db2)),
-                State3 = dht_node_state:set_prbr_state(State2, leases_3, prbr:init(lease_db3)),
-                State4 = dht_node_state:set_prbr_state(State3, leases_4, prbr:init(lease_db4)),
-                State4
+                LeaseDBs = [{lease_db, I} || I <- lists:seq(1, config:read(replication_factor))],
+                lists:foldl(fun (DB, Acc) ->
+                                    dht_node_state:set_prbr_state(Acc, DB, prbr:init(DB))
+                            end, State, LeaseDBs)
         end,
     change_node_state(Node, F).
 
 
 change_lease_replicas(Node) ->
     F = fun(State) ->
-                reset_read_and_write_rounds(State, leases_1, lease_db1),
-                reset_read_and_write_rounds(State, leases_2, lease_db2),
-                reset_read_and_write_rounds(State, leases_3, lease_db3),
-                reset_read_and_write_rounds(State, leases_4, lease_db4),
+                [reset_read_and_write_rounds(State, {lease_db, I})
+                 || I <- lists:seq(1, config:read(replication_factor))],
                 State
         end,
     change_node_state(Node, F).
@@ -203,10 +200,8 @@ change_node_state(Node, F) ->
 change_owner_pids(DHTNodes) ->
     Self = comm:this(),
     F = fun(State) ->
-                change_owner_pid(Self, State, leases_1, lease_db1),
-                change_owner_pid(Self, State, leases_2, lease_db2),
-                change_owner_pid(Self, State, leases_3, lease_db3),
-                change_owner_pid(Self, State, leases_4, lease_db4),
+                [change_owner_pid(Self, State, {lease_db, I})
+                 || I <- lists:seq(1, config:read(replication_factor))],
                 State
         end,
     lists:foreach(fun (Node) ->
@@ -224,7 +219,7 @@ change_owner_pids(DHTNodes) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-change_owner_pid(Pid, State, DBName, _PRBRName) ->
+change_owner_pid(Pid, State, DBName) ->
     LeaseDB = dht_node_state:get_prbr_state(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
     _ = [ 
@@ -241,7 +236,7 @@ change_owner_pid(Pid, State, DBName, _PRBRName) ->
     ok.
 
 
-reset_read_and_write_rounds(State, DBName, _PRBRName) ->
+reset_read_and_write_rounds(State, DBName) ->
     LeaseDB = dht_node_state:get_prbr_state(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
     _ = [ 
