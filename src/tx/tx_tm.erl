@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -586,8 +586,6 @@ state_inc_opentxnum(State) -> setelement(3, State, element(3, State) + 1).
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(quorum_factor) and
-    config:cfg_is_greater_than(quorum_factor, 0) and
     config:cfg_is_integer(replication_factor) and
     config:cfg_is_greater_than(replication_factor, 0)
     .

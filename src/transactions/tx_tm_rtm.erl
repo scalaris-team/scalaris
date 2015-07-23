@@ -241,7 +241,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
            [TransLog, state_get_role(State)]),
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
-    Maj = config:read(quorum_factor),
+    Maj = quorum:majority_for_accept(config:read(replication_factor)),
     GLLearner = state_get_gllearner(State),
     TLogUid = uid:get_global_uid(),
     NewTid = {?tx_id, TLogUid},
@@ -559,7 +559,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
         new -> ok; %% takeover is not necessary. Was finished successfully.
         _Any ->
             log:log(info, "Takeover by RTM was necessary."),
-            Maj = config:read(quorum_factor),
+            Maj = quorum:majority_for_accept(config:read(replication_factor)),
             RTMs = tx_state_get_rtms(TxState),
             Role = state_get_role(State),
             ValidAccs = rtms_get_valid_accpids(RTMs),
@@ -1220,8 +1220,6 @@ is_tx_state(_) -> false.
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(quorum_factor) and
-    config:cfg_is_greater_than(quorum_factor, 0) and
     config:cfg_is_integer(replication_factor) and
     config:cfg_is_greater_than(replication_factor, 0) and
 
