@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.8.1+git"
+SCALARIS_VERSION="0.8.2+git"
 date=`date +"%Y%m%d.%H%M"`
 name="scalaris" # folder base name (without version)
 pkg_name="scalaris" # package name

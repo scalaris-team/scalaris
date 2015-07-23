@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.65)
-AC_INIT(scalaris, 0.8.1+git, scalaris@googlegroups.com)
+AC_INIT(scalaris, 0.8.2+git, scalaris@googlegroups.com)
 
 EMAKEFILEDEFINES=
 EDOCMACROS=
