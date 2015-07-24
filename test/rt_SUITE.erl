@@ -84,7 +84,6 @@ next_hop(_Config) ->
     % which will fail here -> however, we don't need this process
     DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
-    config:write(rt_size_use_neighbors, 0),
 
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, succ]), % succ is responsible
@@ -121,7 +120,6 @@ next_hop2(_Config) ->
     % which will fail here -> however, we don't need this process
     DB = db_dht:new(db_dht),
     State = dht_node_state:new(RT, RMState, DB),
-    config:write(rt_size_use_neighbors, 10),
 
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 0, node:pidX(Pred)]),
     call_helper_fun(check_next_hop, [State, node:pidX(Succ), 1, succ]), % succ is responsible

@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
--dialyzer([{no_return, [next_hop_setup/0, next_hop_no_neighbors/1, next_hop_with_neighbors/1]},
+-dialyzer([{no_return, [next_hop_setup/0, next_hop_with_neighbors/1]},
            {no_fail_call, next_hop_setup/0}]).
 
 all() ->
@@ -77,7 +77,7 @@ suite() ->
     ].
 
 groups() ->
-    [{with_config, [sequence], [next_hop_no_neighbors, next_hop_with_neighbors]}].
+    [{with_config, [sequence], [next_hop_with_neighbors]}].
 
 init_per_suite(Config) ->
     Config.
@@ -156,7 +156,7 @@ ets_ordset_insert2(_Config) ->
 ets_ordset_foldl(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                       ets:foldl(fun(_E, _Acc) -> ok end, ok, Table)
@@ -167,7 +167,7 @@ ets_ordset_foldl(_Config) ->
 ets_ordset_next_iteration(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                       Keys = ets_next(Table, ets:first(Table), []),
@@ -177,13 +177,13 @@ ets_ordset_next_iteration(_Config) ->
     ok.
 
 ets_next(_Table, '$end_of_table', Acc) -> Acc;
-ets_next(Table, Key, Acc) -> 
+ets_next(Table, Key, Acc) ->
     ets_next(Table, ets:next(Table, Key), [Key | Acc]).
 
 ets_ordset_lists_foldl(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                       List = ets:tab2list(Table),
@@ -195,7 +195,7 @@ ets_ordset_lists_foldl(_Config) ->
 ets_ordset_match(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                       List = ets:match(Table, {'$1', '_', '_', '_', '_'}),
@@ -208,7 +208,7 @@ ets_ordset_match_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
-                                                                      * 2)], 
+                                                                      * 2)],
     ets:insert(Table, Data),
     iter(10, fun() ->
                      {List, _Cont} = ets:match(Table, {'$1', '_', '_', '_', '_'},
@@ -221,7 +221,7 @@ ets_ordset_match_with_limit(_Config) ->
 ets_ordset_select(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                       List = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
@@ -236,7 +236,7 @@ ets_ordset_select_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
-                                                                      * 2)], 
+                                                                      * 2)],
     ets:insert(Table, Data),
     iter(10, fun() ->
                      {List, _Cont} = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
@@ -251,7 +251,7 @@ ets_ordset_select_with_limit(_Config) ->
 ets_ordset_select_with_guards(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
-                                                                      data_count())], 
+                                                                      data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
                      End = data_count() -1,
@@ -268,7 +268,7 @@ ets_ordset_select_with_guards_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
     Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
-                                                                      * 2)], 
+                                                                      * 2)],
     ets:insert(Table, Data),
     iter(10, fun() ->
                      End = data_count() -1,
@@ -437,29 +437,22 @@ next_hop_setup() ->
                gb_trees:enter(102, node:new(?PID(102), 102, 0),
                 gb_trees:enter(103, node:new(?PID(103), 103, 0),
                  rt_chord:empty_ext(nodelist:new_neighborhood(Me, Succ)))))))))),
-    RMState = rm_loop:unittest_create_state(
-               nodelist:add_nodes(
+    %% RMState = rm_loop:unittest_create_state(
+    Neighborhood= nodelist:add_nodes(
                 nodelist:new_neighborhood(Pred, Me, Succ),
                  [node:new(?PID(Id + 2), Id + 2, 0)
                   || Id <- lists:seq(2, config:read(succ_list_length))] ++
                      [node:new(?PID(1022 - Id), 1022 - Id, 0)
                       || Id <- lists:seq(2, config:read(pred_list_length))],
                  config:read(succ_list_length), config:read(pred_list_length)),
-                false),
-    _State = dht_node_state:new(RT, RMState, db).
-
-next_hop_no_neighbors(_Config) ->
-    State = next_hop_setup(),
-    config:write(rt_size_use_neighbors, 0),
-    iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) no neighbors"),
-    iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) no neighbors"),
-    ok.
+                %% false),
+    %% _State = dht_node_state:new(RT, RMState, db).
+    {Neighborhood, RT}.
 
 next_hop_with_neighbors(_Config) ->
-    State = next_hop_setup(),
-    config:write(rt_size_use_neighbors, 10),
-    iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) with neighbors"),
-    iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) with neighbors"),
+    {Neighbors, RT}  = next_hop_setup(),
+    iter(count(), fun() -> rt_chord:next_hop(Neighbors, RT, 42) end, "next_hop(42) with neighbors"),
+    iter(count(), fun() -> rt_chord:next_hop(Neighbors, RT, 5) end, "next_hop(5) with neighbors"),
     ok.
 
 pid_groups_lookup(_Config) ->
