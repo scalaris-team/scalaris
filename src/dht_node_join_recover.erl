@@ -27,12 +27,9 @@
 -spec join(Options::[tuple()]) -> dht_node_state:state().
 join(Options) ->
     % 1. get old lease databases
-    Lease_DB1 = get_db(Options, lease_db1),
-    Lease_DB2 = get_db(Options, lease_db2),
-    Lease_DB3 = get_db(Options, lease_db3),
-    Lease_DB4 = get_db(Options, lease_db4),
+    LeaseDBs = [get_db(Options, erlang:list_to_existing_atom("lease_db-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
     % 2. find old leases
-    LeaseList = lease_recover:recover(Lease_DB1, Lease_DB2, Lease_DB3, Lease_DB4),
+    LeaseList = lease_recover:recover(LeaseDBs),
     % 3. create state with old mnesias
     MyId = l_on_cseq:get_id(lease_list:get_active_lease(LeaseList)),
     Me = node:new(comm:this(), MyId, 0), 
@@ -40,16 +37,9 @@ join(Options) ->
     EmptyRT = ?RT:empty_ext(Neighbors), % only for rt_chord
     RMState = rm_loop:init(Me, Me, Me, null),
     PRBR_KV_DB = get_db(Options, prbr_kv_db),
-    TXID_DB1  = get_db(Options, txid_db1),
-    TXID_DB2  = get_db(Options, txid_db2),
-    TXID_DB3  = get_db(Options, txid_db3),
-    TXID_DB4  = get_db(Options, txid_db4),
+    TXID_DBs = [get_db(Options, erlang:list_to_existing_atom("txid-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
     State = dht_node_state:new_on_recover(EmptyRT, RMState,
-                               PRBR_KV_DB,
-                               TXID_DB1, TXID_DB2, TXID_DB3, TXID_DB4, 
-                               Lease_DB1, Lease_DB2, Lease_DB3, Lease_DB4,
-                               LeaseList
-                               ),
+                               PRBR_KV_DB, TXID_DBs, LeaseDBs, LeaseList),
     % 3. after the leases are known, we can start ring-maintenance and routing
     % 4. now we can try to refresh the local leases
     msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),

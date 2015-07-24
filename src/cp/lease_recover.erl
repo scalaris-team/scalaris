@@ -23,12 +23,11 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--export([recover/4]).
+-export([recover/1]).
 
--spec recover(prbr:state(), prbr:state(), prbr:state(), prbr:state()) -> lease_list:lease_list().
-recover(Leases1, Leases2, Leases3, Leases4) ->
-    AllLeases = lists:append([prbr:tab2list(Leases4), prbr:tab2list(Leases3),
-                              prbr:tab2list(Leases2), prbr:tab2list(Leases1)]),
+-spec recover(list(prbr:state())) -> lease_list:lease_list().
+recover(LeaseDBs) ->
+    AllLeases = lists:append([prbr:tab2list(DB) || DB <- LeaseDBs]),
     Candidates = [L || {Id, L} <- AllLeases,
                        L =/= prbr_bottom, %% ??
                        Id =:= l_on_cseq:get_id(L), %% is first replica?

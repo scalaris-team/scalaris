@@ -69,7 +69,7 @@ childs([DHTNodeGroup, Options]) ->
                    start_link,
                    [DHTNodeGroup,
                     _PidGroupsNameKV = kv_rbrcseq,
-                    _DBSelectorKV = kv]),
+                    _DBSelectorKV = prbr_kv_db]),
     %% rbrcseq process working on the lease_db1 DB
     Lease_RBRcseqs = [sup:worker_desc(
                    {lease_db, Id}, rbrcseq,
