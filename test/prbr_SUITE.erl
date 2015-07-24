@@ -327,7 +327,7 @@ modify_rbr_at_key(R, N) ->
                    %% let fill in whether lookup was consistent
                    LookupReadEnvelope = dht_node_lookup:envelope(
                                           4,
-                                          {prbr, read, kv, '_', comm:this(),
+                                          {prbr, read, prbr_kv_db, '_', comm:this(),
                                            Repl, unittest_rbr_consistency1_id,
                                            fun prbr:noop_read_filter/1}),
                    comm:send_local(pid_groups:find_a(dht_node),
@@ -343,7 +343,7 @@ modify_rbr_at_key(R, N) ->
     %% let fill in whether lookup was consistent
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
-                            {prbr, write, kv, '_', comm:this(),
+                            {prbr, write, prbr_kv_db, '_', comm:this(),
                              R, HighestRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
@@ -359,9 +359,9 @@ modify_rbr_at_key(R, N) ->
 drop_prbr_read_request(Client, Tag) ->
     fun (Message, _State) ->
             case Message of
-%%                {prbr, _, kv, ReqClient, Key, _Round, _RF} ->
+%%                {prbr, _, prbr_kv_db, ReqClient, Key, _Round, _RF} ->
                 _ when element(1, Message) =:= prbr
-                       andalso element(3, Message) =:= kv ->
+                       andalso element(3, Message) =:= prbr_kv_db ->
                     ct:pal("Detected read, dropping it ~p, key ~p~n",
                            [self(), element(5, Message)]),
                     comm:send_local(Client, {Tag, done}),
