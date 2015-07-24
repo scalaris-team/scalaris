@@ -220,7 +220,7 @@ change_owner_pids(DHTNodes) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 change_owner_pid(Pid, State, DBName) ->
-    LeaseDB = dht_node_state:get_prbr_state(State, DBName),
+    LeaseDB = dht_node_state:get(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
     _ = [ 
       prbr:set_entry({Key, 
@@ -237,7 +237,7 @@ change_owner_pid(Pid, State, DBName) ->
 
 
 reset_read_and_write_rounds(State, DBName) ->
-    LeaseDB = dht_node_state:get_prbr_state(State, DBName),
+    LeaseDB = dht_node_state:get(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
     _ = [ 
       prbr:set_entry({Key, 
