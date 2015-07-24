@@ -1258,8 +1258,8 @@ check_well_connectedness(RT) ->
 node2mynode(Node) -> node2mynode(Node, none).
 
 %% @doc Transform a node:node_type() to mynode().
--spec node2mynode(Node::node:node_type(), PidRT::comm:mypid()) -> mynode().
-node2mynode(Node={node, _, _, _, _}, PidRT) ->
+-spec node2mynode(Node::node:node_type(), PidRT::comm:mypid() | none) -> mynode().
+node2mynode(Node, PidRT) ->
     {node:id(Node), node:id_version(Node), node:pidX(Node), PidRT}.
 
 %% @doc Get the id from a mynode().
