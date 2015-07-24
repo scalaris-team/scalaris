@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.2
+%define pkg_version 0.8.2+git
 Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
