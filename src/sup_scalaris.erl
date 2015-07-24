@@ -187,7 +187,7 @@ childs(Options) ->
 
     ServicePaxosGroup = sup:supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
-                          [{ServiceGroup, [{sup_paxos_parent, ServiceGroup}]}]),
+                          [{ServiceGroup, []}]),
     AutoscaleServer =
         case (config:read(autoscale_server) =:= true) andalso
                  StartMgmtServer of

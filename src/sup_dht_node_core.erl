@@ -57,8 +57,7 @@ supspec(_) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([DHTNodeGroup, Options]) ->
     PaxosProcesses = sup:supervisor_desc(sup_paxos, sup_paxos,
-                                              start_link, [{DHTNodeGroup,
-                                                            [{sup_paxos_parent, dht_node}]}]),
+                                              start_link, [{DHTNodeGroup, []}]),
     DHTNodeModule = config:read(dht_node),
     DHTNode = sup:worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
@@ -80,11 +79,11 @@ childs([DHTNodeGroup, Options]) ->
         || Id <- lists:seq(1, config:read(replication_factor))],
 
     Tx_RBRcseqs = [sup:worker_desc(
-                   {txid_db, Id}, rbrcseq,
+                   {tx_id, Id}, rbrcseq,
                    start_link,
                    [DHTNodeGroup,
-                    _PidGroupsNameL1 = {txid_db, Id},
-                    _DBSelectorL1 = {txid_db, Id}])
+                    _PidGroupsNameL1 = {tx_id, Id},
+                    _DBSelectorL1 = {tx_id, Id}])
                    || Id <- lists:seq(1, config:read(replication_factor))],
 
     DHTNodeMonitor = sup:worker_desc(

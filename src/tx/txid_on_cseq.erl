@@ -55,13 +55,13 @@ read(Key, ReplyTo) ->
     %% decide which db is responsible, ie. if the key is from
     %% the first quarter of the ring, use lease_db1, if from 2nd
     %% quarter -> use lease_db2, ...
-    DB = rbrcseq:get_db_for_id(txid_db, Key),
+    DB = rbrcseq:get_db_for_id(tx_id, Key),
     %% perform qread
     rbrcseq:qread(DB, ReplyTo, Key).
 
 -spec new(txid(), [client_key()], comm:erl_local_pid()) -> ok.
 new(Key, InvolvedKeys, ReplyTo) ->
-    DB = rbrcseq:get_db_for_id(txid_db, Key),
+    DB = rbrcseq:get_db_for_id(tx_id, Key),
     Value = new_entry(Key, InvolvedKeys, comm:make_global(ReplyTo)),
     RBRCseqPid = comm:make_global(pid_groups:find_a(DB)),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
@@ -71,7 +71,7 @@ new(Key, InvolvedKeys, ReplyTo) ->
 -spec decide(txid(), commit | abort, comm:erl_local_pid(),
              pr:pr(), any()) -> ok.
 decide(Key, Decision, ReplyTo, Round, OldVal) ->
-    DB = rbrcseq:get_db_for_id(txid_db, Key),
+    DB = rbrcseq:get_db_for_id(tx_id, Key),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
                         fun txid_on_cseq:is_valid_decide/3, Decision,
                         Round, OldVal).
