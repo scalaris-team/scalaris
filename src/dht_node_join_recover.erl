@@ -27,7 +27,7 @@
 -spec join(Options::[tuple()]) -> dht_node_state:state().
 join(Options) ->
     % 1. get old lease databases
-    LeaseDBs = [get_db(Options, erlang:list_to_existing_atom("lease_db-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
+    LeaseDBs = [get_db(Options, erlang:list_to_atom("lease_db-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
     % 2. find old leases
     LeaseList = lease_recover:recover(LeaseDBs),
     % 3. create state with old mnesias
@@ -37,7 +37,7 @@ join(Options) ->
     EmptyRT = ?RT:empty_ext(Neighbors), % only for rt_chord
     RMState = rm_loop:init(Me, Me, Me, null),
     PRBR_KV_DB = get_db(Options, prbr_kv_db),
-    TXID_DBs = [get_db(Options, erlang:list_to_existing_atom("txid-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
+    TXID_DBs = [get_db(Options, erlang:list_to_atom("tx_id-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
     State = dht_node_state:new_on_recover(EmptyRT, RMState,
                                PRBR_KV_DB, TXID_DBs, LeaseDBs, LeaseList),
     % 3. after the leases are known, we can start ring-maintenance and routing
