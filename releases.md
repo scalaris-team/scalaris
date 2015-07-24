@@ -9,6 +9,21 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
+## Scalaris 0.8.2 - July 24, 2015 - [scalaris-0.8.2.tar.gz](https://github.com/scalaris-team/scalaris/archive/0.8.2.tar.gz)
+
+(partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/))
+
+#### Business Logic:
+
+ * rrepair: minor performance improvements
+
+#### Bugs:
+
+ * rrepair: fix a rare crash due to hash collisions
+ * rrepair: fix calculation of the next MaxItemCount in the merkle tree repair protocol (was one level behind)
+ * tests: fix rare crashes in some unit tests
+ * fix a few more minor bugs
+
 ## Scalaris 0.8.1 - July 12, 2015 - [scalaris-0.8.1.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.8.1.tar.gz/download)
 
 (partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/))
