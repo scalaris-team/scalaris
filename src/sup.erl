@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -221,7 +221,7 @@ show_child(Prefix, Child) ->
 
 last_prefix_to_space([LastElem]) ->
     [[case X of
-         $+ -> $ 
+         $+ -> $
      end || X <- LastElem]];
 last_prefix_to_space([X | T]) ->
     [X | last_prefix_to_space(T)].
@@ -254,21 +254,21 @@ progress(Fmt, Args) ->
     ok.
 
 %% @doc Creates a worker description for a supervisor.
--spec worker_desc(Name::atom() | string(), Module::module(), Function::atom())
+-spec worker_desc(Name::atom() | string() | {atom(), pos_integer()}, Module::module(), Function::atom())
         -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
             permanent, brutal_kill, worker, []}.
 worker_desc(Name, Module, Function) ->
     worker_desc(Name, Module, Function, []).
 
 %% @doc Creates a worker description for a supervisor.
--spec worker_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
+-spec worker_desc(Name::atom() | string() | {atom(), pos_integer()}, Module::module(), Function::atom(), Options::list())
         -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
             permanent, brutal_kill, worker, []}.
 worker_desc(Name, Module, Function, Options) ->
     {Name, {Module, Function, Options}, permanent, brutal_kill, worker, []}.
 
 %% @doc Creates a supervisor description for a supervisor.
--spec supervisor_desc(Name::atom() | string(), Module::module(), Function::atom())
+-spec supervisor_desc(Name::atom() | string() | {atom(), pos_integer()}, Module::module(), Function::atom())
         -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
             permanent, brutal_kill, supervisor, []}.
 supervisor_desc(Name, Module, Function) ->
