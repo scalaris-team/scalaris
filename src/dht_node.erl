@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -132,8 +132,17 @@ on({rt_update, RoutingTable}, State) ->
 on({get_rtm, Source_PID, Key, Process}, State) ->
     case pid_groups:get_my(Process) of
         failed ->
-            log:log(warn, "[ ~.0p ] requested non-existing rtm ~.0p~n",
-                    [comm:this(), Process]);
+            R = config:read(replication_factor),
+            case Process of
+                {tx_rtm,X} when X =< R ->
+                    %% these rtms are concurrently started by the supervisor
+                    %% we just have to wait a bit...
+                    comm:send_local(self(),
+                                    {get_rtm, Source_PID, Key, Process});
+                _ ->
+                    log:log(warn, "[ ~.0p ] requested non-existing rtm ~.0p~n",
+                            [comm:this(), Process])
+            end;
         Pid ->
             GPid = comm:make_global(Pid),
             GPidAcc = comm:make_global(tx_tm_rtm:get_my(Process, acceptor)),
