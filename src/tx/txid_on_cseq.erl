@@ -78,7 +78,7 @@ decide(Key, Decision, ReplyTo, Round, OldVal) ->
 
 -spec delete(txid(), comm:erl_local_pid()) -> ok.
 delete(Key, ReplyTo) ->
-    DB = rbrcseq:get_db_for_id(Key),
+    DB = rbrcseq:get_db_for_id(tx_id, Key),
     rbrcseq:qwrite(DB, ReplyTo, Key,
                    fun txid_on_cseq:is_valid_delete/3, prbr_bottom).
 
