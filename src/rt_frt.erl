@@ -467,7 +467,7 @@ handle_custom_message({rt_get_neighbor, From}, State) ->
     comm:send(From, {rt_learn_neighbor, node2mynode(MyNode, comm:this())}),
     State;
 
-handle_custom_message({rt_learn_neighbor, {Id, _IdVersion, PidDHT, PidRT}}, State) ->
+handle_custom_message({rt_learn_neighbor, {Id, IdVersion, PidDHT, PidRT}}, State) ->
     OldRT = rt_loop:get_rt(State),
     {NewRT, NewERT} =
         case rt_lookup_node(Id, OldRT) of
@@ -482,9 +482,15 @@ handle_custom_message({rt_learn_neighbor, {Id, _IdVersion, PidDHT, PidRT}}, Stat
             %% only update the RT if the PidRT is unknown
             {value, OldEntry} ->
                 OldNode = rt_entry_node(OldEntry),
-                case OldNode =:= {Id, PidDHT, none} of
+                case OldNode =:= {Id, IdVersion, PidDHT, none} of
                     true ->
-                        RT = rt_update_pid(OldRT, {id(OldNode), PidDHT, PidRT}),
+                        %% update the rt pid
+                        OldEntry= rt_get_node(Id, OldRT),
+                        NewNode = {Id, IdVersion, PidDHT, PidRT},
+                        NewEntry = rt_entry_set_node(OldEntry, NewNode),
+                        OldNodeTree = get_rt_tree(OldRT),
+                        NewNodeTree = gb_trees:update(Id, NewEntry, OldNodeTree),
+                        RT = rt_set_nodes(OldRT, NewNodeTree),
                         ERT = check(OldRT, RT, rt_loop:get_ert(State),
                                     rt_loop:get_neighb(State), true),
                         %% print_debug(true, OldNode, {Id, PidDHT, PidRT}, ERT),
@@ -1029,18 +1035,10 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 -spec rt_set_ring_size(RT :: rt(), Size :: unknown | float()) -> rt().
 rt_set_ring_size(#rt_t{}=RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
--spec rt_update_pid(RT::rt(), NewNode::mynode()) -> rt().
-rt_update_pid(OldRT, NewNode) ->
-    OldEntry= rt_get_node(id(NewNode), OldRT),
-    NewEntry = rt_entry_set_node(OldEntry, NewNode),
-    OldNodeTree = get_rt_tree(OldRT),
-    NewNodeTree = gb_trees:update(id(NewNode), NewEntry, OldNodeTree),
-    rt_set_nodes(OldRT, NewNodeTree).
-
 % @doc Get the ring size estimate from the external routing table
 -spec external_rt_get_ring_size(RT :: external_rt()) -> Size :: float() | unknown.
-external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
-                                   element(1, RT) == unknown ->
+external_rt_get_ring_size(RT)
+  when element(1, RT) >= 0 orelse element(1, RT) == unknown ->
     element(1, RT).
 
 % @doc Get the tree of an external rt
