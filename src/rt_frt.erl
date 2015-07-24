@@ -606,27 +606,16 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 -spec next_hop_node(nodelist:neighborhood(), external_rt(), key()) -> succ | mynode().
 next_hop_node(Neighbors, ERT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true ->
-            succ;
-        _ ->
-            RT = external_rt_get_tree(ERT),
-            RTSize = get_size(ERT),
-            NextHop = case util:gb_trees_largest_smaller_than(Id, RT) of
-                          {value, _Id1, Node} -> Node;
-                          nil when RTSize =:= 0 ->
-                              node2mynode(nodelist:succ(Neighbors));
-                          nil -> % forward to largest finger
-                              {_Id, Node} = gb_trees:largest(RT),
-                              Node
-                      end,
-                 case RTSize < config:read(rt_size_use_neighbors) of
-                     false -> NextHop;
-                     _     -> % check neighborhood:
-                         % create a fake LastFound node:node_type() for largest_smaller_than
-                         % (only Id is used in largest_smaller_than)
-                         BestSoFar = node:new(pid_dht(NextHop), id(NextHop), 0),
-                         NextHopNew = nodelist:largest_smaller_than(Neighbors, Id, BestSoFar),
-                         node2mynode(NextHopNew)
+        true -> succ;
+        _else -> RT = external_rt_get_tree(ERT),
+                 RTSize = get_size(ERT),
+                 case util:gb_trees_largest_smaller_than(Id, RT) of
+                     {value, _Id1, Node} -> Node;
+                     nil when RTSize =:= 0 ->
+                         node2mynode(nodelist:succ(Neighbors));
+                     nil -> % forward to largest finger
+                         {_Id, Node} = gb_trees:largest(RT),
+                         Node
                  end
     end.
 
@@ -634,6 +623,7 @@ next_hop_node(Neighbors, ERT, Id) ->
 next_hop(Neighbors, ERT, Id) ->
     case next_hop_node(Neighbors, ERT, Id) of
         succ -> succ;
+        %% prefer rt pid
         Node -> case pid_rt(Node) of
                     none -> pid_dht(Node);
                     Pid -> Pid
