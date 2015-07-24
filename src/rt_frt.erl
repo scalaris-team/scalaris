@@ -637,8 +637,8 @@ succ(ERT, Neighbors) ->
     ERTtree = external_rt_get_tree(ERT),
     %% prefer pid of rt_loop
     case gb_trees:lookup(node:id(Succ), ERTtree) of
-        {value, {_Key, PidDHT, none}} -> PidDHT;
-        {value, {_Key, _PidDHT, PidRT}} -> PidRT;
+        {value, {_Key, _IdVersion, PidDHT, none}} -> PidDHT;
+        {value, {_Key, _IdVersion, _PidDHT, PidRT}} -> PidRT;
         none -> node:pidX(Succ)
     end.
 
