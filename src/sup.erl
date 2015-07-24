@@ -256,7 +256,7 @@ progress(Fmt, Args) ->
 %% @doc Creates a worker description for a supervisor.
 -spec worker_desc(Name::atom() | string() | {atom(), pos_integer()}, Module::module(),
                   Function::atom())
-        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
+        -> {Name::atom() | string() | {atom(), pos_integer()}, {Module::module(), Function::atom(), Options::[]},
             permanent, brutal_kill, worker, []}.
 worker_desc(Name, Module, Function) ->
     worker_desc(Name, Module, Function, []).
@@ -264,7 +264,7 @@ worker_desc(Name, Module, Function) ->
 %% @doc Creates a worker description for a supervisor.
 -spec worker_desc(Name::atom() | string() | {atom(), pos_integer()}, Module::module(),
                   Function::atom(), Options::list())
-        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
+        -> {Name::atom() | string() | {atom(), pos_integer()}, {Module::module(), Function::atom(), Options::list()},
             permanent, brutal_kill, worker, []}.
 worker_desc(Name, Module, Function, Options) ->
     {Name, {Module, Function, Options}, permanent, brutal_kill, worker, []}.
