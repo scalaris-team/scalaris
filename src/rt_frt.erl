@@ -685,9 +685,9 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 to_list(State) -> % match external RT
     ERT = external_rt_get_tree(dht_node_state:get(State, rt)),
     KVList = gb_trees:to_list(ERT),
-    FakeNodes = lists:map(fun ({Id, Node}) -> node:new(pid_dht(Node), Id, 0) end, KVList),
+    Nodes = lists:map(fun ({Id, Node}) -> node:new(pid_dht(Node), Id, id_version(Node)) end, KVList),
     Neighbors = dht_node_state:get(State, neighbors),
-    NodeList = nodelist:mk_nodelist([nodelist:succ(Neighbors) | FakeNodes],
+    NodeList = nodelist:mk_nodelist([nodelist:succ(Neighbors) | Nodes],
         nodelist:node(Neighbors)),
     lists:map(fun (Node) -> {node:id(Node), node:pidX(Node)} end, NodeList).
 
@@ -1274,6 +1274,14 @@ node2mynode(Node) -> node2mynode(Node, none).
 node2mynode(Node={node, _, _, _, _}, PidRT) ->
     {node:id(Node), node:id_version(Node), node:pidX(Node), PidRT}.
 
+%% @doc Get the id from a mynode().
+-spec id(Node::mynode()) -> key().
+id({Id, _IdVersion, _PidDHT, _PidRT}) -> Id.
+
+%% @doc Get the id_version from a mynode().
+-spec id_version(Node::mynode()) -> key().
+id_version({_Id, IdVersion, _PidDHT, _PidRT}) when is_integer(_Id), is_integer(IdVersion)  -> IdVersion.
+
 %% @doc Get the Pid from an mynode().
 -spec pid_dht(Node::mynode()) -> comm:mypid().
 pid_dht({_Id, _IdVersion, PidDHT, _PidRT}) -> PidDHT.
@@ -1281,10 +1289,6 @@ pid_dht({_Id, _IdVersion, PidDHT, _PidRT}) -> PidDHT.
 %% @doc Get the Pid from an mynode().
 -spec pid_rt(Node::mynode()) -> comm:mypid() | none.
 pid_rt({_Id, _IdVersion, _PidDHT, PidRT}) -> PidRT.
-
-%% @doc Get the id from a mynode().
--spec id(Node::mynode()) -> key().
-id({Id, _IdVersion, _PidDHT, _PidRT}) -> Id.
 
 %% @doc Determines whether Node1 is a newer instance of Node2.
 %%      Note: Both nodes need to share the same PidDHT, otherwise an exception of
