@@ -542,7 +542,7 @@ test_qwrite_qwrite_qread(_Config) ->
     util:for_to(1, 100, fun qwrite_qwrite_qread/1).
 
 qwrite_qwrite_qread(_I) ->
-    DB = lease_db1,
+    DB = {lease_db, 1},
     ContentCheck = fun content_check/3,
     Self = comm:reply_as(self(), 2, {test_rbr, '_'}),
     Id = ?RT:hash_key("1"),
