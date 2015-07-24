@@ -3,7 +3,7 @@
   <groupId>de.zib.scalaris</groupId>
   <artifactId>java-api</artifactId>
   <versioning>
-    <release>0.8.1</release>
+    <release>0.8.2</release>
     <versions>
       <version>0.5.0</version>
       <version>0.6.0</version>
@@ -13,7 +13,8 @@
       <version>0.7.2</version>
       <version>0.8.0</version>
       <version>0.8.1</version>
+      <version>0.8.2</version>
     </versions>
-    <lastUpdated>20150712092653</lastUpdated>
+    <lastUpdated>20150724173936</lastUpdated>
   </versioning>
 </metadata>
