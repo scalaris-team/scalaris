@@ -43,7 +43,7 @@ scalaris:
 trivial_single-all.aligned/%/trivial.dat: trivial_single-all.aligned/Makefile
 	@echo " executing trivial_single $*, aligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "trivial_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "trivial_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 trivial_single-all.unaligned/Makefile: Makefile.tmpl2 trivial_single-all.unaligned/.gitignore
 	@mkdir -p "trivial_single-all.unaligned"
@@ -59,12 +59,12 @@ trivial_single-all.unaligned/Makefile: Makefile.tmpl2 trivial_single-all.unalign
 trivial_single-all.unaligned/%/trivial.dat: trivial_single-all.unaligned/Makefile
 	@echo " executing trivial_single $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "trivial_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "trivial_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 trivial_0-100-all.unaligned/%/trivial.dat: trivial_0-100-all.unaligned/Makefile
 	@echo " executing trivial_0-100 $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "trivial_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "trivial_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
 trivial.aligned-all: trivial_single-all.aligned/0.01/trivial.dat
 	
@@ -76,7 +76,7 @@ trivial.unaligned-all: trivial_single-all.unaligned/0.1/trivial.dat trivial_sing
 trivial_ddists_fdists-all.unaligned/%/trivial_ddists_fdists.dat: trivial_ddists_fdists-all.unaligned/Makefile
 	@echo " executing trivial_ddists_fdists $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "trivial_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a trivial_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "trivial_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 trivial_dists.unaligned-all: trivial_ddists_fdists-all.unaligned/0.01/trivial_ddists_fdists.dat
 	
@@ -85,7 +85,7 @@ trivial_dists.unaligned-all: trivial_ddists_fdists-all.unaligned/0.01/trivial_dd
 trivial_scale-all.unaligned/%/trivial_scale.dat: trivial_scale-all.unaligned/Makefile
 	@echo " executing trivial_scale $*, unaligned (start at N=$(SYSTEM_SIZE_SCALE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "trivial_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
+	+./rr_eval.sh -a trivial_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "trivial_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
 
 trivial_scale.unaligned-all: trivial_scale-all.unaligned/0.01/trivial_scale.dat
 	
@@ -99,7 +99,7 @@ trivial: trivial.unaligned
 shash_single-all.aligned/%/shash.dat: shash_single-all.aligned/Makefile
 	@echo " executing shash_single $*, aligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "shash_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "shash_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 shash_single-all.unaligned/Makefile: Makefile.tmpl2 shash_single-all.unaligned/.gitignore
 	@mkdir -p "shash_single-all.unaligned"
@@ -115,12 +115,12 @@ shash_single-all.unaligned/Makefile: Makefile.tmpl2 shash_single-all.unaligned/.
 shash_single-all.unaligned/%/shash.dat: shash_single-all.unaligned/Makefile
 	@echo " executing shash_single $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "shash_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "shash_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 shash_0-100-all.unaligned/%/shash.dat: shash_0-100-all.unaligned/Makefile
 	@echo " executing shash_0-100 $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "shash_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "shash_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
 shash.aligned-all: shash_single-all.aligned/0.01/shash.dat
 	
@@ -132,7 +132,7 @@ shash.unaligned-all: shash_single-all.unaligned/0.1/shash.dat shash_single-all.u
 shash_ddists_fdists-all.unaligned/%/shash_ddists_fdists.dat: shash_ddists_fdists-all.unaligned/Makefile
 	@echo " executing shash_ddists_fdists $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "shash_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a shash_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "shash_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 shash_dists.unaligned-all: shash_ddists_fdists-all.unaligned/0.01/shash_ddists_fdists.dat
 	
@@ -141,7 +141,7 @@ shash_dists.unaligned-all: shash_ddists_fdists-all.unaligned/0.01/shash_ddists_f
 shash_scale-all.unaligned/%/shash_scale.dat: shash_scale-all.unaligned/Makefile
 	@echo " executing shash_scale $*, unaligned (start at N=$(SYSTEM_SIZE_SCALE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "shash_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
+	+./rr_eval.sh -a shash_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "shash_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
 
 shash_scale.unaligned-all: shash_scale-all.unaligned/0.01/shash_scale.dat
 	
@@ -156,7 +156,7 @@ shash: shash.unaligned
 bloom_single-all.aligned/%/bloom.dat: bloom_single-all.aligned/Makefile
 	@echo " executing bloom_single $*, aligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "bloom_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,true,2" -g eval_fprob.gp -t "bloom_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 bloom_single-all.unaligned/Makefile: Makefile.tmpl2 bloom_single-all.unaligned/.gitignore
 	@mkdir -p "bloom_single-all.unaligned"
@@ -172,12 +172,12 @@ bloom_single-all.unaligned/Makefile: Makefile.tmpl2 bloom_single-all.unaligned/.
 bloom_single-all.unaligned/%/bloom.dat: bloom_single-all.unaligned/Makefile
 	@echo " executing bloom_single $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "bloom_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob.gp -t "bloom_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 bloom_0-100-all.unaligned/%/bloom.dat: bloom_0-100-all.unaligned/Makefile
 	@echo " executing bloom_0-100 $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "bloom_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,false,20" -g eval_fprob.gp -t "bloom_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
 bloom.aligned-all: bloom_single-all.aligned/0.01/bloom.dat
 	
@@ -189,7 +189,7 @@ bloom.unaligned-all: bloom_single-all.unaligned/0.1/bloom.dat bloom_single-all.u
 bloom_ddists_fdists-all.unaligned/%/bloom_ddists_fdists.dat: bloom_ddists_fdists-all.unaligned/Makefile
 	@echo " executing bloom_ddists_fdists $*, unaligned (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "bloom_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
+	+./rr_eval.sh -a bloom_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,false,2" -g eval_fprob_dists.gp -t "bloom_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 bloom_dists.unaligned-all: bloom_ddists_fdists-all.unaligned/0.01/bloom_ddists_fdists.dat
 	
@@ -198,7 +198,7 @@ bloom_dists.unaligned-all: bloom_ddists_fdists-all.unaligned/0.01/bloom_ddists_f
 bloom_scale-all.unaligned/%/bloom_scale.dat: bloom_scale-all.unaligned/Makefile
 	@echo " executing bloom_scale $*, unaligned (start at N=$(SYSTEM_SIZE_SCALE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "bloom_{$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
+	+./rr_eval.sh -a bloom_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*,false" -g eval_data_inc.gp -t "bloom_{p$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
 
 bloom_scale.unaligned-all: bloom_scale-all.unaligned/0.01/bloom_scale.dat
 	
