@@ -211,7 +211,6 @@ on_active({?lookup_aux, Key, Hops, Msg}, {Neighbors, _RT, ERT, DHTPid} = State) 
 
 on_active({send_error, _Target, {?send_to_group_member, routing_table,
                                  {?lookup_aux, Key, Hops, Msg}} = _Message, _Reason}, State) ->
-    %% TODO can this message be received at routing_table?
     log:log(warn, "[routing_table] lookup_aux failed 1. Target: ~p. Msg: ~p.", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State;

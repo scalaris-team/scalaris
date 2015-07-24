@@ -159,7 +159,6 @@ lookup_fin_chord(State, Key, Data, Msg) ->
                                      DBRange2, MsgFwd, Key, nodelist:pred(Neighbors),
                                      nodelist:node(Neighbors), nodelist:succ(Neighbors)])
                     end,
-                    %% TODO: replace with lookup_aux msg?
                     lookup_decision_chord(State, Key, Hops, Msg),
                     State
             end;
