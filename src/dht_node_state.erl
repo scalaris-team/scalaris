@@ -103,8 +103,8 @@
 
 -spec new(?RT:external_rt(), RMState::rm_loop:state(), db_dht:db()) -> state().
 new(RT, RMState, DB) ->
-    TxidDBs  = [prbr:init({txid, Id}) || Id <- lists:seq(1, config:read(replication_factor))],
-    LeaseDBs = [prbr:init({lease_db, Id}) || Id <- lists:seq(1, config:read(replication_factor))],
+    TxidDBs  = [{Id, prbr:init({txid, Id})} || Id <- lists:seq(1, config:read(replication_factor))],
+    LeaseDBs = [{Id, prbr:init({lease_db, Id})} || Id <- lists:seq(1, config:read(replication_factor))],
     #state{rt = RT,
            rm_state = RMState,
            join_time = os:timestamp(),
@@ -113,8 +113,8 @@ new(RT, RMState, DB) ->
            proposer = pid_groups:get_my({dht_node, proposer}),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = prbr:init(prbr_kv_db),
-           txid_dbs = erlang:make_tuple(config:read(replication_factor), TxidDBs),
-           lease_dbs = erlang:make_tuple(config:read(replication_factor), LeaseDBs),
+           txid_dbs = erlang:make_tuple(config:read(replication_factor), ok, TxidDBs),
+           lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, LeaseDBs),
            lease_list = lease_list:empty(),
            snapshot_state = snapshot_state:new(),
            mr_state = orddict:new(),
