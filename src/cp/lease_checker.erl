@@ -144,6 +144,7 @@ get_relative_range(ActiveInterval) ->
 
 -spec get_dht_node_state(comm:mypid(), atom() | list(atom())) -> term() | list(term()).
 get_dht_node_state(Pid, What) ->
+    false = trace_mpath:infected(),
     Cookie = {os:timestamp(), randoms:getRandomInt()},
     This = comm:reply_as(comm:this(), 2, {get_dht_node_state_response, '_', Cookie}),
     comm:send(Pid, {get_state, This, What}),
@@ -160,6 +161,7 @@ get_dht_node_state(Pid, What) ->
     Result.
 
 drain_message_queue() ->
+    false = trace_mpath:infected(),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_dht_state_response, _Data, _Cookie},% ->
