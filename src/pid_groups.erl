@@ -90,7 +90,8 @@
 
 -export_type([pidname/0, groupname/0]).
 
--type(pidname() :: atom()
+-type(pidname() :: nonempty_string()                       % vivaldi and fd
+                 | atom()
                  | {atom(), atom()}
                  | {atom(), pos_integer()}                 % the nth lease_db
                  | {{atom(), pos_integer()}, atom()}).     % the acceptor of the nths tm
