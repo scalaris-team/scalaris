@@ -104,7 +104,7 @@ init({Owner, RemotePid, Token}) ->
 -spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(),
                       gossip_vivaldi:est_error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
-    PidName = {?MODULE, RemotePid, randoms:getRandomInt()},
+    PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, RemotePid, randoms:getRandomString()])),
     gen_component:start(?MODULE, fun ?MODULE:on/2,
                         {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}},
                         [{pid_groups_join_as, pid_groups:my_groupname(),
