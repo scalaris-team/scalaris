@@ -43,7 +43,6 @@
                            DHTNodePid   :: comm:mypid()}).
 -type(state_inactive() :: {inactive,
                            MessageQueue::msg_queue:msg_queue()}).
-%% -type(state() :: state_active() | state_inactive()).
 %% userdevguide-end rt_loop:state
 
 % accepted messages of rt_loop processes
@@ -128,8 +127,8 @@ on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages} = State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on_inactive(_Msg, State) ->
-    State.
+on_inactive(Msg, {inactive, MsgQueue}) ->
+    {inactive, msg_queue:add(MsgQueue, Msg)}.
 
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(message(), state_active())
