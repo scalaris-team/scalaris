@@ -91,6 +91,7 @@
 -export_type([pidname/0, groupname/0]).
 
 -type(pidname() :: atom()
+                 | {module(), comm:mypid(), pos_integer()} % vivaldi latency processes
                  | {atom(), atom()}
                  | {atom(), pos_integer()}                 % the nth lease_db
                  | {{atom(), pos_integer()}, atom()}).     % the acceptor of the nths tm
