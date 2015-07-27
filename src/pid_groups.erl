@@ -355,19 +355,11 @@ pids_to_names(Pids, Timeout) ->
 -spec get_web_debug_info(groupname(), nonempty_string()) ->
    {struct, [{pairs, {array, [{struct, [{key | value, nonempty_string()}]}]}}]}.
 get_web_debug_info(GrpName, PidNameString) ->
-    PidName = try erlang:list_to_existing_atom(PidNameString)
-              catch error:badarg -> PidNameString
-              end,
-    Pid = case pid_of(GrpName, PidName) of
-              failed -> pid_of(GrpName, PidNameString);
-              X -> X
+    KVs = case pid_of_string(GrpName, PidNameString) of
+              failed -> [{"process", "unknown"}];
+              Pid    -> util:debug_info(Pid)
           end,
-    KVs =
-        case Pid of
-            failed -> [{"process", "unknown"}];
-            _      -> util:debug_info(Pid)
-        end,
-    JsonKVs = [ {struct, [{key, K}, {value, toString(V)}]} || {K, V} <- KVs],
+    JsonKVs = [ {struct, [{key, K}, {value, V}]} || {K, V} <- KVs],
     {struct, [{pairs, {array, JsonKVs}}]}.
 
 %% for web interface
@@ -385,9 +377,11 @@ groups_as_json() ->
 members_by_name_as_json(GrpName) ->
     PidList = members_by_name(GrpName),
     PidListAsJson =
-        [ {struct, [{id, toString(GrpName) ++ "." ++ toString(El)},
-                    {text, toString(El)}, {leaf, true}]}
-          || El <- PidList ],
+        [ begin
+              ElStr = pidname_to_string(El),
+              {struct, [{id, GrpName ++ "." ++ ElStr},
+                        {text, ElStr}, {leaf, true}]}
+          end || El <- PidList ],
     {array, PidListAsJson}.
 
 %% @doc hide a group of processes temporarily (for paused groups in
@@ -493,11 +487,36 @@ on({'EXIT', FromPid, _Reason}, State) ->
 
 
 %% Internal functions
--spec toString(atom() | nonempty_string()) -> nonempty_string().
-%%toString(X) -> io_lib:write_string(X).
-toString('') -> "''";
-toString(X) when is_atom(X) -> atom_to_list(X);
-toString(X)                 -> X.
+%% @doc Helper for the web debug interface to convert a pidname.
+-spec pidname_to_string(pidname()) -> nonempty_string().
+pidname_to_string('') ->
+    "''";
+pidname_to_string(X) when is_atom(X) ->
+    atom_to_list(X);
+pidname_to_string(Name) when is_tuple(Name) ->
+    lists:flatten(io_lib:format("~p", [Name]));
+pidname_to_string(Name) when is_list(Name) ->
+    Name.
+
+-spec pid_of_string(groupname(), nonempty_string()) -> pid() | failed.
+pid_of_string(GrpName, [${ | _] = PidNameStr) ->
+    case [Name || Name <- members_by_name(GrpName),
+                  pidname_to_string(Name) =:= PidNameStr] of
+        [PidName] -> pid_of(GrpName, PidName);
+        [] -> failed
+    end;
+pid_of_string(GrpName, "''") ->
+    pid_of(GrpName, '');
+pid_of_string(GrpName, PidNameStr) ->
+    PidName = try erlang:list_to_existing_atom(PidNameStr)
+              catch error:badarg -> PidNameStr
+              end,
+    case pid_of(GrpName, PidName) of
+        failed when is_atom(PidName) ->
+            % fallback for string pidnames with matching atoms somewhere
+            pid_of(GrpName, PidNameStr);
+        X -> X
+    end.
 
 %% @doc Returns the pid of the pid_groups manager process (a gen_component).
 -spec pid_groups_manager() -> pid() | failed.

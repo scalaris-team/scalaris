@@ -1260,7 +1260,7 @@ list_set_nth([H | T], Pos, Val, Cur) ->
     [H | list_set_nth(T, Pos, Val, Cur + 1)];
 list_set_nth([], _Pos, _Val, _Cur) -> [].
 
--spec debug_info() -> [[{string(), term()}]].
+-spec debug_info() -> [[{string(), string() | number()}]].
 debug_info() ->
     [ [ debug_info(Y) || Y <- pid_groups:members(X)] || X <- pid_groups:groups()].
 
@@ -1279,7 +1279,8 @@ debug_info(Pid) when is_pid(Pid) ->
                 trace_mpath:thread_yield(),
                 receive
                     ?SCALARIS_RECV({web_debug_info_reply, LocalKVs}, %% ->
-                                   {[{"pidgroup", Grp}, {"pidname", Name}],
+                                   {[{"pidgroup", Grp},
+                                     {"pidname", webhelpers:safe_html_string("~p", [Name])}],
                                     LocalKVs})
                 after 1000 -> {[], []}
                 end;
