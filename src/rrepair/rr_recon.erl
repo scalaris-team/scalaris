@@ -2391,7 +2391,7 @@ key_dist(Key1, Key2) ->
 map_key_to_quadrant(Key, Q) ->
     RKeys = ?RT:get_replica_keys(Key),
     SegM = case lists:member(?MINUS_INFINITY, RKeys) of
-               true -> Q + 1;
+               true -> (Q + 1) rem config:read(replication_factor);
                _ -> Q
            end,
     hd(lists:dropwhile(fun(K) -> ?RT:get_key_segment(K) =/= SegM end, RKeys)).
