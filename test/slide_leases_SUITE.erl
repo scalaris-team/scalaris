@@ -212,7 +212,7 @@ leave_until(CurrentSize, TargetSize) ->
     ct:pal("shuting down node: ~s ~w", [Group, Node]),
     ok = api_vm:kill_node(Group),
     lease_helper:wait_for_ring_size(CurrentSize - 1),
-    ct:pal("wait for ring to stabilize iafter shutdown"),
+    ct:pal("wait for ring to stabilize after shutdown"),
     util:wait_for(fun admin:check_leases/0, 10000),
     ct:pal("shuting down node: success"),
     leave_until(CurrentSize - 1, TargetSize).

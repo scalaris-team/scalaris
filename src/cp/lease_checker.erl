@@ -62,7 +62,7 @@ check_local_leases(DHTNode) ->
                              end,
             LocalCorrect = MyRange =:= ActiveInterval,
             RelRange = get_relative_range(ActiveInterval),
-            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n rel_range     =~p",
+            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
                       [LocalCorrect, ActiveInterval, MyRange, RelRange]),
             length(PassiveLeases) == 0 andalso LocalCorrect
     end.
@@ -96,6 +96,13 @@ lease_checker(TargetSize) ->
     io:format("no leases overlap              : ~w~n", [IsDisjoint]),
     io:format("each node has one active lease : ~w~n", [HaveAllActiveLeases]),
     io:format("no passive leases              : ~w~n", [HaveNoPassiveLeases]),
+    case HaveAllAuxEmpty of
+        false ->
+            io:format("aux fields: ~w~n", [[ l_on_cseq:get_aux(L) || L <- ActiveLeases,
+                                                                     L =/= empty ]]);
+        true ->
+            ok
+    end,
     IsAll andalso
         HaveAllAuxEmpty andalso
         IsDisjoint andalso
