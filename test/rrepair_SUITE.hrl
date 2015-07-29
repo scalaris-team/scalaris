@@ -74,8 +74,9 @@ end_per_suite(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-init_per_group(Group, Config) ->
+init_per_group(Group, Config0) ->
     ct:comment(io_lib:format("BEGIN ~p", [Group])),
+    Config = init_per_group_special(Group, Config0),
     case Group of
         upd_trivial -> [{ru_method, trivial}, {ftype, update}];
         upd_shash -> [{ru_method, shash}, {ftype, update}];
@@ -102,7 +103,8 @@ end_per_group(Group, Config) ->
         undefined -> ct:comment(io_lib:format("END ~p", [Group]));
         M -> ct:comment(io_lib:format("END ~p/~p", [FType, M]))
     end,
-    proplists:delete(ru_method, Config).
+    Config2 = proplists:delete(ru_method, Config),
+    end_per_group_special(Group, Config2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

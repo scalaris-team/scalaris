@@ -58,6 +58,12 @@ groups() ->
 
 suite() -> [ {timetrap, {seconds, 20}} ].
 
+init_per_group_special(_Group, Config) ->
+    Config.
+
+end_per_group_special(_Group, Config) ->
+    Config.
+
 -spec proto_sched_fun(start | stop) -> ok.
 proto_sched_fun(start) ->
     %% ct:pal("Starting proto scheduler"),

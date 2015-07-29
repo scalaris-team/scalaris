@@ -73,15 +73,29 @@ groups() ->
 
 suite() -> [{timetrap, {seconds, 15}}].
 
+init_per_group_special(tester_tests, Config) ->
+    unittest_helper:start_minimal_procs(Config, [], true);
+init_per_group_special(basic, Config) ->
+    unittest_helper:start_minimal_procs(Config, [], true);
+init_per_group_special(_, Config) ->
+    Config.
+
+end_per_group_special(tester_tests, Config) ->
+    unittest_helper:stop_minimal_procs(Config),
+    Config;
+end_per_group_special(basic, Config) ->
+    unittest_helper:stop_minimal_procs(Config),
+    Config;
+end_per_group_special(_, Config) ->
+    Config.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Basic Functions Group
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_symmetric_keys_test(Config) ->
-    Conf2 = unittest_helper:start_minimal_procs(Config, [], true),
+get_symmetric_keys_test(_) ->
     ToTest = lists:sort(get_symmetric_keys(4)),
     ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
-    unittest_helper:stop_minimal_procs(Conf2),
     ?equals_w_note(ToTest, ToBe,
                    io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
     ok.
