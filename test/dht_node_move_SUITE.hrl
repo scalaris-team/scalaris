@@ -1078,11 +1078,13 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     %% get neighborhood to check if jump will be a slide
     comm:send_local(JumpingNode, {get_state, comm:this(), neighbors}),
     Neighbors = fun() -> receive ?SCALARIS_RECV({get_state_response, Neighb}, Neighb) end end(),
-    case intervals:in(TargetKey, nodelist:node_range(Neighbors)) orelse
-         intervals:in(TargetKey, nodelist:succ_range(Neighbors)) of
-        true -> ct:pal("Jump will be converted to slide.");
-        _ -> ok
-    end,
+    ConvertedToSlide =
+        case intervals:in(TargetKey, nodelist:node_range(Neighbors)) orelse
+             intervals:in(TargetKey, nodelist:succ_range(Neighbors)) of
+            true -> ct:pal("Jump will be converted to slide."),
+                    true;
+            _ -> false
+        end,
     %% debug output in case of pending slide/jump operations
     comm:send_local(JumpingNode, {get_node_details, comm:this(), [slide_pred, slide_succ]}),
     SlideInfo = fun() -> receive ?SCALARIS_RECV({get_node_details_response, Details}, Details) end end(),
@@ -1113,7 +1115,8 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
             timer:sleep(10),
             perform_jump(JumpingNode, TargetKey, InvalidTarget);
        InvalidTarget ->
-            ?equals(Result, ok),
+            ?assert_w_note((ConvertedToSlide andalso Result =:= target_id_not_in_range)
+                               orelse Result =:= ok, {ConvertedToSlide, Result}),
             %% check if the invalid target is really taken by another node
             ?assert(key_taken_as_node_id(TargetKey, JumpingNode)),
             %% and that it is different from ours
