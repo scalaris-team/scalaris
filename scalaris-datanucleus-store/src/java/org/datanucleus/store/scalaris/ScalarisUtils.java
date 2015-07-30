@@ -233,6 +233,7 @@ public class ScalarisUtils {
     static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         updateUniqueMemberKey(op, json, t);
+        insertToForeignKeyAction(op, json, t);
     }
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
@@ -458,19 +459,45 @@ public class ScalarisUtils {
             AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
             if (mmd == null) continue;
             ForeignKeyMetaData fmd = mmd.getForeignKeyMetaData();
-
+            
+            boolean isJoin = false;
+            if (mmd.getJoinMetaData() != null) {
+                // The member is a collection with an ForeignKeyAction attached
+                fmd = mmd.getJoinMetaData().getForeignKeyMetaData();
+                isJoin = true;
+            }
+            
             if (fmd != null && fmd.getDeleteAction() == ForeignKeyAction.CASCADE) {
                 String fieldName = mmd.getName();
-                String foreignObjectId = null;
+                ArrayList<String> foreignObjectIds = new ArrayList<String>();
                 try {
-                    foreignObjectId = objToInsert.getString(fieldName);
+                    if (isJoin) {
+                        JSONArray arr = objToInsert.getJSONArray(fieldName);
+                        for (int i = 0; i < arr.length(); i++) {
+                            foreignObjectIds.add(arr.getString(i));
+                        }
+                    } else {
+                        foreignObjectIds.add(objToInsert.getString(fieldName));
+                    }
                 } catch (JSONException e) {
                     // not found -> this action will be skipped
                 }
-                if (foreignObjectId != null) {
-                    String memberClassName = mmd.getType().getCanonicalName();
-                    String action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className);
-                
+                for (String foreignObjectId : foreignObjectIds) {
+                    if (foreignObjectId == null) continue;
+                    
+                    String memberClassName;
+                    String action;
+                    
+                    if (isJoin) {
+                        memberClassName = mmd.getCollection().getElementType();
+                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
+                                fieldName);
+                    } else {
+                        memberClassName = mmd.getType().getCanonicalName();
+                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
+                                ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                    }
+                    
                     JSONArray newRow = new JSONArray();
                     newRow.put(foreignObjectId);
                     newRow.put(objectStringIdentity);
@@ -492,6 +519,28 @@ public class ScalarisUtils {
         }
     }
     
+    private static class ScalarisFKA {
+        private String scalarisKey;
+        private String memberToDeleteIn;
+        
+        ScalarisFKA(String scalarisKey, String memberToDeleteIn) {
+            this.scalarisKey = scalarisKey;
+            this.memberToDeleteIn = memberToDeleteIn;
+        }
+        
+        boolean deleteCompleteObject() {
+            return memberToDeleteIn.equals(ScalarisSchemaHandler.FKA_DELETE_OBJ);
+        }
+        
+        String getScalarisKey() {
+            return scalarisKey;
+        }
+        
+        String getMemberToDeleteIn() {
+            return memberToDeleteIn;
+        }
+    }
+    
     private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -501,43 +550,64 @@ public class ScalarisUtils {
         ExecutionContext ec = op.getExecutionContext();
         StoreManager storeMgr = ec.getStoreManager();
         
-        List<String> attachedActions = findForeignKeyActions(className, t);
+        List<ScalarisFKA> attachedActions = findForeignKeyActions(className, t);
         // now search in every found action entries with op's id and start a delete as sub transaction
-        for (String action : attachedActions) {
+        for (ScalarisFKA action : attachedActions) {
             JSONArray actionTable = null;
             try {
-                actionTable = new JSONArray(t.read(action).stringValue());
+                actionTable = new JSONArray(t.read(action.getScalarisKey()).stringValue());
                 
                 JSONArray newTable = new JSONArray();
                 ArrayList<String> objectsToDelete = new ArrayList<String>();
+
                 for (int i = 0; i < actionTable.length(); i++) {
-                    JSONArray row = (JSONArray) actionTable.get(i);
-                    
-                    if (row.getString(0).equals(objectStringIdentity)) {
+                   JSONArray row = (JSONArray) actionTable.get(i);
+                        
+                   if (row.getString(0).equals(objectStringIdentity)) {
                         objectsToDelete.add(row.getString(1));
-                    } else {
+                   } else {
                         newTable.put(row);
-                    }
+                   }
                 }
                 // update table if something changed
                 if (actionTable.length() != newTable.length()) {
-                    t.write(action, newTable.toString());
+                    t.write(action.getScalarisKey(), newTable.toString());
                 }
-                
-                // Start deletion of referenced objects                
-                // TODO: there must be a better way than fetching the object and then deleting it
+                    
                 for (int i = 0; i < objectsToDelete.size(); i++) {
                     String objId = objectsToDelete.get(i);
-                    try {
-                        String toDeleteClassName = storeMgr
-                            .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
-                        AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
-                            .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
-                        Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
-                        ec.deleteObject(obj);
-                    } catch (NucleusObjectNotFoundException e) {
-                        // if we land in this catch block, the object we are trying to delete
-                        // is already deleted. Therefore do nothing.
+                    if (action.deleteCompleteObject()) {
+                        // Start deletion of referenced objects                
+                        // TODO: there must be a better way than fetching the object and then deleting it
+                        try {
+                            String toDeleteClassName = storeMgr
+                                .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
+                            AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
+                                .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
+                            Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+                            ec.deleteObject(obj);
+                        } catch (NucleusObjectNotFoundException e) {
+                            // if we land in this catch block, the object we are trying to delete
+                            // is already deleted. Therefore do nothing.
+                        }
+                    } else {
+                        // remove the object reference of the deleted object from
+                        // the collection 
+                        String foreignObjStr = t.read(objId).stringValue();
+                        if (!isDeletedRecord(foreignObjStr)) {
+                            JSONObject foreignObjJson = new JSONObject(foreignObjStr);
+                            JSONArray colToDeleteFrom = foreignObjJson.getJSONArray(action.getMemberToDeleteIn());
+                        
+                            ArrayList<String> elements = new ArrayList<String>(colToDeleteFrom.length());
+                            for (int j = 0; j < colToDeleteFrom.length(); j++) {
+                                String ele = colToDeleteFrom.getString(j);
+                                if (!ele.equals(objectStringIdentity)) {
+                                    elements.add(ele);
+                                }
+                            }
+                            foreignObjJson.put(action.getMemberToDeleteIn(), new JSONArray(elements));
+                            t.write(objId, foreignObjJson.toString());
+                        }
                     }
                 }
             } catch (NotFoundException e) {
@@ -552,20 +622,22 @@ public class ScalarisUtils {
     // object
     // TODO: structure index in some way so that less than O(n) is needed here
     // TODO: sub transaction?
-    private static ArrayList<String> findForeignKeyActions(String className, Transaction t) 
+    private static ArrayList<ScalarisFKA> findForeignKeyActions(String className, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         
         String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey();
         JSONArray fkaIndex = null;
-        ArrayList<String> attachedActions = new ArrayList<String>();
+        ArrayList<ScalarisFKA> attachedActions = new ArrayList<ScalarisFKA>();
         try {
             fkaIndex = new JSONArray(t.read(fkaIndexKey).stringValue());
             
             for (int i = 0; i < fkaIndex.length(); i++) {
                 JSONArray row = (JSONArray) fkaIndex.get(i);
                 if (row.getString(0).equals(className)) {
-                    attachedActions.add(ScalarisSchemaHandler
-                            .getForeignKeyActionKey(className, row.getString(1)));
+                    String scalarisKey = ScalarisSchemaHandler.getForeignKeyActionKey(className, 
+                            row.getString(1), row.getString(2));
+                    
+                    attachedActions.add(new ScalarisFKA(scalarisKey,row.getString(2)));
                 }
             }
         } catch (NotFoundException e) {

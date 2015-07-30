@@ -26,15 +26,18 @@ import de.zib.scalaris.UnknownException;
 
 public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
     
+    
+    static final String FKA_DELETE_OBJ = "_DEL_OBJECT";
+    
     /**
      * This key stores all foreign key actions.
      */
-    private static String FKA_INDEX_KEY = "FKA_INDEX";
+    private static final String FKA_INDEX_KEY = "FKA_INDEX";
     
     /**
      * Used to signal a key in which all instances of a single foreign key action is stored.
      */
-    private static String FKA_KEY_PREFIX = "FKA";
+    private static final String FKA_KEY_PREFIX = "FKA";
     
     /**
      * Key prefix used to signal a key in which a collection of all key IDs of the same 
@@ -94,8 +97,8 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
     public static String getForeignKeyActionIndexKey() {
         return FKA_INDEX_KEY;
     }
-    public static String getForeignKeyActionKey(String foreignClassName, String thisClassName) {
-        return String.format("%s_%s_%s", foreignClassName, thisClassName, FKA_KEY_PREFIX);
+    public static String getForeignKeyActionKey(String foreignClassName, String thisClassName, String inMember) {
+        return String.format("%s_%s_%s_%s", foreignClassName, thisClassName, inMember, FKA_KEY_PREFIX);
     }
 
     
@@ -144,10 +147,23 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
             
             // TODO: handle ForeignKeyAction in Join, element etc.
             ForeignKeyMetaData fmd = mmd.getForeignKeyMetaData();
-
+            
+            boolean isJoin = false;
+            if (mmd.getJoinMetaData() != null) {
+                // The member is a collection with an ForeignKeyAction attached
+                fmd = mmd.getJoinMetaData().getForeignKeyMetaData();
+                isJoin = true;
+            }
+            
             // TODO: support for other ForeignKeyActions
             if (fmd != null && fmd.getDeleteAction() == ForeignKeyAction.CASCADE) {
-                String memberClassName = mmd.getType().getCanonicalName();
+                String memberClassName;
+                if (isJoin) {
+                    // the member in the collection is important 
+                    memberClassName = mmd.getCollection().getElementType();
+                } else {
+                    memberClassName = mmd.getType().getCanonicalName();
+                }
             
                 try {
                     // append the new ForeignKeyAction-Relation to the index key
@@ -165,6 +181,12 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
                     JSONArray row = new JSONArray();
                     row.put(memberClassName);
                     row.put(className);
+                    
+                    if (isJoin) {
+                        row.put(mmd.getName());
+                    } else {
+                        row.put(FKA_DELETE_OBJ);
+                    }
                     
                     // check if this entry already exists
                     boolean exists = false;
