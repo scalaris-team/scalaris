@@ -353,8 +353,12 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                             .persistObjectInternal(element, op, fieldNumber, -1);
                     final Object elementID = op.getExecutionContext()
                             .getApiAdapter().getIdForObject(elementPC);
-                    idColl.add(IdentityUtils
-                            .getPersistableIdentityForId(elementID));
+                    
+                    String objId = IdentityUtils.getPersistableIdentityForId(elementID);
+                    if (objId != null) {
+                        // object with this ID was already deleted
+                        idColl.add(objId);
+                    }
                 }
                 System.out.println("name=" + name + " idColl.size()="
                         + idColl.size() + " idColl=" + idColl);
@@ -370,8 +374,12 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                             .persistObjectInternal(element, op, fieldNumber, -1);
                     final Object elementID = op.getExecutionContext()
                             .getApiAdapter().getIdForObject(elementPC);
-                    ids.add(IdentityUtils
-                            .getPersistableIdentityForId(elementID));
+                    
+                    String objId = IdentityUtils.getPersistableIdentityForId(elementID);
+                    if (objId != null) {
+                        // object with this ID was already deleted
+                        ids.add(objId);
+                    }
                 }
                 jsonobj.put(name, ids);
                 return;
