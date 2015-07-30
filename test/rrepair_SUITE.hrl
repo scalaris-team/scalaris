@@ -111,7 +111,7 @@ end_per_group(Group, Config) ->
 init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 
-end_per_testcase(_TestCase, Config) ->
+end_per_testcase(_TestCase, _Config) ->
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
