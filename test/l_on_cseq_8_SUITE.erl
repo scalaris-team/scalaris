@@ -16,11 +16,11 @@
 %% @doc    Unit tests for l_on_cseq
 %% @end
 %% @version $Id$
--module(l_on_cseq_SUITE).
+-module(l_on_cseq_8_SUITE).
 -author('schuett@zib.de').
 -vsn('$Id').
 
--define(REPLICATION_FACTOR, 4).
+-define(REPLICATION_FACTOR, 8).
 -define(RING_SIZE, 4).
 
 -include("l_on_cseq_SUITE.hrl").
