@@ -316,7 +316,7 @@ wait_for_stable_ring() ->
                           R = admin:check_ring(),
                           %% ct:pal("CheckRing: ~p~n", [R]),
                           R =:= ok
-             end, 500).
+             end, 100).
 
 -spec wait_for_stable_ring_deep() -> ok.
 wait_for_stable_ring_deep() ->
@@ -324,7 +324,7 @@ wait_for_stable_ring_deep() ->
                      R = admin:check_ring_deep(),
                      ct:pal("CheckRingDeep: ~p~n", [R]),
                      R =:= ok
-             end, 500).
+             end, 100).
 
 -spec check_ring_size(non_neg_integer(), CheckFun::fun((DhtNodeState::term()) -> boolean())) -> ok.
 check_ring_size(Size, CheckFun) ->
@@ -344,7 +344,7 @@ check_ring_size(Size, CheckFun) ->
                   Size =:= erlang:length(
                              [P || P <- pid_groups:find_all(dht_node),
                                    CheckFun(gen_component:get_state(P))])
-      end, 500).
+      end, 50).
 
 -spec check_ring_size(Size::non_neg_integer()) -> ok.
 check_ring_size(Size) ->
