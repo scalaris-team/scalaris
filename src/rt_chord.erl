@@ -206,15 +206,31 @@ get_random_in_interval2('(', L, R, ')', Count) ->
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
-    [Key,
-     Key bxor 16#40000000000000000000000000000000,
-     Key bxor 16#80000000000000000000000000000000,
-     Key bxor 16#C0000000000000000000000000000000
-    ].
+    case config:read(replication_factor) of
+        4 ->
+            [Key,
+             Key bxor 16#40000000000000000000000000000000,
+             Key bxor 16#80000000000000000000000000000000,
+             Key bxor 16#C0000000000000000000000000000000
+            ];
+        8 ->
+            [Key,
+             Key bxor 16#20000000000000000000000000000000,
+             Key bxor 16#40000000000000000000000000000000,
+             Key bxor 16#60000000000000000000000000000000,
+             Key bxor 16#80000000000000000000000000000000,
+             Key bxor 16#A0000000000000000000000000000000,
+             Key bxor 16#C0000000000000000000000000000000,
+             Key bxor 16#E0000000000000000000000000000000
+            ]
+    end.
 
 -spec get_key_segment(key()) -> pos_integer().
 get_key_segment(Key) ->
-    (Key bsr 126) + 1.
+    case config:read(replication_factor) of
+        4 -> (Key bsr 126) + 1;
+        8 -> (Key bsr 125) + 1
+    end.
 
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
@@ -350,6 +366,8 @@ prev_index({I, J}) ->
 check_config() ->
     config:cfg_is_integer(chord_base) and
         config:cfg_is_greater_than_equal(chord_base, 2) and
+        config:cfg_is_integer(replication_factor) and
+        config:cfg_is_greater_than_equal(replication_factor, 2) and
         config:cfg_is_integer(rt_size_use_neighbors) and
         config:cfg_is_greater_than_equal(rt_size_use_neighbors, 0) and
         config:cfg_is_in(key_creator, [random, random_with_bit_mask]) and
