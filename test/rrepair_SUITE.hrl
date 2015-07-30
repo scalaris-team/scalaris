@@ -112,7 +112,6 @@ init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_minimal_procs(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

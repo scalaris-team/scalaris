@@ -40,7 +40,7 @@ all() ->
 groups() ->
     [
      {gsession_ttl,  [sequence], [session_ttl]},
-     {tester_tests, [parallel], [
+     {tester_tests, [sequence], [
                            tester_map_key_to_interval,
                            tester_map_key_to_quadrant,
                            tester_map_interval,
@@ -48,7 +48,7 @@ groups() ->
                            tester_merkle_compress_hashlist%,
 %%                            tester_merkle_compress_cmp_result
                                 ]},
-     {basic,  [parallel], [
+     {basic,  [sequence], [
                            get_symmetric_keys_test,
                            check_quadrant_intervals
                           ]},
