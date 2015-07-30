@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
+% @copyright 2009-2015 Zuse Institute Berlin,
 %                      onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -148,8 +148,9 @@ tx_item_newly_decided(State) ->
         false ->
             Prepared = tx_item_get_numprepared(State) =:= tx_item_get_maj_for_prepared(State),
             Abort =    tx_item_get_numabort(State) =:= tx_item_get_maj_for_abort(State),
+            Bad = quorum:majority_for_accept(config:read(replication_factor)) + 1,
             case tx_item_get_numprepared(State) + tx_item_get_numabort(State) of
-                4 -> log:log("Deciding at 4th answer!!!");
+                Bad -> log:log("Deciding at ~pth answer!!!", [Bad]);
                 _ -> ok
             end,
             if Prepared andalso not Abort -> ?prepared;
