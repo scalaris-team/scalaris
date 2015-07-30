@@ -81,14 +81,14 @@ init_per_testcase(TestCase, Config) ->
         test_network_partition ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Ids = unittest_helper:get_evenly_spaced_keys(8),
-            unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
+            unittest_helper:make_ring_with_ids(Ids, [{scale_ring_size_by, 2},
+                                                     {config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
             ok;
         _ ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Ids = unittest_helper:get_evenly_spaced_keys(4),
-            unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
-                                                               {leases, true}]}]),
+            unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir},
+                                                           {leases, true}]}]),
             ok
     end,
     [{stop_ring, true} | Config].

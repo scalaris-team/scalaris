@@ -61,9 +61,8 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ids = unittest_helper:get_evenly_spaced_keys(4),
-    unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
-                                                       {leases, true}]}]),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir},
+                                                   {leases, true}]}]),
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, _Config) ->

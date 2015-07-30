@@ -61,13 +61,13 @@ join_parameters_list() ->
 join_lookup(Config) ->
     %% need config to get random node id
     Config2 = unittest_helper:start_minimal_procs(Config, [], false),
-    Keys = ?RT:get_replica_keys(?RT:get_random_node_id()),
     unittest_helper:stop_minimal_procs(Config2),
 
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
                                             {rrepair_after_crash, false}]
                                        ++ additional_ring_config()}]),
+    Keys = ?RT:get_replica_keys(?RT:get_random_node_id()),
     ?proto_sched(start),
     %% do as less as possible between make_ring and sending the lookups
     This = comm:this(),
@@ -132,11 +132,6 @@ add_3_rm_3_data_inc(Config) ->
     add_3_rm_3_data(Config, true).
 
 add_3_rm_3_data(Config, Incremental) ->
-    RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
-    % note: there may be hash collisions -> count the number of unique DB entries!
-    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
-    ExpLoad = length(lists:usort(RandomHashedKeys)),
-
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{move_max_transport_entries, 25},
                                             {move_use_incremental_slides, Incremental},
@@ -145,6 +140,11 @@ add_3_rm_3_data(Config, Incremental) ->
                                             {rrepair_after_crash, false}
                                            | join_parameters_list()]
                                        ++ additional_ring_config()}]),
+
+    RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
+    % note: there may be hash collisions -> count the number of unique DB entries!
+    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
+    ExpLoad = length(lists:usort(RandomHashedKeys)),
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes

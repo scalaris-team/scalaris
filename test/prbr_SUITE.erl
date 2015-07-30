@@ -61,10 +61,9 @@ init_per_testcase(TestCase, Config) ->
             ok;
         rbr_consistency ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
-                                               [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir}]}]),
             %% necessary for the consistency check:
-            unittest_helper:check_ring_size_fully_joined(4),
+            unittest_helper:check_ring_size_fully_joined(config:read(replication_factor)),
 
             ok;
         _ ->

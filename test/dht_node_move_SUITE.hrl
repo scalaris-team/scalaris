@@ -113,11 +113,12 @@ init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     GroupConfig = proplists:get_value(tc_group_properties, Config, []),
     {move_config, MoveConf} = lists:keyfind(move_config, 1, GroupConfig),
-    unittest_helper:make_ring_with_ids(
-      ?RT:get_replica_keys(?RT:hash_key("0")),
-      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0},
-                 {join_lb_psv, lb_psv_simple}, {lb_psv_samples, 1}]
-            ++ MoveConf ++ additional_ring_config()}]),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir},
+                                                   {dht_node, mockup_dht_node},
+                                                   {monitor_perf_interval, 0},
+                                                   {join_lb_psv, lb_psv_simple},
+                                                   {lb_psv_samples, 1}]
+                                          ++ MoveConf ++ additional_ring_config()}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
     %% write some data (use a function because left-over tx_timeout messages can disturb the tests):

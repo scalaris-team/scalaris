@@ -26,6 +26,7 @@
 -export([get_scalaris_port/0, get_yaws_port/0,
          get_evenly_spaced_keys/1,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2, make_ring_recover/1,
+         make_symmetric_ring/0, make_symmetric_ring/1,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
          check_ring_size/1, check_ring_size_fully_joined/1,
@@ -132,6 +133,38 @@ get_evenly_spaced_keys(4) ->
     ?RT:get_replica_keys(?MINUS_INFINITY);
 get_evenly_spaced_keys(N) ->
     [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, N)].
+
+%% @doc Creates a symmetric ring.
+-spec make_symmetric_ring() -> pid().
+make_symmetric_ring() ->
+    make_symmetric_ring([]).
+
+%% @doc Creates a symmetric ring.
+-spec make_symmetric_ring(Options::kv_opts()) -> pid().
+make_symmetric_ring(Options) ->
+    ct:pal("Trying to make a symmetric ring"),
+    NodeAddFun =
+        fun() ->
+                Ids = case lists:keyfind(scale_ring_size_by, 1, Options) of
+                          {scale_ring_size_by, Scale} ->
+                              unittest_helper:get_evenly_spaced_keys(
+                                Scale * config:read(replication_factor));
+                          false ->
+                              unittest_helper:get_evenly_spaced_keys(
+                                config:read(replication_factor))
+                      end,
+                [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}])
+                 | [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
+        end,
+    Pid = make_ring_generic(Options, NodeAddFun),
+    Size = config:read(replication_factor),
+    check_ring_size(Size),
+    wait_for_stable_ring(),
+    check_ring_size(Size),
+    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
+    TimeTrap = test_server:timetrap(3000 + Size * 1000),
+    test_server:timetrap_cancel(TimeTrap),
+    Pid.
 
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 -spec make_ring_with_ids([?RT:key()]) -> pid().

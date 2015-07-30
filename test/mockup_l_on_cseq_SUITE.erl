@@ -67,9 +67,8 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ids = ?RT:get_replica_keys(?RT:hash_key("0")),
-    unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
-                                                       {leases, true}]}]),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir},
+                                                   {leases, true}]}]),
     {ok, _} = mockup_l_on_cseq:start_link(),
     [{stop_ring, true} | Config].
 

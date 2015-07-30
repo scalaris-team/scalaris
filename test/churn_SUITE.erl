@@ -67,8 +67,7 @@ init_per_testcase(TestCase, Config) ->
             {skip, "ring maint. cannot handle network split yet - see issue 59"};
         _ ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(
-              ?RT:get_replica_keys(?RT:hash_key("0")),
+            unittest_helper:make_symmetric_ring(
               [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
             [{stop_ring, true} | Config]

@@ -56,9 +56,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:wait_for_stable_ring_deep();
         false ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(
-              ?RT:get_replica_keys(?RT:hash_key("0")),
-              [{config,
+            unittest_helper:make_symmetric_ring([{config,
                 [{monitor_perf_interval, 0},  % deactivate monitor_perf
                  {log_path, PrivDir}]}]),
             ok
