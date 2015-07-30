@@ -245,10 +245,6 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
 prop_join_at(FirstId, SecondId, Incremental) ->
     OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2, BenchRuns = 50,
-    RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
-    % note: there may be hash collisions -> count the number of unique DB entries!
-    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
-    ExpLoad = length(lists:usort(RandomHashedKeys)),
 
     unittest_helper:make_ring_with_ids(
       [FirstId],
@@ -257,6 +253,11 @@ prop_join_at(FirstId, SecondId, Incremental) ->
                  pdb:get(log_path, ?MODULE), {rrepair_after_crash, false},
                  {monitor_perf_interval, 0} | join_parameters_list()]
             ++ additional_ring_config()}]),
+
+    RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
+    % note: there may be hash collisions -> count the number of unique DB entries!
+    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
+    ExpLoad = length(lists:usort(RandomHashedKeys)),
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes
