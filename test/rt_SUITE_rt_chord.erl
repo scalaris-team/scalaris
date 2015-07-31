@@ -33,9 +33,10 @@ create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes, Neighbors) ->
                 Key = number_to_key(N),
                 {Key, lists:nth(Idx, Nodes)}
             end || {N, Idx} <- RT_Keys]),
+    Neighborlist = tl(nodelist:to_list(Neighbors)),
     lists:foldl(fun(Node, AccIn) ->
                         gb_trees:enter(node:id(Node), node:pidX(Node), AccIn)
-                end, RT, nodelist:succs(Neighbors) ++ nodelist:preds(Neighbors)).
+                end, RT, Neighborlist).
 
 check_next_hop(State, _Succ, N, NodeExp) ->
     Neighbors = dht_node_state:get(State, neighbors),
