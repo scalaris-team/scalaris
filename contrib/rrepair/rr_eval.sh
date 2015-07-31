@@ -58,7 +58,7 @@ EVALCMD="rr_eval_admin:${ALGO}(\"${DIRECTORY}\", \"${ALGO}.dat\", ${SYSTEM_SIZE}
 # {lb_active_use_gossip, false}. % deactivate gossip load modules (only needed for active load balancing)
 # {gossip_load_number_of_buckets, 1}. % no overhead by scanning through the DB
 # {gossip_load_additional_modules, []}. % no active load measurements, e.g. CPU or RAM
-${scriptdir}/../../bin/scalarisctl -t first_nostart -m start -p ${SCALARIS_PORT} -y ${YAWS_PORT} -n "node$RANDOM" -l "${DIRECTORY}" -e "-noinput -scalaris mgmt_server \"{{127,0,0,1},${SCALARIS_PORT},mgmt_server}\" -scalaris known_hosts \"[{{127,0,0,1},${SCALARIS_PORT},service_per_vm}]\" -scalaris monitor_perf_interval \"0\" -scalaris lb_active_use_gossip \"false\" -scalaris gossip_load_number_of_buckets \"1\" -scalaris gossip_load_additional_modules \"[]\" -pa ../test -t 60000000 -eval '${EVALCMD}'"
+${scriptdir}/../../bin/scalarisctl -t first_nostart -m start -p ${SCALARIS_PORT} -y ${YAWS_PORT} -n "node$RANDOM" -l "${DIRECTORY}" -e "-noinput -scalaris mgmt_server \"{{127,0,0,1},${SCALARIS_PORT},mgmt_server}\" -scalaris known_hosts \"[{{127,0,0,1},${SCALARIS_PORT},service_per_vm}]\" -scalaris monitor_perf_interval \"0\" -scalaris lb_active_use_gossip \"false\" -scalaris gossip_load_number_of_buckets \"1\" -scalaris gossip_load_additional_modules \"[]\" -pa ../test -eval '${EVALCMD}'"
 
 #gnuplot
 if [ "${ALGO:0:5}" == "bloom" ] ; then
