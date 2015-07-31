@@ -26,8 +26,8 @@
 %% userdevguide-begin rt_chord:types
 -type key() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type index() :: {pos_integer(), non_neg_integer()}.
--opaque rt() :: gb_trees:tree(index(), Node::node:node_type()).
--type external_rt() :: gb_trees:tree(NodeId::key(), Node::node:node_type()). %% @todo: make opaque
+-opaque rt() :: gb_trees:tree(index(), {Node::node:node_type(), RTLoop::comm:mypid()}).
+-opaque external_rt() :: gb_trees:tree(NodeId::key(), RTLoop::comm:mypid()).
 -type custom_message() ::
        {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
        {rt_get_node_response, Index::index(), Node::node:node_type()}.
@@ -515,7 +515,7 @@ export_rt_to_dht_node(RT, Neighbors) ->
                                 gb_trees:enter(node:id(Node), node:pidX(Node), Tree)
                         end, gb_trees:empty(), Preds ++ Succs),
     ERT = util:gb_trees_foldl(fun (_Key, {Node, RTLoop}, Acc) ->
-                                 % only store the ring id and the according node structure
+                                 % only store the id and the according RTLoop Pid
                                  case node:id(Node) =:= Id of
                                      true  -> Acc;
                                      false -> gb_trees:enter(node:id(Node), RTLoop, Acc)
