@@ -26,12 +26,21 @@
 %% start proto scheduler for this suite
 -define(proto_sched(Action), proto_sched_fun(Action)).
 
+%% start proto scheduler with a second thread running function given as Arg
+%% Action :: start | restart | stop.  Arg :: fun()
+-define(proto_sched2(Action, Arg), proto_sched2_fun(Action, Arg)).
+
+%% Use different bench parameters when using proto sched
+%%  bench:increment(Threads1, Iterations1) for proto sched
+%%  bench:increment(Threads2, Iterations2) otherwise
+-define(bench(Threads1, Iterations1, Threads2, Iterations2),
+        bench:increment(Threads1, Iterations1)).
+
 suite() -> [ {timetrap, {seconds, 60}} ].
 
 test_cases() ->
     [
-     tester_join_at,
-     tester_join_at_timeouts
+     tester_join_at
     ].
 
 groups() ->
@@ -90,3 +99,18 @@ proto_sched_fun(stop) ->
             unittest_helper:print_proto_sched_stats(at_end_if_failed_append),
             proto_sched:cleanup()
     end.
+
+proto_sched2_fun(start, Fun) ->
+    unittest_helper:print_proto_sched_stats(at_end_if_failed), % clear previous stats
+    proto_sched:thread_num(2),
+    Pid = erlang:spawn(fun() -> proto_sched:thread_begin(),
+                          Fun(),
+                          proto_sched:thread_end()
+                       end),
+    proto_sched:thread_begin(),
+    Pid;
+
+proto_sched2_fun(stop, _Pid) ->
+    proto_sched_fun(stop).
+
+

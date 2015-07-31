@@ -23,8 +23,18 @@
 
 -compile(export_all).
 
-%% start proto scheduler for this suite
+%% no proto scheduler for this suite
 -define(proto_sched(Action), ok).
+
+%% spawn a process running the given function
+-define(proto_sched2(Action, Arg), proto_sched2_fun(Action, Arg)).
+
+%% Use different bench parameters when using proto sched
+%%  bench:increment(Threads1, Iterations1) for proto sched
+%%  bench:increment(Threads2, Iterations2) otherwise
+-define(bench(Threads1, Iterations1, Threads2, Iterations2),
+        ct:pal("Threads: ~w. Its: ~w", [Threads2, Iterations2]),
+        bench:increment(Threads2, Iterations2)).
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
@@ -56,3 +66,9 @@ additional_ring_config() ->
     [].
 
 -include("join_leave_SUITE.hrl").
+
+proto_sched2_fun(start, Fun) ->
+    erlang:spawn(Fun);
+
+proto_sched2_fun(stop, Pid) ->
+    wait_for_process_to_die(Pid).

@@ -172,13 +172,14 @@ add_2x3_load(Config) ->
                                             {monitor_perf_interval, 0}
                                            | join_parameters_list()]
                                        ++ additional_ring_config()}]),
-    %% stop_time calls ?proto_sched(start)
-    stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
+    %% stop_time calls ?proto_sched2(start/stop)
+    stop_time(fun add_2x3_load_test/0,
+               fun() -> ?bench(1, 100, 1, 5000) end,
+               "add_2x3_load"),
     unittest_helper:check_ring_load(4),
     unittest_helper:check_ring_data().
 
 add_2x3_load_test() ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(1, 5000) end),
     ct:pal("######## starting join 1 ########"),
     _ = api_vm:add_nodes(3),
     check_size(4),
@@ -186,8 +187,7 @@ add_2x3_load_test() ->
     ct:pal("######## starting join 2 ########"),
     _ = api_vm:add_nodes(3),
     check_size(7),
-    ct:pal("######## waiting for bench finish ########"),
-    wait_for_process_to_die(BenchPid).
+    ct:pal("######## waiting for bench finish ########").
 
 make_4_add_1_rm_1_load(Config) ->
     make_4_add_x_rm_y_load(Config, 1, 1, true).
@@ -208,13 +208,15 @@ make_4_add_x_rm_y_load(Config, X, Y, StartOnlyAdded) ->
                  {monitor_perf_interval, 0} | join_parameters_list()]
             ++ additional_ring_config()}]),
     %% stop_time calls ?proto_sched(start)
-    stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
+    stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end,
+               fun() -> ?bench(10, 100, 10, 1000) end,
+               lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
     unittest_helper:check_ring_load(40),
     unittest_helper:check_ring_data().
 
 -spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer(), StartOnlyAdded::boolean()) -> ok.
 add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 1000) end),
+    %% BenchPid = erlang:spawn(fun() -> bench:increment(10, 1000) end),
     {Started, []} = api_vm:add_nodes(X),
     check_size(X + 4),
     timer:sleep(500),
@@ -238,8 +240,7 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
          check_size(X + 4 - I)
      end || {I, Group} <- lists:zip(lists:seq(1, Y), ToShutdown)],
     check_size(X + 4 - Y),
-    ct:pal("######## waiting for bench finish ########"),
-    wait_for_process_to_die(BenchPid).
+    ct:pal("######## waiting for bench finish ########").
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
 prop_join_at(FirstId, SecondId, Incremental) ->
@@ -263,10 +264,11 @@ prop_join_at(FirstId, SecondId, Incremental) ->
     % wait for late write messages to arrive at the original nodes
     api_tx_SUITE:wait_for_dht_entries(ExpLoad),
 
-    BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
-    _ = admin:add_node_at_id(SecondId),
-    check_size(2),
-    wait_for_process_to_die(BenchPid),
+    %% stop_time calls ?proto_sched2(start/stop)
+    stop_time(fun() -> _ = admin:add_node_at_id(SecondId), check_size(2) end,
+               fun() -> ?bench(BenchSlaves, 15, BenchSlaves, 50) end,
+               "join_at"),
+
     unittest_helper:check_ring_load(ExpLoad + BenchSlaves * 4),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
@@ -434,6 +436,19 @@ stop_time(F, Tag) ->
     ?proto_sched(start),
     F(),
     ?proto_sched(stop),
+    Stop = erlang:now(),
+    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Frequency = 1 / ElapsedTime,
+    ct:pal("~p took ~ps: ~p1/s~n",
+           [Tag, ElapsedTime, Frequency]),
+    ok.
+
+-spec stop_time(F1::fun(() -> any()), F2::fun(() -> any()), Tag::string()) -> ok.
+stop_time(F1, F2, Tag) ->
+    Start = erlang:now(),
+    Pid = ?proto_sched2(start, fun() -> F2() end),
+    F1(),
+    ?proto_sched2(stop, Pid),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = 1 / ElapsedTime,
