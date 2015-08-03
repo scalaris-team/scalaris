@@ -102,7 +102,7 @@
           range   = ?required(lease, range  ) :: intervals:interval(),
           aux     = ?required(lease, aux    ) :: lease_aux(),
           version = ?required(lease, version) :: non_neg_integer(),
-          timeout = ?required(lease, timeout) :: erlang:timestamp()}).
+          timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease_t() :: #lease{}.
 
 -type generic_failed_reason() :: lease_does_not_exist
@@ -1305,7 +1305,7 @@ unittest_create_lease_with_range(From, To, Owner) ->
            timeout = new_timeout()
           }.
 
--spec new_timeout() -> erlang:timestamp().
+-spec new_timeout() -> erlang_timestamp().
 new_timeout() ->
     util:time_plus_s(os:timestamp(), delta()).
 
@@ -1324,7 +1324,7 @@ set_epoch(Lease, Epoch) -> Lease#lease{epoch=Epoch}.
 -spec set_timeout(lease_t()) -> lease_t().
 set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 
--spec get_timeout(lease_t()) -> erlang:timestamp().
+-spec get_timeout(lease_t()) -> erlang_timestamp().
 get_timeout(#lease{timeout=Timeout}) -> Timeout.
 
 -spec get_pretty_timeout(lease_t()) -> string().
@@ -1443,7 +1443,7 @@ get_active_lease(State) ->
 %                    {true, null}
 %            end
 
--spec format_utc_timestamp(erlang:timestamp()) -> string().
+-spec format_utc_timestamp(erlang_timestamp()) -> string().
 format_utc_timestamp({_,_,Micro} = TS) ->
     {{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_local_time(TS),
     Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul", "Aug","Sep",

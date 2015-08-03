@@ -290,7 +290,7 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     end.
 
 %% @doc get the reductions of all processes in the pid group
--spec get_reductions() -> {non_neg_integer(), erlang:timestamp()}.
+-spec get_reductions() -> {non_neg_integer(), erlang_timestamp()}.
 get_reductions() ->
     MyGroupPids = pid_groups:my_members(),
     AllReductions =
@@ -300,12 +300,12 @@ get_reductions() ->
          end || Pid <- MyGroupPids, Pid =/= self()],
     {lists:sum(AllReductions), os:timestamp()}.
 
--spec set_last_reductions(non_neg_integer(), erlang:timestamp()) -> ok.
+-spec set_last_reductions(non_neg_integer(), erlang_timestamp()) -> ok.
 set_last_reductions(Reductions, Timestamp) ->
     erlang:put(reductions, {Reductions, Timestamp}),
     ok.
 
--spec get_last_reductions() -> {non_neg_integer(), erlang:timestamp()}.
+-spec get_last_reductions() -> {non_neg_integer(), erlang_timestamp()}.
 get_last_reductions() ->
     erlang:get(reductions).
 

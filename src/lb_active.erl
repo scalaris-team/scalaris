@@ -52,8 +52,8 @@
                 light_node_succ = ?required(light_node_succ, lb_op) :: node:node_type(),
                 target = ?required(target, lb_op)                   :: ?RT:key(),
                 %% time of the oldest data used for the decision for this lb_op
-                data_time = ?required(data_time, lb_op)             :: erlang:timestamp(),
-                time = os:timestamp()                               :: erlang:timestamp()
+                data_time = ?required(data_time, lb_op)             :: erlang_timestamp(),
+                time = os:timestamp()                               :: erlang_timestamp()
                }).
 
 -type lb_op() :: #lb_op{}.
@@ -79,8 +79,8 @@
 
 -type module_state() :: tuple().
 
--record(my_state, {last_balance = os:timestamp() :: erlang:timestamp(),
-                   last_db_monitor_reset = os:timestamp() :: erlang:timestamp(),
+-record(my_state, {last_balance = os:timestamp() :: erlang_timestamp(),
+                   last_db_monitor_reset = os:timestamp() :: erlang_timestamp(),
                    pending_op = nil :: lb_op() | nil
                   }).
 
@@ -582,11 +582,11 @@ old_data(Op, MyState) ->
 set_last_db_monitor_init(MyState) ->
     MyState#my_state{last_db_monitor_reset = os:timestamp()}.
 
--spec get_last_db_monitor_init(my_state()) -> erlang:timestamp().
+-spec get_last_db_monitor_init(my_state()) -> erlang_timestamp().
 get_last_db_monitor_init(MyState) ->
     MyState#my_state.last_db_monitor_reset.
 
--spec get_time_last_balance(my_state()) -> erlang:timestamp().
+-spec get_time_last_balance(my_state()) -> erlang_timestamp().
 get_time_last_balance(MyState) ->
     MyState#my_state.last_balance.
 

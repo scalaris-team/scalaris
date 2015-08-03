@@ -44,7 +44,7 @@
                   items = ?required(lb_info, items) :: load(),
                   node  = ?required(lb_info, node)  :: node:node_type(),
                   succ  = ?required(lb_info, succ)  :: node:node_type(),
-                  time  = os:timestamp()            :: erlang:timestamp()
+                  time  = os:timestamp()            :: erlang_timestamp()
                  }).
 
 -opaque lb_info() :: #lb_info{}.
@@ -91,7 +91,7 @@ get_node (#lb_info{node  = Node }) -> Node.
 -spec get_succ(LBInfo::lb_info()) -> node:node_type().
 get_succ (#lb_info{succ  = Succ }) -> Succ.
 
--spec get_time(LBInfo::lb_info()) -> erlang:timestamp().
+-spec get_time(LBInfo::lb_info()) -> erlang_timestamp().
 get_time (#lb_info{time  = Time }) -> Time.
 
 -spec is_succ(Node1::lb_info(), Node2::lb_info()) -> boolean().
@@ -168,11 +168,11 @@ get_load_change_diff(DhtSize, OldLoad, NewLoad) ->
 get_metric_fun(items)    -> fun get_items/1;
 get_metric_fun(requests) -> fun get_reqs/1.
 
--spec get_oldest_data_time([lb_info()]) -> OldestTime::erlang:timestamp().
+-spec get_oldest_data_time([lb_info()]) -> OldestTime::erlang_timestamp().
 get_oldest_data_time([Node | Other]) ->
     get_oldest_data_time(Other, get_time(Node)).
 
--spec get_oldest_data_time([lb_info()], Oldest::erlang:timestamp()) -> OldestTime::erlang:timestamp().
+-spec get_oldest_data_time([lb_info()], Oldest::erlang_timestamp()) -> OldestTime::erlang_timestamp().
 get_oldest_data_time([], Oldest) ->
     Oldest;
 get_oldest_data_time([Node | Other], Oldest) ->

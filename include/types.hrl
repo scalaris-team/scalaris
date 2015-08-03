@@ -19,3 +19,8 @@
 %% @version $Id$
 
 % add type defs if required...
+
+%% more restrictive (and correct) definition of the timestamp type:
+-type erlang_timestamp() :: {MegaSecs::non_neg_integer(),
+                             Secs::0..999999,
+                             MicroSecs::0..999999}.

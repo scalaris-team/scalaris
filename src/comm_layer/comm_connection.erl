@@ -63,7 +63,7 @@
                       OQueue::[comm:send_options()]}.
 -type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
                         SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
--type time_last_msg() :: erlang:timestamp().
+-type time_last_msg() :: erlang_timestamp().
 -type msg_or_tag() :: comm:message() | comm:msg_tag().
 
 -type state() ::
@@ -72,7 +72,7 @@
      LocalListenPort         :: comm_server:tcp_port(),
      Channel                 :: comm:channel(),
      Socket                  :: inet:socket() | notconnected,
-     StartTime               :: erlang:timestamp(),
+     StartTime               :: erlang_timestamp(),
      SentMsgCount            :: non_neg_integer(),
      ReceivedMsgCount        :: non_neg_integer(),
      MsgQueue                :: msg_queue(),
@@ -648,7 +648,7 @@ socket(State)                  -> element(5, State).
 -spec set_socket(state(), inet:socket() | notconnected) -> state().
 set_socket(State, Val)         -> setelement(5, State, Val).
 
--spec started(state()) -> erlang:timestamp().
+-spec started(state()) -> erlang_timestamp().
 started(State)                 -> element(6, State).
 
 -spec s_msg_count(state()) -> non_neg_integer().
@@ -692,12 +692,12 @@ last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
 
--spec time_last_msg_seen(state()) -> erlang:timestamp().
+-spec time_last_msg_seen(state()) -> erlang_timestamp().
 time_last_msg_seen(State) -> element(14, State).
 -spec set_time_last_msg_seen(state()) -> state().
 set_time_last_msg_seen(State) -> setelement(14, State, os:timestamp()).
 
--spec time_last_msg_received(state()) -> erlang:timestamp().
+-spec time_last_msg_received(state()) -> erlang_timestamp().
 time_last_msg_received(State) -> element(15, State).
 -spec set_time_last_msg_received(state()) -> state().
 set_time_last_msg_received(State) -> setelement(15, State, os:timestamp()).
