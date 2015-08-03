@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%% @doc    Helper for rt_frtchord unit tests.
+%% @doc    Helper for rt_frt unit tests.
 %% @end
 %% @version $Id$
 -module(rt_SUITE_rt_frt).
@@ -69,4 +69,4 @@ check_split_key(Begin, End, SplitKey, SplitFraction) ->
                       [(FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction), SplitKey])).
 
 additional_tests(_Config) ->
-    tester:test(rt_frtchord, get_random_key_from_generator, 3, 2000, [{threads, 2}]) .
+    tester:test(rt_frt, get_random_key_from_generator, 3, 2000, [{threads, 2}]) .
