@@ -336,11 +336,10 @@ tester_type_check_node(_Config) ->
             {lupdate_ids, 2}, % base node must not be in node list
             {update_node, 2}, %% needs node in certain interval
             {merge, 4}, % base node must not be in node list of the other neighbour's object
-            {remove, 3} %% cannot create funs
+            {remove, 3}, %% cannot create funs
+            {create_pid_to_node_dict, 2} %% needs a dict() of node() objects
           ],
-          [ {dict_add_valid_nodes, 2}, %% needs a dict() of node() objects
-            {dict_make_unique_update, 1}, %% needs a dict() of node() objects
-            {throw_if_newer, 2}, %% throws
+          [ {throw_if_newer, 2}, %% throws
             {lsplit_nodelist, 2}, %% base node must not be in node list
             {lusplit_nodelist, 2}, %% base node must not be in node list
             {lmerge_helper, 5} %% base node must not be in node list

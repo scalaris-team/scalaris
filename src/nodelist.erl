@@ -22,7 +22,7 @@
 
 -compile({inline, [node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
                    node_range/1, succ_range/1,
-                   dict_add_valid_nodes/2, dict_make_unique_update/1]}).
+                   create_pid_to_node_dict/2]}).
 
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
@@ -51,7 +51,8 @@
          succ_ord_node/2, succ_ord_id/2,
          succ_ord_node/3, succ_ord_id/3,
          lupdate_ids/2, lremove_outdated/1, lremove_outdated/2,
-         largest_smaller_than/2, largest_smaller_than/3]).
+         largest_smaller_than/2, largest_smaller_than/3,
+         create_pid_to_node_dict/2]).
 
 -include("scalaris.hrl").
 
@@ -647,29 +648,26 @@ succ_ord_id(K1, K2, BaseKey) ->
 %%     (node:id(N1) < BaseNodeId andalso node:id(N2) > BaseNodeId) orelse
 %%     (node:id(N1) =:= BaseNodeId).
 
-%% @doc Adds all valid nodes to the dictionary mapping node PIDs to a list of
-%%      node objects.
--spec dict_add_valid_nodes(Dict, NodeList::[node:node_type()]) -> Dict
+%% @doc Creates a dictionary mapping a node PID to the newest version of its
+%%      node object from the given lists.
+-spec create_pid_to_node_dict(Dict, NodeLists::[[node:node_type()]]) -> Dict
         when is_subtype(Dict, dict:dict(comm:mypid(), node:node_type())).
-dict_add_valid_nodes(Dict, NodeList) ->
-    lists:foldl(fun(NodeX, DictX) ->
+create_pid_to_node_dict(Dict, []) ->
+    dict:map(fun(_PidX, [NodeX]) -> NodeX;
+                (_PidX, [H | RestX]) ->
+                     lists:foldl(fun node:newer/2, H, RestX)
+             end, Dict);
+create_pid_to_node_dict(Dict, [NodeList | Rest]) ->
+    DictNew = lists:foldl(
+                fun(NodeX, DictX) ->
                         case node:is_valid(NodeX) of
                             true ->
                                 dict:append(node:pidX(NodeX), NodeX, DictX);
                             false ->
                                 DictX
                         end
-                end, Dict, NodeList).
-
-%% @doc Makes a dictionary mapping node PIDs to a list of node objects map PIDs
-%%      to the most up-to-date version of the node object.
--spec dict_make_unique_update(Dict) -> Dict
-        when is_subtype(Dict, dict:dict(comm:mypid(), node:node_type())).
-dict_make_unique_update(Dict) ->
-    dict:map(fun(_PidX, [NodeX]) -> NodeX;
-                (_PidX, [H | RestX]) ->
-                     lists:foldl(fun node:newer/2, H, RestX)
-             end, Dict).
+                end, Dict, NodeList),
+    create_pid_to_node_dict(DictNew, Rest).
 
 %% @doc Removes any node with outdated ID information from the list as well as
 %%      any outdated node that shares the same process as Node and any invalid
@@ -678,8 +676,7 @@ dict_make_unique_update(Dict) ->
         -> [node:node_type()].
 lremove_outdated(NodeList, Node) ->
     % make a unique set of updated pids:
-    UpdNodes0 = dict_add_valid_nodes(dict:new(), NodeList),
-    UpdNodes = dict_make_unique_update(UpdNodes0),
+    UpdNodes = create_pid_to_node_dict(dict:new(), [NodeList]),
     % now remove all out-dated nodes:
     NodeIsUpToDate = fun(N) ->
                              NInDict = dict:fetch(node:pidX(N), UpdNodes),
@@ -705,9 +702,7 @@ lremove_outdated(NodeList) ->
         -> {L1Upd::[node:node_type()], L2Upd::[node:node_type()]}.
 lupdate_ids(L1, L2) ->
     % make a unique set of updated pids:
-    UpdNodes0 = dict_add_valid_nodes(dict:new(), L1),
-    UpdNodes1 = dict_add_valid_nodes(UpdNodes0, L2),
-    UpdNodes = dict_make_unique_update(UpdNodes1),
+    UpdNodes = create_pid_to_node_dict(dict:new(), [L1, L2]),
 
     GetNewNode = fun(Node) -> dict:fetch(node:pidX(Node), UpdNodes) end,
     L1Upd = lists:map(GetNewNode, L1),
