@@ -1,6 +1,8 @@
 package org.datanucleus.store.scalaris;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.datanucleus.ExecutionContext;
@@ -576,38 +578,50 @@ public class ScalarisUtils {
                     
                 for (int i = 0; i < objectsToDelete.size(); i++) {
                     String objId = objectsToDelete.get(i);
-                    if (action.deleteCompleteObject()) {
-                        // Start deletion of referenced objects                
-                        // TODO: there must be a better way than fetching the object and then deleting it
-                        try {
-                            String toDeleteClassName = storeMgr
+                    try {
+                        String toDeleteClassName = storeMgr
                                 .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
-                            AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
+                        AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
                                 .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
-                            Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+                        Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+
+                        if (action.deleteCompleteObject()) {
+                            // Start deletion of referenced objects
                             ec.deleteObject(obj);
-                        } catch (NucleusObjectNotFoundException e) {
-                            // if we land in this catch block, the object we are trying to delete
-                            // is already deleted. Therefore do nothing.
-                        }
-                    } else {
-                        // remove the object reference of the deleted object from
-                        // the collection 
-                        String foreignObjStr = t.read(objId).stringValue();
-                        if (!isDeletedRecord(foreignObjStr)) {
-                            JSONObject foreignObjJson = new JSONObject(foreignObjStr);
-                            JSONArray colToDeleteFrom = foreignObjJson.getJSONArray(action.getMemberToDeleteIn());
-                        
-                            ArrayList<String> elements = new ArrayList<String>(colToDeleteFrom.length());
-                            for (int j = 0; j < colToDeleteFrom.length(); j++) {
-                                String ele = colToDeleteFrom.getString(j);
-                                if (!ele.equals(objectStringIdentity)) {
-                                    elements.add(ele);
+                        } else {
+                            // remove the object reference of the deleted object from the collection
+
+                            ObjectProvider toDelOp = ec.findObjectProvider(obj);
+
+                            int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(action.getMemberToDeleteIn());
+                            Object objColl = toDelOp.provideField(memberId);
+
+                            if (objColl instanceof Collection) {
+                                Collection collection = (Collection) objColl;
+
+                                ArrayList<Object> toRemove = new ArrayList<Object>();
+                                Iterator iter = collection.iterator();
+                                while (iter.hasNext()) {
+                                    Object item = iter.next();
+                                    ObjectProvider itemOp = ec.findObjectProvider(item);
+                                    String itemId = getPersistableIdentity(itemOp);
+
+                                    if (itemId.equals(objectStringIdentity)) {
+                                        toRemove.add(item);
+                                    }
                                 }
+                                for (Object o : toRemove) {
+                                    collection.remove(o);
+                                }
+                                storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
+                                // updated field must be marked as dirty to ensure that instances of this object used
+                                // somewhere else will fetch the updated value
+                                toDelOp.makeDirty(memberId);
                             }
-                            foreignObjJson.put(action.getMemberToDeleteIn(), new JSONArray(elements));
-                            t.write(objId, foreignObjJson.toString());
                         }
+                    } catch (NucleusObjectNotFoundException e) {
+                        // if we land in this catch block, the object we are trying to delete
+                        // is already deleted. Therefore do nothing.
                     }
                 }
             } catch (NotFoundException e) {
