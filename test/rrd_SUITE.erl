@@ -29,7 +29,6 @@ all()   -> [simple_create,
             create_counter,
             create_event,
             create_timing,
-            timestamp,
             add_nonexisting_timeslots,
             reduce_timeslots,
             {group, tester_tests}
@@ -102,11 +101,6 @@ create_timing(_Config) ->
             [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0,0}}},
              {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0,0}}},
              {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0,0}}}]),
-    ok.
-
-timestamp(_Config) ->
-    TS = os:timestamp(),
-    ?equals(TS, util:us2timestamp(util:timestamp2us(TS))),
     ok.
 
 add_nonexisting_timeslots(_Config) ->

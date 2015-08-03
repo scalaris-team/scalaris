@@ -23,6 +23,7 @@
 -compile(export_all).
 
 -include("unittest.hrl").
+-include("types.hrl").
 
 -dialyzer([{[no_opaque, no_return], largest_smaller_than/1},
            {no_fail_call, lists_remove_at_indices/1}]).
@@ -36,6 +37,7 @@ all() ->
      tester_minus_first, tester_minus_first_sort,
      tester_par_map2, tester_par_map3,
      lists_remove_at_indices,
+     tester_timestamp,
      rrd_combine_timing_slots_handle_empty_rrd,
      rrd_combine_timing_slots_simple,
      rrd_combine_timing_slots_subset,
@@ -361,6 +363,20 @@ prop_sublist3(L, X) ->
 
 tester_sublist3(_Config) ->
     tester:test(?MODULE, prop_sublist3, 2, 5000, [{threads, 2}]).
+
+-spec prop_timestamp1(erlang_timestamp()) -> true.
+prop_timestamp1(TS) ->
+    ?equals(TS, util:us2timestamp(util:timestamp2us(TS))),
+    true.
+
+-spec prop_timestamp2(util:us_timestamp()) -> true.
+prop_timestamp2(Us) ->
+    ?equals(Us, util:timestamp2us(util:us2timestamp(Us))),
+    true.
+
+tester_timestamp(_Config) ->
+    tester:test(?MODULE, prop_timestamp1, 1, 5000, [{threads, 2}]),
+    tester:test(?MODULE, prop_timestamp2, 1, 5000, [{threads, 2}]).
 
 rrd_combine_timing_slots_handle_empty_rrd(_Config) ->
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
