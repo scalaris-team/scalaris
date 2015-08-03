@@ -1098,12 +1098,6 @@ set_adjacent_succ(#rt_entry{adjacent_fingers={PredId, _Succ}} = Entry, SuccId) -
 set_adjacent_pred(#rt_entry{adjacent_fingers={_Pred, SuccId}} = Entry, PredId) ->
     set_adjacent_fingers(Entry, PredId, SuccId).
 
--ifdef(GFRT).
-%% @doc Get the custom info field of a rt entry
--spec get_custom_info(rt_entry()) -> custom_info().
-get_custom_info(#rt_entry{custom=CustomInfo}) -> CustomInfo.
--endif.
-
 %% @doc Get the adjacent predecessor rt_entry() of the given node.
 -spec predecessor_node(RT::rt(), Node::rt_entry()) -> rt_entry().
 predecessor_node(RT, Node) ->
@@ -1314,11 +1308,12 @@ send2rt(Node, Msg) ->
 %%             [pid_groups:get_my(dht_node), self(), Case, {OldPidDHT, OldPidRT},
 %%              {NewPidDHT, NewPidRT}]).
 
+-ifdef(GFRT).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GFRT-chord
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--ifdef(GFRT).
 % Additional information appended to an rt_entry()
 -record(rt_entry_info, {group = other_dc :: other_dc | same_dc}).
 -type rt_entry_info_t()::#rt_entry_info{}.
@@ -1382,22 +1377,18 @@ rt_entry_info(Node, _Type, _PredId, _SuccId) ->
             false -> other_dc
         end}.
 
-%% @doc Check if the given node belongs to another group of nodes
+%% Check if the given node belongs to another group of nodes
 -spec is_from_other_group(rt_entry()) -> boolean().
 is_from_other_group(Node) ->
-    (get_custom_info(Node))#rt_entry_info.group =:= same_dc.
+    CustomInfo = Node#rt_entry.custom,
+    CustomInfo#rt_entry_info.group =:= same_dc.
 
-%% @doc Checks whether config parameters of the rt_gfrtchord process exist and are
-%%      valid.
--spec frt_check_config() -> boolean().
-frt_check_config() -> true.
-
+-else.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FRT-chord
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--else.
 % Additional information appended to an rt_frt_helpers:rt_entry()
 -type rt_entry_info_t() :: undefined.
 
@@ -1410,9 +1401,9 @@ allowed_nodes(RT) ->
 rt_entry_info(_Node, _Type, _PredId, _SuccId) ->
     undefined.
 
-%% @doc Checks whether config parameters of the rt_frtchord process exist and are
-%%      valid.
+-endif.
+
+%% @doc Checks whether config parameters of the rt_frtchord/rt_gfrtchord
+%%      process exist and are valid.
 -spec frt_check_config() -> boolean().
 frt_check_config() -> true.
-
--endif.
