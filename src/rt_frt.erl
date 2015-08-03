@@ -262,9 +262,13 @@ get_size_without_special_nodes(#rt_t{} = RT) ->
 
 %% userdevguide-begin rt_frtchord:get_size
 %% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
-get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT));
-get_size(RT) -> external_rt_get_size(RT).
+-spec get_size(rt()) -> non_neg_integer().
+get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT)).
+
+%% @doc Returns the size of the external routing table.
+-spec get_size_ext(external_rt()) -> non_neg_integer().
+get_size_ext(RT) ->
+    gb_trees:size(external_rt_get_tree(RT)).
 %% userdevguide-end rt_frtchord:get_size
 
 %% userdevguide-begin rt_frtchord:n
@@ -607,7 +611,7 @@ next_hop_node(Neighbors, ERT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true -> succ;
         _else -> RT = external_rt_get_tree(ERT),
-                 RTSize = get_size(ERT),
+                 RTSize = get_size_ext(ERT),
                  case util:gb_trees_largest_smaller_than(Id, RT) of
                      {value, _Id1, Node} -> Node;
                      nil when RTSize =:= 0 ->
@@ -1033,11 +1037,6 @@ external_rt_get_ring_size(RT)
 -spec external_rt_get_tree(RT::external_rt()) -> external_rt_t_tree().
 external_rt_get_tree(RT) when is_tuple(RT) ->
     element(2, RT).
-
-% @doc Get the size of the external rt
--spec external_rt_get_size(RT::external_rt()) -> non_neg_integer().
-external_rt_get_size(RT) ->
-    gb_trees:size(external_rt_get_tree(RT)).
 
 %% Get the node with the given Id. This function will crash if the node doesn't exist.
 -spec rt_get_node(NodeId::key(), RT::rt()) -> rt_entry().

@@ -101,8 +101,12 @@ to_pid_list(Succ) -> [node:pidX(Succ)].
 
 %% userdevguide-begin rt_simple:get_size
 %% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
+-spec get_size(rt()) -> non_neg_integer().
 get_size(_RT) -> 1.
+
+%% @doc Returns the size of the external routing table.
+-spec get_size_ext(external_rt()) -> non_neg_integer().
+get_size_ext(_RT) -> 1.
 %% userdevguide-end rt_simple:get_size
 
 %% userdevguide-begin rt_simple:n
@@ -279,7 +283,7 @@ empty_ext(Neighbors) -> empty(Neighbors).
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
+-spec next_hop(nodelist:neighborhood(), external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true -> succ;

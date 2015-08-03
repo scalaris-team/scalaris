@@ -47,7 +47,8 @@
 -callback filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 
 -callback to_pid_list(rt()) -> [comm:mypid()].
--callback get_size(rt() | external_rt()) -> non_neg_integer().
+-callback get_size(rt()) -> non_neg_integer().
+-callback get_size_ext(external_rt()) -> non_neg_integer().
 -callback get_replica_keys(key()) -> [key()].
 -callback get_key_segment(key()) -> pos_integer().
 
@@ -100,7 +101,7 @@ behaviour_info(callbacks) ->
      % dead nodes filtering
      {filter_dead_node, 3},
      % statistics
-     {to_pid_list, 1}, {get_size, 1},
+     {to_pid_list, 1}, {get_size, 1}, {get_size_ext, 1},
      % gets all (replicated) keys for a given (hashed) key
      % (for symmetric replication)
      {get_replica_keys, 1},

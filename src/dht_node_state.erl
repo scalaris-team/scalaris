@@ -102,6 +102,8 @@
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
 
+-dialyzer({no_opaque, get/2}).
+
 -spec new(?RT:external_rt(), RMState::rm_loop:state(), db_dht:db()) -> state().
 new(RT, RMState, DB) ->
     TxidDBs  = [{Id, prbr:init({tx_id, Id})} || Id <- lists:seq(1, config:read(replication_factor))],
@@ -241,7 +243,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            snapshot_state=SnapState} = State, Key) ->
     case Key of
         rt           -> RT;
-        rt_size      -> ?RT:get_size(RT);
+        rt_size      -> ?RT:get_size_ext(RT);
         neighbors    -> rm_loop:get_neighbors(RMState);
         my_range     -> Neighbors = rm_loop:get_neighbors(RMState),
                         nodelist:node_range(Neighbors);

@@ -37,8 +37,6 @@
 
 -export([add_range/2]).
 
--dialyzer({no_opaque, next_hop/3}).
-
 % Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("rt_beh.hrl").
@@ -113,8 +111,13 @@ to_pid_list(RT) ->
     [node:pidX(Node) || {Node, _PidRT} <- gb_trees:values(RT)].
 
 %% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
+-spec get_size(rt()) -> non_neg_integer().
 get_size(RT) ->
+    gb_trees:size(RT).
+
+%% @doc Returns the size of the external routing table.
+-spec get_size_ext(external_rt()) -> non_neg_integer().
+get_size_ext(RT) ->
     gb_trees:size(RT).
 
 %% @doc Keep a key in the address space. See n/0.
@@ -470,14 +473,14 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %% @doc Returns the next hop to contact for a lookup.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(nodelist:neighborhood(), ?RT:external_rt(), key()) -> succ | comm:mypid().
+-spec next_hop(nodelist:neighborhood(), external_rt(), key()) -> succ | comm:mypid().
 next_hop(Neighbors, RT, Id) ->
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true ->
             succ;
         false ->
             % check routing table:
-            RTSize = get_size(RT),
+            RTSize = get_size_ext(RT),
             case util:gb_trees_largest_smaller_than(Id, RT) of
                 {value, _Key, Node} ->
                     Node;

@@ -411,7 +411,7 @@ on({web_debug_info, Requestor}, State) ->
                end,
     KVList1 =
         [{"rt_algorithm", webhelpers:safe_html_string("~p", [?RT])},
-         {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
+         {"rt_size", dht_node_state:get(State, rt_size)},
          {"my_range", webhelpers:safe_html_string("~p", [intervals:get_bounds(dht_node_state:get(State, my_range))])},
          {"db_range", webhelpers:safe_html_string("~p", [dht_node_state:get(State, db_range)])},
          {"load", webhelpers:safe_html_string("~p", [Load])},

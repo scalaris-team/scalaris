@@ -190,7 +190,7 @@ on_active({web_debug_info, Requestor},
    {_Neighbors, RT, ERT, _DHTPid} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RT)},
-         {"ert_size", ?RT:get_size(ERT)},
+         {"ert_size", ?RT:get_size_ext(ERT)},
          {"rt (index, node):", ""} | ?RT:dump(RT)],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
