@@ -100,17 +100,17 @@ proto_sched_fun(stop) ->
             proto_sched:cleanup()
     end.
 
+-spec proto_sched2_fun(start, Fun::fun(() -> term())) -> pid();
+                      (stop, Pid::pid()) -> ok.
 proto_sched2_fun(start, Fun) ->
     unittest_helper:print_proto_sched_stats(at_end_if_failed), % clear previous stats
     proto_sched:thread_num(2),
-    Pid = erlang:spawn(fun() -> proto_sched:thread_begin(),
-                          Fun(),
-                          proto_sched:thread_end()
+    Pid = erlang:spawn(fun() ->
+                               proto_sched:thread_begin(),
+                               Fun(),
+                               proto_sched:thread_end()
                        end),
     proto_sched:thread_begin(),
     Pid;
-
 proto_sched2_fun(stop, _Pid) ->
     proto_sched_fun(stop).
-
-

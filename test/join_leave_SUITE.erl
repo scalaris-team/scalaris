@@ -67,8 +67,9 @@ additional_ring_config() ->
 
 -include("join_leave_SUITE.hrl").
 
+-spec proto_sched2_fun(start, Fun::fun(() -> term())) -> pid();
+                      (stop, Pid::pid()) -> ok.
 proto_sched2_fun(start, Fun) ->
     erlang:spawn(Fun);
-
 proto_sched2_fun(stop, Pid) ->
     wait_for_process_to_die(Pid).

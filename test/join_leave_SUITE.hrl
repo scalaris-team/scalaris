@@ -245,7 +245,7 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
 prop_join_at(FirstId, SecondId, Incremental) ->
     OldProcesses = unittest_helper:get_processes(),
-    BenchSlaves = 2, BenchRuns = 50,
+    BenchSlaves = 2,
 
     unittest_helper:make_ring_with_ids(
       [FirstId],
