@@ -401,10 +401,11 @@ handle_custom_message({rt_get_node_response, Index, Node, PidRT}, State) ->
     OldERT = rt_loop:get_ert(State),
     Neighbors = rt_loop:get_neighb(State),
     NewERT = case stabilize(Neighbors, OldRT, Index, Node, PidRT) of
-        {NewRT, true} ->
-            check_do_update(OldRT, NewRT, OldERT, rt_loop:get_neighb(State), true);
-        {NewRT, false} -> ok, OldERT
-    end,
+                 {NewRT, true} ->
+                     check_do_update(OldRT, NewRT, OldERT, Neighbors, true);
+                 {NewRT, false} ->
+                     OldERT
+             end,
     rt_loop:set_ert(rt_loop:set_rt(State, NewRT), NewERT);
 handle_custom_message(_Message, _State) ->
     unknown_event.
@@ -445,10 +446,11 @@ check_do_update(OldRT, NewRT, OldERT, NewNeighbors, ReportToFD) ->
             fd:update_subscriptions(self(), OldPids, NewPids);
         _ -> ok
     end,
-    Pid = pid_groups:get_my(dht_node),
-    case Pid of
-        failed -> OldERT;
-        _      ->
+    case pid_groups:get_my(dht_node) of
+        failed ->
+            % TODO: can this really happen?!
+            OldERT;
+        Pid ->
             NewERT = export_rt_to_dht_node(NewRT, NewNeighbors),
             comm:send_local(Pid, {rt_update, NewERT}),
             NewERT
@@ -512,13 +514,14 @@ export_rt_to_dht_node(RT, Neighbors) ->
                    end,
     Tree0 = lists:foldl(EnterDhtNode, gb_trees:empty(), Preds),
     Tree1 = lists:foldl(EnterDhtNode, Tree0, Succs),
-    ERT = util:gb_trees_foldl(fun (_Key, {Node, PidRT}, Acc) ->
-                                 % only store the id and the according PidRT Pid
-                                 case node:id(Node) =:= Id of
-                                     true  -> Acc;
-                                     false -> gb_trees:enter(node:id(Node), PidRT, Acc)
-                                 end
-                        end, Tree1, RT),
+    ERT = util:gb_trees_foldl(
+            fun (_Key, {Node, PidRT}, Acc) ->
+                     % only store the id and the according PidRT Pid
+                     case node:id(Node) of
+                         Id -> Acc;
+                         _  -> gb_trees:enter(node:id(Node), PidRT, Acc)
+                     end
+            end, Tree1, RT),
     ERT.
 %% userdevguide-end rt_chord:export_rt_to_dht_node
 
