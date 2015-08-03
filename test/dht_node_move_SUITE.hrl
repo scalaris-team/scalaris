@@ -654,10 +654,10 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
-    Start = erlang:now(),
+    Start = os:timestamp(),
     F(),
-    Stop = erlang:now(),
-    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Stop = os:timestamp(),
+    ElapsedTime = erlang:max(1, timer:now_diff(Stop, Start)) / 1000000.0,
     Frequency = 1 / ElapsedTime,
     ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),

@@ -105,7 +105,7 @@ create_timing(_Config) ->
     ok.
 
 timestamp(_Config) ->
-    TS = erlang:now(),
+    TS = os:timestamp(),
     ?equals(TS, util:us2timestamp(util:timestamp2us(TS))),
     ok.
 

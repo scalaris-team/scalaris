@@ -94,8 +94,8 @@ make_footer(Start, TotalBytes, TotalCount) ->
          {td, [], {p, [], "Total"}},
          {td, [], io_lib:format("~15.10B", [TotalBytes])},
          {td, [], io_lib:format("~15.10B", [TotalCount])},
-         {td, [], io_lib:format("~15.3f", [TotalBytes / timer:now_diff(erlang:now(), Start) * 1000000.0])},
-         {td, [], io_lib:format("~15.3f", [TotalCount / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [TotalBytes / erlang:max(1, timer:now_diff(os:timestamp(), Start)) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [TotalCount / erlang:max(1, timer:now_diff(os:timestamp(), Start)) * 1000000.0])},
          {td, [], io_lib:format("~15.3f", [TotalBytes / TotalCount])},
          {td, [], io_lib:format("~15.3f", [100.0])},
          {td, [], io_lib:format("~15.3f", [100.0])}
@@ -115,8 +115,8 @@ make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
          {td, [], {p, [], io_lib:format("~p", [RealTag])}},
          {td, [], io_lib:format("~15.10B", [Size])},
          {td, [], io_lib:format("~15.10B", [Count])},
-         {td, [], io_lib:format("~15.3f", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])},
-         {td, [], io_lib:format("~15.3f", [Count / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [Size / erlang:max(1, timer:now_diff(os:timestamp(), Start)) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [Count / erlang:max(1, timer:now_diff(os:timestamp(), Start)) * 1000000.0])},
          {td, [], io_lib:format("~15.3f", [Size / Count])},
          {td, [], io_lib:format("~15.3f", [Size / TotalBytes * 100.0])},
          {td, [], io_lib:format("~15.3f", [Count / TotalCount * 100.0])}

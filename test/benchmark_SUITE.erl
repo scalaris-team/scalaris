@@ -44,40 +44,40 @@ end_per_suite(_Config) ->
 run_increment_1_1000(_Config) ->
     Threads    = 1,
     Iterations = 10000,
-    Start = erlang:now(),
+    Start = os:timestamp(),
     {ok, _} = bench:increment(Threads, Iterations),
-    Stop = erlang:now(),
-    RunTime = timer:now_diff(Stop, Start),
+    Stop = os:timestamp(),
+    RunTime = erlang:max(1, timer:now_diff(Stop, Start)),
     write_result("result_increment_1_10000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 
 run_increment_10_100(_Config) ->
     Threads    = 10,
     Iterations = 1000,
-    Start = erlang:now(),
+    Start = os:timestamp(),
     {ok, _} = bench:increment(Threads, Iterations),
-    Stop = erlang:now(),
-    RunTime = timer:now_diff(Stop, Start),
+    Stop = os:timestamp(),
+    RunTime = erlang:max(1, timer:now_diff(Stop, Start)),
     write_result("result_increment_10_1000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 
 run_read_1_100000(_Config) ->
     Threads    = 1,
     Iterations = 100000,
-    Start = erlang:now(),
+    Start = os:timestamp(),
     {ok, _} = bench:quorum_read(Threads, Iterations),
-    Stop = erlang:now(),
-    RunTime = timer:now_diff(Stop, Start),
+    Stop = os:timestamp(),
+    RunTime = erlang:max(1, timer:now_diff(Stop, Start)),
     write_result("result_read_1_100000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 
 run_read_10_10000(_Config) ->
     Threads    = 10,
     Iterations = 10000,
-    Start = erlang:now(),
+    Start = os:timestamp(),
     {ok, _} = bench:quorum_read(Threads, Iterations),
-    Stop = erlang:now(),
-    RunTime = timer:now_diff(Stop, Start),
+    Stop = os:timestamp(),
+    RunTime = erlang:max(1, timer:now_diff(Stop, Start)),
     write_result("result_read_10_10000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 

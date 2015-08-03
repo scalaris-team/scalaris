@@ -432,12 +432,12 @@ tester_join_at_timeouts(Config) ->
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
-    Start = erlang:now(),
+    Start = os:timestamp(),
     ?proto_sched(start),
     F(),
     ?proto_sched(stop),
-    Stop = erlang:now(),
-    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Stop = os:timestamp(),
+    ElapsedTime = erlang:max(1, timer:now_diff(Stop, Start)) / 1000000.0,
     Frequency = 1 / ElapsedTime,
     ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
@@ -445,12 +445,12 @@ stop_time(F, Tag) ->
 
 -spec stop_time(F1::fun(() -> any()), F2::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F1, F2, Tag) ->
-    Start = erlang:now(),
+    Start = os:timestamp(),
     Pid = ?proto_sched2(start, fun() -> F2() end),
     F1(),
     ?proto_sched2(stop, Pid),
-    Stop = erlang:now(),
-    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Stop = os:timestamp(),
+    ElapsedTime = erlang:max(1, timer:now_diff(Stop, Start)) / 1000000.0,
     Frequency = 1 / ElapsedTime,
     ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
