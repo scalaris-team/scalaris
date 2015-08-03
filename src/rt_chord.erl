@@ -287,24 +287,22 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
     OldSucc = nodelist:succ(OldNeighbors),
     NewSucc = nodelist:succ(NewNeighbors),
     NewNodeId = nodelist:nodeid(NewNeighbors),
-    Neighbors = nodelist:succs(NewNeighbors) ++ nodelist:preds(NewNeighbors),
     % only re-build if a new successor occurs or the new node ID is not between
     % Pred and Succ any more (which should not happen since this must come from
     % a slide!)
-    % -> if not rebuilding, update the node IDs though
     case node:same_process(OldSucc, NewSucc) andalso
              intervals:in(NewNodeId, node:mk_interval_between_nodes(NewPred, NewSucc)) of
         true ->
+            % -> if not rebuilding, update the node IDs though
+            UpdNodes = nodelist:create_pid_to_node_dict(
+                         dict:new(), [nodelist:preds(NewNeighbors),
+                                      nodelist:succs(NewNeighbors)]),
             NewRT = gb_trees:map(
                       fun(_K, {Node, PidRT}) ->
                               % check neighbors for newer version of the node
-                              case lists:dropwhile(
-                                     fun(NodeNH) ->
-                                             not node:same_process(Node, NodeNH)
-                                     end, Neighbors)
-                              of
-                                  [] -> {Node, PidRT};
-                                  [H | _] -> {node:newer(Node, H), PidRT}
+                              case dict:find(node:pidX(Node), UpdNodes) of
+                                  {ok, N} -> {node:newer(Node, N), PidRT};
+                                  error -> {Node, PidRT}
                               end
                       end, OldRT),
             {ok, NewRT};
