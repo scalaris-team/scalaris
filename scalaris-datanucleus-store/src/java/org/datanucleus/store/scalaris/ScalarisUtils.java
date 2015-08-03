@@ -165,14 +165,15 @@ public class ScalarisUtils {
             }
 
             String identity = getPersistableIdentity(op);
-            // TODO is this right?
-            // DataNucleus expects as internal object id an integer value if there is only one
-            // primary key member which is an integer. Otherwise it can be an arbitrary
-            // object.
-            if (pkFieldNumbers.length == 1) {
-                op.setPostStoreNewObjectId(idKey);
-            } else {
-                op.setPostStoreNewObjectId(identity);
+            if (op.getExternalObjectId() == null) {
+                // DataNucleus expects as internal object id an integer value if there is only one
+                // primary key member which is an integer. Otherwise it can be an arbitrary
+                // object.
+                if (pkFieldNumbers.length == 1) {
+                    op.setPostStoreNewObjectId(idKey);
+                } else {
+                    op.setPostStoreNewObjectId(identity);
+                }
             }
             return identity;
         } else {
@@ -191,11 +192,10 @@ public class ScalarisUtils {
      *         key field is not loaded.
      */
     static String getPersistableIdentity(ObjectProvider op) {
-        StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         AbstractClassMetaData cmd = op.getClassMetaData();
         String keySeparator = ":";
 
-        if (cmd.pkIsDatastoreAttributed(storeMgr)) {
+        if (op.getExternalObjectId() == null) {
             // The primary key must be (partially) calculated by the data store.
             // There is no distinction between APPLICATION and DATASTORE
             // IdentityType (yet)
@@ -209,10 +209,8 @@ public class ScalarisUtils {
                         .getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
 
                 keyBuilder.append(keySeparator);
-                keyBuilder
-                        .append(op.provideField(mmd.getAbsoluteFieldNumber()));
+                keyBuilder.append(op.provideField(mmd.getAbsoluteFieldNumber()));
             }
-
             return keyBuilder.toString();
         } else {
             // The data store has nothing to do with generating a key value
