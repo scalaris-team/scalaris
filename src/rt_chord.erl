@@ -528,11 +528,10 @@ export_rt_to_dht_node(RT, Neighbors) ->
 -spec to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 to_list(State) ->
     ERT = dht_node_state:get(State, rt),
-    Neighbors = dht_node_state:get(State, neighbors),
-    KVList = gb_trees:to_list(ERT),
-    FakeNodes = lists:map(fun ({Id, Pid}) -> node:new(Pid, Id, 0) end, KVList),
-    NodeList = nodelist:mk_nodelist(FakeNodes, nodelist:node(Neighbors)),
-    lists:map(fun (Node) -> {node:id(Node), node:pidX(Node)} end, NodeList).
+    MyNodeId = dht_node_state:get(State, node_id),
+    lists:usort(fun({AId, _APid}, {BId, _BPid}) ->
+                        nodelist:succ_ord_id(AId, BId, MyNodeId)
+                end, gb_trees:to_list(ERT)).
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
