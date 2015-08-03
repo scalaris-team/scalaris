@@ -509,16 +509,18 @@ export_rt_to_dht_node(RT, Neighbors) ->
     %% note: we are subscribed at the RM for changes to whole neighborhood
     Preds = nodelist:preds(Neighbors),
     Succs = nodelist:succs(Neighbors),
-    Tree = lists:foldl(fun(Node, Tree) ->
-                                gb_trees:enter(node:id(Node), node:pidX(Node), Tree)
-                        end, gb_trees:empty(), Preds ++ Succs),
+    EnterDhtNode = fun(Node, Tree) ->
+                           gb_trees:enter(node:id(Node), node:pidX(Node), Tree)
+                   end,
+    Tree0 = lists:foldl(EnterDhtNode, gb_trees:empty(), Preds),
+    Tree1 = lists:foldl(EnterDhtNode, Tree0, Succs),
     ERT = util:gb_trees_foldl(fun (_Key, {Node, PidRT}, Acc) ->
                                  % only store the id and the according PidRT Pid
                                  case node:id(Node) =:= Id of
                                      true  -> Acc;
                                      false -> gb_trees:enter(node:id(Node), PidRT, Acc)
                                  end
-                        end, Tree, RT),
+                        end, Tree1, RT),
     ERT.
 %% userdevguide-end rt_chord:export_rt_to_dht_node
 
