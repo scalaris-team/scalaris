@@ -931,7 +931,7 @@ entry_learning_and_filtering(Entry, Type, RT) ->
 -spec get_source_node(RT::rt()) -> rt_entry().
 get_source_node(#rt_t{source=undefined}) -> erlang:error("routing table source unknown");
 get_source_node(#rt_t{source=NodeId, nodes=Nodes}) ->
-    case Nodes =:= gb_trees:empty() of
+    case gb_trees:is_empty(Nodes) of
             false -> gb_trees:get(NodeId, Nodes);
             true  -> exit(rt_broken_tree_empty)
     end.
