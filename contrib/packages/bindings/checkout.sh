@@ -18,7 +18,7 @@ if [ "$MODE" = "snapshot" ] ; then
   folder="${name}"
   if [ ! -d "${folder}" ]; then
     echo "checkout ${url} -> ${folder} ..."
-    git clone "${url}" "${folder}"
+    git clone --branch master --single-branch --depth=1 "${url}" "${folder}"
     result=$?
   else
     echo "update ${url} -> ${folder} ..."
