@@ -9,7 +9,7 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
-## Scalaris 0.8.2 - July 24, 2015 - [scalaris-0.8.2.tar.gz](https://github.com/scalaris-team/scalaris/archive/0.8.2.tar.gz)
+## Scalaris 0.8.2 - July 24, 2015 - [scalaris-0.8.2.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.8.2.tar.gz/download)
 
 (partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/))
 
