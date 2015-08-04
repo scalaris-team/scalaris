@@ -1,5 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
-%                      onScale solutions GmbH
+% @copyright 2009-2015 Zuse Institute Berlin.
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -173,13 +172,15 @@ tx_state_newly_decided(State) ->
 
 -spec tx_state_all_tps_informed(tx_state()) -> boolean().
 tx_state_all_tps_informed(State) ->
-    %% @TODO use repl. degree
-    tx_state_get_numinformed(State) =:= tx_state_get_numids(State) * 4.
+    tx_state_get_numinformed(State)
+        =:= (tx_state_get_numids(State)
+             * config:read(replication_factor)).
 
 -spec tx_state_all_tps_registered(tx_state()) -> boolean().
 tx_state_all_tps_registered(State) ->
-    %% @TODO use repl. degree
-    tx_state_get_numtpsregistered(State) =:= tx_state_get_numids(State) * 4.
+    tx_state_get_numtpsregistered(State)
+        =:= (tx_state_get_numids(State)
+             * config:read(replication_factor)).
 
 -spec tx_state_add_item_decision(tx_state(), ?prepared | ?abort)
         -> {?undecided | false | {tx_newly_decided, ?abort | ?commit},
