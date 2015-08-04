@@ -982,8 +982,23 @@ add_entry(Node, Type, RT) ->
                 false -> %% ignore node w/ outdated id version
                     RT;
                 true -> %% remove the old (outdated) entry before adding the new one
-                    RT1 = entry_delete(id(OldNode), RT),
-                    entry_learning_and_filtering(Node, Type, RT1)
+                    SourceNode = rt_entry_node(get_source_node(RT)),
+                    {Id1, IdV1, PidDHT1, _PidRT1} = SourceNode,
+                    {Id2, IdV2, PidDHT2, _PidRT2} = OldNode,
+                    case {Id1, IdV1, PidDHT1} =:= {Id2, IdV2, PidDHT2} of
+                        %% If the new entry is the source node of the current node,
+                        %% we need to change the source node manually.
+                        %% This can happen, when messages from the learning on
+                        %% forwarding (of lookup messages) reach the node faster,
+                        %% than messages from the RM, i.e. in this case, the node
+                        %% learns its new Id from a rt_learn_node message, not the RM.
+                        true ->
+                            RT1 = entry_delete(id(OldNode), RT),
+                            add_source_entry(Node, RT1#rt_t{source=undefined});
+                        false ->
+                            RT1 = entry_delete(id(OldNode), RT),
+                            entry_learning_and_filtering(Node, Type, RT1)
+                    end
             end
     end.
 
