@@ -287,41 +287,37 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             %% can happen when already cleaned up at tm
             ok;
         ok ->
-            %% This tx is a bit slow. Start fds on the participants
-            %% and then take over on crash messages.  When not enough
-            %% tps have registered? propose yourself.
-
-            %% TODO: instead of direct takeover, fd:subscribe to the
-            %% participants. And then takeover when a crash is
-            %% actually reported.
-            QLen = element(2, erlang:process_info(self(), message_queue_len)),
-
-            %% TODO: check if any messages in the queue contribute to this TxId,
-            %%       then, delay, otherwise trigger take over
             WhatToDo =
-                case QLen > state_get_opentxnum(State) of
-                    true ->
-                        % we have replies other than 'isdone' for some
-                        % of the tx in the queue
-                        delay;
-                    false ->
-                        takeover
-                        %% may lead to endless loops and may delay failed tx
-                        %% indefinitely,
-                        %% e.g. 100 open tx, 49 tx_tm_rtm_tid_isdone messages:
-%%                         {IsDoneMsgs, NoIsDoneMsgs} = count_messages_for_type(tx_tm_rtm_tid_isdone),
-%%                         case NoIsDoneMsgs > 10 of
-%%                             true -> delay;
-%%                             false ->
-%%                                 case IsDoneMsgs < (state_get_opentxnum(State) div 2) of
-%%                                     true -> requeue;
-%%                                     false -> takeover
-%%                                 end
-%%                         end
+                case tx_state_is_decided(TxState) of
+                    ?abort -> {delete, ?abort};
+                    ?commit -> {delete, ?commit};
+                    ?undecided ->
+                        %% This tx is a bit slow. Start fds on the participants
+                        %% and then take over on crash messages.  When not enough
+                        %% tps have registered? propose yourself.
+
+                        %% TODO: instead of direct takeover, fd:subscribe to the
+                        %% participants. And then takeover when a crash is
+                        %% actually reported.
+                        QLen = element(2, erlang:process_info(self(), message_queue_len)),
+
+                        %% TODO: check if any messages in the queue contribute to this TxId,
+                        %%       then, delay, otherwise trigger take over
+                        case QLen > state_get_opentxnum(State) of
+                            true ->
+                                                % we have replies other than 'isdone' for some
+                                                % of the tx in the queue
+                                delay;
+                            false ->
+                                takeover
+                        end
                 end,
             case WhatToDo of
-%%                 requeue ->
-%%                     comm:send_local(self(), {tx_tm_rtm_tid_isdone, TxId});
+                {delete, Decision} ->
+                    %% we delete the local state. As we have to maintain opentxnum
+                    %% we send a message to ourselves:
+                    log:log("Trigger tx_tm_rtm_delete in ~p~n", [state_get_role(State)]),
+                    comm:send_local(self(), {?tx_tm_rtm_delete, TxId, Decision});
                 delay ->
                     msg_delay:send_local((config:read(tx_timeout) * 2)
                                              div 1000,
@@ -395,7 +391,7 @@ on({?tx_tm_rtm_delete, TxId, Decision}, State) ->
             %% request to delete from the tm
             NewState;
         true ->
-            TableName = state_get_tablename(State),
+            TableName = state_get_tablename(NewState),
             %% delete locally
             _ = [ pdb:delete(ItemId, TableName)
               || ItemId <- tx_state_get_txitemids(TxState)],
