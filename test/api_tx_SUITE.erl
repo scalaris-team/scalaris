@@ -1,4 +1,4 @@
-%% @copyright 2012-2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -130,7 +130,7 @@ write_test(Config) ->
     receive {time, SecondWriteTime} -> ok
     end,
     util:wait_for_process_to_die(BenchPid2),
-    unittest_helper:check_ring_load(4  * 2),
+    unittest_helper:check_ring_load(config:read(replication_factor) * 2),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), %doesn't matter
