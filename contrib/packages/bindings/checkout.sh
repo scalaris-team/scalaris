@@ -9,7 +9,7 @@ deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
 if [[ "$SCALARIS_VERSION" == *git* ]]; then
-  MODE="unstable"
+  MODE="snapshot"
 else
   MODE="tag"
 fi
