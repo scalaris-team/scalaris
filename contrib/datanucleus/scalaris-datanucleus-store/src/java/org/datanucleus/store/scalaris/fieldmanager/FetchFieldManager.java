@@ -370,15 +370,8 @@ public class FetchFieldManager extends AbstractFieldManager {
         } else if (Double.class.isAssignableFrom(mmd.getType())) {
             return result.getDouble(memberName);
         } else if (Date.class.isAssignableFrom(mmd.getType())) {
-            String dateValue = result.getString(memberName);
-            try {
-                // if a Date is processed by StoreFieldManager the date.toString() method
-                // is used for conversion. This converts the date to the format seen here.
-                return new SimpleDateFormat("EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH).
-                        parse(dateValue);
-            } catch (ParseException e) {
-                throw new NucleusException("Could not parse " + dateValue  + " as a date", e);
-            }
+            Long dateValue = result.getLong(memberName);
+            return new Date(dateValue);
         } else if (Enum.class.isAssignableFrom(mmd.getType())) {
             ColumnMetaData[] colmds = mmd.getColumnMetaData();
             // boolean useNumeric = MetaDataUtils

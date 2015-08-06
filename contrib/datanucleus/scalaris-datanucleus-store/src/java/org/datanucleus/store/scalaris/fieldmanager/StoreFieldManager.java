@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -264,6 +265,9 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                 jsonobj.put(name, ((Long) value).longValue());
             } else if (value instanceof Double) {
                 jsonobj.put(name, ((Double) value).doubleValue());
+            } else if (value instanceof Date) {
+                Date dateValue = (Date) value;
+                jsonobj.put(name, dateValue.getTime());
             } else if (value instanceof Enum) {
                 ColumnMetaData[] colmds = mmd.getColumnMetaData();
                 // test is faulty
