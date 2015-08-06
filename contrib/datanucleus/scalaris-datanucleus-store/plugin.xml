@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.2"?>
+<plugin>
+    <extension point="org.datanucleus.store_manager">
+        <store-manager
+            class-name="org.datanucleus.store.scalaris.ScalarisStoreManager"
+            key="scalaris" url-key="scalaris">
+        </store-manager>
+    </extension>
+
+    <extension point="org.datanucleus.store_connectionfactory">
+        <connectionfactory
+            class-name="org.datanucleus.store.scalaris.ConnectionFactoryImpl"
+            datastore="scalaris" name="scalaris/tx" transactional="true">
+            <persistence-property name="scalaris.cookie" />
+            <persistence-property name="scalaris.node" />
+            <persistence-property name="scalaris.client.name" />
+            <persistence-property name="scalaris.client.appendUUID" />
+            <persistence-property name="scalaris.debug"/>
+        </connectionfactory>
+        <connectionfactory
+            class-name="org.datanucleus.store.scalaris.ConnectionFactoryImpl"
+            datastore="scalaris" name="scalaris/nontx" transactional="false" />
+    </extension>
+
+    <extension point="org.datanucleus.store_query_query">
+        <query class-name="org.datanucleus.store.scalaris.query.JPQLQuery"
+            datastore="scalaris" name="JPQL">
+        </query>
+        <query class-name="org.datanucleus.store.scalaris.query.JDOQLQuery"
+            datastore="scalaris" name="JDOQL">
+        </query>
+    </extension>
+
+    <extension point="org.datanucleus.persistence_properties">
+        <persistence-property name="datanucleus.cloud.storage.bucket" />
+    </extension>
+
+</plugin>
