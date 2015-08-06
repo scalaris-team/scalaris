@@ -68,13 +68,13 @@ range_read(Interval) ->
     range_read_loop(Interval, Id, intervals:empty(), [], TimerRef).
 
 -spec range_read_loop(Interval::intervals:interval(), Id::uid:global_uid(),
-        Done::intervals:interval(), Data::[db_entry:entry() | [db_entry:entry()]],
+        Done::intervals:interval(), Data::[[db_entry:entry()]],
         TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, %% ->
-            {timeout, lists:flatten(Data)});
+            {timeout, lists:append(Data)});
         ?SCALARIS_RECV(
         {bulkowner, reply, Id, {bulk_read_entry_response, NowDone, NewData}}, %% ->
            begin
@@ -84,7 +84,7 @@ range_read_loop(Interval, Id, Done, Data, TimerRef) ->
                     range_read_loop(Interval, Id, Done2, [NewData | Data], TimerRef);
                 true ->
                     delete_and_cleanup_timer(TimerRef, Id),
-                    {ok, lists:flatten(Data, NewData)}
+                    {ok, lists:append([NewData | Data])}
             end
            end)
     end.

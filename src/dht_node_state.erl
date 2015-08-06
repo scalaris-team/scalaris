@@ -459,7 +459,7 @@ details(State) ->
 get_prbr_selectors() ->
     TXIDs    = [{tx_id   , I} || I <- lists:seq(1, config:read(replication_factor))],
     LeaseDBs = [{lease_db, I} || I <- lists:seq(1, config:read(replication_factor))],
-    [prbr_kv_db | lists:flatten(TXIDs, LeaseDBs)].
+    [prbr_kv_db | lists:append(TXIDs, LeaseDBs)].
 
 %% @doc Gets all entries to transfer (slide) in the given range and starts delta
 %%      recording on the DB for changes in this interval.

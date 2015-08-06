@@ -435,7 +435,7 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     %% initiate local paxos acceptors (with received paxos_ids)
     Learners = tx_state_get_learners(TxState),
     LAcceptor = state_get_lacceptor(NewState),
-    NewItemsHoldBackQ = lists:flatten(
+    NewItemsHoldBackQ = lists:append(
                           merge_item_states(Tid, tx_state_get_txitemids(NewEntry),
                                             ItemStates, NewState, Learners, LAcceptor)),
 

@@ -134,11 +134,11 @@ on({takeover_after_rm_change, LeaseId, _Lease, Result}, State) ->
                         {value, L2} ->
                             case l_on_cseq:get_timeout(L) =:= l_on_cseq:get_timeout(L2) of
                                 true ->
-                                    ?TRACE("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
+                                    ?TRACE("retry ~s", [l_on_cseq:get_pretty_timeout(L)]),
                                     LeaseTimeout = l_on_cseq:get_timeout(L),
                                     Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, L, '_'}),
                                     WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
-                                    ?TRACE("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
+                                    ?TRACE("retry ~s ~w", [l_on_cseq:get_pretty_timeout(L), WaitTime]),
                                     case WaitTime < 500*1000 of
                                         true ->
                                             l_on_cseq:lease_takeover(L, Pid);

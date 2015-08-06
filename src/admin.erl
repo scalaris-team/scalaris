@@ -316,7 +316,7 @@ get_dump() ->
     GetKeys =
         fun(DumpsX, ElementX) ->
                 lists:usort(
-                  lists:flatten(
+                  lists:append(
                     [gb_trees:keys(element(ElementX, DumpX)) || DumpX <- DumpsX]))
         end,
     ReceivedKeys = GetKeys(Dumps, 1),

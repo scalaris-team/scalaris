@@ -227,7 +227,7 @@ resolve_remote_pids(Trace) ->
     % -> find (a) and replace (b):
     DictResolved =
         dict:from_list(
-          lists:flatten(
+          lists:append(
             [begin
                  Pid1 = element(4, Event),
                  Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),

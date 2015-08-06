@@ -231,10 +231,10 @@ cached_lookup(SearchGrp, PidName) ->
             %% try in my own group first
             X = case my_groupname() of
                     undefined -> failed;
-                    GrpName when SearchGrp =:= GrpName ->
+                    SearchGrp ->
                         %% lookup in own group
-                        case ets:lookup(?MODULE, {GrpName, PidName}) of
-                            [{{GrpName, PidName}, FPid}] -> FPid;
+                        case ets:lookup(?MODULE, {SearchGrp, PidName}) of
+                            [{{SearchGrp, PidName}, FPid}] -> FPid;
                             [] -> failed
                         end;
                     GrpName ->
@@ -257,7 +257,7 @@ cached_lookup(SearchGrp, PidName) ->
                             %% processes not registered in a pid_group (failed)
                             %% io:format("Ring is created to find a ~p in ~p ~p~n",
                             %% [PidName, self(), pid_groups:group_and_name_of(self())]),
-                            Ring = ring_new([PidX || PidX <- lists:flatten(Pids),
+                            Ring = ring_new([PidX || [PidX] <- Pids,
                                                      erlang:is_process_alive(PidX),
                                                      erlang:process_info(PidX, priority) =/= {priority, low}]),
                             {Pid, NewPids} = ring_get(Ring),
@@ -308,12 +308,12 @@ ring_new(L) -> {L, []}.
 -spec find_all(pidname()) -> [pid()].
 find_all(PidName) ->
     PidList = ets:match(?MODULE, {{'_', PidName}, '$1'}),
-    lists:flatten(PidList).
+    lists:append(PidList).
 
 -spec members(groupname()) -> [pid()].
 members(GrpName) ->
     PidList = ets:match(?MODULE, {{GrpName, '_'}, '$1'}),
-    lists:flatten(PidList).
+    lists:append(PidList).
 
 -spec members_by_name(groupname()) -> [pidname()].
 members_by_name(GrpName) ->
