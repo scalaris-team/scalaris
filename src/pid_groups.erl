@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin,
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -159,7 +159,7 @@ my_pidname() -> erlang:get('$@pidname').
 get_my(PidName) ->
     case my_groupname() of
         undefined -> failed;
-        GrpName   -> pid_of(GrpName, PidName)
+        GrpName   -> cached_lookup(GrpName, PidName)
     end.
 
 -spec my_members() -> [pid()].
@@ -175,10 +175,7 @@ my_tab2list() ->
 %% @doc lookup a pid via its group name and pid name.
 -spec pid_of(groupname(), pidname()) -> pid() | failed.
 pid_of(GrpName, PidName) ->
-    case ets:lookup(?MODULE, {GrpName, PidName}) of
-        [{{GrpName, PidName}, Pid}] -> Pid;
-        []                          -> failed
-    end.
+    cached_lookup(GrpName, PidName).
 
 %% @doc lookup group and pid name of a process via its pid.
 -spec group_and_name_of(pid()) -> {groupname(), pidname()} | failed.
@@ -213,19 +210,49 @@ groups_with(PidName) ->
         []   -> failed
     end.
 
+%% @doc find a pid with the given name (search in own group first), otherwise
+%% allow round-robin returns of all the pids with this name in any group
 -spec find_a(pidname()) -> pid() | failed.
 find_a(PidName) ->
-    CachedName = {'$?scalaris_pid_groups_cache', PidName},
+    cached_lookup('_', PidName).
+
+%% @doc perform a lookup with caching and cheking whether the cache is up to date.
+%% Commonly used by find_a/1 and get_my/1. get_my should only search in the own
+%% group, while find_a/1 first searches the own group and then searches in other
+%% groups (parameter SearchGrp =:= '_' instead of a groupname()). For find_a/1,
+%% if several matching pidnames are found, we use a round-robin cache per client
+%% process to spread the load.
+%% @private
+-spec cached_lookup('_' | groupname(), pidname()) -> pid() | failed.
+cached_lookup(SearchGrp, PidName) ->
+    CachedName = {'$?scalaris_pid_groups_cache', SearchGrp, PidName},
     case erlang:get(CachedName) of
         undefined ->
             %% try in my own group first
-            case get_my(PidName) of
+            X = case my_groupname() of
+                    undefined -> failed;
+                    GrpName when SearchGrp =:= GrpName ->
+                        %% lookup in own group
+                        case ets:lookup(?MODULE, {GrpName, PidName}) of
+                            [{{GrpName, PidName}, FPid}] -> FPid;
+                            [] -> failed
+                        end;
+                    GrpName ->
+                        %% generic search, but lookup in own group first.
+                        %% recursive call to ask cache of own group before doing a lookup
+                        cached_lookup(GrpName, PidName)
+                end,
+            %% when (failed =:= X) -> search in own group did not help
+            case X of
                 failed ->
-                    %% search others
-                    case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
+                    %% search others (when SearchGrp =:= '_' as in find_a/1)
+                    case ets:match(?MODULE, {{SearchGrp, PidName}, '$1'}) of
+                        [[FoundPid]] ->
+                            erlang:put(CachedName, FoundPid),
+                            FoundPid;
                         [[_TPid] | _] = Pids ->
                             %% fill process local cache
-
+                            ?DBG_ASSERT(SearchGrp =:= '_'),
                             %% This should only happen for client
                             %% processes not registered in a pid_group (failed)
                             %% io:format("Ring is created to find a ~p in ~p ~p~n",
@@ -237,8 +264,8 @@ find_a(PidName) ->
                             erlang:put(CachedName, NewPids),
                             Pid;
                         [] ->
-                            io:format("***No pid registered for ~p~n",
-                                      [PidName]),
+                            log:log(info, "***No pid registered for ~p ~p~n",
+                                    [PidName, util:get_stacktrace()]),
                             failed
                     end;
                 Pid ->
@@ -252,18 +279,20 @@ find_a(PidName) ->
                 true ->
                     Pid;
                 false -> erlang:erase(CachedName),
-                         find_a(PidName)
+                         cached_lookup(SearchGrp, PidName)
             end;
         Pids ->
             %% clean process local cache if entry is outdated
             {Pid, NewPids} = ring_get(Pids),
-            case erlang:is_process_alive(Pid) andalso
-                     erlang:process_info(Pid, priority) =/= {priority, low} of
+            case erlang:is_pid(Pid)
+                andalso erlang:is_process_alive(Pid)
+                andalso
+                erlang:process_info(Pid, priority) =/= {priority, low} of
                 true ->
                     erlang:put(CachedName, NewPids),
                     Pid;
                 false -> erlang:erase(CachedName),
-                         find_a(PidName)
+                         cached_lookup(SearchGrp, PidName)
             end
     end.
 
