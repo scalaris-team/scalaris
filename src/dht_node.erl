@@ -417,7 +417,7 @@ on({web_debug_info, Requestor}, State) ->
          {"load", webhelpers:safe_html_string("~p", [Load])},
          {"join_time", webhelpers:safe_html_string("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))])},
 %%          {"db", webhelpers:safe_html_string("~p", [dht_node_state:get(State, db)])},
-%%          {"proposer", webhelpers:safe_html_string("~p", [dht_node_state:get(State, proposer)])},
+%%          {"proposer", webhelpers:safe_html_string("~p", [pid_groups:get_my(paxos_proposer)])},
          {"tx_tp_db", webhelpers:safe_html_string("~p", [dht_node_state:get(State, tx_tp_db)])},
          {"slide_pred", webhelpers:safe_html_string("~p", [dht_node_state:get(State, slide_pred)])},
          {"slide_succ", webhelpers:safe_html_string("~p", [dht_node_state:get(State, slide_succ)])},

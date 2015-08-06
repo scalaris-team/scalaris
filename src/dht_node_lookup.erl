@@ -120,7 +120,7 @@ lookup_fin_chord(State, Key, Data, Msg) ->
         []    ->
             case dht_node_state:is_db_responsible__no_msg_fwd_check(Key, State) of
                 true ->
-                    %comm:send_local(dht_node_state:get(State, monitor_proc),
+                    %comm:send_local(pid_groups:get_my(dht_node_monitor),
                     %                {lookup_hops, Hops}),
                     %Unwrap = ?RT:unwrap_message(Msg, State),
                     %gen_component:post_op(Unwrap, State);
@@ -206,7 +206,7 @@ lookup_fin_failed(State, _Target, {?lookup_fin, Key, Data, Msg} = _Message) ->
 
 deliver(State, Msg, Consistency, Hops) ->
     %log:log("lookup_fin success: ~p ~p", [self(), Msg]),
-    comm:send_local(dht_node_state:get(State, monitor_proc),
+    comm:send_local(pid_groups:get_my(dht_node_monitor),
                     {lookup_hops, Hops}),
     Unwrap = ?RT:unwrap_message(Msg, State),
     case Unwrap of

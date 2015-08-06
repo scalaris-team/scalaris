@@ -63,8 +63,8 @@
 -type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
               | succ_pid | predlist | pred | pred_id | pred_pid | node
               | node_id | my_range | db_range | succ_range | join_time
-              | db | tx_tp_db | proposer | load | slide_pred | slide_succ
-              | msg_fwd | rm_state | monitor_proc | prbr_state.
+              | db | tx_tp_db | load | slide_pred | slide_succ
+              | msg_fwd | rm_state | prbr_state.
 
 -type slide_snap() :: {snapshot_state:snapshot_state(), db_dht:db_as_list()} | {false}.
 
@@ -83,14 +83,12 @@
                 join_time  = ?required(state, join_time) :: erlang_timestamp(),
                 db         = ?required(state, db)        :: db_dht:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
-                proposer   = ?required(state, proposer)  :: pid(),
                 % slide with pred (must not overlap with 'slide with succ'!):
                 slide_pred              = null :: slide_op:slide_op() | null,
                 % slide with succ (must not overlap with 'slide with pred'!):
                 slide_succ              = null :: slide_op:slide_op() | null,
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
-                monitor_proc            = ?required(state, monitor_proc) :: pid(),
                 prbr_kv_db = ?required(state, prbr_kv_db) :: prbr:state(),
                 txid_dbs = ?required(state, txid_dbs) :: tuple(),
                 lease_dbs = ?required(state, lease_dbs) :: tuple(),
@@ -113,8 +111,6 @@ new(RT, RMState, DB) ->
            join_time = os:timestamp(),
            db = DB,
            tx_tp_db = tx_tp:init(),
-           proposer = pid_groups:get_my(paxos_proposer),
-           monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = prbr:init(prbr_kv_db),
            txid_dbs = erlang:make_tuple(config:read(replication_factor), ok, TxidDBs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, LeaseDBs),
@@ -141,8 +137,6 @@ new_on_recover(RT, RMState,
            join_time = os:timestamp(),
            db = db_dht:new(db_dht),
            tx_tp_db = tx_tp:init(),
-           proposer = pid_groups:get_my({dht_node, proposer}),
-           monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = PRBR_KV_DB,
            txid_dbs  = erlang:make_tuple(config:read(replication_factor), ok, IndexedTXIDs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, IndexedLeases),
@@ -189,7 +183,6 @@ delete_for_rejoin(
 %%        <li>join_time = the time the node was created, i.e. joined the system,</li>
 %%        <li>db = DB storing the items,</li>
 %%        <li>tx_tp_db = transaction participant DB,</li>
-%%        <li>proposer = paxos proposer PID,</li>
 %%        <li>load = the load (items) of the own node (provided for convenience).</li>
 %%        <li>load2 = the load (see in config lb_active_load_metric) of the own node (provided for convenience).</li>
 %%        <li>load3 = the load (see in config lb_active_request_metric) of the own node (provided for convenience).</li>
@@ -221,7 +214,6 @@ delete_for_rejoin(
          (state(), join_time) -> erlang_timestamp();
          (state(), db) -> db_dht:db();
          (state(), tx_tp_db) -> any();
-         (state(), proposer) -> pid();
          (state(), load) -> integer();
          (state(), load2) -> unknown | lb_stats:load();
          (state(), load3) -> lb_stats:load();
@@ -230,15 +222,14 @@ delete_for_rejoin(
          (state(), snapshot_state) -> snapshot_state:snapshot_state() | null;
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
-         (state(), monitor_proc) -> pid();
          (state(), prbr_kv_db) -> prbr:state();
          (state(), {tx_id, pos_integer()}) -> prbr:state();
          (state(), {lease_db, pos_integer()}) -> prbr:state();
          (state(), lease_list) -> lease_list:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
-           db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
+           db=DB, tx_tp_db=TxTpDb,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
+           db_range=DBRange, prbr_kv_db=PRBRState,
            lease_list=LeaseList, txid_dbs = TXID_DBs, lease_dbs = LeaseDBs,
            snapshot_state=SnapState} = State, Key) ->
     case Key of
@@ -266,11 +257,9 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
                         end;
         db           -> DB;
         tx_tp_db     -> TxTpDb;
-        proposer     -> Proposer;
         slide_pred   -> SlidePred;
         slide_succ   -> SlideSucc;
         rm_state     -> RMState;
-        monitor_proc -> MonitorProc;
         snapshot_state -> SnapState;
         succlist     -> nodelist:succs(rm_loop:get_neighbors(RMState));
         succ         -> nodelist:succ(rm_loop:get_neighbors(RMState));

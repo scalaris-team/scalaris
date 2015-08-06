@@ -143,7 +143,6 @@
 -record(rr_recon_state,
         {
          ownerPid           = ?required(rr_recon_state, ownerPid)    :: pid(),
-         dhtNodePid         = ?required(rr_recon_state, dhtNodePid)  :: pid(),
          dest_rr_pid        = ?required(rr_recon_state, dest_rr_pid) :: comm:mypid(), %dest rrepair pid
          dest_recon_pid     = undefined                              :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                              :: method() | undefined,
@@ -212,12 +211,12 @@ on({create_struct, RMethod, SenderI} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     % (first) request from initiator to create a sync struct
     This = comm:reply_as(comm:this(), 2, {create_struct2, '_'}),
-    comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, This, my_range}),
+    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, my_range}),
     State#rr_recon_state{method = RMethod, initiator = false, dest_interval = SenderI};
 
 on({create_struct2, {get_state_response, MyI}} = _Msg,
    State = #rr_recon_state{stage = req_shared_interval, initiator = false,
-                           method = RMethod,            dhtNodePid = DhtPid,
+                           method = RMethod,
                            dest_rr_pid = DestRRPid,     dest_interval = SenderI}) ->
     ?TRACE1(_Msg, State),
     % target node got sync request, asked for its interval
@@ -234,7 +233,8 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
             end,
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
-            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), create_struct),
+            send_chunk_req(pid_groups:get_my(dht_node), self(),
+                           SyncI, SenderSyncI, get_max_items(), create_struct),
             NewState;
         true ->
             shutdown(empty_interval, NewState)
@@ -322,8 +322,8 @@ on({start_recon, RMethod, Params} = _Msg,
     % client only sends non-empty sync intervals or exits
     ?DBG_ASSERT(not intervals:is_empty(MySyncI)),
     
-    DhtNodePid = State#rr_recon_state.dhtNodePid,
-    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
+    send_chunk_req(pid_groups:get_my(dht_node), self(),
+                   MySyncI, MySyncI, get_max_items(), Reconcile),
     State#rr_recon_state{stage = Stage, params = Params1,
                          method = RMethod, initiator = true,
                          my_sync_interval = MySyncI,
@@ -332,7 +332,7 @@ on({start_recon, RMethod, Params} = _Msg,
 
 on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = resolve,            initiator = true,
-                           method = trivial,           dhtNodePid = DhtNodePid,
+                           method = trivial,
                            params = #trivial_recon_struct{sig_size = SigSize,
                                                           ver_size = VSize},
                            dest_rr_pid = DestRR_Pid,   stats = Stats,
@@ -387,14 +387,15 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                          to_resolve = {[], []},
                                          misc = []});
        true ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve),
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, RestI, get_max_items(), resolve),
            State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
                                 misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen}}]}
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
-                           method = shash,             dhtNodePid = DhtNodePid,
+                           method = shash,
                            params = #shash_recon_struct{sig_size = SigSize,
                                                         p1e = P1E} = Params,
                            stats = Stats,              kv_list = KVList,
@@ -415,7 +416,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
     %if rest interval is non empty start another sync
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile),
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, RestI, get_max_items(), reconcile),
            NewState;
        true ->
            FullDiffSize = length(NewKVList),
@@ -474,7 +476,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
-                           method = bloom,             dhtNodePid = DhtNodePid,
+                           method = bloom,
                            params = #bloom_recon_struct{p1e = P1E},
                            stats = Stats,              kv_list = KVList,
                            misc = [{bloom, BF}],
@@ -492,7 +494,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     %if rest interval is non empty start another sync
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile),
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, RestI, get_max_items(), reconcile),
            State#rr_recon_state{kv_list = NewKVList};
        true ->
            FullDiffSize = length(NewKVList),
@@ -806,7 +809,7 @@ build_struct(DBList, SyncI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
                                      struct = {},
                                      initiator = Initiator, stats = Stats,
-                                     dhtNodePid = DhtNodePid, stage = Stage,
+                                     stage = Stage,
                                      kv_list = KVList}) ->
     ?DBG_ASSERT(not intervals:is_empty(SyncI)),
     % note: RestI already is a sub-interval of the sync interval
@@ -817,8 +820,8 @@ build_struct(DBList, SyncI, RestI,
                     if Initiator andalso (Stage =:= reconciliation) -> reconcile;
                        true -> create_struct
                     end,
-                send_chunk_req(DhtNodePid, self(), RestI, SyncI,
-                               get_max_items(), Reconcile),
+                send_chunk_req(pid_groups:get_my(dht_node), self(),
+                               RestI, SyncI, get_max_items(), Reconcile),
                 false;
             true -> true
         end,
@@ -2528,7 +2531,6 @@ init(State) ->
         -> {ok, pid()}.
 start(SessionId, SenderRRPid) ->
     State = #rr_recon_state{ ownerPid = self(),
-                             dhtNodePid = pid_groups:get_my(dht_node),
                              dest_rr_pid = SenderRRPid,
                              stats = rr_recon_stats:new([{session_id, SessionId}]) },
     PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, SessionId, randoms:getRandomString()])),

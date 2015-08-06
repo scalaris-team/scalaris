@@ -84,7 +84,6 @@
 -record(rr_resolve_state,
         {
          ownerPid       = ?required(rr_resolve_state, ownerPid)   :: pid(),
-         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid) :: pid(),
          operation      = undefined                               :: undefined | operation(),
          my_range       = undefined                               :: undefined | intervals:interval(),
          fb_dest_pid    = undefined                               :: undefined | comm:mypid(),
@@ -133,7 +132,7 @@ on({start, Operation, Options}, State) ->
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
            [util:extint2atom(element(1, Operation)), FBDest, SID]),
-    send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), my_range}),
     NewState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,14 +141,14 @@ on({start, Operation, Options}, State) ->
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {?key_upd, KvvList, ReqKeys},
-                          dhtNodePid = DhtPid, stats = _Stats }) ->
+                          stats = _Stats }) ->
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p",
            [key_upd, _Stats#resolve_stats.session_id, MyI, length(KvvList)]),
 
     % send requested entries (similar to key_upd_send handling)
     RepKeyInt = intervals:from_elements(map_key_list(ReqKeys, MyI)),
-    send_local(DhtPid, {get_entries, self(), RepKeyInt}),
+    send_local(pid_groups:get_my(dht_node), {get_entries, self(), RepKeyInt}),
 
     % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
@@ -163,11 +162,12 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIOtherKvvList, []},
-                          dhtNodePid = DhtPid, fb_send_kvv_req = [],
+                          fb_send_kvv_req = [],
                           stats = Stats}) ->
     % note: EntryList may not be unique! - it is made unique in shutdown/2 though
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(), DhtPid),
+    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(),
+                                        pid_groups:get_my(dht_node)),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
            [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)]),
 
@@ -187,11 +187,11 @@ on({get_entries_response, EntryList}, State =
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, _ReqKeys},
-                          dhtNodePid = DhtPid, stats = _Stats }) ->
+                          stats = _Stats }) ->
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
            [key_upd_send, _Stats#resolve_stats.session_id, MyI]),
     SendKeysMappedInterval = intervals:from_elements(map_key_list(SendKeys, MyI)),
-    send_local(DhtPid, {get_entries, self(), SendKeysMappedInterval}),
+    send_local(pid_groups:get_my(dht_node), {get_entries, self(), SendKeysMappedInterval}),
     State;
 
 on({get_entries_response, EntryList}, State =
@@ -223,7 +223,7 @@ on({get_entries_response, EntryList}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
+       #rr_resolve_state{ operation = Op, stats = _Stats })
   when element(1, Op) =:= ?interval_upd;
        element(1, Op) =:= interval_upd_send ->
     % map the given interval into MyI
@@ -249,7 +249,7 @@ on({get_state_response, MyI}, State =
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
         false ->
-            send_local(DhtPid, {get_entries, self(), ISec}),
+            send_local(pid_groups:get_my(dht_node), {get_entries, self(), ISec}),
             NewState;
         true ->
             shutdown(resolve_abort, NewState)
@@ -258,10 +258,10 @@ on({get_state_response, MyI}, State =
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?interval_upd, I, KvvList},
                           my_range = MyI,
-                          dhtNodePid = DhtPid,
                           stats = Stats }) ->
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
-    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(), DhtPid),
+    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(),
+                                        pid_groups:get_my(dht_node)),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
            [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate]),
 
@@ -628,8 +628,7 @@ init(State) ->
 
 -spec start() -> {ok, MyPid::pid()}.
 start() ->
-    State = #rr_resolve_state{ ownerPid = self(),
-                               dhtNodePid = pid_groups:get_my(dht_node) },
+    State = #rr_resolve_state{ownerPid = self()},
     PidName = lists:flatten(io_lib:format("~s.~s", [?MODULE, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
                              [{pid_groups_join_as, pid_groups:my_groupname(),

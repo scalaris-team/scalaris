@@ -362,7 +362,7 @@ handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
     case requests_balance() of
         true ->
             MyPredId = dht_node_state:get(DhtState, pred_id),
-            DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
+            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
             comm:send_local(DhtNodeMonitor, {db_histogram_init, MyPredId});
         _ -> ok
     end,

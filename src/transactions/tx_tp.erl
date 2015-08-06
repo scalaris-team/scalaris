@@ -73,8 +73,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo}, DHT_Node_S
                 end,
             %% initiate a paxos proposer round 0 with the proposal
             R = config:read(replication_factor),
-            Proposer = comm:make_global(dht_node_state:get(DHT_Node_State,
-                                                           proposer)),
+            Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
             proposer:start_paxosid(Proposer, PaxId,
                                    _Acceptors = Accs, Proposal,
                                    _Maj = quorum:majority_for_accept(R),
@@ -112,7 +111,7 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, TMSnapNo, D
         {PaxosId, Proposal} ->
             NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, Proposal, TMSnapNo, DHT_Node_State),
             %% delete corresponding proposer state
-            Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
+            Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
             proposer:stop_paxosids(Proposer, [PaxosId]),
             pdb:delete(PaxosId, TP_DB),
             dht_node_state:set_db(DHT_Node_State, NewDB);
