@@ -1,3 +1,18 @@
 *.class
 datanucleus.log
-*/target/**
+
+*.jar
+/bin
+
+# maven
+target/
+release.properties
+
+# eclipse
+*.project
+*.metadata
+*.tmp
+local.properties
+.settings/
+.loadpath
+.classpath
