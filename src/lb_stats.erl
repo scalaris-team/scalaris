@@ -1,4 +1,4 @@
-%  @copyright 2014 Zuse Institute Berlin
+%  @copyright 2014-2015 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -176,7 +176,7 @@ get_request_metric() ->
 
 -spec get_vm_metric(load_metric()) -> unknown | load().
 get_vm_metric(Metric) ->
-    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
+    ClientMonitorPid = pid_groups:pid_of(clients_group, monitor),
     get_metric(ClientMonitorPid, Metric).
 
 -spec get_dht_metric(load_metric() | request_metric()) -> unknown | load().

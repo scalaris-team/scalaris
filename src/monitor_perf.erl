@@ -1,4 +1,4 @@
-%  @copyright 2011-2014 Zuse Institute Berlin
+%  @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -231,7 +231,7 @@ on({bulkowner, deliver, Id, _Range, {gather_stats, SourcePid}, Parents} = _Msg, 
     % retrieve stats for gather_stats
     MyMonitor = pid_groups:get_my(monitor), % "basic_services" group
     [Val_RR] = monitor:get_rrds(MyMonitor, [{?MODULE, 'read_read'}]),
-    ClientMonitor = pid_groups:pid_of("clients_group", monitor),
+    ClientMonitor = pid_groups:pid_of(clients_group, monitor),
     [Val_TX] = monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]),
     % no need to reduce the multiple LH values - the next gather handler will do that
     DB_LH = [begin

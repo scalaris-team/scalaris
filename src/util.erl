@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1265,11 +1265,9 @@ debug_info() ->
     [ [ debug_info(Y) || Y <- pid_groups:members(X)] || X <- pid_groups:groups()].
 
 -spec debug_info(pid()) -> [{string(), term()}];
-                (atom() | string()) -> [[{string(), term()}]].
+                (atom()) -> [[{string(), term()}]].
 debug_info(PidName) when is_atom(PidName) ->
     [ debug_info(X) || X <- pid_groups:find_all(PidName)];
-debug_info(Group) when is_list(Group) ->
-    [ debug_info(X) || X <- pid_groups:members(Group)];
 debug_info(Pid) when is_pid(Pid) ->
     {GenCompDesc, GenCompInfo} =
         case gen_component:is_gen_component(Pid) of
@@ -1279,7 +1277,7 @@ debug_info(Pid) when is_pid(Pid) ->
                 trace_mpath:thread_yield(),
                 receive
                     ?SCALARIS_RECV({web_debug_info_reply, LocalKVs}, %% ->
-                                   {[{"pidgroup", Grp},
+                                   {[{"pidgroup", pid_groups:group_to_string(Grp)},
                                      {"pidname", webhelpers:safe_html_string("~p", [Name])}],
                                     LocalKVs})
                 after 1000 -> {[], []}

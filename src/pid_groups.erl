@@ -80,10 +80,16 @@
          groups/0,        %% () -> [GrpName]
          tab2list/0]).    %% () -> [{GrpName, PidName, Pid}]
 
+%% for persistency
+-export([group_to_filename/1,   %% (GrpName) -> string()
+         filename_to_group/1]). %% (string()) -> GrpName
+
 %% for the monitoring in the web interface
 -export([get_web_debug_info/2,    %% (Group, PidName) -> any()
-        groups_as_json/0,
-        members_by_name_as_json/1]).
+         groups_as_json/0,
+         members_by_name_as_json/1,
+         group_to_string/1,
+         string_to_group/1]).
 
 %% for unittests when group is in breakpoint
 -export([hide/1, unhide/1]).
@@ -95,7 +101,9 @@
                  | {atom(), atom()}
                  | {atom(), pos_integer()}                 % the nth lease_db
                  | {{atom(), pos_integer()}, atom()}).     % the acceptor of the nths tm
--type(groupname() :: nonempty_string()).
+-type(groupname() :: atom()
+                   | pos_integer()
+                   | {atom(), pos_integer()}).
 
 -type(message() ::
     {pid_groups_add, groupname(), pidname(), pid()} |
@@ -107,12 +115,12 @@
 %% @doc create a new group with a random name.
 -spec new() -> groupname().
 new() ->
-    randoms:getRandomString().
+    randoms:getRandomInt().
 
 %% @doc create a new group with a given prefix.
--spec new(string()) -> groupname().
+-spec new(atom()) -> groupname().
 new(Prefix) ->
-    Prefix ++ new().
+    {Prefix, new()}.
 
 %%% group membership management
 %% @doc Current process joins the group GrpName, but has no process name.
@@ -335,6 +343,28 @@ groups() ->
 -spec tab2list() -> [{{groupname(), pidname()}, pid()}].
 tab2list() -> ets:tab2list(?MODULE).
 
+%% @doc only supports the form {atom(), pos_integer()} | atom(). Not
+%%      deeper nested structures.
+-spec group_to_filename(groupname()) -> nonempty_string().
+group_to_filename(GrpName) when is_atom(GrpName) ->
+    atom_to_list(GrpName);
+group_to_filename(GrpName) when is_integer(GrpName) ->
+    integer_to_list(GrpName);
+group_to_filename({Prefix, Postfix}) ->
+    group_to_filename(Prefix) ++ "@" ++ group_to_filename(Postfix).
+
+%% @doc only supports the form {atom(), pos_integer()} | atom(). Not
+%%      deeper nested structures.
+-spec filename_to_group(nonempty_string()) -> groupname().
+%% filename_to_group([]) -> {'',''};
+filename_to_group(GrpName) ->
+    case string:sub_word(GrpName, 1, $@) of
+        GrpName ->
+            list_to_atom(GrpName);
+        Part1 ->
+            {list_to_atom(Part1), list_to_integer(string:sub_word(GrpName, 2, $@))}
+    end.
+
 %% @doc Resolve a local pid to its name.
 -spec pid_to_name(pid() | {groupname(), pidname()}) -> string().
 pid_to_name(Pid) when is_pid(Pid) ->
@@ -381,9 +411,12 @@ pids_to_names(Pids, Timeout) ->
 
 %% for the monitoring in the web interface
 %% @doc get info about a process
--spec get_web_debug_info(groupname(), nonempty_string()) ->
+-spec get_web_debug_info(string(), string()) ->
    {struct, [{pairs, {array, [{struct, [{key | value, nonempty_string()}]}]}}]}.
-get_web_debug_info(GrpName, PidNameString) ->
+get_web_debug_info([], []) ->
+    {struct, [{pairs, {array, [ {struct, [{key, "process"}, {value, "unknown"}]} ]}}]};
+get_web_debug_info(GrpStr, PidNameString) ->
+    GrpName = string_to_group(GrpStr),
     KVs = case pid_of_string(GrpName, PidNameString) of
               failed -> [{"process", "unknown"}];
               Pid    -> util:debug_info(Pid)
@@ -397,21 +430,38 @@ get_web_debug_info(GrpName, PidNameString) ->
 groups_as_json() ->
     GroupList = groups(),
     GroupListAsStructs =
-        [ {struct, [{id, El}, {text, El}, {leaf, false}]} || El <- GroupList ],
+        [ {struct, [{id, group_to_string(El)}, {text, group_to_string(El)}, {leaf, false}]} || El <- GroupList ],
     {array, GroupListAsStructs}.
 
 %% @doc find processes in a group (for web interface)
--spec members_by_name_as_json(groupname()) ->
+-spec members_by_name_as_json(nonempty_string()) ->
    {array, [{struct, [{id | text, nonempty_string()} | {leaf, true}]}]}.
-members_by_name_as_json(GrpName) ->
+members_by_name_as_json(GrpString) ->
+    GrpName = string_to_group(GrpString),
     PidList = members_by_name(GrpName),
     PidListAsJson =
         [ begin
               ElStr = pidname_to_string(El),
-              {struct, [{id, GrpName ++ "." ++ ElStr},
+              {struct, [{id, GrpString ++ "." ++ ElStr},
                         {text, ElStr}, {leaf, true}]}
           end || El <- PidList ],
     {array, PidListAsJson}.
+
+-spec group_to_string(groupname()) -> string().
+group_to_string(Group) when is_atom(Group) ->
+    atom_to_list(Group);
+group_to_string(Group) when is_integer(Group) ->
+    integer_to_list(Group);
+group_to_string(Group) when is_tuple(Group) ->
+    lists:flatten(io_lib:format("~p", [Group])).
+
+-spec string_to_group(nonempty_string()) -> groupname() | failed.
+string_to_group(GrpStr) ->
+    case [Name || Name <- groups(),
+                  group_to_string(Name) =:= GrpStr] of
+        [GrpName] -> GrpName;
+        [] -> failed
+    end.
 
 %% @doc hide a group of processes temporarily (for paused groups in
 %% unit tests)
@@ -527,7 +577,8 @@ pidname_to_string(Name) when is_tuple(Name) ->
 pidname_to_string(Name) when is_list(Name) ->
     Name.
 
--spec pid_of_string(groupname(), nonempty_string()) -> pid() | failed.
+-spec pid_of_string(groupname() | failed, nonempty_string()) -> pid() | failed.
+pid_of_string(failed, _) -> failed;
 pid_of_string(GrpName, [${ | _] = PidNameStr) ->
     case [Name || Name <- members_by_name(GrpName),
                   pidname_to_string(Name) =:= PidNameStr] of

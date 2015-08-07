@@ -35,7 +35,8 @@ get_name(DBName = {Name, Id}) when is_tuple(DBName) ->
 get_name(DBName) ->
     ?DBG_ASSERT(not lists:member($+, DBName)),
     RandomName = randoms:getRandomString(),
-    DBName ++ "+" ++ pid_groups:my_groupname() ++ "+" ++ RandomName.
+    DBName ++ "+" ++ pid_groups:group_to_filename(pid_groups:my_groupname())
+        ++ "+" ++ RandomName.
 
 -spec get_subscriber_name(DBName::nonempty_string()) -> nonempty_string().
 get_subscriber_name(DBName) ->
@@ -55,4 +56,6 @@ get_recoverable_dbs() ->
 parse_table_name(Table) when is_atom(Table) ->
     parse_table_name(erlang:atom_to_list(Table));
 parse_table_name(Table) ->
-    {string:sub_word(Table, 1, $+), string:sub_word(Table, 2, $+), Table}.
+    {string:sub_word(Table, 1, $+),
+     pid_groups:filename_to_group(string:sub_word(Table, 2, $+)),
+     Table}.

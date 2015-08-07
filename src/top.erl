@@ -39,7 +39,7 @@
                    no_exclude | pid()
                  }.
 
--spec start_link(list()) -> {ok, pid()}.
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(Group) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                              [{erlang_register, ?MODULE},

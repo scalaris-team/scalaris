@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -113,7 +113,7 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
-    pid_groups:join_as("ct_tests", ?MODULE),
+    pid_groups:join_as(ct_tests, ?MODULE),
     Config.
 
 end_per_testcase(_TestCase, _Config) ->

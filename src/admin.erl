@@ -52,7 +52,7 @@ add_node_at_id(Id) ->
 -spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
     DhtNodeId = randoms:getRandomString(),
-    Group = pid_groups:new("dht_node_"),
+    Group = pid_groups:new(dht_node),
     Desc = sup:supervisor_desc(
              DhtNodeId, sup_dht_node, start_link,
              [{Group,
@@ -72,14 +72,20 @@ add_node(Options) ->
 add_nodes(0) -> {[], []};
 add_nodes(Count) ->
     Results = [add_node([]) || _X <- lists:seq(1, Count)],
-    lists:partition(fun(E) -> not is_tuple(E) end, Results).
+    lists:partition(fun(E) -> case E of
+                                  {error, _} -> false;
+                                  _ -> true
+                              end end, Results).
 %% userdevguide-end admin:add_nodes
 
 -spec add_nodes_at_ids(list(?RT:key())) -> {[pid_groups:groupname()], [{error, term()}]}.
 add_nodes_at_ids([]) -> {[], []};
 add_nodes_at_ids(Keys) ->
     Results = [add_node_at_id(Key) || Key <- Keys],
-    lists:partition(fun(E) -> not is_tuple(E) end, Results).
+    lists:partition(fun(E) -> case E of
+                                  {error, _} -> false;
+                                  _ -> true
+                              end end, Results).
 
 -spec get_dht_node_specs()
         -> [{Id::term() | undefined, Child::pid() | undefined,

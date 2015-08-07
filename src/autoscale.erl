@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin
+% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ alarm_handler(lat_avg, Options) ->
     VmsToRemove = get_alarm_option(Options, vms_to_remove, 1),
     VmsToAdd    = get_alarm_option(Options, vms_to_add, 1),
 
-    Monitor = pid_groups:pid_of("basic_services", monitor),
+    Monitor = pid_groups:pid_of(basic_services, monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, _StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'agg_req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};

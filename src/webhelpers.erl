@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin,
+% @copyright 2007-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -800,7 +800,7 @@ format_gossip_value(Value, Key, Fun) ->
 
 -spec getMonitorClientData() -> html_type().
 getMonitorClientData() ->
-    ClientMonitor = pid_groups:pid_of("clients_group", monitor),
+    ClientMonitor = pid_groups:pid_of(clients_group, monitor),
     {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(ClientMonitor, [{api_tx, 'req_list'}], list) of
             []                           -> {[], [], [], [], [], [], []};
@@ -810,7 +810,7 @@ getMonitorClientData() ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
 
-    VMMonitor = pid_groups:pid_of("basic_services", monitor),
+    VMMonitor = pid_groups:pid_of(basic_services, monitor),
     MemMonKeys = [{monitor_perf, X} || X <- [mem_total, mem_processes, mem_system,
                                              mem_atom, mem_binary, mem_ets]],
     case statistics:getGaugeMonitorStats(VMMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
@@ -880,7 +880,7 @@ get_diff_data([_TimeLast, ValueLast], [Cur = [TimeCur, ValueCur] | Rest])
 
 -spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
-    case pid_groups:pid_of("basic_services", monitor) of
+    case pid_groups:pid_of(basic_services, monitor) of
         failed ->
             Prefix = {p, [], "NOTE: no monitor_perf in this VM"},
             DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;

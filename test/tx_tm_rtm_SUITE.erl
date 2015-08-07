@@ -331,7 +331,7 @@ tp_crash(_) ->
     %% ct:pal("written initial value and setting breakpoints now~n"),
     AllProposers = pid_groups:find_all(paxos_proposer),
     Proposers = [X || X <- AllProposers,
-                      "basic_services" =/= pid_groups:group_of(X)],
+                      basic_services =/= pid_groups:group_of(X)],
     Proposer = hd(Proposers),
     %% ct:pal("Selected ~p~n", [pid_groups:group_and_name_of(Proposer)]),
     %% break one TP (minority) after proposer initialize:
@@ -362,7 +362,7 @@ all_tp_crash(_) ->
     %% ct:pal("written initial value and setting breakpoints now~n"),
     AllProposers = pid_groups:find_all(paxos_proposer),
     Proposers = [X || X <- AllProposers,
-                      "basic_services" =/= pid_groups:group_of(X)],
+                      basic_services =/= pid_groups:group_of(X)],
     %% break all TPs (majority) after proposer initialize:
     _ = [ gen_component:bp_set(Proposer, ?proposer_initialize, all_tp_crash)
           || Proposer <- Proposers],

@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin,
+% @copyright 2013-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@
 
 -type state_t() :: #state{}.
 
--spec start_link(nonempty_string()) -> {ok, pid()}.
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], 
                              [{wait_for_init},

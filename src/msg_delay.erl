@@ -1,4 +1,4 @@
-% @copyright 2009-2014 Zuse Institute Berlin,
+% @copyright 2009-2015 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 % @end
 
@@ -65,7 +65,7 @@ send_local_as_client(Seconds, Dest, Msg) ->
                            Msg::comm:message(), comm:send_local_options())
         -> ok.
 send_local_as_client(Seconds, Dest, Msg, Options) ->
-    Delayer = pid_groups:pid_of("clients_group", msg_delay),
+    Delayer = pid_groups:pid_of(clients_group, msg_delay),
     %% TODO: if infected with proto_sched logging, immediately log msg
     %% to proto_sched for the 'delayed' messages pool (which is not
     %% implemented yet) and do *not* deliver to msg_delay process.

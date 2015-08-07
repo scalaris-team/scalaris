@@ -1,4 +1,4 @@
-%  @copyright 2008-2011 Zuse Institute Berlin
+%  @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,10 +45,10 @@ end_per_suite(_Config) ->
 
 -spec make_groupname(Prefix::string(), Number::integer()) -> pid_groups:groupname().
 make_groupname(Prefix, Number) ->
-    Prefix ++ integer_to_list(Number).
+    {Prefix, Number}.
 
 %% make proposers, acceptors, and learners
--spec make(P::pos_integer(), A::pos_integer(), L::pos_integer(), Prefix::string())
+-spec make(P::pos_integer(), A::pos_integer(), L::pos_integer(), Prefix::atom())
         -> {Ps::[comm:mypid(),...], As::[comm:mypid(),...], Ls::[comm:mypid(),...]}.
 make(P, A, L, Prefix) ->
     NumMDs = lists:max([P,A,L]),
@@ -80,7 +80,7 @@ collect(Count) ->
 %%             collect(Count - 1)
     end.
 
--spec tester_fast_paxos(CountAcceptors::pos_integer(), Count::pos_integer(), Prefix::string()) -> ok.
+-spec tester_fast_paxos(CountAcceptors::pos_integer(), Count::pos_integer(), Prefix::atom()) -> ok.
 tester_fast_paxos(CountAcceptors, Count, Prefix) ->
     %% Count = 10,
     CountProposers = 1,
@@ -104,7 +104,7 @@ tester_fast_paxos(CountAcceptors, Count, Prefix) ->
           || X <- lists:flatten([Proposers, Acceptors, Learners])],
     ok.
 
--spec tester_paxos(CountAcceptors::pos_integer(), Count::pos_integer(), Prefix::string()) -> ok.
+-spec tester_paxos(CountAcceptors::pos_integer(), Count::pos_integer(), Prefix::atom()) -> ok.
 tester_paxos(CountAcceptors, Count, Prefix) ->
     CountProposers = 1,
     Majority = CountAcceptors div 2 + 1,
@@ -170,7 +170,7 @@ test_two_proposers(_Config) ->
     CountAcceptors = 4,
     Majority = CountAcceptors div 2 + 1,
     {Proposers, Acceptors, Learners} =
-        make(CountProposers, CountAcceptors, 1, "two_proposers"),
+        make(CountProposers, CountAcceptors, 1, two_proposers),
 
     %% start paxosids in the components
     learner:start_paxosid(hd(Learners), paxid123, Majority, comm:this(), cpaxid123),
@@ -238,7 +238,7 @@ prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
            [NumProposers, NumAcceptors, Seed]),
     Majority = NumAcceptors div 2 + 1,
     {Proposers, Acceptors, Learners} =
-        make(NumProposers, NumAcceptors, 1, "rnd_interleave"),
+        make(NumProposers, NumAcceptors, 1, rnd_interleave),
     %% set bp on all processes
     _ = [ gen_component:bp_set(comm:make_local(X), ?proposer_initialize, bp)
             ||  X <- Proposers],

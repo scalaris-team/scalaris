@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ test_get_coordinate(_Config) ->
 
 
 test_init(_Config) ->
-    pid_groups:join_as(atom_to_list(?MODULE), gossip),
+    pid_groups:join_as(?MODULE, gossip),
     ?expect_no_message(),
     Ret = gossip_vivaldi:init([]),
     ?equals_pattern(Ret, {ok, {_RandomCoordinate, 1.0}}),
@@ -88,7 +88,7 @@ test_select_node(_Config) ->
 
 
 test_select_data(_Config) ->
-    pid_groups:join_as(atom_to_list(?MODULE), gossip),
+    pid_groups:join_as(?MODULE, gossip),
     Ret = gossip_vivaldi:select_data({[0.1, 0.1], 0.2}),
     ?equals(Ret, {ok, {[0.1, 0.1], 0.2}}),
     This = comm:this(),
@@ -124,7 +124,7 @@ test_update_coordinate(_Config) ->
 update_coordinate(Coord1x, Coord1y, Conf1, Latency, Coord2x, Coord2y, Conf2) ->
     Coord1 = [Coord1x, Coord1y], Coord2 = [Coord2x, Coord2y],
     config:write(gossip_vivaldi_dimensions, 2),
-    pid_groups:join_as(atom_to_list(?MODULE), gossip),
+    pid_groups:join_as(?MODULE, gossip),
     Ret = gossip_vivaldi:handle_msg({update_vivaldi_coordinate,
                                      Latency, {Coord1, Conf1}}, {Coord2, Conf2}),
     ?expect_message({integrated_data, {gossip_vivaldi, default},  cur_round}),

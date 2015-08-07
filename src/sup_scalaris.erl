@@ -47,7 +47,7 @@ start_link() -> start_link([]).
         -> {ok, Pid::pid()} |
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
-    ServiceGroup = "basic_services",
+    ServiceGroup = basic_services,
     Link = sup:sup_start({local, main_sup}, ?MODULE,
                          [{service_group, ServiceGroup} | Options]),
     case Link of
@@ -124,7 +124,7 @@ get_dht_node_descs(Options) ->
                       end,
       DhtNodeId = randoms:getRandomString(),
       DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
-      DHTNodeGroup = pid_groups:new("dht_node_"),
+      DHTNodeGroup = pid_groups:new(dht_node),
       sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
         [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
           | DHTNodeOptions]}])
@@ -148,15 +148,15 @@ childs(Options) ->
     CommLayer =
         sup:supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
     CommStats =
-        sup:worker_desc(comm_stats, comm_stats, start_link, ["comm_layer"]),
+        sup:worker_desc(comm_stats, comm_stats, start_link, [comm_layer]),
     ClientsDelayer =
         sup:worker_desc(clients_msg_delay, msg_delay, start_link,
-                             ["clients_group"]),
+                             [clients_group]),
     BasicServicesDelayer =
         sup:worker_desc(basic_services_msg_delay, msg_delay, start_link,
                              [ServiceGroup]),
     ClientsMonitor =
-        sup:worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
+        sup:worker_desc(clients_monitor, monitor, start_link, [clients_group]),
     %% Moves several lines to get_dht_node_descs() for recovery mechanims
     DHTNodes = get_dht_node_descs(Options),
     FailureDetector = sup:worker_desc(fd, fd, start_link, [ServiceGroup]),

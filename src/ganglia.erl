@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ send_message_metrics() ->
 %% @doc Sends latency and transactions/s rrd data from the monitor to Ganglia
 -spec send_rrd_metrics() -> ok.
 send_rrd_metrics() ->
-    case pid_groups:pid_of("clients_group", monitor) of
+    case pid_groups:pid_of(clients_group, monitor) of
         failed -> ok;
         ClientMonitor ->
             RRDMetrics = case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of

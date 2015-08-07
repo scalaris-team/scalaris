@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,12 +42,12 @@ end_per_suite(Config) ->
     ok.
 
 dn_detection(Config) ->
-    pid_groups:join_as("dn_cache_group", node),
+    pid_groups:join_as(dn_cache_group, node),
     config:write(zombieDetectorInterval, 10),
     NodePid = fake_node(),
     NodePidG = comm:make_global(NodePid),
     Node = node:new(NodePidG, ?RT:hash_key("0"), 0),
-    {ok, _DNCachePid} = dn_cache:start_link("dn_cache_group"),
+    {ok, _DNCachePid} = dn_cache:start_link(dn_cache_group),
     
     dn_cache:subscribe(),
     comm:send(NodePidG, {sleep}),
@@ -65,7 +65,7 @@ dn_detection(Config) ->
 
 fake_node() ->
     element(1, unittest_helper:start_subprocess(
-              fun() -> pid_groups:join_as("dn_cache_group", node) end,
+              fun() -> pid_groups:join_as(dn_cache_group, node) end,
               fun fake_process/0)).
 
 fake_process() ->

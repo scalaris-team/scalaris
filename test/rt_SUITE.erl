@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -72,11 +72,11 @@ number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
 next_hop(_Config) ->
     MyNode = node:new(comm:make_global(self()), number_to_key(0), 0),
-    pid_groups:join_as("rt_SUITE", dht_node),
-    Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
-    Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
+    pid_groups:join_as(?MODULE, dht_node),
+    Succ = node:new(fake_dht_node('.succ'), number_to_key(1), 0),
+    Pred = node:new(fake_dht_node('.pred'), number_to_key(1000000), 0),
     Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
-    DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
+    DHTNodes = [fake_dht_node(X) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {2, 2}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
     RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes], Neighbors]),
     RMState = rm_loop:unittest_create_state(Neighbors, false),
@@ -105,11 +105,11 @@ next_hop(_Config) ->
 
 next_hop2(_Config) ->
     MyNode = node:new(comm:make_global(self()), number_to_key(0), 0),
-    pid_groups:join_as("rt_SUITE", dht_node),
-    Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
-    SuccSucc = node:new(fake_dht_node(".succ.succ"), number_to_key(2), 0),
-    Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
-    DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
+    pid_groups:join_as(?MODULE, dht_node),
+    Succ = node:new(fake_dht_node('.succ'), number_to_key(1), 0),
+    SuccSucc = node:new(fake_dht_node('.succ.succ'), number_to_key(2), 0),
+    Pred = node:new(fake_dht_node('.pred'), number_to_key(1000000), 0),
+    DHTNodes = [fake_dht_node(X) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
     Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
                                   SuccSucc, 2, 2),
@@ -206,7 +206,7 @@ additional_tests(Config) ->
 fake_dht_node(Suffix) ->
     comm:make_global(
       element(1, unittest_helper:start_subprocess(
-                fun() -> pid_groups:join_as("rt_SUITE" ++ Suffix, dht_node) end))).
+                fun() -> pid_groups:join_as({?MODULE, Suffix}, dht_node) end))).
 
 -spec call_helper_fun(Fun::atom(), Args::list()) -> term().
 call_helper_fun(Fun, Args) ->

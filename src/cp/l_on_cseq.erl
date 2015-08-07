@@ -284,7 +284,7 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
                                 {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
                             _ ->
                                 % we are trying to recover
-                                log:log("~s: trying to recover: owner=~p id=~p, self=~p",
+                                log:log("~p: trying to recover: owner=~p id=~p, self=~p",
                                         [pid_groups:my_groupname(), Owner, get_id(Old), comm:this()]),
                                 {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0,
                                            timeout=new_timeout()}, renew_recover}

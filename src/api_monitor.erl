@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 -spec get_node_info() -> [{scalaris_version | erlang_version, nonempty_string()} |
                           {dht_nodes, non_neg_integer()},...].
 get_node_info() ->
-    %MyMonitor = pid_groups:pid_of("clients_group", monitor),
+    %MyMonitor = pid_groups:pid_of(clients_group, monitor),
     %statistics:getTimingMonitorStats(MyMonitor, Keys, tuple),
     [{scalaris_version, ?SCALARIS_VERSION},
      {erlang_version, erlang:system_info(otp_release)},
@@ -38,7 +38,7 @@ get_node_info() ->
 
 -spec get_node_performance() -> list().
 get_node_performance() ->
-    Monitor = pid_groups:pid_of("basic_services", monitor),
+    Monitor = pid_groups:pid_of(basic_services, monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'read_read'}], tuple) of
             []                                  -> {[], [], [], [], [], [], []};
@@ -55,7 +55,7 @@ get_service_info() ->
 
 -spec get_service_performance() -> list().
 get_service_performance() ->
-    Monitor = pid_groups:pid_of("basic_services", monitor),
+    Monitor = pid_groups:pid_of(basic_services, monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'agg_read_read'}], tuple) of
             []                                  -> {[], [], [], [], [], [], []};

@@ -1,4 +1,4 @@
-%  @copyright 2008-2011 Zuse Institute Berlin
+%  @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -418,7 +418,7 @@ md5(_Config) ->
 -define(PID(Nr), comm:make_global(list_to_pid("<0.0." ++ erlang:integer_to_list(Nr) ++ ">"))).
 
 next_hop_setup() ->
-    pid_groups:join_as("performance_SUITE", dht_node),
+    pid_groups:join_as(?MODULE, dht_node),
     Pred = node:new(?PID(1021), 1, 0),
     Me = node:new(?PID(2), 2, 0),
     Succ = node:new(?PID(3), 3, 0),
@@ -451,9 +451,9 @@ next_hop_with_neighbors(_Config) ->
 
 pid_groups_lookup(_Config) ->
     {ok, _Pid} = pid_groups:start_link(),
-    pid_groups:join_as(atom_to_list(?MODULE), pid_groups),
+    pid_groups:join_as(?MODULE, pid_groups),
     iter(count(), fun () ->
-                          pid_groups:pid_of(atom_to_list(?MODULE),
+                          pid_groups:pid_of(?MODULE,
                                             pid_groups)
                   end, "pid_of by group and process name"),
     error_logger:tty(false),
@@ -464,7 +464,7 @@ pid_groups_lookup(_Config) ->
 
 pid_groups_lookup_by_pid(_Config) ->
     {ok, _Pid} = pid_groups:start_link(),
-    pid_groups:join_as(atom_to_list(?MODULE), pid_groups),
+    pid_groups:join_as(?MODULE, pid_groups),
     iter(count(), fun () ->
                           pid_groups:group_and_name_of(self())
                   end, "group_and_name_of pid"),

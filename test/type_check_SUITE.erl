@@ -712,6 +712,7 @@ tester_type_check_util(_Config) ->
              {join_as, 2}, %% tries to join with multiple groups/names
              {on, 2},
              {pids_to_names, 2}, %% sends remote messages
+             {filename_to_group, 1}, %% not every string is convertible
              {start_link, 0}
            ], []},
           {quorum, [], []},

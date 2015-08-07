@@ -1,4 +1,4 @@
-%% @copyright 2008-2012 Zuse Institute Berlin
+%% @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ start_link() ->
                                       PeriodInSeconds::pos_integer()},
                          [ProcessDescr::supervisor:child_spec()]}}.
 init(X) ->
-    CommLayerGroup = "comm_layer",
+    CommLayerGroup = comm_layer,
     pid_groups:join_as(CommLayerGroup, ?MODULE),
     supspec(X).
 
@@ -47,7 +47,7 @@ supspec(_) ->
 -spec childs([]) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([]) ->
-    CommLayerGroup = "comm_layer",
+    CommLayerGroup = comm_layer,
     Delayer =
         sup:worker_desc(comm_layer_msg_delay, msg_delay, start_link,
                              [CommLayerGroup]),

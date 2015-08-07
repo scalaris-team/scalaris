@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin
+% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ end_per_group(_GroupName, Config) ->
 init_per_testcase(_TestCase, Config) ->
     % for unit tests without a ring, we need to be in a pid_group:
     case proplists:get_value(name, proplists:get_value(tc_group_properties, Config, []), none) of
-        without_ring -> pid_groups:join_as("ct_tests", ?MODULE);
+        without_ring -> pid_groups:join_as(ct_tests, ?MODULE);
         _ -> ok
     end,
     [{stop_ring, true} | Config].

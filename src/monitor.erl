@@ -1,4 +1,4 @@
-%  @copyright 2011-2014 Zuse Institute Berlin
+%  @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -152,13 +152,13 @@ proc_check_all_timeslot() ->
             ok
     end.
 
-%% @doc Sets the value at Key inside the monitor process of the "clients_group".
+%% @doc Sets the value at Key inside the monitor process of the 'clients_group'.
 %%      Either specify a new value or an update function which generates the
 %%      new value from the old one.
 -spec client_monitor_set_value(Process::atom(), Key::key(),
                         NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
 client_monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
-    MyMonitor = pid_groups:pid_of("clients_group", monitor),
+    MyMonitor = pid_groups:pid_of(clients_group, monitor),
     comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
 
 %% @doc Checks whether a value exists at Key.
