@@ -1,6 +1,8 @@
 package org.datanucleus.store.scalaris;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -14,12 +16,11 @@ import org.datanucleus.metadata.ForeignKeyMetaData;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.schema.AbstractStoreSchemaHandler;
 
-import com.orange.org.json.JSONArray;
-import com.orange.org.json.JSONException;
-
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
@@ -94,8 +95,8 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
         return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
     }
     
-    public static String getForeignKeyActionIndexKey() {
-        return FKA_INDEX_KEY;
+    public static String getForeignKeyActionIndexKey(String foreignClassName) {
+        return String.format("%s_%s", foreignClassName, FKA_INDEX_KEY);
     }
     public static String getForeignKeyActionKey(String foreignClassName, String thisClassName, String inMember) {
         return String.format("%s_%s_%s_%s", foreignClassName, thisClassName, inMember, FKA_KEY_PREFIX);
@@ -167,50 +168,48 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
             
                 try {
                     // append the new ForeignKeyAction-Relation to the index key
-                    
-                    String indexKey = getForeignKeyActionIndexKey();
+                    String indexKey = getForeignKeyActionIndexKey(memberClassName);
                     Transaction t = new Transaction(conn);
                     
-                    JSONArray arr = null;
+                    List<ErlangValue> currentFkaList = null;
                     try {
-                        arr = new JSONArray(t.read(indexKey).stringValue());
+                        currentFkaList = t.read(indexKey).listValue();
                     } catch (NotFoundException e) {
                         // no index key created yet
-                        arr = new JSONArray();
+                        currentFkaList = new ArrayList<ErlangValue>();
                     }
-                    JSONArray row = new JSONArray();
-                    row.put(memberClassName);
-                    row.put(className);
+                    List<String> newFka = new ArrayList<String>();
+                    newFka.add(className);
                     
                     if (isJoin) {
-                        row.put(mmd.getName());
+                        newFka.add(mmd.getName());
                     } else {
-                        row.put(FKA_DELETE_OBJ);
+                        newFka.add(FKA_DELETE_OBJ);
                     }
                     
                     // check if this entry already exists
                     boolean exists = false;
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONArray tmpRow = (JSONArray) arr.get(i);
-                        if (tmpRow.getString(0).equals(row.getString(0)) &&
-                                tmpRow.getString(1).equals(row.getString(1))) {
+                    for (ErlangValue row : currentFkaList) {
+                        List<String> rowAsList = row.stringListValue();
+                        if (rowAsList.equals(newFka)) {
                             exists = true;
                             break;
                         }
                     }
                     if (!exists) {
-                        arr.put(row);
-                        t.write(indexKey, arr.toString());
+                        List<ErlangValue> toAdd = new ArrayList<ErlangValue>();
+                        toAdd.add(new ErlangValue(newFka));
+                         t.addDelOnList(indexKey, toAdd, new ArrayList<ErlangValue>());
                     }
                     t.commit();
                 // TODO: proper exception handling
-                } catch (JSONException e) {
-                    e.printStackTrace();
                 } catch (ConnectionException e) {
                     e.printStackTrace();
                 } catch (UnknownException e) {
                     e.printStackTrace();
                 } catch (AbortException e) {
+                    e.printStackTrace();
+                } catch (NotAListException e) {
                     e.printStackTrace();
                 }
             }

@@ -61,7 +61,7 @@ public class ScalarisUtils {
      *            ObjectProvider of the object this ID is generated for.
      * @return A new ID.
      */
-    private static long generateNextIdentity(ObjectProvider op) {
+    private synchronized static long generateNextIdentity(ObjectProvider op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         ExecutionContext ec = op.getExecutionContext();
@@ -659,32 +659,24 @@ public class ScalarisUtils {
     // object
     // TODO: structure index in some way so that less than O(n) is needed here
     // TODO: sub transaction?
-    private static ArrayList<ScalarisFKA> findForeignKeyActions(String className, Transaction t) 
+    private static ArrayList<ScalarisFKA> findForeignKeyActions(String foreignClassName, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         
-        String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey();
-        JSONArray fkaIndex = null;
+        String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey(foreignClassName);
         ArrayList<ScalarisFKA> attachedActions = new ArrayList<ScalarisFKA>();
         try {
-            fkaIndex = new JSONArray(t.read(fkaIndexKey).stringValue());
-            
-            for (int i = 0; i < fkaIndex.length(); i++) {
-                JSONArray row = (JSONArray) fkaIndex.get(i);
-                if (row.getString(0).equals(className)) {
-                    String scalarisKey = ScalarisSchemaHandler.getForeignKeyActionKey(className, 
-                            row.getString(1), row.getString(2));
-                    
-                    attachedActions.add(new ScalarisFKA(scalarisKey,row.getString(2)));
-                }
+            List<ErlangValue> fkaIndex = t.read(fkaIndexKey).listValue();
+
+            for (ErlangValue fka : fkaIndex) {
+                List<String> fkaList = fka.stringListValue();
+                String scalarisKey = ScalarisSchemaHandler.getForeignKeyActionKey(foreignClassName, 
+                        fkaList.get(0), fkaList.get(1));
+                attachedActions.add(new ScalarisFKA(scalarisKey,fkaList.get(1)));
             }
         } catch (NotFoundException e) {
-            // the schema handler should have created this key. something is wrong.
-            throw new NucleusDataStoreException("ForeignKeyAction index, which should have been created by " +
-                    "ScalarisSchemaHandler, is missing.", e);
-        } catch (JSONException e) {
-            throw new NucleusDataStoreException("ForeignKeyAction index has invalid structure.", e);            
+            // there are no ForeignKeyAction registered for this class
         }
-        
+
         return attachedActions;
     }
     
