@@ -225,7 +225,7 @@ public class ScalarisUtils {
     
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        insertObjectToAllKey(op, t);
+        insertObjectToIDIndex(op, t);
         updateUniqueMemberKey(op, json, t);
         insertToForeignKeyAction(op, json, t);
     }
@@ -238,7 +238,7 @@ public class ScalarisUtils {
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        removeObjectFromAllKey(op, t);
+        removeObjectFromIDIndex(op, t);
         removeObjectFromUniqueMemberKey(op, t);
         performForeignKeyActionDelete(op, t);
     }
@@ -266,11 +266,11 @@ public class ScalarisUtils {
      * @throws ClassCastException 
      * @throws ConnectionException 
      */
-    private static void insertObjectToAllKey(ObjectProvider op, Transaction t) 
+    private static void insertObjectToIDIndex(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
         // retrieve the existing value (null if it does not exist).
@@ -318,11 +318,11 @@ public class ScalarisUtils {
      * @throws ClassCastException 
      * @throws ConnectionException 
      */
-    private static void removeObjectFromAllKey(ObjectProvider op, Transaction t) 
+    private static void removeObjectFromIDIndex(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, JSONException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
         // retrieve the existing value (null if it does not exist).
@@ -714,7 +714,7 @@ public class ScalarisUtils {
             ManagedConnection mconn, Class<?> candidateClass,
             AbstractClassMetaData cmd) {
         List<Object> results = new ArrayList<Object>();
-        String managementKey = ScalarisSchemaHandler.getManagementKeyName(candidateClass);
+        String managementKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();

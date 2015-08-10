@@ -75,11 +75,11 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
      * these keys.
      **/
     
-    static String getManagementKeyName(Class<?> clazz) {
-        return getManagementKeyName(clazz.getCanonicalName());
+    static String getIDIndexKeyName(Class<?> clazz) {
+        return getIDIndexKeyName(clazz.getCanonicalName());
     }
 
-    static String getManagementKeyName(String className) {
+    static String getIDIndexKeyName(String className) {
         return String.format("%s_%s", className, ALL_ID_PREFIX);
     }
 
