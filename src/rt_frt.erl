@@ -94,7 +94,8 @@ maximum_entries() -> config:read(rt_frt_max_entries).
 %% Key Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Initialize the routing table. This function is allowed to send messages.
+%% @doc Initialize the trigger and the routing table. This function is supposed
+%%      to be called only on startup, as is sends a trigger message.
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) ->
     % trigger a random lookup after initializing the table
@@ -102,7 +103,13 @@ init(Neighbors) ->
         true -> msg_delay:send_trigger(0, {trigger_random_lookup});
         false -> ok
     end,
+    init_rt(Neighbors).
 
+%% @doc Initialize the routing table only.
+%%      No trigger messages are sent, i.e. this function can be called during
+%%      normal operation.
+-spec init_rt(nodelist:neighborhood()) -> rt().
+init_rt(Neighbors) ->
     % ask the successor node for its routing table
     Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
@@ -141,7 +148,7 @@ init_stabilize(Neighbors, RT) ->
         true ->
             update_entries(Neighbors, RT) ;
         false -> % source node changed, replace the complete table
-            init(Neighbors)
+            init_rt(Neighbors)
     end
     .
 %% userdevguide-end rt_frtchord:init_stabilize
