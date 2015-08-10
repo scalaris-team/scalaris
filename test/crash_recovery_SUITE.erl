@@ -237,16 +237,7 @@ change_owner_pid(Pid, State, DBName) ->
 
 reset_read_and_write_rounds(State, DBName) ->
     LeaseDB = dht_node_state:get(State, DBName),
-    ct:pal("LeaseDB ~p", [LeaseDB]),
-    _ = [ 
-      prbr:set_entry({Key, 
-                      {ReadRound, ReadClientId, ReadWriteFilter}, 
-                      {WriteRound, WriteClientId, WriteWriteFilter}, 
-                      unittest_crash_recovery}, LeaseDB)
-
-      || {Key, 
-          {ReadRound, ReadClientId, ReadWriteFilter}, 
-          {WriteRound, WriteClientId, WriteWriteFilter},
-          _Value} 
-             <- prbr:tab2list_raw_unittest(LeaseDB)],
+    _ = [ prbr:set_entry(prbr:new(Key, Value), LeaseDB)
+          || {Key, _R_Read, _R_Write, Value}
+                 <- prbr:tab2list_raw_unittest(LeaseDB)],
     ok.
