@@ -396,6 +396,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 throw new NucleusException("Could not update object since its original value was not found", e);
             } catch (ClassCastException e) {
                 throw new NucleusException("The stored object has a broken structure", e);
+            } catch (NotAListException e) {
+                throw new NucleusException("The stored object has a broken structure", e);
             } catch (JSONException e) {
                 throw new NucleusException("The stored object has a broken structure", e);
             }

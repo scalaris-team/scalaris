@@ -2,6 +2,7 @@ package org.datanucleus.store.scalaris;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -232,7 +233,7 @@ public class ScalarisUtils {
     }
     
     static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         updateUniqueMemberKey(op, json, t);
         insertToForeignKeyAction(op, json, t);
     }
@@ -410,12 +411,13 @@ public class ScalarisUtils {
      *                  FOREIGN KEY ACTIONS
      * **********************************************************************/
     
-    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {       
+    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t)
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
         
+        HashMap<String, List<ErlangValue>> toAddToKey = new HashMap<String, List<ErlangValue>>();
         for (int field : cmd.getAllMemberPositions()) {
             AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
             if (mmd == null) continue;
@@ -443,6 +445,8 @@ public class ScalarisUtils {
                 } catch (JSONException e) {
                     // not found -> this action will be skipped
                 }
+               
+                // construct the FKA key for every foreign object id
                 for (String foreignObjectId : foreignObjectIds) {
                     if (foreignObjectId == null) continue;
                     
@@ -458,25 +462,23 @@ public class ScalarisUtils {
                         action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
                                 ScalarisSchemaHandler.FKA_DELETE_OBJ);
                     }
-                    
-                    JSONArray newRow = new JSONArray();
-                    newRow.put(foreignObjectId);
-                    newRow.put(objectStringIdentity);
-                    
-                    JSONArray actionTable = null;
-                    try {
-                        actionTable = new JSONArray(t.read(action).stringValue());
-                    } catch (NotFoundException e) {
-                        actionTable = new JSONArray();
-                    } catch (JSONException e) {
-                        throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+                    List<String> newFka = new ArrayList<String>(2);
+                    newFka.add(foreignObjectId);
+                    newFka.add(objectStringIdentity);
+
+                    List<ErlangValue> toAdd = toAddToKey.get(action);
+                    if (toAdd == null) {
+                        toAdd = new ArrayList<ErlangValue>();
                     }
-                    
-                    // add new row and store again
-                    actionTable.put(newRow);
-                    t.write(action, actionTable.toString());
+                    toAdd.add(new ErlangValue(newFka));
+                    toAddToKey.put(action, toAdd);
                 }
+
             }
+        }
+        for (String key : toAddToKey.keySet()) {
+            List<ErlangValue> toAdd = toAddToKey.get(key);
+            t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>(0));
         }
     }
     
@@ -503,7 +505,7 @@ public class ScalarisUtils {
     }
     
     private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
@@ -514,25 +516,24 @@ public class ScalarisUtils {
         List<ScalarisFKA> attachedActions = findForeignKeyActions(className, t);
         // now search in every found action entries with op's id and start a delete as sub transaction
         for (ScalarisFKA action : attachedActions) {
-            JSONArray actionTable = null;
+            List<ErlangValue> actionList = null;
             try {
-                actionTable = new JSONArray(t.read(action.getScalarisKey()).stringValue());
+                actionList = t.read(action.getScalarisKey()).listValue();
                 
-                JSONArray newTable = new JSONArray();
-                ArrayList<String> objectsToDelete = new ArrayList<String>();
-
-                for (int i = 0; i < actionTable.length(); i++) {
-                   JSONArray row = (JSONArray) actionTable.get(i);
+                List<String> objectsToDelete = new ArrayList<String>();
+                List<ErlangValue> entryToDelete = new ArrayList<ErlangValue>();
+                for (ErlangValue entry : actionList) {
+                   List<String> actionEntry =  entry.stringListValue();
                         
-                   if (row.getString(0).equals(objectStringIdentity)) {
-                        objectsToDelete.add(row.getString(1));
-                   } else {
-                        newTable.put(row);
+                   if (actionEntry.get(0).equals(objectStringIdentity)) {
+                        objectsToDelete.add(actionEntry.get(1));
+                        entryToDelete.add(entry);
                    }
                 }
                 // update table if something changed
-                if (actionTable.length() != newTable.length()) {
-                    t.write(action.getScalarisKey(), newTable.toString());
+                if (!entryToDelete.isEmpty()) {
+                    t.addDelOnList(action.getScalarisKey(), 
+                            new ArrayList<ErlangValue>(0), entryToDelete);
                 }
                     
                 for (int i = 0; i < objectsToDelete.size(); i++) {
