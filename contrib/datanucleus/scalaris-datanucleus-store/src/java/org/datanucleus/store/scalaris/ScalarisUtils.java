@@ -592,29 +592,54 @@ public class ScalarisUtils {
                             ObjectProvider toDelOp = ec.findObjectProvider(obj);
 
                             int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(action.getMemberToDeleteIn());
-                            Object objColl = toDelOp.provideField(memberId);
 
-                            if (objColl instanceof Collection) {
-                                Collection collection = (Collection) objColl;
+                            if (toDelOp.isFieldLoaded(memberId)) {
+                                // the field is loaded which means that the object could be used by the overlying 
+                                // application
+                                Object objColl = toDelOp.provideField(memberId);
 
-                                ArrayList<Object> toRemove = new ArrayList<Object>();
-                                Iterator iter = collection.iterator();
-                                while (iter.hasNext()) {
-                                    Object item = iter.next();
-                                    ObjectProvider itemOp = ec.findObjectProvider(item);
-                                    String itemId = getPersistableIdentity(itemOp);
+                                if (objColl instanceof Collection) {
+                                    Collection collection = (Collection) objColl;
 
-                                    if (itemId.equals(objectStringIdentity)) {
-                                        toRemove.add(item);
+                                    ArrayList<Object> toRemove = new ArrayList<Object>();
+                                    Iterator iter = collection.iterator();
+                                    while (iter.hasNext()) {
+                                        Object item = iter.next();
+                                        ObjectProvider itemOp = ec.findObjectProvider(item);
+                                        String itemId = getPersistableIdentity(itemOp);
+
+                                        if (itemId.equals(objectStringIdentity)) {
+                                            toRemove.add(item);
+                                        }
+                                    }
+                                    for (Object o : toRemove) {
+                                        collection.remove(o);
+                                    }
+                                    storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
+                                    // updated field must be marked as dirty to ensure that instances of this object used
+                                    // somewhere else will fetch the updated value
+                                    toDelOp.makeDirty(memberId);
+                                }
+                            } else {
+                                // if the member is not loaded it is way faster to directly alter the
+                                // stored JSON object
+                                JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
+                                JSONArray memberArr = objAsJson.getJSONArray(action.getMemberToDeleteIn());
+                                JSONArray newMemberArr = new JSONArray();
+                                for (int j = 0; j < memberArr.length(); j++) {
+                                    if (!memberArr.get(j).equals(objectStringIdentity)) {
+                                        newMemberArr.put(memberArr.get(j));
                                     }
                                 }
-                                for (Object o : toRemove) {
-                                    collection.remove(o);
+                                // only write new value if something changed
+                                if (newMemberArr.length() != memberArr.length()) {
+                                    objAsJson.put(action.getMemberToDeleteIn(), newMemberArr);
+                                    t.write(objId, objAsJson.toString());
+                                    // if the object is not removed from cache after this update
+                                    // it is possible that the cached value returned is outdated
+                                    ec.removeObjectFromLevel1Cache(toDelOp.getInternalObjectId());
+                                    ec.removeObjectFromLevel2Cache(toDelOp.getInternalObjectId());
                                 }
-                                storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
-                                // updated field must be marked as dirty to ensure that instances of this object used
-                                // somewhere else will fetch the updated value
-                                toDelOp.makeDirty(memberId);
                             }
                         }
                     } catch (NucleusObjectNotFoundException e) {
