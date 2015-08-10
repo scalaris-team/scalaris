@@ -52,6 +52,7 @@ import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
@@ -208,6 +209,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 } catch (ClassCastException e) {
                     e.printStackTrace();
                 } catch (JSONException e) {
+                    e.printStackTrace();
+                } catch (NotAListException e) {
                     e.printStackTrace();
                 }
 
@@ -470,6 +473,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 } catch (ClassCastException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (JSONException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (NotAListException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 }
             }

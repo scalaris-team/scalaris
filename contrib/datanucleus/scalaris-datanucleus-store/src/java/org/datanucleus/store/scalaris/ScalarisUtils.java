@@ -29,6 +29,7 @@ import com.orange.org.json.JSONObject;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
@@ -224,7 +225,7 @@ public class ScalarisUtils {
      * **********************************************************************/
     
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException, JSONException, NotAListException {
         insertObjectToIDIndex(op, t);
         updateUniqueMemberKey(op, json, t);
         insertToForeignKeyAction(op, json, t);
@@ -237,7 +238,7 @@ public class ScalarisUtils {
     }
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException, JSONException, NotAListException {
         removeObjectFromIDIndex(op, t);
         removeObjectFromUniqueMemberKey(op, t);
         performForeignKeyActionDelete(op, t);
@@ -265,38 +266,18 @@ public class ScalarisUtils {
      * @throws UnknownException 
      * @throws ClassCastException 
      * @throws ConnectionException 
+     * @throws NotAListException 
      */
     private static void insertObjectToIDIndex(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        // retrieve the existing value (null if it does not exist).
-        JSONArray json = null;
-        try {
-            json = new JSONArray(t.read(key).stringValue());
-        } catch (NotFoundException e) {
-            // the key does not exist.
-        }
-
-        // add the new identity if it does not already exists
-        if (json == null) {
-            json = new JSONArray();
-        }
-        for (int i = 0; i < json.length(); i++) {
-            String s = json.getString(i);
-            if (s != null && s.equals(objectStringIdentity)) {
-                // This object identity is already stored here
-                // It is not necessary to write since nothing changed.
-                return;
-            }
-        }
-        json.put(objectStringIdentity);
-
-        // commit changes
-        t.write(key, json.toString());
+        List<ErlangValue> toAdd = new ArrayList<ErlangValue>();
+        toAdd.add(new ErlangValue(objectStringIdentity));
+        t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>());
     }
 
     /**
@@ -319,34 +300,15 @@ public class ScalarisUtils {
      * @throws ConnectionException 
      */
     private static void removeObjectFromIDIndex(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        // retrieve the existing value (null if it does not exist).
-        JSONArray json = null;
-        try {
-            json = new JSONArray(t.read(key).stringValue());
-        } catch (NotFoundException e) {
-            // the key does not exist, therefore there is nothing to do
-            // here.
-            return;
-        }
-
-        // remove all occurrences of the key
-        ArrayList<String> list = new ArrayList<String>(json.length());
-        for (int i = 0; i < json.length(); i++) {
-            String s = json.getString(i);
-            if (s != null && !s.equals(objectStringIdentity)) {
-                list.add(s);
-            }
-        }
-        json = new JSONArray(list);
-
-       // commit changes
-       t.write(key, json.toString());
+        List<ErlangValue> toRemove = new ArrayList<ErlangValue>();
+        toRemove.add(new ErlangValue(objectStringIdentity));
+        t.addDelOnList(key, new ArrayList<ErlangValue>(), toRemove);
     }
     
     /* **********************************************************************
@@ -714,7 +676,7 @@ public class ScalarisUtils {
             ManagedConnection mconn, Class<?> candidateClass,
             AbstractClassMetaData cmd) {
         List<Object> results = new ArrayList<Object>();
-        String managementKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
+        String idIndexKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
@@ -722,12 +684,11 @@ public class ScalarisUtils {
         try {
             // read the management key
             Transaction t = new Transaction(conn);
-            JSONArray json = new JSONArray(t.read(managementKey).stringValue());
+            List<String> idIndex = t.read(idIndexKey).stringListValue();
 
             // retrieve all values from the management key
-            for (int i = 0; i < json.length(); i++) {
-                String s = json.getString(i);
-                results.add(IdentityUtils.getObjectFromPersistableIdentity(s,cmd, ec));
+            for (String id : idIndex) {
+                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
             }
 
             t.commit();
@@ -740,12 +701,8 @@ public class ScalarisUtils {
             throw new NucleusException(e.getMessage(), e);
         } catch (UnknownException e) {
             throw new NucleusException(e.getMessage(), e);
-        } catch (JSONException e) {
-            // management key has invalid format
-            throw new NucleusException(e.getMessage(), e);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+
         return results;
     }
 }
