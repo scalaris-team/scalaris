@@ -3,8 +3,10 @@ package org.datanucleus.store.scalaris;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
@@ -232,10 +234,10 @@ public class ScalarisUtils {
         insertToForeignKeyAction(op, json, t);
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject newJson, JSONObject changedNew, JSONObject changedOld, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
-        updateUniqueMemberKey(op, json, t);
-        insertToForeignKeyAction(op, json, t);
+        updateUniqueMemberKey(op, newJson, t);
+        updateForeignKeyAction(op, changedNew, changedOld, t);
     }
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
@@ -410,75 +412,122 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  FOREIGN KEY ACTIONS
      * **********************************************************************/
-    
+
     private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t)
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        updateForeignKeyAction(op, objToInsert, null, t);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void updateForeignKeyAction(ObjectProvider op, JSONObject changedFieldsNewVal, 
+            JSONObject changedFieldsOldVal, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
-        
+
+        // the map will store all elements which must be added/removed from which key
         HashMap<String, List<ErlangValue>> toAddToKey = new HashMap<String, List<ErlangValue>>();
+        HashMap<String, List<ErlangValue>> toRemoveFromKey = new HashMap<String, List<ErlangValue>>();
+
         for (int field : cmd.getAllMemberPositions()) {
             AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
-            if (mmd == null) continue;
+            // do nothing if this field has not changed
+            if (mmd == null || !changedFieldsNewVal.has(mmd.getName())) continue;
+
             ForeignKeyMetaData fmd = mmd.getForeignKeyMetaData();
-            
             boolean isJoin = false;
             if (mmd.getJoinMetaData() != null) {
                 // The member is a collection with an ForeignKeyAction attached
                 fmd = mmd.getJoinMetaData().getForeignKeyMetaData();
                 isJoin = true;
             }
-            
+            // add to actions keys if it is a cascading delete
             if (fmd != null && fmd.getDeleteAction() == ForeignKeyAction.CASCADE) {
                 String fieldName = mmd.getName();
-                ArrayList<String> foreignObjectIds = new ArrayList<String>();
+                // parse JSON entries 
+                ArrayList<String> foreignObjectIdsNew = new ArrayList<String>();
+                ArrayList<String> foreignObjectIdsOld = new ArrayList<String>();
                 try {
                     if (isJoin) {
-                        JSONArray arr = objToInsert.getJSONArray(fieldName);
-                        for (int i = 0; i < arr.length(); i++) {
-                            foreignObjectIds.add(arr.getString(i));
+                        JSONArray arrNew = changedFieldsNewVal.getJSONArray(fieldName);
+                        JSONArray arrOld = new JSONArray();
+                        if (changedFieldsOldVal != null) {
+                            arrOld = changedFieldsOldVal.getJSONArray(fieldName);
+                        }
+                        for (int i = 0; i < arrNew.length(); i++) {
+                            foreignObjectIdsNew.add(arrNew.getString(i));
+                        }
+                        for (int i = 0; i < arrOld.length(); i++) {
+                            foreignObjectIdsOld.add(arrOld.getString(i));
                         }
                     } else {
-                        foreignObjectIds.add(objToInsert.getString(fieldName));
+                        foreignObjectIdsNew.add(changedFieldsNewVal.getString(fieldName));
                     }
                 } catch (JSONException e) {
                     // not found -> this action will be skipped
                 }
-               
-                // construct the FKA key for every foreign object id
-                for (String foreignObjectId : foreignObjectIds) {
-                    if (foreignObjectId == null) continue;
-                    
-                    String memberClassName;
-                    String action;
-                    
-                    if (isJoin) {
-                        memberClassName = mmd.getCollection().getElementType();
-                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                fieldName);
-                    } else {
-                        memberClassName = mmd.getType().getCanonicalName();
-                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                // ignore the objects in both the new and old list
+                for (int i = foreignObjectIdsNew.size() - 1; i >= 0; i--) {
+                    String s = foreignObjectIdsNew.get(i);
+                    if (foreignObjectIdsOld.remove(s)) {
+                        foreignObjectIdsNew.remove(s);
                     }
-                    List<String> newFka = new ArrayList<String>(2);
-                    newFka.add(foreignObjectId);
-                    newFka.add(objectStringIdentity);
-
-                    List<ErlangValue> toAdd = toAddToKey.get(action);
-                    if (toAdd == null) {
-                        toAdd = new ArrayList<ErlangValue>();
-                    }
-                    toAdd.add(new ErlangValue(newFka));
-                    toAddToKey.put(action, toAdd);
                 }
 
+                // construct the FKA key for every foreign object id
+                for (ArrayList<String> changeList : 
+                        new ArrayList[]{foreignObjectIdsNew, foreignObjectIdsNew}) {
+                    for (String foreignObjectId : changeList) {
+                        if (foreignObjectId == null) continue;
+
+                        String memberClassName;
+                        String action;
+
+                        if (isJoin) {
+                            memberClassName = mmd.getCollection().getElementType();
+                            action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
+                                    fieldName);
+                        } else {
+                            memberClassName = mmd.getType().getCanonicalName();
+                            action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
+                                    ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                        }
+                        List<String> newFka = new ArrayList<String>(2);
+                        newFka.add(foreignObjectId);
+                        newFka.add(objectStringIdentity);
+
+                        // check in which list we are currently in to choose the
+                        // HashMap to which the action must be added to
+                        HashMap<String, List<ErlangValue>> toChangeMap = (foreignObjectIdsNew == changeList) ?
+                                toAddToKey : toRemoveFromKey;
+
+                        List<ErlangValue> toChange = toChangeMap.get(action);
+                        if (toChange == null) {
+                            toChange = new ArrayList<ErlangValue>();
+                        }
+                        toChange.add(new ErlangValue(newFka));
+                        toChangeMap.put(action, toChange);
+                    }
+                }
             }
         }
+
+        // update all keys where new entries are added
         for (String key : toAddToKey.keySet()) {
             List<ErlangValue> toAdd = toAddToKey.get(key);
-            t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>(0));
+            List<ErlangValue> toRemove = new ArrayList<ErlangValue>(0);
+            if (toRemoveFromKey.containsKey(key)) {
+                toRemove = toRemoveFromKey.get(key);
+            }
+            t.addDelOnList(key, toAdd, toRemove);
+        }
+        // update the remaining keys (only deletions)
+        for (String key : toRemoveFromKey.keySet()) {
+            if (toAddToKey.containsKey(key)) {
+                List<ErlangValue> toRemove = toRemoveFromKey.get(key);
+                t.addDelOnList(key, new ArrayList<ErlangValue>(0), toRemove);
+            }
         }
     }
     

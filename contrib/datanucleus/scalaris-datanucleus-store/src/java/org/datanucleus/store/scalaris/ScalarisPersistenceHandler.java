@@ -318,7 +318,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId(), fieldStr.toString()));
             }
 
-            JSONObject jsonobj = new JSONObject();
+            JSONObject changedVals = new JSONObject();
             if (cmd.isVersioned()) {
                 VersionMetaData vermd = cmd.getVersionMetaDataForClass();
                 String memberName = storeMgr.getNamingFactory().getColumnName(
@@ -331,7 +331,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                                 op.getInternalObjectId(), "" + nextVersion));
                     }
                     try {
-                        jsonobj.put(memberName, nextVersion);
+                        changedVals.put(memberName, nextVersion);
                     } catch (JSONException e) {
                         throw new NucleusException(e.getMessage(), e);
                     }
@@ -347,7 +347,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     Date date = new Date();
                     date.setTime(ts.getTime());
                     try {
-                        jsonobj.put(memberName, ts.getTime());
+                        changedVals.put(memberName, ts.getTime());
                     } catch (JSONException e) {
                         throw new NucleusException(e.getMessage(), e);
                     }
@@ -357,31 +357,34 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final String id;
             {
                 op.provideFields(updatedFieldNums, new StoreFieldManager(op,
-                        jsonobj, false));
+                        changedVals, false));
                 op.provideFields(op.getClassMetaData().getPKMemberPositions(),
-                        new StoreFieldManager(op, jsonobj, false));
+                        new StoreFieldManager(op, changedVals, false));
                 id = ScalarisUtils.getPersistableIdentity(op);
                 System.out.println("update id=" + id);
             }
 
             if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_NATIVE.debug("PUT "
-                        + jsonobj.toString());
+                        + changedVals.toString());
             }
 
 
             Transaction t1 = new Transaction(conn);
             try {
                 JSONObject stored = new JSONObject(t1.read(id).stringValue());
-
+                JSONObject changedValsOld = new JSONObject();
                 // update stored object
-                Iterator<String> keyIter = jsonobj.keys();
+                Iterator<String> keyIter = changedVals.keys();
                 while (keyIter.hasNext()) {
                     String key = keyIter.next();
-                    stored.put(key, jsonobj.get(key));
+                    if (stored.has(key)) {
+                        changedValsOld.put(key, stored.get(key));
+                    }
+                    stored.put(key, changedVals.get(key));
                 }
 
-                ScalarisUtils.performScalarisManagementForUpdate(op, stored, t1);
+                ScalarisUtils.performScalarisManagementForUpdate(op, stored, changedVals, changedValsOld, t1);
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
                 t1.commit();
