@@ -674,15 +674,16 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 %% @doc Converts the external representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
-to_list(State) -> % match external RT
+-spec to_list(dht_node_state:state()) -> [{Id::key(), DHTPid::comm:mypid()}].
+to_list(State) ->
     ERT = external_rt_get_tree(dht_node_state:get(State, rt)),
-    KVList = gb_trees:to_list(ERT),
-    Nodes = lists:map(fun ({Id, Node}) -> node:new(pid_dht(Node), Id, id_version(Node)) end, KVList),
-    Neighbors = dht_node_state:get(State, neighbors),
-    NodeList = nodelist:mk_nodelist([nodelist:succ(Neighbors) | Nodes],
-        nodelist:node(Neighbors)),
-    lists:map(fun (Node) -> {node:id(Node), node:pidX(Node)} end, NodeList).
+    MyNodeId = dht_node_state:get(State, node_id),
+    L1 = util:gb_trees_foldl(fun(Id, {Id, _IdV, PidDHT, _PidRT}, Acc) ->
+                                     [{Id, PidDHT}|Acc]
+                             end, [], ERT),
+    lists:usort(fun({AId, _APid}, {BId, _PPid}) ->
+                        nodelist:succ_ord_id(AId, BId, MyNodeId)
+                end, L1).
 
 %% @doc Converts the internal representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
