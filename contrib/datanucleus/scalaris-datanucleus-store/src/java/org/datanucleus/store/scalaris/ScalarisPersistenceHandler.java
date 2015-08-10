@@ -208,8 +208,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     e.printStackTrace();
                 } catch (ClassCastException e) {
                     e.printStackTrace();
-                } catch (JSONException e) {
-                    e.printStackTrace();
                 } catch (NotAListException e) {
                     e.printStackTrace();
                 }
@@ -471,8 +469,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 } catch (AbortException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (ClassCastException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (JSONException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (NotAListException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);

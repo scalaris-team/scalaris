@@ -225,20 +225,20 @@ public class ScalarisUtils {
      * **********************************************************************/
     
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException, NotAListException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         insertObjectToIDIndex(op, t);
         updateUniqueMemberKey(op, json, t);
         insertToForeignKeyAction(op, json, t);
     }
     
     static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException {
         updateUniqueMemberKey(op, json, t);
         insertToForeignKeyAction(op, json, t);
     }
     
     static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException, NotAListException {
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         removeObjectFromIDIndex(op, t);
         removeObjectFromUniqueMemberKey(op, t);
         performForeignKeyActionDelete(op, t);
@@ -270,7 +270,6 @@ public class ScalarisUtils {
      */
     private static void insertObjectToIDIndex(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
-        
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
@@ -316,7 +315,7 @@ public class ScalarisUtils {
      * **********************************************************************/
     
     private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+            throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
