@@ -171,6 +171,7 @@ public class Connection {
             throws ConnectionException {
         try {
             boolean success = false;
+            final boolean isConnected = connection.isConnected();
             while(!success) {
                 try {
                     connection.sendRPC(mod, fun, args);
@@ -190,7 +191,10 @@ public class Connection {
                     // reconnect (and then re-try the operation) if no exception was thrown:
                     reconnect();
                 } catch (final IOException e) {
-                    connectionPolicy.nodeFailed(remote);
+                    // don't count RPC requests on closed connections as a failing node:
+                    if (isConnected) {
+                        connectionPolicy.nodeFailed(remote);
+                    }
                     // first re-try (connection was the first contact)
                     remote = connectionPolicy.selectNode(1, remote, e);
                     // reconnect (and then re-try the operation) if no exception was thrown:

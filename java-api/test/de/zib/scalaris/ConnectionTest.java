@@ -305,8 +305,6 @@ public class ConnectionTest {
                 .getNodes().get(0).getNode().node());
         final DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
         connectionPolicy.setMaxRetries(0);
-        final Date d0 = new Date();
-        Date d1;
         TimeUnit.MILLISECONDS.sleep(10);
         final Connection c = new Connection(self, connectionPolicy);
 
@@ -322,10 +320,8 @@ public class ConnectionTest {
             fail();
         } catch (final Exception e) {
         }
-        assertEquals(1, remote.getFailureCount());
-        d1 = remote.getLastFailedConnect();
-        assertNotNull(d1);
-        assertTrue(d0.getTime() < d1.getTime());
+        assertEquals(0, remote.getFailureCount());
+        assertNull(remote.getLastFailedConnect());
     }
 
     /**
@@ -401,8 +397,6 @@ public class ConnectionTest {
                 .getNodes().get(0).getNode().node());
         final DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
         connectionPolicy.setMaxRetries(0);
-        final Date d0 = new Date();
-        Date d1;
         TimeUnit.MILLISECONDS.sleep(10);
         final Connection c = new Connection(self, connectionPolicy);
 
@@ -418,10 +412,8 @@ public class ConnectionTest {
             fail();
         } catch (final Exception e) {
         }
-        assertEquals(1, remote.getFailureCount());
-        d1 = remote.getLastFailedConnect();
-        assertNotNull(d1);
-        assertTrue(d0.getTime() < d1.getTime());
+        assertEquals(0, remote.getFailureCount());
+        assertNull(remote.getLastFailedConnect());
     }
 
 }
