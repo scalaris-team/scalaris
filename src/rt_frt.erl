@@ -1282,10 +1282,6 @@ node2mynode(Node, PidRT) ->
 -spec id(Node::mynode()) -> key().
 id({Id, _IdVersion, _PidDHT, _PidRT}) -> Id.
 
-%% @doc Get the id_version from a mynode().
-%% -spec id_version(Node::mynode()) -> key().
-%% id_version({_Id, IdVersion, _PidDHT, _PidRT}) when is_integer(_Id), is_integer(IdVersion)  -> IdVersion.
-
 %% @doc Get the Pid from an mynode().
 -spec pid_dht(Node::mynode()) -> comm:mypid().
 pid_dht({_Id, _IdVersion, PidDHT, _PidRT}) -> PidDHT.
