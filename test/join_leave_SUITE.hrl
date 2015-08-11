@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ join_lookup(Config) ->
     _ = [ comm:send_local(pid_groups:find_a(dht_node),
                           {?lookup_aux, X, 0, {ping, This}}) || X <- Keys ],
 
-    %% got all 4 replies? ok
+    %% got all replies? ok
     [ begin
           trace_mpath:thread_yield(),
           receive
@@ -176,7 +176,7 @@ add_2x3_load(Config) ->
     stop_time(fun add_2x3_load_test/0,
                fun() -> ?bench(1, 100, 1, 5000) end,
                "add_2x3_load"),
-    unittest_helper:check_ring_load(4),
+    unittest_helper:check_ring_load(config:read(replication_factor)),
     unittest_helper:check_ring_data().
 
 add_2x3_load_test() ->
@@ -211,7 +211,7 @@ make_4_add_x_rm_y_load(Config, X, Y, StartOnlyAdded) ->
     stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end,
                fun() -> ?bench(10, 100, 10, 1000) end,
                lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
-    unittest_helper:check_ring_load(40),
+    unittest_helper:check_ring_load(config:read(replication_factor)*10),
     unittest_helper:check_ring_data().
 
 -spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer(), StartOnlyAdded::boolean()) -> ok.
@@ -269,7 +269,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
                fun() -> ?bench(BenchSlaves, 15, BenchSlaves, 50) end,
                "join_at"),
 
-    unittest_helper:check_ring_load(ExpLoad + BenchSlaves * 4),
+    unittest_helper:check_ring_load(ExpLoad + BenchSlaves * config:read(replication_factor)),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
     unittest_helper:kill_new_processes(OldProcesses),
@@ -417,7 +417,7 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_, IgnMsgAt1st, IgnMsgAt
                end,
     _ = admin:add_node([{{dht_node, id}, SecondId}, {skip_psv_lb}] ++ MoreOpts),
     check_size(2),
-    unittest_helper:check_ring_load(BenchSlaves * 4),
+    unittest_helper:check_ring_load(BenchSlaves * config:read(replication_factor)),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), % tester may need it

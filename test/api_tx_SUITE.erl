@@ -148,7 +148,7 @@ read_write_2old(_Config) ->
     Key = "read_write_2old_a",
     GSelf = comm:make_global(self()),
     ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
-    wait_for_dht_entries(4),
+    wait_for_dht_entries(config:read(replication_factor)),
     [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
     _ = [comm:send_local(DhtNode, {delete_keys, GSelf, [HK1, HK2]}) || DhtNode <- pid_groups:find_all(dht_node)],
     receive {delete_keys_reply} -> ok end,
@@ -162,7 +162,7 @@ read_write_2old_locked(_Config) ->
     Key = "read_write_2old_a",
     GSelf = comm:make_global(self()),
     ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
-    wait_for_dht_entries(4),
+    wait_for_dht_entries(config:read(replication_factor)),
     [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
 
     % get HK1, HK2 entries
