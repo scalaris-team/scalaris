@@ -1,4 +1,4 @@
-%% @copyright 2012-2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,8 +26,7 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--dialyzer([{[no_fail_call, no_return], basic_begin_after_running/1},
-           {no_return, basic_start_bench_and_kill_it/1}]).
+-dialyzer([{no_return, basic_start_bench_and_kill_it/1}]).
 
 %%-define(TRACE(X,Y), log:log("proto_sched_SUITE: " ++ X,Y)).
 -define(TRACE(X,Y), ok).
@@ -232,9 +231,18 @@ basic_begin_after_running(_Config) ->
     %% when a proto_sched runs, it should not allow further threads to
     %% join, because when the new thread joins could depend on the
     %% executing environment, so reproducability could be violated
-    proto_sched:thread_num(0),
+    proto_sched:thread_num(1),
+    Pid = self(),
+    Child = spawn(fun() ->
+                          proto_sched:thread_begin(),
+                          Pid ! {started},
+                          receive {done} -> ok end,
+                          proto_sched:thread_end()
+          end),
+    receive {started} -> ok end,
     ?expect_exception(proto_sched:thread_begin(),
                       throw, 'proto_sched:thread_begin-but_already_running'),
+    Child ! {done},
     proto_sched:wait_for_end(),
     _ = proto_sched:get_infos(),
     unittest_helper:print_proto_sched_stats(at_end_if_failed),

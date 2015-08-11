@@ -202,7 +202,7 @@ additional_tests(Config) ->
 
 %% helpers
 
--spec fake_dht_node(Suffix::string()) -> comm:mypid().
+-spec fake_dht_node(Suffix::atom()|integer()) -> comm:mypid().
 fake_dht_node(Suffix) ->
     comm:make_global(
       element(1, unittest_helper:start_subprocess(

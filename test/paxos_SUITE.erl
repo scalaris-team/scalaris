@@ -135,7 +135,7 @@ tester_paxos(CountAcceptors, Count, Prefix) ->
 test_fast_acceptors_4(_Config) ->
     Count = 10000,
     Before = os:timestamp(),
-    tester_fast_paxos(4, Count, "test_acceptors_4"),
+    tester_fast_paxos(4, Count, test_acceptors_4),
     After = os:timestamp(),
     ct:pal("fast: acceptors: 4, throughput: ~p~n", [Count / (erlang:max(1, timer:now_diff(After, Before)) / 1000000.0)]),
     ok.
@@ -143,7 +143,7 @@ test_fast_acceptors_4(_Config) ->
 test_fast_acceptors_16(_Config) ->
     Count = 10000,
     Before = os:timestamp(),
-    tester_fast_paxos(16, Count, "test_acceptors_16"),
+    tester_fast_paxos(16, Count, test_acceptors_16),
     After = os:timestamp(),
     ct:pal("fast: acceptors: 16, throughput: ~p~n", [Count / (erlang:max(1, timer:now_diff(After, Before)) / 1000000.0)]),
     ok.
@@ -151,7 +151,7 @@ test_fast_acceptors_16(_Config) ->
 test_acceptors_4(_Config) ->
     Count = 10000,
     Before = os:timestamp(),
-    tester_paxos(4, Count, "test_acceptors_4"),
+    tester_paxos(4, Count, test_acceptors_4),
     After = os:timestamp(),
     ct:pal("slow: acceptors: 4, throughput: ~p~n", [Count / (erlang:max(1, timer:now_diff(After, Before)) / 1000000.0)]),
     ok.
@@ -159,7 +159,7 @@ test_acceptors_4(_Config) ->
 test_acceptors_16(_Config) ->
     Count = 10000,
     Before = os:timestamp(),
-    tester_paxos(16, Count, "test_acceptors_16"),
+    tester_paxos(16, Count, test_acceptors_16),
     After = os:timestamp(),
     ct:pal("slow: acceptors: 16, throughput: ~p~n", [Count / (erlang:max(1, timer:now_diff(After, Before)) / 1000000.0)]),
     ok.

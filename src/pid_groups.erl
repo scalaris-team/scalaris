@@ -103,7 +103,7 @@
                  | {{atom(), pos_integer()}, atom()}).     % the acceptor of the nths tm
 -type(groupname() :: atom()
                    | pos_integer()
-                   | {atom(), pos_integer()}).
+                   | {atom(), pos_integer() | atom()}).
 
 -type(message() ::
     {pid_groups_add, groupname(), pidname(), pid()} |

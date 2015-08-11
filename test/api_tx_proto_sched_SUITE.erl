@@ -1,4 +1,4 @@
-%% @copyright 2014 Zuse Institute Berlin
+%% @copyright 2014-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,11 +26,12 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--dialyzer({no_match, concurrent_2/1}).
+-dialyzer({no_match, concurrent_2/1}). % tx_tm:is_txnew_enabled() looks constant
 
 %% start proto scheduler for this suite
 -define(proto_sched(Action), proto_sched_fun(Action)).
 -include("api_tx_SUITE.hrl").
+
 
 groups() ->
     [%% implementation in api_tx_SUITE.hrl
