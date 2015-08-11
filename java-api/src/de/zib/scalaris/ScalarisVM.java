@@ -26,7 +26,6 @@ import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
-import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
@@ -236,7 +235,7 @@ public class ScalarisVM {
     /**
      * Gets the names of the nodes in the Scalaris VM of the current connection.
      *
-     * @return the names of the nodes
+     * @return the names of the nodes (arbitrary type!)
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -245,12 +244,12 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public List<String> getNodes()
+    public List<ErlangValue> getNodes()
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "get_nodes",
                     new OtpErlangObject[] {});
         try {
-            return new ErlangValue(received_raw).stringListValue();
+            return new ErlangValue(received_raw).listValue();
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);
         }
@@ -267,14 +266,14 @@ public class ScalarisVM {
         /**
          * Names of successfully added nodes.
          */
-        public final List<String> successful;
+        public final List<ErlangValue> successful;
         /**
          * Error string for nodes that could not be started (empty if all nodes
          * have been started successfully).
          */
         public final String errors;
 
-        protected AddNodesResult(final List<String> successful, final String errors) {
+        protected AddNodesResult(final List<ErlangValue> successful, final String errors) {
             this.successful = successful;
             this.errors = errors;
         }
@@ -301,7 +300,7 @@ public class ScalarisVM {
                     new OtpErlangObject[] { new OtpErlangInt(number) });
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            final List<String> successful = new ErlangValue(received.elementAt(0)).stringListValue();
+            final List<ErlangValue> successful = new ErlangValue(received.elementAt(0)).listValue();
             final OtpErlangList errors = ErlangValue.otpObjectToOtpList(received.elementAt(1));
             String error_str;
             if (errors.arity() == 0) {
@@ -332,10 +331,10 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public boolean shutdownNode(final String name)
+    public boolean shutdownNode(final ErlangValue name)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_node",
-                    new OtpErlangObject[] { new OtpErlangString(name) });
+                    new OtpErlangObject[] { name.value() });
         if (received_raw.equals(CommonErlangObjects.okAtom)) {
             return true;
         } else if (received_raw.equals(CommonErlangObjects.notFoundAtom)) {
@@ -360,10 +359,10 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public boolean killNode(final String name)
+    public boolean killNode(final ErlangValue name)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_node",
-                    new OtpErlangObject[] { new OtpErlangString(name) });
+                    new OtpErlangObject[] { name.value() });
         if (received_raw.equals(CommonErlangObjects.okAtom)) {
             return true;
         } else if (received_raw.equals(CommonErlangObjects.notFoundAtom)) {
@@ -388,7 +387,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public List<String> shutdownNodes(final int number)
+    public List<ErlangValue> shutdownNodes(final int number)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes",
                     new OtpErlangObject[] { new OtpErlangInt(number) });
@@ -411,7 +410,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public List<String> killNodes(final int number)
+    public List<ErlangValue> killNodes(final int number)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes",
                     new OtpErlangObject[] { new OtpErlangInt(number) });
@@ -430,10 +429,10 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if an error occurs during transformation
      */
-    private final List<String> makeDeleteResult(
+    private final List<ErlangValue> makeDeleteResult(
             final OtpErlangObject received_raw) throws UnknownException {
         try {
-            return new ErlangValue(received_raw).stringListValue();
+            return new ErlangValue(received_raw).listValue();
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);
         }
@@ -452,13 +451,14 @@ public class ScalarisVM {
         /**
          * Names of successfully deleted nodes.
          */
-        public final List<String> successful;
+        public final List<ErlangValue> successful;
         /**
          * Nodes which do not exist (anymore) in the VM.
          */
-        public final List<String> notFound;
+        public final List<ErlangValue> notFound;
 
-        protected DeleteNodesByNameResult(final List<String> successful, final List<String> notFound) {
+        protected DeleteNodesByNameResult(final List<ErlangValue> successful,
+                final List<ErlangValue> notFound) {
             this.successful = successful;
             this.notFound = notFound;
         }
@@ -480,7 +480,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesByNameResult shutdownNodesByName(final List<String> names)
+    public DeleteNodesByNameResult shutdownNodesByName(final List<ErlangValue> names)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes_by_name",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
@@ -502,7 +502,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesByNameResult killNodes(final List<String> names)
+    public DeleteNodesByNameResult killNodes(final List<ErlangValue> names)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes_by_name",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
@@ -525,8 +525,8 @@ public class ScalarisVM {
             final OtpErlangObject received_raw) throws UnknownException {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            final List<String> successful = new ErlangValue(received.elementAt(0)).stringListValue();
-            final List<String> not_found = new ErlangValue(received.elementAt(1)).stringListValue();
+            final List<ErlangValue> successful = new ErlangValue(received.elementAt(0)).listValue();
+            final List<ErlangValue> not_found = new ErlangValue(received.elementAt(1)).listValue();
             return new DeleteNodesByNameResult(successful, not_found);
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);

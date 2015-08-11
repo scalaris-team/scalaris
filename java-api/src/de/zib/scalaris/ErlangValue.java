@@ -41,7 +41,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * @version 3.19
  * @since 3.0
  */
-public class ErlangValue {
+public class ErlangValue implements Comparable<ErlangValue> {
     /**
      * The (internal representation of the) wrapped erlang value.
      */
@@ -675,5 +675,15 @@ public class ErlangValue {
     @Override
     public String toString() {
         return value.toString();
+    }
+
+    /**
+     * Compares two erlang values by their string representation (expensive!).
+     *
+     * @param o
+     *            another erlang value
+     */
+    public int compareTo(final ErlangValue o) {
+        return value.toString().compareTo(o.toString());
     }
 }
