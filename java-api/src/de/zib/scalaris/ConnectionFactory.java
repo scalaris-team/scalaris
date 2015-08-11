@@ -72,7 +72,7 @@ import de.zib.tools.PropertyLoader;
  * default, {@link DefaultConnectionPolicy} is used.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.16
+ * @version 3.20
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -548,6 +548,26 @@ public class ConnectionFactory {
     public void removeNode(final PeerNode node) {
         this.nodes.remove(node);
         connectionPolicy.availableNodeRemoved(node);
+    }
+
+    /**
+     * (Re-)evaluates all currently set nodes by trying to establish a
+     * connection to each of them.
+     *
+     * Note: This resets all {@link PeerNode} statistics collected before.
+     *
+     * @since 3.20
+     */
+    public void testAllNodes() {
+        connectionPolicy.availableNodesReset();
+        for (final PeerNode node: nodes) {
+            node.resetFailureCount();
+            try {
+                createConnection(new FixedNodeConnectionPolicy(node)).close();
+            } catch (final ConnectionException e) {
+            }
+            connectionPolicy.availableNodeAdded(node);
+        }
     }
 
     /**

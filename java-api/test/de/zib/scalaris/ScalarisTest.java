@@ -31,8 +31,11 @@ import org.junit.Test;
 public class ScalarisTest {
 
     static {
+        // determine good/bad nodes:
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        cf.testAllNodes();
         // set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working):
-        ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy()).setMaxRetries(0);
+        ((DefaultConnectionPolicy) cf.getConnectionPolicy()).setMaxRetries(0);
     }
 
     /**

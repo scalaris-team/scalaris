@@ -37,8 +37,11 @@ public class MonitorTest {
     final static String scalarisNode;
 
     static {
+        // determine good/bad nodes:
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        cf.testAllNodes();
         // set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working):
-        final DefaultConnectionPolicy cp = ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy());
+        final DefaultConnectionPolicy cp = ((DefaultConnectionPolicy) cf.getConnectionPolicy());
         cp.setMaxRetries(0);
         scalarisNode = cp.selectNode().toString();
     }
