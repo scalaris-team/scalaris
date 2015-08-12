@@ -493,8 +493,15 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                                      ValType = ?not_found,
                                      state_set_result(Entry1, {Ok_Fail, empty_val, -1});
                                  Ok_Fail =:= ?ok ->
-                                     ValType = if Op =:= ?read -> ?value;
-                                                  true         -> ?partial_value
+                                      NumOk = state_get_numok(Entry),
+                                      ValType = if Op =:= ?read andalso NumOk >= MajDeny ->
+                                                        %% a value visible in every majority r=4: at least in 2 visible
+                                                        ?value;
+                                                   Op =:= ?read ->
+                                                        %% maybe a value not visible in every majority
+                                                        ?not_found;
+                                                   true ->
+                                                        ?partial_value
                                                end,
                                      state_set_decided(Entry, Ok_Fail);
                                  Ok_Fail =:= ?fail ->
