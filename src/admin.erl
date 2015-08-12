@@ -20,6 +20,7 @@
 -vsn('$Id$').
 
 -export([add_node/1, add_node_at_id/1, add_nodes/1, add_nodes_at_ids/1,
+         add_remaining_symmetric_nodes/0,
          del_node/2, del_nodes/2, del_nodes_by_name/2,
          get_dht_node_specs/0,
          wait_for_stable_ring/1,
@@ -86,6 +87,19 @@ add_nodes_at_ids(Keys) ->
                                   {error, _} -> false;
                                   _ -> true
                               end end, Results).
+
+% @doc if you started a single firstnode.sh you can add the remaining symmetric r-1 nodes in the local VM,
+%       for example to interactively run a unittest scenario step by step.
+-spec add_remaining_symmetric_nodes() -> ok.
+add_remaining_symmetric_nodes() ->
+    ?ASSERT2(1 =:= admin:number_of_nodes(), more_than_one_dht_node),
+    DHTNode = pid_groups:find_a(dht_node),
+    comm:send_local(DHTNode, {get_state, comm:this(), node_id}),
+    receive
+        ?SCALARIS_RECV({get_state_response, Id}, Id)
+    end,
+    Keys = ?RT:get_replica_keys(Id),
+    add_nodes_at_ids([X || X <- Keys, X =/= Id]).
 
 -spec get_dht_node_specs()
         -> [{Id::term() | undefined, Child::pid() | undefined,
