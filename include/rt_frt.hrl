@@ -1,8 +1,4 @@
 %% Flexible Routing Tables
-%% Grouped Flexible Routing Table
-%% (needs to be commented out to deactivate, setting to false isn't enough!)
-%% -define(GFRT, true).
-
 -define(RT, rt_frt).
 % first valid key:
 -define(MINUS_INFINITY, 0).
