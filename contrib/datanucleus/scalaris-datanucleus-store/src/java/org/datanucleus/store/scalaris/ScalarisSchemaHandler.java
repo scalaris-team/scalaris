@@ -87,12 +87,8 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
         return String.format("%s_%s", className, ID_GEN_PREXIF);
     }
     
-    static String getUniqueMemberValueToIdKeyName(String className, String memberName, String memberValue) {
+    static String getUniqueMemberKey(String className, String memberName, String memberValue) {
         return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
-    }
-    
-    static String geIdToUniqueMemberValueKeyName(String objectId, String memberName) {
-        return String.format("%s_%s_%s", objectId, memberName, UNIQUE_MEMBER_PREFIX);
     }
     
     public static String getForeignKeyActionIndexKey(String foreignClassName) {

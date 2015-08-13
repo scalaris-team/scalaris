@@ -3,10 +3,8 @@ package org.datanucleus.store.scalaris;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
@@ -230,20 +228,20 @@ public class ScalarisUtils {
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         insertObjectToIDIndex(op, t);
-        updateUniqueMemberKey(op, json, t);
+        updateUniqueMemberKey(op, json, null, t);
         insertToForeignKeyAction(op, json, t);
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject newJson, JSONObject changedNew, JSONObject changedOld, Transaction t) 
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject changedNew, JSONObject changedOld, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
-        updateUniqueMemberKey(op, newJson, t);
+        updateUniqueMemberKey(op, changedNew, changedOld, t);
         updateForeignKeyAction(op, changedNew, changedOld, t);
     }
     
-    static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
+    static void performScalarisManagementForDelete(ObjectProvider op, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         removeObjectFromIDIndex(op, t);
-        removeObjectFromUniqueMemberKey(op, t);
+        removeObjectFromUniqueMemberKey(op, oldJson, t);
         performForeignKeyActionDelete(op, t);
     }
         
@@ -317,7 +315,7 @@ public class ScalarisUtils {
      *                  ACTIONS TO GUARANTEE UNIQUENESS
      * **********************************************************************/
     
-    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) 
+    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject newJson, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
@@ -329,60 +327,49 @@ public class ScalarisUtils {
             if (umd != null) {
                 // this member has @Unique annotation -> lookup all stored values for this member
                 String fieldName = mmd.getName();
-                String fieldValue = null;
+                String oldFieldValue = null, newFieldValue = null;
                 try {
-                    fieldValue = json.getString(fieldName);
+                    newFieldValue = (newJson != null && newJson.has(fieldName)) ? newJson.getString(fieldName) : null;
+                    oldFieldValue = (oldJson != null && oldJson.has(fieldName)) ? oldJson.getString(fieldName) : null;
                 } catch (JSONException e) {
                     // unique members can be null which means they are not found in the JSON
                 }
+                if (newFieldValue != null && newFieldValue.equals(oldFieldValue)) {
+                    // this field has not changed -> skip update
+                    continue;
+                }
+                
+                if (oldFieldValue != null) {
+                    // mark the old key as removed
+                    String oldValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, oldFieldValue);
+                    t.write(oldValueKey, DELETED_RECORD_VALUE);
+                }
+                
+                if (newFieldValue != null) {
+                    // check if this value already exists
+                    // if it does -> exception; if not -> store
+                    String newValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, newFieldValue);
+                    String idStoringThisValue = null;
+                    try {
+                        idStoringThisValue = t.read(newValueKey).stringValue();
+                    } catch (NotFoundException e) {} // this value does not exist yet, therefore there is no conflict
                     
-                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
-                String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, fieldValue);
-
-                String idStoringThisValue = null;
-                String oldValueByThisId = null;
-                try {
-                    idStoringThisValue = t.read(valueToIdKey).stringValue();
-                } catch (NotFoundException e) {} // handled below
-                try {
-                    oldValueByThisId = t.read(idToValueKey).stringValue();
-                } catch(NotFoundException e) {} // handled below 
-
-                if (fieldValue != null && !isDeletedRecord(idStoringThisValue)) {
-                    // the unique value we try to store already exist
-                    if (idStoringThisValue.equals(objectStringIdentity)) {
-                        // .. but the current object is the one storing this value
-                        // This can happen if the current object was updated but this field
-                        // was unchanged. We don't need to do anything here.
-                    } else {
+                    if (idStoringThisValue != null && !isDeletedRecord(idStoringThisValue) 
+                            && !idStoringThisValue.equals(objectStringIdentity)) {
                         // another object has stored this value -> violation of uniqueness
-                        throw new NucleusDataStoreException("The value '" + fieldValue + "' of unique member '" + 
+                        throw new NucleusDataStoreException("The value '" + newFieldValue + "' of unique member '" + 
                                 fieldName + "' of class '" + className + "' already exists");
-                    }
-                } else {
-                    // the unique value does not exist
-
-                    if (!isDeletedRecord(oldValueByThisId)) {
-                        // the current object has a value of this member stored -> delete the old entry
-                        String oldValueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
-                        // overwrite with "empty" value to signal deletion
-                        t.write(oldValueToIdKey, DELETED_RECORD_VALUE);
-                    }
-                    
-                    // store the new value
-                    if (fieldValue != null) {
-                        t.write(idToValueKey, fieldValue);
-                        t.write(valueToIdKey, objectStringIdentity);
+                    } else {
+                        t.write(newValueKey, objectStringIdentity);
                     }
                 }
             }
         }
     }
     
-    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, Transaction t) 
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
         
         for (int field : cmd.getAllMemberPositions()) {
@@ -392,19 +379,15 @@ public class ScalarisUtils {
                 // this member has @Unique annotation -> lookup all stored values for this member
                 String fieldName = mmd.getName();
 
-                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
-                String oldValueByThisId = null;
+                String oldFieldValue = null;
                 try {
-                    oldValueByThisId = t.read(idToValueKey).stringValue();
-                } catch (NotFoundException e) {
-                    // should not happen but is not breaking anything
-                }
+                    oldFieldValue = oldJson.has(fieldName) ? oldJson.getString(fieldName) : null;
+                } catch (JSONException e) {} // can not happen since it is checked before 
                 
-                if (!isDeletedRecord(oldValueByThisId)) {
-                    String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
-                    t.write(valueToIdKey, DELETED_RECORD_VALUE);
+                if (oldFieldValue != null) {
+                    String oldValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, oldFieldValue);
+                    t.write(oldValueKey, DELETED_RECORD_VALUE);
                 }
-                t.write(idToValueKey, DELETED_RECORD_VALUE);
             }
         }
     }

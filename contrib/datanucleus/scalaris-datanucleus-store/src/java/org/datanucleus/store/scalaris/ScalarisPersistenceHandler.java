@@ -384,7 +384,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     stored.put(key, changedVals.get(key));
                 }
 
-                ScalarisUtils.performScalarisManagementForUpdate(op, stored, changedVals, changedValsOld, t1);
+                ScalarisUtils.performScalarisManagementForUpdate(op, changedVals, changedValsOld, t1);
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
                 t1.commit();
@@ -463,7 +463,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
-                    ScalarisUtils.performScalarisManagementForDelete(op, t1);
+                    JSONObject obj  = new JSONObject(t1.read(id).stringValue());
+                    ScalarisUtils.performScalarisManagementForDelete(op, obj, t1);
                     t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
                     t1.commit();
                     System.out.println("deleted id=" + id);
@@ -476,6 +477,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 } catch (ClassCastException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (NotAListException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (NotFoundException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (JSONException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 }
             }
