@@ -599,6 +599,7 @@ RUBYSITELIBDIR
 ENABLERUBYINSTALL
 BUILDCLASSPATH
 JAVAFUNCTIONS
+RT
 YAWS_OPTIONS
 EMAKEFILECOMPILECOMPAT
 DIALYZER_FLAGS
@@ -699,6 +700,7 @@ enable_runuser
 with_systemd
 enable_native
 enable_debug
+with_rt
 with_java_functions
 with_build_classpath
 with_ruby_sitelibdir
@@ -1332,6 +1334,8 @@ Optional Packages:
   --with-systemd[=UNITDIR]
                           use systemd, optionally specify the directory for
                           systemd service files
+  --with-rt[=RTFILE]      optionally specify the routing table type
+                          (default=rt_chord.hrl)
   --with-java-functions=JAVAFUNCTIONS
                           use the given java-functions script for
                           java-api/scalaris (default is
@@ -4186,6 +4190,23 @@ DIALYZER_FLAGS="${DIALYZER_FLAGS## }${YAWS_OPTIONS_DIALYZER}"
 
 
 
+
+
+
+###########################################################
+#
+# check for routing table type
+#
+###########################################################
+
+RT=rt_chord.hrl
+
+# Check whether --with-rt was given.
+if test "${with_rt+set}" = set; then :
+  withval=$with_rt; if test "$withval"; then
+               RT="$withval"
+             fi
+fi
 
 
 

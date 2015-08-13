@@ -25,24 +25,7 @@
 %%The RT macro determines which kind of routingtable is used. Uncomment the
 %%one that is desired.
 
-%%Standard Chord routingtable
--define(RT, rt_chord).
-% first valid key:
--define(MINUS_INFINITY, 0).
--define(MINUS_INFINITY_TYPE, 0).
-% first invalid key:
--define(PLUS_INFINITY, 16#100000000000000000000000000000000).
--define(PLUS_INFINITY_TYPE, 16#100000000000000000000000000000000).
-
-%%Simple routingtable
-%-define(RT, rt_simple).
-
-%% Flexible Routing Tables
-%% -define(RT, rt_frt).
-%% Grouped Flexible Routing Table
-%% (needs to be commented out to deactivate, setting to false isn't enough!)
-%% -define(GFRT, true).
-%% userdevguide-end scalaris:rt
+-include("$RT").
 
 % special parameters to be passed to ets:new/2 (not only used on db_ets!)
 % note: keep access level at least at protected for dht_node_db_cache to work!

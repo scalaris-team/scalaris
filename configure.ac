@@ -350,6 +350,22 @@ AC_SUBST(YAWS_OPTIONS)
 
 ###########################################################
 #
+# check for routing table type
+#
+###########################################################
+
+RT=rt_chord.hrl
+AC_ARG_WITH([rt],
+            [AS_HELP_STRING([--with-rt[[=RTFILE]]],
+                            [optionally specify the routing table type (default=rt_chord.hrl)])],
+            [if test "$withval"; then
+               RT="$withval"
+             fi],
+            [])
+AC_SUBST(RT)
+
+###########################################################
+#
 # check java-functions, build-classpath availability for java-api/scalaris
 #
 ###########################################################
