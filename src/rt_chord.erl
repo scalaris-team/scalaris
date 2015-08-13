@@ -211,6 +211,10 @@ get_random_in_interval2('(', L, R, ')', Count) ->
 -spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
     case config:read(replication_factor) of
+        2 ->
+            [Key,
+             Key bxor 16#80000000000000000000000000000000
+            ];
         4 ->
             [Key,
              Key bxor 16#40000000000000000000000000000000,
@@ -251,6 +255,7 @@ get_replica_keys(Key) ->
 -spec get_key_segment(key()) -> pos_integer().
 get_key_segment(Key) ->
     case config:read(replication_factor) of
+        2  -> (Key bsr 127) + 1;
         4  -> (Key bsr 126) + 1;
         8  -> (Key bsr 125) + 1;
         16 -> (Key bsr 124) + 1
