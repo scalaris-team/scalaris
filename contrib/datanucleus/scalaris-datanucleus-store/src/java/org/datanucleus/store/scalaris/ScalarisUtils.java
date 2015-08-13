@@ -407,7 +407,6 @@ public class ScalarisUtils {
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
-        String className = cmd.getFullClassName();
 
         // the map will store all elements which must be added/removed from which key
         HashMap<String, List<ErlangValue>> toAddToKey = new HashMap<String, List<ErlangValue>>();
@@ -464,33 +463,27 @@ public class ScalarisUtils {
                     for (String foreignObjectId : changeList) {
                         if (foreignObjectId == null) continue;
 
-                        String memberClassName;
-                        String action;
+                        List<String> newFka = new ArrayList<String>(2);
+                        newFka.add(objectStringIdentity);
 
                         if (isJoin) {
-                            memberClassName = mmd.getCollection().getElementType();
-                            action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                    fieldName);
+                            newFka.add(fieldName);
                         } else {
-                            memberClassName = mmd.getType().getCanonicalName();
-                            action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                    ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                            newFka.add(ScalarisSchemaHandler.FKA_DELETE_OBJ);
                         }
-                        List<String> newFka = new ArrayList<String>(2);
-                        newFka.add(foreignObjectId);
-                        newFka.add(objectStringIdentity);
+                        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(foreignObjectId);
 
                         // check in which list we are currently in to choose the
                         // HashMap to which the action must be added to
                         HashMap<String, List<ErlangValue>> toChangeMap = (foreignObjectIdsNew == changeList) ?
                                 toAddToKey : toRemoveFromKey;
 
-                        List<ErlangValue> toChange = toChangeMap.get(action);
+                        List<ErlangValue> toChange = toChangeMap.get(fkaKey);
                         if (toChange == null) {
                             toChange = new ArrayList<ErlangValue>();
                         }
                         toChange.add(new ErlangValue(newFka));
-                        toChangeMap.put(action, toChange);
+                        toChangeMap.put(fkaKey, toChange);
                     }
                 }
             }
@@ -514,167 +507,110 @@ public class ScalarisUtils {
         }
     }
     
-    private static class ScalarisFKA {
-        private String scalarisKey;
-        private String memberToDeleteIn;
-        
-        ScalarisFKA(String scalarisKey, String memberToDeleteIn) {
-            this.scalarisKey = scalarisKey;
-            this.memberToDeleteIn = memberToDeleteIn;
-        }
-        
-        boolean deleteCompleteObject() {
-            return memberToDeleteIn.equals(ScalarisSchemaHandler.FKA_DELETE_OBJ);
-        }
-        
-        String getScalarisKey() {
-            return scalarisKey;
-        }
-        
-        String getMemberToDeleteIn() {
-            return memberToDeleteIn;
-        }
-    }
-    
     private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
-        AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
-        String className = cmd.getFullClassName();
         
         ExecutionContext ec = op.getExecutionContext();
         StoreManager storeMgr = ec.getStoreManager();
         
-        List<ScalarisFKA> attachedActions = findForeignKeyActions(className, t);
+        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(objectStringIdentity);
+        List<ErlangValue> attachedActions;
+        try {
+            attachedActions = t.read(fkaKey).listValue();
+        } catch (NotFoundException e) {
+            // there is no FKA key for this object --> there are no actions to perform
+            return;
+        }
         // now search in every found action entries with op's id and start a delete as sub transaction
-        for (ScalarisFKA action : attachedActions) {
-            List<ErlangValue> actionList = null;
+        for (ErlangValue action : attachedActions) {
             try {
-                actionList = t.read(action.getScalarisKey()).listValue();
+                List<String> actionAsList = action.stringListValue();
                 
-                List<String> objectsToDelete = new ArrayList<String>();
-                List<ErlangValue> entryToDelete = new ArrayList<ErlangValue>();
-                for (ErlangValue entry : actionList) {
-                   List<String> actionEntry =  entry.stringListValue();
-                        
-                   if (actionEntry.get(0).equals(objectStringIdentity)) {
-                        objectsToDelete.add(actionEntry.get(1));
-                        entryToDelete.add(entry);
-                   }
-                }
-                // update table if something changed
-                if (!entryToDelete.isEmpty()) {
-                    t.addDelOnList(action.getScalarisKey(), 
-                            new ArrayList<ErlangValue>(0), entryToDelete);
-                }
-                    
-                for (int i = 0; i < objectsToDelete.size(); i++) {
-                    String objId = objectsToDelete.get(i);
-                    try {
-                        String toDeleteClassName = storeMgr
-                                .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
-                        AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
-                                .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
-                        Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
-
-                        if (action.deleteCompleteObject()) {
-                            // Start deletion of referenced objects
-                            ec.deleteObject(obj);
-                        } else {
-                            // remove the object reference of the deleted object from the collection
-
-                            ObjectProvider toDelOp = ec.findObjectProvider(obj);
-
-                            int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(action.getMemberToDeleteIn());
-
-                            if (toDelOp.isFieldLoaded(memberId)) {
-                                // the field is loaded which means that the object could be used by the overlying 
-                                // application
-                                Object objColl = toDelOp.provideField(memberId);
-
-                                if (objColl instanceof Collection) {
-                                    Collection collection = (Collection) objColl;
-
-                                    ArrayList<Object> toRemove = new ArrayList<Object>();
-                                    Iterator iter = collection.iterator();
-                                    while (iter.hasNext()) {
-                                        Object item = iter.next();
-                                        ObjectProvider itemOp = ec.findObjectProvider(item);
-                                        String itemId = getPersistableIdentity(itemOp);
-
-                                        if (itemId.equals(objectStringIdentity)) {
-                                            toRemove.add(item);
-                                        }
-                                    }
-                                    for (Object o : toRemove) {
-                                        collection.remove(o);
-                                    }
-                                    storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
-                                    // updated field must be marked as dirty to ensure that instances of this object used
-                                    // somewhere else will fetch the updated value
-                                    toDelOp.makeDirty(memberId);
-                                }
-                            } else {
-                                // if the member is not loaded it is way faster to directly alter the
-                                // stored JSON object
-                                JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
-                                JSONArray memberArr = objAsJson.getJSONArray(action.getMemberToDeleteIn());
-                                JSONArray newMemberArr = new JSONArray();
-                                for (int j = 0; j < memberArr.length(); j++) {
-                                    if (!memberArr.get(j).equals(objectStringIdentity)) {
-                                        newMemberArr.put(memberArr.get(j));
-                                    }
-                                }
-                                // only write new value if something changed
-                                if (newMemberArr.length() != memberArr.length()) {
-                                    objAsJson.put(action.getMemberToDeleteIn(), newMemberArr);
-                                    t.write(objId, objAsJson.toString());
-                                    // if the object is not removed from cache after this update
-                                    // it is possible that the cached value returned is outdated
-                                    ec.removeObjectFromLevel1Cache(toDelOp.getInternalObjectId());
-                                    ec.removeObjectFromLevel2Cache(toDelOp.getInternalObjectId());
+                String objId = actionAsList.get(0);
+                String memberToDelete = actionAsList.get(1);
+                
+                String toDeleteClassName = storeMgr
+                        .getClassNameForObjectID(objId,  ec.getClassLoaderResolver(), ec);
+                AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
+                        .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
+                Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+                
+                if (ScalarisSchemaHandler.FKA_DELETE_OBJ.equals(memberToDelete)) {
+                    // delete the complete object
+                    ec.deleteObject(obj);
+                } else {
+                    // remove the object reference of the deleted object from the collection
+    
+                    ObjectProvider toDelOp = ec.findObjectProvider(obj);
+    
+                    int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(memberToDelete);
+    
+                    if (toDelOp.isFieldLoaded(memberId)) {
+                        // the field is loaded which means that the object could be used by the overlying 
+                        // application
+                        Object objColl = toDelOp.provideField(memberId);
+    
+                        if (objColl instanceof Collection) {
+                            Collection collection = (Collection) objColl;
+    
+                            ArrayList<Object> toRemove = new ArrayList<Object>();
+                            Iterator iter = collection.iterator();
+                            while (iter.hasNext()) {
+                                Object item = iter.next();
+                                ObjectProvider itemOp = ec.findObjectProvider(item);
+                                String itemId = getPersistableIdentity(itemOp);
+    
+                                if (itemId.equals(objectStringIdentity)) {
+                                    toRemove.add(item);
                                 }
                             }
+                            for (Object o : toRemove) {
+                                collection.remove(o);
+                            }
+                            storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
+                            // updated field must be marked as dirty to ensure that instances of this object used
+                            // somewhere else will fetch the updated value
+                            toDelOp.makeDirty(memberId);
                         }
-                    } catch (NucleusObjectNotFoundException e) {
-                        // if we land in this catch block, the object we are trying to delete
-                        // is already deleted. Therefore do nothing.
+                    } else {
+                        // if the member is not loaded it is way faster to directly alter the
+                        // stored JSON object
+                        JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
+                        if (isDeletedRecord(objAsJson)) {
+                            continue;
+                        }
+                        JSONArray memberArr = objAsJson.getJSONArray(memberToDelete);
+                        JSONArray newMemberArr = new JSONArray();
+                        for (int j = 0; j < memberArr.length(); j++) {
+                            if (!memberArr.get(j).equals(objectStringIdentity)) {
+                                newMemberArr.put(memberArr.get(j));
+                            }
+                        }
+                        // only write new value if something changed
+                        if (newMemberArr.length() != memberArr.length()) {
+                            objAsJson.put(memberToDelete, newMemberArr);
+                            t.write(objId, objAsJson.toString());
+                            // if the object is not removed from cache after this update
+                            // it is possible that the cached value returned is out dated
+                            ec.removeObjectFromLevel1Cache(toDelOp.getInternalObjectId());
+                            ec.removeObjectFromLevel2Cache(toDelOp.getInternalObjectId());
+                        }
                     }
                 }
+            } catch (NucleusObjectNotFoundException e) {
+                // the object we want to delete is already deleted 
+                // nothing must be done
             } catch (NotFoundException e) {
-                // this can happen
+                throw new NucleusException(e.getMessage(), e);
             } catch (JSONException e) {
-               throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+                throw new NucleusException(e.getMessage(), e);
+                // the member containing the current object does not exist any more
+                // that means we don't have to remove it any more
             }
         }
     }
 
-    // retrieve the ForeignKeyAction-index key to check if there are delete actions attached to this 
-    // object
-    // TODO: structure index in some way so that less than O(n) is needed here
-    // TODO: sub transaction?
-    private static ArrayList<ScalarisFKA> findForeignKeyActions(String foreignClassName, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
-        
-        String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey(foreignClassName);
-        ArrayList<ScalarisFKA> attachedActions = new ArrayList<ScalarisFKA>();
-        try {
-            List<ErlangValue> fkaIndex = t.read(fkaIndexKey).listValue();
-
-            for (ErlangValue fka : fkaIndex) {
-                List<String> fkaList = fka.stringListValue();
-                String scalarisKey = ScalarisSchemaHandler.getForeignKeyActionKey(foreignClassName, 
-                        fkaList.get(0), fkaList.get(1));
-                attachedActions.add(new ScalarisFKA(scalarisKey,fkaList.get(1)));
-            }
-        } catch (NotFoundException e) {
-            // there are no ForeignKeyAction registered for this class
-        }
-
-        return attachedActions;
-    }
-    
-    
     /* **********************************************************************
      *                     MISC
      * **********************************************************************/
