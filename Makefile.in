@@ -568,14 +568,14 @@ TAGS.root:
 doc: .make-doc
 
 .make-doc: $(SOURCEPATHS_ERL)
-	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
+	@RT=$(RT) $(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
 	'"."' '[{def, {vsn, "$(VERSION)"}}, no_packages, {preprocess, true}, {includes, ["include", "contrib/yaws/include", "contrib/log4erl/include"]}, {sort_functions, false}, {pretty_printer, erl_pp}, {macros, [@EDOCMACROS@]}]'
 	@touch .make-doc
 
 docs: doc java-doc
 
 dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test --no_native
+	@RT=$(RT) $(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test --no_native
 
 dialyzer-col:
 	$(MAKE) dialyzer | sed -f contrib/dialyzer-col.sed
