@@ -631,46 +631,4 @@ public class ScalarisUtils {
     public static boolean isDeletedRecord(final String record) {
         return record == null || record.isEmpty() || record.equals(DELETED_RECORD_VALUE);
     }
-    
-    /**
-     * Convenience method to get all objects of the candidate type from the
-     * specified connection. Objects of subclasses are ignored.
-     * 
-     * @param ec
-     * @param mconn
-     * @param candidateClass
-     */
-    public static List<Object> getObjectsOfCandidateType(ExecutionContext ec,
-            ManagedConnection mconn, Class<?> candidateClass,
-            AbstractClassMetaData cmd) {
-        List<Object> results = new ArrayList<Object>();
-        String idIndexKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
-
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
-
-        try {
-            // read the management key
-            Transaction t = new Transaction(conn);
-            List<String> idIndex = t.read(idIndexKey).stringListValue();
-
-            // retrieve all values from the management key
-            for (String id : idIndex) {
-                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
-            }
-
-            t.commit();
-        } catch (NotFoundException e) {
-            // the management key does not exist which means there
-            // are no instances of this class stored.
-        } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
-        }
-
-        return results;
-    }
 }

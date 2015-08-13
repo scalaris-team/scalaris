@@ -18,12 +18,15 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.exceptions.NucleusObjectNotFoundException;
+import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.AbstractPersistenceHandler;
@@ -469,5 +472,47 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             // Add to statistics
             ec.getStatistics().incrementNumReads();
         }
+    }
+
+    /**
+     * Convenience method to get all objects of the candidate type from the
+     * specified connection. Objects of subclasses are ignored.
+     * 
+     * @param ec
+     * @param mconn
+     * @param candidateClass
+     */
+    public List<Object> getObjectsOfCandidateType(ExecutionContext ec,
+            ManagedConnection mconn, Class<?> candidateClass,
+            AbstractClassMetaData cmd) {
+        List<Object> results = new ArrayList<Object>();
+        String idIndexKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
+
+        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
+                .getConnection();
+
+        try {
+            // read the management key
+            Transaction t = new Transaction(conn);
+            List<String> idIndex = t.read(idIndexKey).stringListValue();
+
+            // retrieve all values from the management key
+            for (String id : idIndex) {
+                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
+            }
+
+            t.commit();
+        } catch (NotFoundException e) {
+            // the management key does not exist which means there
+            // are no instances of this class stored.
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+
+        return results;
     }
 }
