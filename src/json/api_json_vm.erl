@@ -85,7 +85,7 @@ add_nodes(Number) ->
               {ok, {array, [pid_groups:group_to_string(Group) || Group <- Ok]}},
               {failed, {array, Failed}}]}.
 
--spec shutdown_node(Name::pid_groups:groupname()) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec shutdown_node(Name::nonempty_string()) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_node(Name) ->
     {struct, [{status, erlang:atom_to_list(api_vm:shutdown_node(pid_groups:string_to_group(Name)))}]}.
 
@@ -93,7 +93,7 @@ shutdown_node(Name) ->
 shutdown_nodes(Count) ->
     {struct, [{status, "ok"}, {ok, {array, [pid_groups:group_to_string(Group) || Group <- api_vm:shutdown_nodes(Count)]}}]}.
 
--spec shutdown_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec shutdown_nodes_by_name(Names::{array, [nonempty_string()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:shutdown_nodes_by_name(
                        [pid_groups:string_to_group(Group) || Group <- Names]),
@@ -101,7 +101,7 @@ shutdown_nodes_by_name({array, Names}) ->
     NotFound2 = [pid_groups:group_to_string(Group) || Group <- NotFound],
     {struct, [{status, "ok"}, {ok, {array, Ok2}}, {not_found, {array, NotFound2}}]}.
 
--spec kill_node(Name::pid_groups:groupname()) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec kill_node(Name::nonempty_string()) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_node(Name) ->
     {struct, [{status, erlang:atom_to_list(api_vm:kill_node(pid_groups:string_to_group(Name)))}]}.
 
@@ -110,7 +110,7 @@ kill_nodes(Count) ->
     Ok = [pid_groups:group_to_string(Group) || Group <- api_vm:kill_nodes(Count)],
     {struct, [{status, "ok"}, {ok, {array, Ok}}]}.
 
--spec kill_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec kill_nodes_by_name(Names::{array, [nonempty_string()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:kill_nodes_by_name(
                        [pid_groups:string_to_group(Group) || Group <- Names]),

@@ -90,7 +90,7 @@ add_nodes_at_ids(Keys) ->
 
 % @doc if you started a single firstnode.sh you can add the remaining symmetric r-1 nodes in the local VM,
 %       for example to interactively run a unittest scenario step by step.
--spec add_remaining_symmetric_nodes() -> ok.
+-spec add_remaining_symmetric_nodes() -> {[pid_groups:groupname()], [{error, term()}]}.
 add_remaining_symmetric_nodes() ->
     ?ASSERT2(1 =:= admin:number_of_nodes(), more_than_one_dht_node),
     DHTNode = pid_groups:find_a(dht_node),
