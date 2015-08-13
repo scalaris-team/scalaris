@@ -19,7 +19,6 @@ Contributors:
 package org.datanucleus.store.scalaris;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.datanucleus.ExecutionContext;
@@ -98,8 +97,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId()));
             }
 
+            // prepare object
             JSONObject jsonobj = new JSONObject();
-            final String id = ScalarisUtils.generatePersistableIdentity(op);
+            String id = ScalarisUtils.generatePersistableIdentity(op);
             populateJsonObj(jsonobj, op);
 
             if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
@@ -107,22 +107,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         + jsonobj.toString());
             }
 
-            System.out.println("id=" + id + " json=" + jsonobj.toString());
-
-            Transaction t1 = new Transaction(conn);
-            try {
-                ScalarisUtils.performScalarisManagementForInsert(op, jsonobj, t1);
-                t1.write(id, jsonobj.toString());
-                t1.commit();
-            } catch (ConnectionException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (UnknownException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (ClassCastException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (NotAListException e) {
-                throw new NucleusException(e.getMessage(), e);
-            }
+            // insert object
+            ScalarisUtils.performScalarisObjectInsert(op, id, jsonobj, conn);
 
             if (ec.getStatistics() != null) {
                 // Add to statistics
@@ -138,6 +124,12 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         } catch (AbortException e) {
             throw new NucleusException(e.getMessage(), e);
         } catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (ClassCastException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (NotAListException e) {
             throw new NucleusException(e.getMessage(), e);
         } finally {
             mconn.release();
@@ -174,7 +166,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             JSONObject changedVals = new JSONObject();
-
             final String id = ScalarisUtils.getPersistableIdentity(op);
             op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
                     changedVals, false));
@@ -186,41 +177,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         + changedVals.toString());
             }
 
-
-            Transaction t1 = new Transaction(conn);
-            try {
-                JSONObject stored = new JSONObject(t1.read(id).stringValue());
-                JSONObject changedValsOld = new JSONObject();
-                // update stored object values
-                Iterator<String> keyIter = changedVals.keys();
-                while (keyIter.hasNext()) {
-                    String key = keyIter.next();
-                    if (stored.has(key)) {
-                        changedValsOld.put(key, stored.get(key));
-                    }
-                    stored.put(key, changedVals.get(key));
-                }
-
-                ScalarisUtils.performScalarisManagementForUpdate(op, changedVals, changedValsOld, t1);
-                t1.write(id, stored.toString());
-                System.out.println("Updated JSON: " + stored.toString());
-                t1.commit();
-            } catch (ConnectionException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (AbortException e) {
-                throw new NucleusException(e.getMessage(), e);
-            }catch (UnknownException e) {
-                throw new NucleusException(e.getMessage(), e);
-            }catch (NotFoundException e) {
-                // if we have an update we should already have this object stored
-                throw new NucleusException("Could not update object since its original value was not found", e);
-            } catch (ClassCastException e) {
-                throw new NucleusException("The stored object has a broken structure", e);
-            } catch (NotAListException e) {
-                throw new NucleusException("The stored object has a broken structure", e);
-            } catch (JSONException e) {
-                throw new NucleusException("The stored object has a broken structure", e);
-            }
+            ScalarisUtils.performScalarisObjectUpdate(op, id, changedVals, conn);
 
             if (ec.getStatistics() != null) {
                 // Add to statistics
@@ -233,6 +190,21 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         "Scalaris.ExecutionTime",
                         (System.currentTimeMillis() - startTime)));
             }
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }catch (NotFoundException e) {
+            // if we have an update we should already have this object stored
+            throw new NucleusException("Could not update object since its original value was not found", e);
+        } catch (ClassCastException e) {
+            throw new NucleusException("The stored object has a broken structure", e);
+        } catch (NotAListException e) {
+            throw new NucleusException("The stored object has a broken structure", e);
+        } catch (JSONException e) {
+            throw new NucleusException("The stored object has a broken structure", e);
         } finally {
             mconn.release();
         }
@@ -273,29 +245,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final String id = ScalarisUtils.getPersistableIdentity(op);
             System.out.println("deleting object with key=" + id);
 
-            Transaction t1 = new Transaction(conn);
-
-            try {
-                JSONObject obj  = new JSONObject(t1.read(id).stringValue());
-                ScalarisUtils.performScalarisManagementForDelete(op, obj, t1);
-                t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
-                t1.commit();
-                System.out.println("deleted id=" + id);
-            } catch (ConnectionException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (UnknownException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (AbortException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (ClassCastException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (NotAListException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (NotFoundException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (JSONException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            }
+            ScalarisUtils.performScalarisObjectDelete(op, id, conn);
 
             if (ec.getStatistics() != null) {
                 ec.getStatistics().incrementNumWrites();
@@ -307,6 +257,20 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         "Scalaris.ExecutionTime",
                         (System.currentTimeMillis() - startTime)));
             }
+        } catch (ConnectionException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (UnknownException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (ClassCastException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (NotAListException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (NotFoundException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (JSONException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
             mconn.release();
         }
@@ -336,65 +300,68 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
-        try {
-            final long startTime = System.currentTimeMillis();
-
-            final String key = ScalarisUtils.getPersistableIdentity(op);
-            System.out.println("FETCH KEY: " + key);
-
+        // TODO: Reads should not require synchronization
+        synchronized(ScalarisUtils.class) {
             try {
-                Transaction t1 = new Transaction(conn);
-
-                JSONObject result = new JSONObject(t1.read(key).stringValue());
-                if (ScalarisUtils.isDeletedRecord(result)) {
-                    throw new NucleusObjectNotFoundException(
-                            "Record has been deleted");
+                final long startTime = System.currentTimeMillis();
+    
+                final String key = ScalarisUtils.getPersistableIdentity(op);
+                System.out.println("FETCH KEY: " + key);
+    
+                try {
+                    Transaction t1 = new Transaction(conn);
+    
+                    JSONObject result = new JSONObject(t1.read(key).stringValue());
+                    if (ScalarisUtils.isDeletedRecord(result)) {
+                        throw new NucleusObjectNotFoundException(
+                                "Record has been deleted");
+                    }
+                    final String declaredClassQName = result.getString("class");
+                    final Class declaredClass = op.getExecutionContext()
+                            .getClassLoaderResolver()
+                            .classForName(declaredClassQName);
+                    final Class objectClass = op.getObject().getClass();
+    
+                    if (!objectClass.isAssignableFrom(declaredClass)) {
+                            System.out.println("Type found in db not compatible with requested type");
+                        throw new NucleusObjectNotFoundException(
+                                "Type found in db not compatible with requested type");
+                    }
+    
+                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
+    
+                    t1.commit();
+    
+                    if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
+                        NucleusLogger.DATASTORE_NATIVE
+                                .debug("GET " + result.toString());
+                    }
+                } catch (NotFoundException e) {
+                    throw new NucleusObjectNotFoundException(e.getMessage(), e);
+                } catch (ConnectionException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (UnknownException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (AbortException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (JSONException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
                 }
-                final String declaredClassQName = result.getString("class");
-                final Class declaredClass = op.getExecutionContext()
-                        .getClassLoaderResolver()
-                        .classForName(declaredClassQName);
-                final Class objectClass = op.getObject().getClass();
 
-                if (!objectClass.isAssignableFrom(declaredClass)) {
-                        System.out.println("Type found in db not compatible with requested type");
-                    throw new NucleusObjectNotFoundException(
-                            "Type found in db not compatible with requested type");
+                if (ec.getStatistics() != null) {
+                    // Add to statistics
+                    ec.getStatistics().incrementNumReads();
+                    ec.getStatistics().incrementFetchCount();
                 }
-
-                op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
-
-                t1.commit();
-
-                if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
-                    NucleusLogger.DATASTORE_NATIVE
-                            .debug("GET " + result.toString());
+    
+                if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
+                    NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
+                            "Scalaris.ExecutionTime",
+                            (System.currentTimeMillis() - startTime)));
                 }
-            } catch (NotFoundException e) {
-                throw new NucleusObjectNotFoundException(e.getMessage(), e);
-            } catch (ConnectionException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (UnknownException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (AbortException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (JSONException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
+            } finally {
+                mconn.release();
             }
-
-            if (ec.getStatistics() != null) {
-                // Add to statistics
-                ec.getStatistics().incrementNumReads();
-                ec.getStatistics().incrementFetchCount();
-            }
-
-            if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
-                NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
-                        "Scalaris.ExecutionTime",
-                        (System.currentTimeMillis() - startTime)));
-            }
-        } finally {
-            mconn.release();
         }
     }
 
@@ -467,28 +434,31 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
-        try {
-            // read the management key
-            Transaction t = new Transaction(conn);
-            List<String> idIndex = t.read(idIndexKey).stringListValue();
-
-            // retrieve all values from the management key
-            for (String id : idIndex) {
-                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
+        // TODO: Reads should not require synchronization
+        synchronized(ScalarisUtils.class) {
+            try {
+                // read the management key
+                Transaction t = new Transaction(conn);
+                List<String> idIndex = t.read(idIndexKey).stringListValue();
+    
+                // retrieve all values from the management key
+                for (String id : idIndex) {
+                    results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
+                }
+    
+                t.commit();
+            } catch (NotFoundException e) {
+                // the management key does not exist which means there
+                // are no instances of this class stored.
+            } catch (ConnectionException e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (AbortException e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (UnknownException e) {
+                throw new NucleusException(e.getMessage(), e);
             }
-
-            t.commit();
-        } catch (NotFoundException e) {
-            // the management key does not exist which means there
-            // are no instances of this class stored.
-        } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
+    
+            return results;
         }
-
-        return results;
     }
 }

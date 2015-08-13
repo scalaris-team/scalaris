@@ -28,6 +28,7 @@ import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
+import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotAListException;
@@ -224,25 +225,58 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  HOOKS FOR ScalarisStoreManager
      * **********************************************************************/
-    
-    static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+    static synchronized void performScalarisObjectInsert(ObjectProvider op, String keyToInsertTo, JSONObject json, Connection conn) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException, AbortException {
+
+        Transaction t = new Transaction(conn);
+
         insertObjectToIDIndex(op, t);
         updateUniqueMemberKey(op, json, null, t);
         insertToForeignKeyAction(op, json, t);
+
+        t.write(keyToInsertTo, json.toString());
+        t.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    static synchronized void performScalarisObjectUpdate(ObjectProvider op, String objectKey, JSONObject changedVals, Connection conn) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
+            NotFoundException, JSONException, AbortException {
+        // get old value
+        Transaction t = new Transaction(conn);
+        JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
+
+        // update stored object values
+        JSONObject changedValsOld = new JSONObject();
+        Iterator<String> keyIter = changedVals.keys();
+        while (keyIter.hasNext()) {
+            String key = keyIter.next();
+            if (stored.has(key)) {
+                changedValsOld.put(key, stored.get(key));
+            }
+            stored.put(key, changedVals.get(key));
+        }
+
+        updateUniqueMemberKey(op, changedVals, changedValsOld, t);
+        updateForeignKeyAction(op, changedVals, changedValsOld, t);
+
+        t.write(objectKey, stored.toString());
+        t.commit();
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject changedNew, JSONObject changedOld, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
-        updateUniqueMemberKey(op, changedNew, changedOld, t);
-        updateForeignKeyAction(op, changedNew, changedOld, t);
-    }
-    
-    static void performScalarisManagementForDelete(ObjectProvider op, JSONObject oldJson, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+    static synchronized void performScalarisObjectDelete(ObjectProvider op, String objectKey, Connection conn) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
+            NotFoundException, JSONException, AbortException {
+
+        Transaction t = new Transaction(conn);
+        JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
+
         removeObjectFromIDIndex(op, t);
         removeObjectFromUniqueMemberKey(op, oldJson, t);
         performForeignKeyActionDelete(op, t);
+
+        t.write(objectKey,  DELETED_RECORD_VALUE);
+        t.commit();
     }
         
     /* **********************************************************************
