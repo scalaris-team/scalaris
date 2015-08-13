@@ -520,11 +520,13 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                is_atom(PidName) ->
                    %% we can give this process a better name for
                    %% debugging, for example for etop.
-                   ?DEBUG_REGISTER(list_to_atom(GroupId ++ "-" ++ atom_to_list(PidName)),
+                   ?DEBUG_REGISTER(list_to_atom(pid_groups:group_to_string(GroupId)
+                                               ++ "-" ++ atom_to_list(PidName)),
                                    self()),
                    ok;
                true ->
-                   ?DEBUG_REGISTER(list_to_atom(GroupId ++ "-" ++ PidName),
+                   ?DEBUG_REGISTER(list_to_atom(pid_groups:group_to_string(GroupId)
+                                               ++ "-" ++ PidName),
                                    self()),
                    ok
             end;
