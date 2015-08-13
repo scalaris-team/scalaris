@@ -69,7 +69,7 @@
         <dependency>
             <groupId>de.zib.scalaris</groupId>
             <artifactId>java-api</artifactId>
-            <version>0.7.2</version>
+            <version>[0.7.2,)</version>
         </dependency>
         <dependency>
             <!-- Scalaris does not set its dependencies correctly, add here: -->
