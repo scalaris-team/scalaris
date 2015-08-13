@@ -18,34 +18,21 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
-import java.sql.Timestamp;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.exceptions.NucleusObjectNotFoundException;
-import org.datanucleus.identity.SCOID;
 import org.datanucleus.metadata.AbstractClassMetaData;
-import org.datanucleus.metadata.AbstractMemberMetaData;
-import org.datanucleus.metadata.IdentityType;
-import org.datanucleus.metadata.VersionMetaData;
-import org.datanucleus.metadata.VersionStrategy;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.AbstractPersistenceHandler;
 import org.datanucleus.store.StoreManager;
-import org.datanucleus.store.VersionHelper;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.scalaris.fieldmanager.FetchFieldManager;
 import org.datanucleus.store.scalaris.fieldmanager.StoreFieldManager;
-import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
-import org.datanucleus.util.StringUtils;
-
 
 import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
@@ -60,7 +47,7 @@ import de.zib.scalaris.UnknownException;
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
-    /** Setup localiser for messages. */
+    /** Setup localizer for messages. */
     static {
         Localiser.registerBundle("org.datanucleus.store.scalaris.Localisation",
                 ScalarisStoreManager.class.getClassLoader());
@@ -95,11 +82,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
-        Map<String, String> options = new HashMap<String, String>();
-        // options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec, options);
-
+        ManagedConnection mconn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
@@ -112,77 +96,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             JSONObject jsonobj = new JSONObject();
-
-            AbstractClassMetaData cmd = op.getClassMetaData();
-            System.out.println("insert looking for key=" + "key"
-                    + " discriminator=" + cmd.getDiscriminatorColumnName()
-                    + " table=" + cmd.getTable());
-
-            if (cmd.getIdentityType() == IdentityType.DATASTORE) {
-                String memberName = storeMgr.getNamingFactory().getColumnName(
-                        cmd, ColumnType.DATASTOREID_COLUMN);
-                Object idKey = ((SCOID) op.getInternalObjectId());
-                System.out.println("idKey=" + idKey);
-                try {
-                    jsonobj.put(memberName, idKey);
-                } catch (JSONException e) {
-                    throw new NucleusException(
-                            "Exception setting datastore identity in JSON object",
-                            e);
-                }
-            }
-
-            if (cmd.isVersioned()) {
-                VersionMetaData vermd = cmd.getVersionMetaDataForClass();
-                String memberName = storeMgr.getNamingFactory().getColumnName(
-                        cmd, ColumnType.VERSION_COLUMN);
-                if (vermd.getVersionStrategy() == VersionStrategy.VERSION_NUMBER) {
-                    long versionNumber = 1;
-                    op.setTransactionalVersion(new Long(versionNumber));
-                    if (NucleusLogger.DATASTORE.isDebugEnabled()) {
-                        NucleusLogger.DATASTORE.debug(Localiser.msg(
-                                "Scalaris.Insert.ObjectPersistedWithVersion",
-                                StringUtils.toJVMIDString(op.getObject()),
-                                op.getInternalObjectId(), "" + versionNumber));
-                    }
-                    try {
-                        jsonobj.put(memberName, versionNumber);
-                    } catch (JSONException e) {
-                        throw new NucleusException(
-                                "Exception setting version in JSON object", e);
-                    }
-
-                    if (vermd.getFieldName() != null) {
-                        // Version is stored in a field, so set it there too
-                        AbstractMemberMetaData verfmd = cmd
-                                .getMetaDataForMember(vermd.getFieldName());
-                        if (verfmd.getType() == Integer.class) {
-                            op.replaceField(verfmd.getAbsoluteFieldNumber(),
-                                    new Integer((int) versionNumber));
-                        } else {
-                            op.replaceField(verfmd.getAbsoluteFieldNumber(),
-                                    new Long(versionNumber));
-                        }
-                    }
-                } else if (vermd.getVersionStrategy() == VersionStrategy.DATE_TIME) {
-                    Date date = new Date();
-                    Timestamp ts = new Timestamp(date.getTime());
-                    op.setTransactionalVersion(ts);
-                    if (NucleusLogger.DATASTORE.isDebugEnabled()) {
-                        NucleusLogger.DATASTORE.debug(Localiser.msg(
-                                "Scalaris.Insert.ObjectPersistedWithVersion",
-                                StringUtils.toJVMIDString(op.getObject()),
-                                op.getInternalObjectId(), "" + ts));
-                    }
-                    try {
-                        jsonobj.put(memberName, ts.getTime());
-                    } catch (JSONException e) {
-                        throw new NucleusException(
-                                "Exception setting version in JSON object", e);
-                    }
-                }
-            }
-
             final String id = ScalarisUtils.generatePersistableIdentity(op);
             populateJsonObj(jsonobj, op);
 
@@ -190,28 +103,22 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 NucleusLogger.DATASTORE_NATIVE.debug("POST "
                         + jsonobj.toString());
             }
-            // write("POST",conn.getURL().toExternalForm(), conn, jsonobj,
-            // getHeaders("POST",options));
 
             System.out.println("id=" + id + " json=" + jsonobj.toString());
 
-            { // TRANSACTION
-                Transaction t1 = new Transaction(conn); // Transaction()
-
-                try {
-                    ScalarisUtils.performScalarisManagementForInsert(op, jsonobj, t1);
-                    t1.write(id, jsonobj.toString());
-                    t1.commit();
-                } catch (ConnectionException e) {
-                    e.printStackTrace();
-                } catch (UnknownException e) {
-                    e.printStackTrace();
-                } catch (ClassCastException e) {
-                    e.printStackTrace();
-                } catch (NotAListException e) {
-                    e.printStackTrace();
-                }
-
+            Transaction t1 = new Transaction(conn);
+            try {
+                ScalarisUtils.performScalarisManagementForInsert(op, jsonobj, t1);
+                t1.write(id, jsonobj.toString());
+                t1.commit();
+            } catch (ConnectionException e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (UnknownException e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (ClassCastException e) {
+                throw new NucleusException(e.getMessage(), e);
+            } catch (NotAListException e) {
+                throw new NucleusException(e.getMessage(), e);
             }
 
             if (ec.getStatistics() != null) {
@@ -226,92 +133,37 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         (System.currentTimeMillis() - startTime)));
             }
         } catch (AbortException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new NucleusException(e.getMessage(), e);
         } catch (UnknownException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new NucleusException(e.getMessage(), e);
         } finally {
             mconn.release();
         }
     }
 
-    public void updateObject(ObjectProvider op, int[] fieldNumbers) {
+    public void updateObject(ObjectProvider op, int[] updatedFieldNumbers) {
         System.out.println("UPDATE " + ScalarisUtils.getPersistableIdentity(op));
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
-        
-        Map<String, String> options = new HashMap<String, String>();
-        // options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec, options);
-
+        ManagedConnection mconn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
         try {
-
             AbstractClassMetaData cmd = op.getClassMetaData();
-            int[] updatedFieldNums = fieldNumbers;
-            Object currentVersion = op.getTransactionalVersion();
-            Object nextVersion = null;
-            if (cmd.isVersioned()) {
-                // Version object so calculate version to store with
-                VersionMetaData vermd = cmd.getVersionMetaDataForClass();
-                if (vermd.getFieldName() != null) {
-                    // Version field
-                    AbstractMemberMetaData verMmd = cmd
-                            .getMetaDataForMember(vermd.getFieldName());
-                    if (currentVersion instanceof Integer) {
-                        // Cater for Integer-based versions TODO Generalise this
-                        currentVersion = new Long(
-                                ((Integer) currentVersion).longValue());
-                    }
-
-                    nextVersion = VersionHelper.getNextVersion(
-                            vermd.getVersionStrategy(), currentVersion);
-                    if (verMmd.getType() == Integer.class
-                            || verMmd.getType() == int.class) {
-                        // Cater for Integer-based versions TODO Generalise this
-                        nextVersion = new Integer(
-                                ((Long) nextVersion).intValue());
-                    }
-                    op.replaceField(verMmd.getAbsoluteFieldNumber(),
-                            nextVersion);
-
-                    boolean updatingVerField = false;
-                    for (int i = 0; i < fieldNumbers.length; i++) {
-                        if (fieldNumbers[i] == verMmd.getAbsoluteFieldNumber()) {
-                            updatingVerField = true;
-                        }
-                    }
-                    if (!updatingVerField) {
-                        // Add the version field to the fields to be updated
-                        updatedFieldNums = new int[fieldNumbers.length + 1];
-                        System.arraycopy(fieldNumbers, 0, updatedFieldNums, 0,
-                                fieldNumbers.length);
-                        updatedFieldNums[fieldNumbers.length] = verMmd
-                                .getAbsoluteFieldNumber();
-                    }
-                } else {
-                    // Surrogate version column
-                    nextVersion = VersionHelper.getNextVersion(
-                            vermd.getVersionStrategy(), currentVersion);
-                }
-                op.setTransactionalVersion(nextVersion);
-            }
 
             long startTime = System.currentTimeMillis();
             if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
                 StringBuffer fieldStr = new StringBuffer();
-                for (int i = 0; i < fieldNumbers.length; i++) {
+                for (int i = 0; i < updatedFieldNumbers.length; i++) {
                     if (i > 0) {
                         fieldStr.append(",");
                     }
                     fieldStr.append(cmd
                             .getMetaDataForManagedMemberAtAbsolutePosition(
-                                    fieldNumbers[i]).getName());
+                                    updatedFieldNumbers[i]).getName());
                 }
                 NucleusLogger.DATASTORE_PERSIST.debug(Localiser.msg(
                         "Scalaris.Update.Start", op.getObjectAsPrintable(),
@@ -319,50 +171,12 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             JSONObject changedVals = new JSONObject();
-            if (cmd.isVersioned()) {
-                VersionMetaData vermd = cmd.getVersionMetaDataForClass();
-                String memberName = storeMgr.getNamingFactory().getColumnName(
-                        cmd, ColumnType.VERSION_COLUMN);
-                if (vermd.getVersionStrategy() == VersionStrategy.VERSION_NUMBER) {
-                    if (NucleusLogger.DATASTORE.isDebugEnabled()) {
-                        NucleusLogger.DATASTORE.debug(Localiser.msg(
-                                "Scalaris.Insert.ObjectPersistedWithVersion",
-                                StringUtils.toJVMIDString(op.getObject()),
-                                op.getInternalObjectId(), "" + nextVersion));
-                    }
-                    try {
-                        changedVals.put(memberName, nextVersion);
-                    } catch (JSONException e) {
-                        throw new NucleusException(e.getMessage(), e);
-                    }
-                } else if (vermd.getVersionStrategy() == VersionStrategy.DATE_TIME) {
-                    op.setTransactionalVersion(nextVersion);
-                    if (NucleusLogger.DATASTORE.isDebugEnabled()) {
-                        NucleusLogger.DATASTORE.debug(Localiser.msg(
-                                "Scalaris.Insert.ObjectPersistedWithVersion",
-                                StringUtils.toJVMIDString(op.getObject()),
-                                op.getInternalObjectId(), "" + nextVersion));
-                    }
-                    Timestamp ts = (Timestamp) nextVersion;
-                    Date date = new Date();
-                    date.setTime(ts.getTime());
-                    try {
-                        changedVals.put(memberName, ts.getTime());
-                    } catch (JSONException e) {
-                        throw new NucleusException(e.getMessage(), e);
-                    }
-                }
-            }
 
-            final String id;
-            {
-                op.provideFields(updatedFieldNums, new StoreFieldManager(op,
-                        changedVals, false));
-                op.provideFields(op.getClassMetaData().getPKMemberPositions(),
-                        new StoreFieldManager(op, changedVals, false));
-                id = ScalarisUtils.getPersistableIdentity(op);
-                System.out.println("update id=" + id);
-            }
+            final String id = ScalarisUtils.getPersistableIdentity(op);
+            op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
+                    changedVals, false));
+
+            System.out.println("update id=" + id);
 
             if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_NATIVE.debug("PUT "
@@ -374,7 +188,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             try {
                 JSONObject stored = new JSONObject(t1.read(id).stringValue());
                 JSONObject changedValsOld = new JSONObject();
-                // update stored object
+                // update stored object values
                 Iterator<String> keyIter = changedVals.keys();
                 while (keyIter.hasNext()) {
                     String key = keyIter.next();
@@ -386,7 +200,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
                 ScalarisUtils.performScalarisManagementForUpdate(op, changedVals, changedValsOld, t1);
                 t1.write(id, stored.toString());
-                System.out.println("json!!!!" + stored.toString());
+                System.out.println("Updated JSON: " + stored.toString());
                 t1.commit();
             } catch (ConnectionException e) {
                 throw new NucleusException(e.getMessage(), e);
@@ -440,11 +254,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
-        Map<String, String> options = new HashMap<String, String>();
-        // options.put(ConnectionFactoryImpl.STORE_JSON_URL, getURLPath(op));
-        options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec, options);
+        ManagedConnection mconn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
@@ -459,30 +270,28 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final String id = ScalarisUtils.getPersistableIdentity(op);
             System.out.println("deleting object with key=" + id);
 
-            { // TRANSACTION
-                Transaction t1 = new Transaction(conn); // Transaction()
+            Transaction t1 = new Transaction(conn);
 
-                try {
-                    JSONObject obj  = new JSONObject(t1.read(id).stringValue());
-                    ScalarisUtils.performScalarisManagementForDelete(op, obj, t1);
-                    t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
-                    t1.commit();
-                    System.out.println("deleted id=" + id);
-                } catch (ConnectionException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (UnknownException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (AbortException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (ClassCastException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (NotAListException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (NotFoundException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (JSONException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                }
+            try {
+                JSONObject obj  = new JSONObject(t1.read(id).stringValue());
+                ScalarisUtils.performScalarisManagementForDelete(op, obj, t1);
+                t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
+                t1.commit();
+                System.out.println("deleted id=" + id);
+            } catch (ConnectionException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (UnknownException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (AbortException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (ClassCastException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (NotAListException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (NotFoundException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (JSONException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
             }
 
             if (ec.getStatistics() != null) {
@@ -519,12 +328,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     public void fetchObject(ObjectProvider op, int[] fieldNumbers) {
         System.out.println("FETCH " + op.getObject().getClass().getName());
 
-        Map<String, String> options = new HashMap<String, String>();
-        // options.put("Content-Type", "application/json");
         ExecutionContext ec = op.getExecutionContext();
-
-        ManagedConnection mconn = storeMgr.getConnection(ec, options);
-
+        ManagedConnection mconn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
@@ -533,49 +338,47 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
             final String key = ScalarisUtils.getPersistableIdentity(op);
             System.out.println("FETCH KEY: " + key);
-            final JSONObject result;
-            {
-                try {
-                    Transaction t1 = new Transaction(conn);
 
-                    result = new JSONObject(t1.read(key).stringValue());
-                    if (ScalarisUtils.isDeletedRecord(result)) {
-                        throw new NucleusObjectNotFoundException(
-                                "Record has been deleted");
-                    }
-                    final String declaredClassQName = result.getString("class");
-                    final Class declaredClass = op.getExecutionContext()
-                            .getClassLoaderResolver()
-                            .classForName(declaredClassQName);
-                    final Class objectClass = op.getObject().getClass();
+            try {
+                Transaction t1 = new Transaction(conn);
 
-                    if (!objectClass.isAssignableFrom(declaredClass)) {
-                        System.out
-                                .println("Type found in db not compatible with requested type");
-                        throw new NucleusObjectNotFoundException(
-                                "Type found in db not compatible with requested type");
-                    }
-
-                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
-
-                    t1.commit();
-                } catch (NotFoundException e) {
-                    throw new NucleusObjectNotFoundException(e.getMessage(), e);
-                } catch (ConnectionException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (UnknownException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (AbortException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (JSONException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
+                JSONObject result = new JSONObject(t1.read(key).stringValue());
+                if (ScalarisUtils.isDeletedRecord(result)) {
+                    throw new NucleusObjectNotFoundException(
+                            "Record has been deleted");
                 }
+                final String declaredClassQName = result.getString("class");
+                final Class declaredClass = op.getExecutionContext()
+                        .getClassLoaderResolver()
+                        .classForName(declaredClassQName);
+                final Class objectClass = op.getObject().getClass();
+
+                if (!objectClass.isAssignableFrom(declaredClass)) {
+                        System.out.println("Type found in db not compatible with requested type");
+                    throw new NucleusObjectNotFoundException(
+                            "Type found in db not compatible with requested type");
+                }
+
+                op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
+
+                t1.commit();
+
+                if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
+                    NucleusLogger.DATASTORE_NATIVE
+                            .debug("GET " + result.toString());
+                }
+            } catch (NotFoundException e) {
+                throw new NucleusObjectNotFoundException(e.getMessage(), e);
+            } catch (ConnectionException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (UnknownException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (AbortException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (JSONException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
             }
 
-            if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
-                NucleusLogger.DATASTORE_NATIVE
-                        .debug("GET " + result.toString());
-            }
             if (ec.getStatistics() != null) {
                 // Add to statistics
                 ec.getStatistics().incrementNumReads();
@@ -639,23 +442,12 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     public void locateObject(ObjectProvider op) {
         System.out.println("LOCATE");
 
-        final String key;
-        {
-            final JSONObject jsonobj = new JSONObject();
-            populateJsonObj(jsonobj, op);
-            key = ScalarisUtils.getPersistableIdentity(op);
-        }
-
-        System.out.println("############# locateObject(class="
-                + op.getObject().getClass().getName() + ",key=" + key);
+        final String key = ScalarisUtils.getPersistableIdentity(op);
 
         final ExecutionContext ec = op.getExecutionContext();
-        final de.zib.scalaris.Connection conn;
-        {
-            Map<String, String> options = new HashMap<String, String>();
-            ManagedConnection mconn = storeMgr.getConnection(ec, options);
-            conn = (de.zib.scalaris.Connection) mconn.getConnection();
-        }
+
+        ManagedConnection mconn = storeMgr.getConnection(ec);
+        final de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn.getConnection();
 
         try {
             Transaction t1 = new Transaction(conn);
