@@ -112,8 +112,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), log:pal("~w [~s:~p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
--define(TRACE_SEND(Pid, Msg), ?TRACE("to ~s:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
+%-define(TRACE(X,Y), log:pal("~w [~p:~p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("to ~p:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling

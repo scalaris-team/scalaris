@@ -338,7 +338,7 @@ init([]) ->
     ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n",
            [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_rdht_tx_read"),
+    %%TableName = erlang:list_to_atom(pid_groups:group_to_filename(pid_groups:my_groupname()) ++ "_rdht_tx_read"),
     %%Table = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     Table = pdb:new(?MODULE, [set]),

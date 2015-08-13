@@ -39,16 +39,16 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), log:pal("~w [~s:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+%-define(TRACE(X,Y), log:pal("~w [~p:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 -define(TRACE_RECON(X,Y), ok).
-%-define(TRACE_RECON(X,Y), log:pal("~w [~s:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+%-define(TRACE_RECON(X,Y), log:pal("~w [~p:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 -define(TRACE_RESOLVE(X,Y), ok).
-%-define(TRACE_RESOLVE(X,Y), log:pal("~w [~s:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+%-define(TRACE_RESOLVE(X,Y), log:pal("~w [~p:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 -define(TRACE_COMPLETE(X,Y), ok).
-%-define(TRACE_COMPLETE(X,Y), log:pal("~w [~s:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+%-define(TRACE_COMPLETE(X,Y), log:pal("~w [~p:~.0p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % export

@@ -109,7 +109,7 @@ send_trigger(Seconds, Msg) ->
 init([]) ->
     ?TRACE("msg_delay:init for pid group ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_msg_delay"),
+    %%TableName = erlang:list_to_atom(pid_groups:group_to_filename(pid_groups:my_groupname()) ++ "_msg_delay"),
     %%TimeTable = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TimeTable = pdb:new(?MODULE, [set]),

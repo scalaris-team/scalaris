@@ -36,7 +36,7 @@
 -spec init() -> pdb:tableid().
 init() ->
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tp"),
+    %%TableName = erlang:list_to_atom(pid_groups:group_to_filename(pid_groups:my_groupname()) ++ "_tx_tp"),
     %%Table = pdb:new(TableName, [set, protected, named_table]).
     %% use random table name provided by ets to *not* generate an atom
     _Table = pdb:new(?MODULE, [set]).
