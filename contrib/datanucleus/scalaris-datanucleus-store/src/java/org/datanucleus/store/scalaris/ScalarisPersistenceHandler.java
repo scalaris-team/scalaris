@@ -52,6 +52,7 @@ import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
@@ -207,7 +208,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     e.printStackTrace();
                 } catch (ClassCastException e) {
                     e.printStackTrace();
-                } catch (JSONException e) {
+                } catch (NotAListException e) {
                     e.printStackTrace();
                 }
 
@@ -317,7 +318,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId(), fieldStr.toString()));
             }
 
-            JSONObject jsonobj = new JSONObject();
+            JSONObject changedVals = new JSONObject();
             if (cmd.isVersioned()) {
                 VersionMetaData vermd = cmd.getVersionMetaDataForClass();
                 String memberName = storeMgr.getNamingFactory().getColumnName(
@@ -330,7 +331,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                                 op.getInternalObjectId(), "" + nextVersion));
                     }
                     try {
-                        jsonobj.put(memberName, nextVersion);
+                        changedVals.put(memberName, nextVersion);
                     } catch (JSONException e) {
                         throw new NucleusException(e.getMessage(), e);
                     }
@@ -346,7 +347,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     Date date = new Date();
                     date.setTime(ts.getTime());
                     try {
-                        jsonobj.put(memberName, ts.getTime());
+                        changedVals.put(memberName, ts.getTime());
                     } catch (JSONException e) {
                         throw new NucleusException(e.getMessage(), e);
                     }
@@ -356,31 +357,34 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final String id;
             {
                 op.provideFields(updatedFieldNums, new StoreFieldManager(op,
-                        jsonobj, false));
+                        changedVals, false));
                 op.provideFields(op.getClassMetaData().getPKMemberPositions(),
-                        new StoreFieldManager(op, jsonobj, false));
+                        new StoreFieldManager(op, changedVals, false));
                 id = ScalarisUtils.getPersistableIdentity(op);
                 System.out.println("update id=" + id);
             }
 
             if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_NATIVE.debug("PUT "
-                        + jsonobj.toString());
+                        + changedVals.toString());
             }
 
 
             Transaction t1 = new Transaction(conn);
             try {
                 JSONObject stored = new JSONObject(t1.read(id).stringValue());
-
+                JSONObject changedValsOld = new JSONObject();
                 // update stored object
-                Iterator<String> keyIter = jsonobj.keys();
+                Iterator<String> keyIter = changedVals.keys();
                 while (keyIter.hasNext()) {
                     String key = keyIter.next();
-                    stored.put(key, jsonobj.get(key));
+                    if (stored.has(key)) {
+                        changedValsOld.put(key, stored.get(key));
+                    }
+                    stored.put(key, changedVals.get(key));
                 }
 
-                ScalarisUtils.performScalarisManagementForUpdate(op, stored, t1);
+                ScalarisUtils.performScalarisManagementForUpdate(op, changedVals, changedValsOld, t1);
                 t1.write(id, stored.toString());
                 System.out.println("json!!!!" + stored.toString());
                 t1.commit();
@@ -394,6 +398,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 // if we have an update we should already have this object stored
                 throw new NucleusException("Could not update object since its original value was not found", e);
             } catch (ClassCastException e) {
+                throw new NucleusException("The stored object has a broken structure", e);
+            } catch (NotAListException e) {
                 throw new NucleusException("The stored object has a broken structure", e);
             } catch (JSONException e) {
                 throw new NucleusException("The stored object has a broken structure", e);
@@ -457,7 +463,8 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 Transaction t1 = new Transaction(conn); // Transaction()
 
                 try {
-                    ScalarisUtils.performScalarisManagementForDelete(op, t1);
+                    JSONObject obj  = new JSONObject(t1.read(id).stringValue());
+                    ScalarisUtils.performScalarisManagementForDelete(op, obj, t1);
                     t1.write(id, ScalarisUtils.DELETED_RECORD_VALUE);
                     t1.commit();
                     System.out.println("deleted id=" + id);
@@ -468,6 +475,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 } catch (AbortException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (ClassCastException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (NotAListException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (NotFoundException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } catch (JSONException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);

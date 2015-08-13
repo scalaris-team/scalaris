@@ -2,6 +2,7 @@ package org.datanucleus.store.scalaris;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -29,6 +30,7 @@ import com.orange.org.json.JSONObject;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
@@ -61,7 +63,7 @@ public class ScalarisUtils {
      *            ObjectProvider of the object this ID is generated for.
      * @return A new ID.
      */
-    private static long generateNextIdentity(ObjectProvider op) {
+    private synchronized static long generateNextIdentity(ObjectProvider op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         ExecutionContext ec = op.getExecutionContext();
@@ -224,22 +226,22 @@ public class ScalarisUtils {
      * **********************************************************************/
     
     static void performScalarisManagementForInsert(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        insertObjectToAllKey(op, t);
-        updateUniqueMemberKey(op, json, t);
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        insertObjectToIDIndex(op, t);
+        updateUniqueMemberKey(op, json, null, t);
         insertToForeignKeyAction(op, json, t);
     }
     
-    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        updateUniqueMemberKey(op, json, t);
-        insertToForeignKeyAction(op, json, t);
+    static void performScalarisManagementForUpdate(ObjectProvider op, JSONObject changedNew, JSONObject changedOld, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        updateUniqueMemberKey(op, changedNew, changedOld, t);
+        updateForeignKeyAction(op, changedNew, changedOld, t);
     }
     
-    static void performScalarisManagementForDelete(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        removeObjectFromAllKey(op, t);
-        removeObjectFromUniqueMemberKey(op, t);
+    static void performScalarisManagementForDelete(ObjectProvider op, JSONObject oldJson, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        removeObjectFromIDIndex(op, t);
+        removeObjectFromUniqueMemberKey(op, oldJson, t);
         performForeignKeyActionDelete(op, t);
     }
         
@@ -265,38 +267,17 @@ public class ScalarisUtils {
      * @throws UnknownException 
      * @throws ClassCastException 
      * @throws ConnectionException 
+     * @throws NotAListException 
      */
-    private static void insertObjectToAllKey(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        
+    private static void insertObjectToIDIndex(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        // retrieve the existing value (null if it does not exist).
-        JSONArray json = null;
-        try {
-            json = new JSONArray(t.read(key).stringValue());
-        } catch (NotFoundException e) {
-            // the key does not exist.
-        }
-
-        // add the new identity if it does not already exists
-        if (json == null) {
-            json = new JSONArray();
-        }
-        for (int i = 0; i < json.length(); i++) {
-            String s = json.getString(i);
-            if (s != null && s.equals(objectStringIdentity)) {
-                // This object identity is already stored here
-                // It is not necessary to write since nothing changed.
-                return;
-            }
-        }
-        json.put(objectStringIdentity);
-
-        // commit changes
-        t.write(key, json.toString());
+        List<ErlangValue> toAdd = new ArrayList<ErlangValue>();
+        toAdd.add(new ErlangValue(objectStringIdentity));
+        t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>());
     }
 
     /**
@@ -318,104 +299,23 @@ public class ScalarisUtils {
      * @throws ClassCastException 
      * @throws ConnectionException 
      */
-    private static void removeObjectFromAllKey(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
+    private static void removeObjectFromIDIndex(ObjectProvider op, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
-        String key = ScalarisSchemaHandler.getManagementKeyName(cmd.getFullClassName());
+        String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
 
-        // retrieve the existing value (null if it does not exist).
-        JSONArray json = null;
-        try {
-            json = new JSONArray(t.read(key).stringValue());
-        } catch (NotFoundException e) {
-            // the key does not exist, therefore there is nothing to do
-            // here.
-            return;
-        }
-
-        // remove all occurrences of the key
-        ArrayList<String> list = new ArrayList<String>(json.length());
-        for (int i = 0; i < json.length(); i++) {
-            String s = json.getString(i);
-            if (s != null && !s.equals(objectStringIdentity)) {
-                list.add(s);
-            }
-        }
-        json = new JSONArray(list);
-
-       // commit changes
-       t.write(key, json.toString());
+        List<ErlangValue> toRemove = new ArrayList<ErlangValue>();
+        toRemove.add(new ErlangValue(objectStringIdentity));
+        t.addDelOnList(key, new ArrayList<ErlangValue>(), toRemove);
     }
     
     /* **********************************************************************
      *                  ACTIONS TO GUARANTEE UNIQUENESS
      * **********************************************************************/
     
-    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject json, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException, JSONException {
-        AbstractClassMetaData cmd = op.getClassMetaData();
-        String objectStringIdentity = getPersistableIdentity(op);
-        String className = cmd.getFullClassName();
-        
-        for (int field : cmd.getAllMemberPositions()) {
-            AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
-            UniqueMetaData umd = mmd.getUniqueMetaData();
-            if (umd != null) {
-                // this member has @Unique annotation -> lookup all stored values for this member
-                String fieldName = mmd.getName();
-                String fieldValue = null;
-                try {
-                    fieldValue = json.getString(fieldName);
-                } catch (JSONException e) {
-                    // unique members can be null which means they are not found in the JSON
-                }
-                    
-                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
-                String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, fieldValue);
-
-                String idStoringThisValue = null;
-                String oldValueByThisId = null;
-                try {
-                    idStoringThisValue = t.read(valueToIdKey).stringValue();
-                } catch (NotFoundException e) {} // handled below
-                try {
-                    oldValueByThisId = t.read(idToValueKey).stringValue();
-                } catch(NotFoundException e) {} // handled below 
-
-                if (fieldValue != null && !isDeletedRecord(idStoringThisValue)) {
-                    // the unique value we try to store already exist
-                    if (idStoringThisValue.equals(objectStringIdentity)) {
-                        // .. but the current object is the one storing this value
-                        // This can happen if the current object was updated but this field
-                        // was unchanged. We don't need to do anything here.
-                    } else {
-                        // another object has stored this value -> violation of uniqueness
-                        throw new NucleusDataStoreException("The value '" + fieldValue + "' of unique member '" + 
-                                fieldName + "' of class '" + className + "' already exists");
-                    }
-                } else {
-                    // the unique value does not exist
-
-                    if (!isDeletedRecord(oldValueByThisId)) {
-                        // the current object has a value of this member stored -> delete the old entry
-                        String oldValueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);                     
-                        // overwrite with "empty" value to signal deletion
-                        t.write(oldValueToIdKey, DELETED_RECORD_VALUE);
-                    }
-                    
-                    // store the new value
-                    if (fieldValue != null) {
-                        t.write(idToValueKey, fieldValue);
-                        t.write(valueToIdKey, objectStringIdentity);
-                    }
-                }
-            }
-        }
-    }
-    
-    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, Transaction t) 
+    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject newJson, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
@@ -427,20 +327,67 @@ public class ScalarisUtils {
             if (umd != null) {
                 // this member has @Unique annotation -> lookup all stored values for this member
                 String fieldName = mmd.getName();
-
-                String idToValueKey = ScalarisSchemaHandler.geIdToUniqueMemberValueKeyName(objectStringIdentity, fieldName);
-                String oldValueByThisId = null;
+                String oldFieldValue = null, newFieldValue = null;
                 try {
-                    oldValueByThisId = t.read(idToValueKey).stringValue();
-                } catch (NotFoundException e) {
-                    // should not happen but is not breaking anything
+                    newFieldValue = (newJson != null && newJson.has(fieldName)) ? newJson.getString(fieldName) : null;
+                    oldFieldValue = (oldJson != null && oldJson.has(fieldName)) ? oldJson.getString(fieldName) : null;
+                } catch (JSONException e) {
+                    // unique members can be null which means they are not found in the JSON
+                }
+                if (newFieldValue != null && newFieldValue.equals(oldFieldValue)) {
+                    // this field has not changed -> skip update
+                    continue;
                 }
                 
-                if (!isDeletedRecord(oldValueByThisId)) {
-                    String valueToIdKey = ScalarisSchemaHandler.getUniqueMemberValueToIdKeyName(className, fieldName, oldValueByThisId);
-                    t.write(valueToIdKey, DELETED_RECORD_VALUE);
+                if (oldFieldValue != null) {
+                    // mark the old key as removed
+                    String oldValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, oldFieldValue);
+                    t.write(oldValueKey, DELETED_RECORD_VALUE);
                 }
-                t.write(idToValueKey, DELETED_RECORD_VALUE);
+                
+                if (newFieldValue != null) {
+                    // check if this value already exists
+                    // if it does -> exception; if not -> store
+                    String newValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, newFieldValue);
+                    String idStoringThisValue = null;
+                    try {
+                        idStoringThisValue = t.read(newValueKey).stringValue();
+                    } catch (NotFoundException e) {} // this value does not exist yet, therefore there is no conflict
+                    
+                    if (idStoringThisValue != null && !isDeletedRecord(idStoringThisValue) 
+                            && !idStoringThisValue.equals(objectStringIdentity)) {
+                        // another object has stored this value -> violation of uniqueness
+                        throw new NucleusDataStoreException("The value '" + newFieldValue + "' of unique member '" + 
+                                fieldName + "' of class '" + className + "' already exists");
+                    } else {
+                        t.write(newValueKey, objectStringIdentity);
+                    }
+                }
+            }
+        }
+    }
+    
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, JSONObject oldJson, Transaction t) 
+            throws ConnectionException, ClassCastException, UnknownException {
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String className = cmd.getFullClassName();
+        
+        for (int field : cmd.getAllMemberPositions()) {
+            AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
+            UniqueMetaData umd = mmd.getUniqueMetaData();
+            if (umd != null) {
+                // this member has @Unique annotation -> lookup all stored values for this member
+                String fieldName = mmd.getName();
+
+                String oldFieldValue = null;
+                try {
+                    oldFieldValue = oldJson.has(fieldName) ? oldJson.getString(fieldName) : null;
+                } catch (JSONException e) {} // can not happen since it is checked before 
+                
+                if (oldFieldValue != null) {
+                    String oldValueKey = ScalarisSchemaHandler.getUniqueMemberKey(className, fieldName, oldFieldValue);
+                    t.write(oldValueKey, DELETED_RECORD_VALUE);
+                }
             }
         }
     }
@@ -448,247 +395,222 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  FOREIGN KEY ACTIONS
      * **********************************************************************/
-    
-    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {       
+
+    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t)
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        updateForeignKeyAction(op, objToInsert, null, t);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void updateForeignKeyAction(ObjectProvider op, JSONObject changedFieldsNewVal, 
+            JSONObject changedFieldsOldVal, Transaction t)
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
-        String className = cmd.getFullClassName();
-        
+
+        // the map will store all elements which must be added/removed from which key
+        HashMap<String, List<ErlangValue>> toAddToKey = new HashMap<String, List<ErlangValue>>();
+        HashMap<String, List<ErlangValue>> toRemoveFromKey = new HashMap<String, List<ErlangValue>>();
+
         for (int field : cmd.getAllMemberPositions()) {
             AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
-            if (mmd == null) continue;
+            // do nothing if this field has not changed
+            if (mmd == null || !changedFieldsNewVal.has(mmd.getName())) continue;
+
             ForeignKeyMetaData fmd = mmd.getForeignKeyMetaData();
-            
             boolean isJoin = false;
             if (mmd.getJoinMetaData() != null) {
                 // The member is a collection with an ForeignKeyAction attached
                 fmd = mmd.getJoinMetaData().getForeignKeyMetaData();
                 isJoin = true;
             }
-            
+            // add to actions keys if it is a cascading delete
             if (fmd != null && fmd.getDeleteAction() == ForeignKeyAction.CASCADE) {
                 String fieldName = mmd.getName();
-                ArrayList<String> foreignObjectIds = new ArrayList<String>();
+                // parse JSON entries 
+                ArrayList<String> foreignObjectIdsNew = new ArrayList<String>();
+                ArrayList<String> foreignObjectIdsOld = new ArrayList<String>();
                 try {
                     if (isJoin) {
-                        JSONArray arr = objToInsert.getJSONArray(fieldName);
-                        for (int i = 0; i < arr.length(); i++) {
-                            foreignObjectIds.add(arr.getString(i));
+                        JSONArray arrNew = changedFieldsNewVal.getJSONArray(fieldName);
+                        JSONArray arrOld = new JSONArray();
+                        if (changedFieldsOldVal != null) {
+                            arrOld = changedFieldsOldVal.getJSONArray(fieldName);
+                        }
+                        for (int i = 0; i < arrNew.length(); i++) {
+                            foreignObjectIdsNew.add(arrNew.getString(i));
+                        }
+                        for (int i = 0; i < arrOld.length(); i++) {
+                            foreignObjectIdsOld.add(arrOld.getString(i));
                         }
                     } else {
-                        foreignObjectIds.add(objToInsert.getString(fieldName));
+                        foreignObjectIdsNew.add(changedFieldsNewVal.getString(fieldName));
                     }
                 } catch (JSONException e) {
                     // not found -> this action will be skipped
                 }
-                for (String foreignObjectId : foreignObjectIds) {
-                    if (foreignObjectId == null) continue;
-                    
-                    String memberClassName;
-                    String action;
-                    
-                    if (isJoin) {
-                        memberClassName = mmd.getCollection().getElementType();
-                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                fieldName);
-                    } else {
-                        memberClassName = mmd.getType().getCanonicalName();
-                        action = ScalarisSchemaHandler.getForeignKeyActionKey(memberClassName, className, 
-                                ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                // ignore the objects in both the new and old list
+                for (int i = foreignObjectIdsNew.size() - 1; i >= 0; i--) {
+                    String s = foreignObjectIdsNew.get(i);
+                    if (foreignObjectIdsOld.remove(s)) {
+                        foreignObjectIdsNew.remove(s);
                     }
-                    
-                    JSONArray newRow = new JSONArray();
-                    newRow.put(foreignObjectId);
-                    newRow.put(objectStringIdentity);
-                    
-                    JSONArray actionTable = null;
-                    try {
-                        actionTable = new JSONArray(t.read(action).stringValue());
-                    } catch (NotFoundException e) {
-                        actionTable = new JSONArray();
-                    } catch (JSONException e) {
-                        throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+                }
+
+                // construct the FKA key for every foreign object id
+                for (ArrayList<String> changeList : 
+                        new ArrayList[]{foreignObjectIdsNew, foreignObjectIdsNew}) {
+                    for (String foreignObjectId : changeList) {
+                        if (foreignObjectId == null) continue;
+
+                        List<String> newFka = new ArrayList<String>(2);
+                        newFka.add(objectStringIdentity);
+
+                        if (isJoin) {
+                            newFka.add(fieldName);
+                        } else {
+                            newFka.add(ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                        }
+                        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(foreignObjectId);
+
+                        // check in which list we are currently in to choose the
+                        // HashMap to which the action must be added to
+                        HashMap<String, List<ErlangValue>> toChangeMap = (foreignObjectIdsNew == changeList) ?
+                                toAddToKey : toRemoveFromKey;
+
+                        List<ErlangValue> toChange = toChangeMap.get(fkaKey);
+                        if (toChange == null) {
+                            toChange = new ArrayList<ErlangValue>();
+                        }
+                        toChange.add(new ErlangValue(newFka));
+                        toChangeMap.put(fkaKey, toChange);
                     }
-                    
-                    // add new row and store again
-                    actionTable.put(newRow);
-                    t.write(action, actionTable.toString());
                 }
             }
         }
-    }
-    
-    private static class ScalarisFKA {
-        private String scalarisKey;
-        private String memberToDeleteIn;
-        
-        ScalarisFKA(String scalarisKey, String memberToDeleteIn) {
-            this.scalarisKey = scalarisKey;
-            this.memberToDeleteIn = memberToDeleteIn;
+
+        // update all keys where new entries are added
+        for (String key : toAddToKey.keySet()) {
+            List<ErlangValue> toAdd = toAddToKey.get(key);
+            List<ErlangValue> toRemove = new ArrayList<ErlangValue>(0);
+            if (toRemoveFromKey.containsKey(key)) {
+                toRemove = toRemoveFromKey.get(key);
+            }
+            t.addDelOnList(key, toAdd, toRemove);
         }
-        
-        boolean deleteCompleteObject() {
-            return memberToDeleteIn.equals(ScalarisSchemaHandler.FKA_DELETE_OBJ);
-        }
-        
-        String getScalarisKey() {
-            return scalarisKey;
-        }
-        
-        String getMemberToDeleteIn() {
-            return memberToDeleteIn;
+        // update the remaining keys (only deletions)
+        for (String key : toRemoveFromKey.keySet()) {
+            if (toAddToKey.containsKey(key)) {
+                List<ErlangValue> toRemove = toRemoveFromKey.get(key);
+                t.addDelOnList(key, new ArrayList<ErlangValue>(0), toRemove);
+            }
         }
     }
     
     private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
-        AbstractClassMetaData cmd = op.getClassMetaData();
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         String objectStringIdentity = getPersistableIdentity(op);
-        String className = cmd.getFullClassName();
         
         ExecutionContext ec = op.getExecutionContext();
         StoreManager storeMgr = ec.getStoreManager();
         
-        List<ScalarisFKA> attachedActions = findForeignKeyActions(className, t);
+        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(objectStringIdentity);
+        List<ErlangValue> attachedActions;
+        try {
+            attachedActions = t.read(fkaKey).listValue();
+        } catch (NotFoundException e) {
+            // there is no FKA key for this object --> there are no actions to perform
+            return;
+        }
         // now search in every found action entries with op's id and start a delete as sub transaction
-        for (ScalarisFKA action : attachedActions) {
-            JSONArray actionTable = null;
+        for (ErlangValue action : attachedActions) {
             try {
-                actionTable = new JSONArray(t.read(action.getScalarisKey()).stringValue());
+                List<String> actionAsList = action.stringListValue();
                 
-                JSONArray newTable = new JSONArray();
-                ArrayList<String> objectsToDelete = new ArrayList<String>();
-
-                for (int i = 0; i < actionTable.length(); i++) {
-                   JSONArray row = (JSONArray) actionTable.get(i);
-                        
-                   if (row.getString(0).equals(objectStringIdentity)) {
-                        objectsToDelete.add(row.getString(1));
-                   } else {
-                        newTable.put(row);
-                   }
-                }
-                // update table if something changed
-                if (actionTable.length() != newTable.length()) {
-                    t.write(action.getScalarisKey(), newTable.toString());
-                }
-                    
-                for (int i = 0; i < objectsToDelete.size(); i++) {
-                    String objId = objectsToDelete.get(i);
-                    try {
-                        String toDeleteClassName = storeMgr
-                                .getClassNameForObjectID(objId, ec.getClassLoaderResolver(), ec);
-                        AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
-                                .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
-                        Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
-
-                        if (action.deleteCompleteObject()) {
-                            // Start deletion of referenced objects
-                            ec.deleteObject(obj);
-                        } else {
-                            // remove the object reference of the deleted object from the collection
-
-                            ObjectProvider toDelOp = ec.findObjectProvider(obj);
-
-                            int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(action.getMemberToDeleteIn());
-
-                            if (toDelOp.isFieldLoaded(memberId)) {
-                                // the field is loaded which means that the object could be used by the overlying 
-                                // application
-                                Object objColl = toDelOp.provideField(memberId);
-
-                                if (objColl instanceof Collection) {
-                                    Collection collection = (Collection) objColl;
-
-                                    ArrayList<Object> toRemove = new ArrayList<Object>();
-                                    Iterator iter = collection.iterator();
-                                    while (iter.hasNext()) {
-                                        Object item = iter.next();
-                                        ObjectProvider itemOp = ec.findObjectProvider(item);
-                                        String itemId = getPersistableIdentity(itemOp);
-
-                                        if (itemId.equals(objectStringIdentity)) {
-                                            toRemove.add(item);
-                                        }
-                                    }
-                                    for (Object o : toRemove) {
-                                        collection.remove(o);
-                                    }
-                                    storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
-                                    // updated field must be marked as dirty to ensure that instances of this object used
-                                    // somewhere else will fetch the updated value
-                                    toDelOp.makeDirty(memberId);
-                                }
-                            } else {
-                                // if the member is not loaded it is way faster to directly alter the
-                                // stored JSON object
-                                JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
-                                JSONArray memberArr = objAsJson.getJSONArray(action.getMemberToDeleteIn());
-                                JSONArray newMemberArr = new JSONArray();
-                                for (int j = 0; j < memberArr.length(); j++) {
-                                    if (!memberArr.get(j).equals(objectStringIdentity)) {
-                                        newMemberArr.put(memberArr.get(j));
-                                    }
-                                }
-                                // only write new value if something changed
-                                if (newMemberArr.length() != memberArr.length()) {
-                                    objAsJson.put(action.getMemberToDeleteIn(), newMemberArr);
-                                    t.write(objId, objAsJson.toString());
-                                    // if the object is not removed from cache after this update
-                                    // it is possible that the cached value returned is outdated
-                                    ec.removeObjectFromLevel1Cache(toDelOp.getInternalObjectId());
-                                    ec.removeObjectFromLevel2Cache(toDelOp.getInternalObjectId());
+                String objId = actionAsList.get(0);
+                String memberToDelete = actionAsList.get(1);
+                
+                String toDeleteClassName = storeMgr
+                        .getClassNameForObjectID(objId,  ec.getClassLoaderResolver(), ec);
+                AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
+                        .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
+                Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
+                
+                if (ScalarisSchemaHandler.FKA_DELETE_OBJ.equals(memberToDelete)) {
+                    // delete the complete object
+                    ec.deleteObject(obj);
+                } else {
+                    // remove the object reference of the deleted object from the collection
+    
+                    ObjectProvider toDelOp = ec.findObjectProvider(obj);
+    
+                    int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(memberToDelete);
+    
+                    if (toDelOp.isFieldLoaded(memberId)) {
+                        // the field is loaded which means that the object could be used by the overlying 
+                        // application
+                        Object objColl = toDelOp.provideField(memberId);
+    
+                        if (objColl instanceof Collection) {
+                            Collection collection = (Collection) objColl;
+    
+                            ArrayList<Object> toRemove = new ArrayList<Object>();
+                            Iterator iter = collection.iterator();
+                            while (iter.hasNext()) {
+                                Object item = iter.next();
+                                ObjectProvider itemOp = ec.findObjectProvider(item);
+                                String itemId = getPersistableIdentity(itemOp);
+    
+                                if (itemId.equals(objectStringIdentity)) {
+                                    toRemove.add(item);
                                 }
                             }
+                            for (Object o : toRemove) {
+                                collection.remove(o);
+                            }
+                            storeMgr.getPersistenceHandler().updateObject(toDelOp, new int[]{memberId});
+                            // updated field must be marked as dirty to ensure that instances of this object used
+                            // somewhere else will fetch the updated value
+                            toDelOp.makeDirty(memberId);
                         }
-                    } catch (NucleusObjectNotFoundException e) {
-                        // if we land in this catch block, the object we are trying to delete
-                        // is already deleted. Therefore do nothing.
+                    } else {
+                        // if the member is not loaded it is way faster to directly alter the
+                        // stored JSON object
+                        JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
+                        if (isDeletedRecord(objAsJson)) {
+                            continue;
+                        }
+                        JSONArray memberArr = objAsJson.getJSONArray(memberToDelete);
+                        JSONArray newMemberArr = new JSONArray();
+                        for (int j = 0; j < memberArr.length(); j++) {
+                            if (!memberArr.get(j).equals(objectStringIdentity)) {
+                                newMemberArr.put(memberArr.get(j));
+                            }
+                        }
+                        // only write new value if something changed
+                        if (newMemberArr.length() != memberArr.length()) {
+                            objAsJson.put(memberToDelete, newMemberArr);
+                            t.write(objId, objAsJson.toString());
+                            // if the object is not removed from cache after this update
+                            // it is possible that the cached value returned is out dated
+                            ec.removeObjectFromLevel1Cache(toDelOp.getInternalObjectId());
+                            ec.removeObjectFromLevel2Cache(toDelOp.getInternalObjectId());
+                        }
                     }
                 }
+            } catch (NucleusObjectNotFoundException e) {
+                // the object we want to delete is already deleted 
+                // nothing must be done
             } catch (NotFoundException e) {
-                // this can happen
+                throw new NucleusException(e.getMessage(), e);
             } catch (JSONException e) {
-               throw new NucleusDataStoreException("ForeignKeyAction has invalid structure");
+                throw new NucleusException(e.getMessage(), e);
+                // the member containing the current object does not exist any more
+                // that means we don't have to remove it any more
             }
         }
     }
 
-    // retrieve the ForeignKeyAction-index key to check if there are delete actions attached to this 
-    // object
-    // TODO: structure index in some way so that less than O(n) is needed here
-    // TODO: sub transaction?
-    private static ArrayList<ScalarisFKA> findForeignKeyActions(String className, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
-        
-        String fkaIndexKey = ScalarisSchemaHandler.getForeignKeyActionIndexKey();
-        JSONArray fkaIndex = null;
-        ArrayList<ScalarisFKA> attachedActions = new ArrayList<ScalarisFKA>();
-        try {
-            fkaIndex = new JSONArray(t.read(fkaIndexKey).stringValue());
-            
-            for (int i = 0; i < fkaIndex.length(); i++) {
-                JSONArray row = (JSONArray) fkaIndex.get(i);
-                if (row.getString(0).equals(className)) {
-                    String scalarisKey = ScalarisSchemaHandler.getForeignKeyActionKey(className, 
-                            row.getString(1), row.getString(2));
-                    
-                    attachedActions.add(new ScalarisFKA(scalarisKey,row.getString(2)));
-                }
-            }
-        } catch (NotFoundException e) {
-            // the schema handler should have created this key. something is wrong.
-            throw new NucleusDataStoreException("ForeignKeyAction index, which should have been created by " +
-                    "ScalarisSchemaHandler, is missing.", e);
-        } catch (JSONException e) {
-            throw new NucleusDataStoreException("ForeignKeyAction index has invalid structure.", e);            
-        }
-        
-        return attachedActions;
-    }
-    
-    
     /* **********************************************************************
      *                     MISC
      * **********************************************************************/
@@ -722,7 +644,7 @@ public class ScalarisUtils {
             ManagedConnection mconn, Class<?> candidateClass,
             AbstractClassMetaData cmd) {
         List<Object> results = new ArrayList<Object>();
-        String managementKey = ScalarisSchemaHandler.getManagementKeyName(candidateClass);
+        String idIndexKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
@@ -730,12 +652,11 @@ public class ScalarisUtils {
         try {
             // read the management key
             Transaction t = new Transaction(conn);
-            JSONArray json = new JSONArray(t.read(managementKey).stringValue());
+            List<String> idIndex = t.read(idIndexKey).stringListValue();
 
             // retrieve all values from the management key
-            for (int i = 0; i < json.length(); i++) {
-                String s = json.getString(i);
-                results.add(IdentityUtils.getObjectFromPersistableIdentity(s,cmd, ec));
+            for (String id : idIndex) {
+                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
             }
 
             t.commit();
@@ -748,12 +669,8 @@ public class ScalarisUtils {
             throw new NucleusException(e.getMessage(), e);
         } catch (UnknownException e) {
             throw new NucleusException(e.getMessage(), e);
-        } catch (JSONException e) {
-            // management key has invalid format
-            throw new NucleusException(e.getMessage(), e);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+
         return results;
     }
 }
