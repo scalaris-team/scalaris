@@ -14,6 +14,7 @@
 #    limitations under the License.
 
 RINGSIZE=4
+NODEPREFIX=ebench_node
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
 SCALARIS_YAWS_PORT=${SCALARIS_YAWS_PORT-"8000"}
 usage(){
@@ -46,15 +47,15 @@ start_ring(){
             let YAWSPORT=$SCALARIS_YAWS_PORT+$idx
         fi
 
-        ./bin/scalarisctl -d -k $key -n "ebench_node$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
+        ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
 
     done
-    ./bin/scalarisctl -n "ebench_node1" dbg-check-ring $RINGSIZE 30
+    ./bin/scalarisctl -n "${NODEPREFIX}1" dbg-check-ring $RINGSIZE 30
 }
 
 stop_ring(){
     for idx in `seq 1 $RINGSIZE`; do
-        ./bin/scalarisctl -n "ebench_node$idx" stop
+        ./bin/scalarisctl -n "${NODEPREFIX}$idx" stop
     done
 }
 
@@ -67,6 +68,10 @@ until [ -z "$1" ]; do
         "--ring-size")
             shift
             RINGSIZE=$1
+            shift;;
+        "--node-prefix")
+            shift
+            NODEPREFIX=$1
             shift;;
         start | stop)
             cmd="$1"

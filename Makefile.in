@@ -185,13 +185,13 @@ test-clean:
             data/ct*@*
 
 bench: compile
-	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node start && \
 	echo "running bench:increment(10, 500)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
 	echo "running bench:quorum_read(10, 5000)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
 	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -228,10 +228,10 @@ java-test: compile java
 	fi
 
 java-bench: compile java
-	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
-	SCALARIS_JAPI_NODE="ebench_node1 ebench_node2 ebench_node4 ebench_node4" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix jbench_node start && \
+	SCALARIS_JAPI_NODE="jbench_node1 jbench_node2 jbench_node4 jbench_node4" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix jbench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -278,10 +278,10 @@ python-test: compile python
 	fi
 
 python-bench: compile python
-	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start --node-prefix pbench_node && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON2) python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix pbench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -354,10 +354,10 @@ python3-test: compile python3
 	fi
 
 python3-bench: compile python3
-	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix p3bench_node start && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON3) python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix p3bench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
