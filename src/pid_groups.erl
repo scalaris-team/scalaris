@@ -346,6 +346,9 @@ tab2list() -> ets:tab2list(?MODULE).
 %% @doc only supports the form {atom(), pos_integer()} | atom(). Not
 %%      deeper nested structures.
 -spec group_to_filename(groupname()) -> nonempty_string().
+group_to_filename('') ->
+    ?ASSERT(util:is_unittest()),
+    "''"; %% make tester happy by not delivering an empty string
 group_to_filename(GrpName) when is_atom(GrpName) ->
     atom_to_list(GrpName);
 group_to_filename(GrpName) when is_integer(GrpName) ->
@@ -569,7 +572,8 @@ on({'EXIT', FromPid, _Reason}, State) ->
 %% @doc Helper for the web debug interface to convert a pidname.
 -spec pidname_to_string(pidname()) -> nonempty_string().
 pidname_to_string('') ->
-    "''";
+    ?ASSERT(util:is_unittest()),
+    "''"; %% make tester happy by not delivering an empty string
 pidname_to_string(X) when is_atom(X) ->
     atom_to_list(X);
 pidname_to_string(Name) when is_tuple(Name) ->
