@@ -759,8 +759,10 @@ def run_from_cmd(argv):
     if (len(argv) == 1):
         allBenchs = True
     elif (len(argv) == 2):
+        allBenchs = True
         nr_operations = int(argv[1])
     elif (len(argv) == 3):
+        allBenchs = True
         nr_operations = int(argv[1])
         threads_per_node = int(argv[2])
     elif (len(argv) >= 4):
