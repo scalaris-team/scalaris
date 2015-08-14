@@ -120,12 +120,6 @@ SCALARIS_UNITTEST_PORT ?= 14194
 SCALARIS_UNITTEST_YAWS_PORT ?= 8000
 SCALARIS_JTEST_NAME ?= jtest_boot
 
-# replicas for key 0 in rt_chord:
-REPLICA_KEY_1 = 0
-REPLICA_KEY_2 = 85070591730234615865843651857942052864
-REPLICA_KEY_3 = 170141183460469231731687303715884105728
-REPLICA_KEY_4 = 255211775190703847597530955573826158592
-
 all: Makefile compile tags
 #all: compile dialyzer java test docs
 
@@ -191,28 +185,13 @@ test-clean:
             data/ct*@*
 
 bench: compile
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "ebench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -t first start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "ebench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "ebench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "ebench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
-	( ./bin/scalarisctl -n "ebench_boot" dbg-check-ring 4 30 && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
 	echo "running bench:increment(10, 500)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
 	echo "running bench:quorum_read(10, 5000)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "ebench_boot" stop ; \
-	./bin/scalarisctl -n "ebench_node1" stop ; \
-	./bin/scalarisctl -n "ebench_node2" stop ; \
-	./bin/scalarisctl -n "ebench_node3" stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -249,25 +228,10 @@ java-test: compile java
 	fi
 
 java-bench: compile java
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "jbench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -t first start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "jbench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "jbench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "jbench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
-	( ./bin/scalarisctl -n "jbench_boot" dbg-check-ring 4 30 && \
-	SCALARIS_JAPI_NODE="jbench_boot jbench_node1 jbench_node2 jbench_node3" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
+	SCALARIS_JAPI_NODE="ebench_node1 ebench_node2 ebench_node4 ebench_node4" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "jbench_boot" stop ; \
-	./bin/scalarisctl -n "jbench_node1" stop ; \
-	./bin/scalarisctl -n "jbench_node2" stop ; \
-	./bin/scalarisctl -n "jbench_node3" stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -314,25 +278,10 @@ python-test: compile python
 	fi
 
 python-bench: compile python
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "pbench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -t first start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "pbench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "pbench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "pbench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
-	( ./bin/scalarisctl -n "pbench_boot" dbg-check-ring 4 30 && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON2) python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "pbench_boot" stop ; \
-	./bin/scalarisctl -n "pbench_node1" stop ; \
-	./bin/scalarisctl -n "pbench_node2" stop ; \
-	./bin/scalarisctl -n "pbench_node3" stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
@@ -405,25 +354,10 @@ python3-test: compile python3
 	fi
 
 python3-bench: compile python3
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_1) -n "p3bench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -t first start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_2) -n "p3bench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_3) -n "p3bench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -t joining start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "p3bench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -t joining start ; \
-	( ./bin/scalarisctl -n "p3bench_boot" dbg-check-ring 4 30 && \
+	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 start && \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" $(PYTHON3) python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "p3bench_boot" stop ; \
-	./bin/scalarisctl -n "p3bench_node1" stop ; \
-	./bin/scalarisctl -n "p3bench_node2" stop ; \
-	./bin/scalarisctl -n "p3bench_node3" stop ; \
+	./bin/setup-ring-for-benchmarks.sh --ring-size 4 stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
