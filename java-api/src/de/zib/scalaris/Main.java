@@ -117,8 +117,8 @@ public class Main {
             final String[] optionValues = line.getOptionValues("minibench");
             int nrOperations = 500;
             int threadsPerNode = 10;
-            final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
-            boolean all = false;
+            final HashSet<Integer> benchmarks = new HashSet<Integer>(18);
+            boolean all = true;
             if (optionValues != null) {
                 checkArguments(optionValues, 0, options, "b");
                 if (optionValues.length >= 1) {
@@ -128,6 +128,7 @@ public class Main {
                     threadsPerNode = Integer.parseInt(optionValues[1]);
                 }
                 if (optionValues.length >= 3) {
+                    all = false;
                     for (int i = 2; i < Math.min(20, optionValues.length); ++i) {
                         final String benchmarks_str = optionValues[i];
                         if (benchmarks_str.equals("all")) {
@@ -137,8 +138,6 @@ public class Main {
                         }
                     }
                 }
-            } else {
-                all = true;
             }
             if (all) {
                 for (int i = 1; i <= 18; ++i) {
