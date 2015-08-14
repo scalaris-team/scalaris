@@ -14,7 +14,8 @@
 #    limitations under the License.
 
 RINGSIZE=4
-
+SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
+SCALARIS_YAWS_PORT=${SCALARIS_YAWS_PORT-"8000"}
 usage(){
     echo "usage: setup-ring-for-benchmarks [options] <cmd>"
     echo " options:"
@@ -28,7 +29,7 @@ usage(){
 start_ring(){
     KEYS=`./bin/scalarisctl -t nostart -e "-noinput -eval \"io:format('\n%~p', [api_rt:escaped_list_of_keys(api_rt:get_evenly_spaced_keys($RINGSIZE))]), halt(0)\"" start | grep % | cut -c 3- | rev | cut -c 2- | rev`
 
-    KNOWNHOSTS="-scalaris known_hosts [{{127,0,0,1},$SCALARIS_UNITTEST_PORT,service_per_vm}]"
+    SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$SCALARIS_UNITTEST_PORT,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$SCALARIS_UNITTEST_PORT,service_per_vm}]"
     idx=0
     for key in $KEYS; do
         let idx+=1
@@ -36,15 +37,16 @@ start_ring(){
         STARTTYPE=null
         if [ "x$idx" == x1 ]
         then
-            STARTTYPE=first
+            STARTTYPE="first -m"
+            TESTPORT=$SCALARIS_UNITTEST_PORT
+            YAWSPORT=$SCALARIS_YAWS_PORT
         else
-            STARTTYPE=joining
+            STARTTYPE="joining"
+            let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx
+            let YAWSPORT=$SCALARIS_YAWS_PORT+$idx
         fi
-        let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx
-        let YAWSPORT=$SCALARIS_YAWS_PORT+$idx
 
-        SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$TESTPORT,mgmt_server} $KNOWNHOSTS" 
-        ./bin/scalarisctl -d -k $key -n "ebench_node$idx" -p $TESTPORT -y $YAWSPORT -m -t $STARTTYPE start
+        ./bin/scalarisctl -d -k $key -n "ebench_node$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
 
     done
     ./bin/scalarisctl -n "ebench_node1" dbg-check-ring $RINGSIZE 30
