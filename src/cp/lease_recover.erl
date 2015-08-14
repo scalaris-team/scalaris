@@ -38,7 +38,7 @@ recover(LeaseDBs) ->
         [Lease] -> % one potentially active lease: set active lease
             lease_list:make_lease_list(Lease, [], []);
         [_, _] -> % could be an ongoing split or an ongoing merge: finish operation
-            io:format("~p~n", [Candidates]),
+            log:log("leases: ~p~n", [Candidates]),
             ts = nyi, % ts: not yet implemented
             lease_list:empty()
     end.
