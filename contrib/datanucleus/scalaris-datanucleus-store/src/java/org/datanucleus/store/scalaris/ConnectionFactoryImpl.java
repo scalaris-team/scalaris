@@ -18,7 +18,6 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
 
@@ -31,12 +30,10 @@ import org.datanucleus.store.connection.AbstractConnectionFactory;
 import org.datanucleus.store.connection.AbstractManagedConnection;
 import org.datanucleus.store.connection.ManagedConnection;
 
-import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
-import de.zib.scalaris.Transaction;
-import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.ConnectionPool;
 
 /**
  * Implementation of a ConnectionFactory for Scalaris. The connections are only
@@ -45,34 +42,39 @@ import de.zib.scalaris.UnknownException;
  */
 @SuppressWarnings("rawtypes")
 public class ConnectionFactoryImpl extends AbstractConnectionFactory {
+    
+    private static final int MAX_NUMBER_CONNECTIONS = 0;
+    
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
      * Property value Cookie used for connecting to Scalaris node. <property
      * name="..." value="..." />
      */
-    public final String PROPERTY_SCALARIS_COOKIE = "scalaris.cookie";
+    public final static String PROPERTY_SCALARIS_COOKIE = "scalaris.cookie";
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
      * Should be the same as defined in Scalaris server <property name="..."
      * value="..." />
      */
-    public final String PROPERTY_SCALARIS_DEBUG = "scalaris.debug";
+    public final static String PROPERTY_SCALARIS_DEBUG = "scalaris.debug";
     /**
      * Symbolic Name of property used in persistence-unit configuration file
      * <property name="..." value="..." />
      */
-    public final String PROPERTY_SCALARIS_NODE = "scalaris.node";
+    public final static String PROPERTY_SCALARIS_NODE = "scalaris.node";
     /**
      * Symbolic Name of property used in persistence-unit configuration file
      * <property name="..." value="..." />
      */
-    public final String PROPERTY_SCALARIS_CLIENT_NAME = "scalaris.client.name";
+    public final static String PROPERTY_SCALARIS_CLIENT_NAME = "scalaris.client.name";
     /**
      * Symbolic Name of property used in persistence-unit configuration file
      * <property name="..." value="..." />
      */
-    public final String PROPERTY_SCALARIS_CLIENT_APPENDUUID = "scalaris.client.appendUUID";
+    public final static String PROPERTY_SCALARIS_CLIENT_APPENDUUID = "scalaris.client.appendUUID";
 
+    private static ConnectionPool connPool = null;
+    
     /**
      * Constructor.
      * 
@@ -84,16 +86,60 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
     public ConnectionFactoryImpl(final StoreManager storeMgr,
             final String resourceType) {
         super(storeMgr, resourceType);
+        
+        initConnectionPool();
+    }
+    
+    private void initConnectionPool() {
+        synchronized(ConnectionFactoryImpl.class) {
+            if (connPool == null) {
+                Properties properties = new Properties();
+                copyProperty(PROPERTY_SCALARIS_NODE, properties, "scalaris.node",
+                        (String) null);
+                copyProperty(PROPERTY_SCALARIS_COOKIE, properties,
+                        "scalaris.cookie", (String) null);
+                copyProperty(PROPERTY_SCALARIS_CLIENT_APPENDUUID, properties,
+                        "scalaris.client.appendUUID", true);
+                ConnectionFactory connectionFactory = new ConnectionFactory(properties);
+            
+                connPool = new ConnectionPool(connectionFactory, MAX_NUMBER_CONNECTIONS);
+            }
+        }
     }
 
     /**
-     * A Java Instance can only create one connection per scalaris node. We need
-     * to store already created connection and reuse if necessary.
+     * Helper for copying setting from Datanucleus to Scalaris
      * 
-     * This need to be thread safe, hence volatile.
-     */
-    private static final Hashtable<String, Connection> static_connectionSingletons = new Hashtable<String, Connection>();
+     * @return
+     * */
+    String copyProperty(final String propertyNameFrom,
+            final Properties propertiesTo, final String propertyNameTo,
+            final String defaultIfNotSet) {
+        final String v = storeMgr.getStringProperty(propertyNameFrom);
+        if (defaultIfNotSet == null && v == null) {
+            throw new NucleusDataStoreException("Property "
+                    + propertyNameFrom + " is mandatory");
+        }
+        final String ret = v == null ? defaultIfNotSet : v;
+        propertiesTo.put(propertyNameTo, ret);
+        return ret;
+    }
 
+    /**
+     * Helper for copying setting from Datanucleus to Scalaris
+     * 
+     * @return
+     * */
+    boolean copyProperty(final String propertyNameFrom,
+            final Properties propertiesTo, final String propertyNameTo,
+            final boolean defaultIfNotSet) {
+        final boolean ret = storeMgr.getBooleanProperty(propertyNameFrom,
+                defaultIfNotSet);
+        if (propertyNameTo != null)
+            propertiesTo.put(propertyNameTo, ret);
+        return ret;
+    }
+    
     /**
      * Obtain a connection from the Factory. The connection will be enlisted
      * within the transaction associated to the ExecutionContext
@@ -107,8 +153,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
      */
     public ManagedConnection createManagedConnection(final ExecutionContext ec,
             final Map txnOptions) {
-        return new ManagedConnectionImpl(txnOptions,
-                static_connectionSingletons);
+        return new ManagedConnectionImpl(txnOptions);
     }
 
     /**
@@ -116,149 +161,27 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
      */
     public class ManagedConnectionImpl extends AbstractManagedConnection {
 
-        final private Hashtable<String, Connection> connectionSingletons;
-
-        public ManagedConnectionImpl(final Map options,
-                final Hashtable<String, Connection> _connectionSingletons) {
-            this.connectionSingletons = _connectionSingletons;
-        }
-
-        public void close() {
-            // TODO Auto-generated method stub
-        }
-
-        /**
-         * Helper for copying setting from Datanucleus to Scalaris
-         * 
-         * @return
-         * */
-        String copyProperty(final String propertyNameFrom,
-                final Properties propertiesTo, final String propertyNameTo,
-                final String defaultIfNotSet) {
-            final String v = storeMgr.getStringProperty(propertyNameFrom);
-            if (defaultIfNotSet == null && v == null) {
-                throw new NucleusDataStoreException("Property "
-                        + propertyNameFrom + " is mandatory");
-            }
-            final String ret = v == null ? defaultIfNotSet : v;
-            propertiesTo.put(propertyNameTo, ret);
-            return ret;
-        }
-
-        /**
-         * Helper for copying setting from Datanucleus to Scalaris
-         * 
-         * @return
-         * */
-        boolean copyProperty(final String propertyNameFrom,
-                final Properties propertiesTo, final String propertyNameTo,
-                final boolean defaultIfNotSet) {
-            final boolean ret = storeMgr.getBooleanProperty(propertyNameFrom,
-                    defaultIfNotSet);
-            if (propertyNameTo != null)
-                propertiesTo.put(propertyNameTo, ret);
-            return ret;
+        private Connection conn;
+        
+        public ManagedConnectionImpl(final Map optionsl) {
+            // TODO: handle options?
         }
 
         public Object getConnection() {
-
-            Properties properties = new Properties();
-            copyProperty(PROPERTY_SCALARIS_NODE, properties, "scalaris.node",
-                    (String) null);
-            copyProperty(PROPERTY_SCALARIS_COOKIE, properties,
-                    "scalaris.cookie", (String) null);
-            final String cname = copyProperty(PROPERTY_SCALARIS_CLIENT_NAME,
-                    properties, "scalaris.client.name", "java_client");
-            copyProperty(PROPERTY_SCALARIS_CLIENT_APPENDUUID, properties,
-                    "scalaris.client.appendUUID", true);
-            final boolean debug = copyProperty(PROPERTY_SCALARIS_DEBUG,
-                    properties, null, false);
-
-            {
-                Connection c = connectionSingletons.get(cname);
-                if (c != null)
-                    return c;
+            try {
+                conn = connPool.getConnection();
+            } catch (ConnectionException e) {
+                throw new NucleusDataStoreException("Could not create a connection", e);
             }
-            System.out.println(properties.toString());
-
-            final Connection connection;
-            synchronized (connectionSingletons) {
-
-                {// In case someone overruns me to the synchronized section
-                    Connection c = connectionSingletons.get(cname);
-                    if (c != null) {
-                        System.out.println("Ouch. I was overrun");
-                        return c;
-
-                    }
-                }
-
-                {// I am the first one.
-                    System.out.println("I am the first for " + cname);
-                    try {
-                        ConnectionFactory connectionFactory = new ConnectionFactory(
-                                properties);
-
-                        connectionFactory.createConnection();
-                        connection = connectionFactory.createConnection();
-                        connectionSingletons.put(cname, connection);
-                    } catch (ConnectionException e1) {
-                        throw new NucleusDataStoreException(
-                                "An error occured while creating scalaris connection",
-                                e1);
-                    }
-                }
-
-            }
-
-            if (debug) {
-                // TODO: test for early development. to be removed someday.
-                Transaction t1 = new Transaction(connection); // Transaction()
-
-                try {
-                    t1.write("datanucleus", "connected at "
-                            + new java.util.Date() + " from java_client="
-                            + cname);
-                    t1.commit();
-                } catch (ConnectionException e) {
-                    throw new NucleusDataStoreException(
-                            "an error occured in debug self test ", e);
-
-                    // } catch (TimeoutException e) {
-                    // throw new NucleusDataStoreException(
-                    // "an error occured in debug self test ", e);
-                } catch (AbortException e) {
-                    throw new NucleusDataStoreException(
-                            "an error occured in debug self test ", e);
-                } catch (UnknownException e) {
-                    throw new NucleusDataStoreException(
-                            "an error occured in debug self test ", e);
-                }
-            }
-
-            return connection;
-
+            return conn;
         }
 
         public XAResource getXAResource() {
             return null;
         }
-    }
-}
 
-class ConnectorSingleton {
-    /** Constructeur privé */
-    private ConnectorSingleton() {
-    }
-
-    /** Holder */
-    private static class SingletonHolder {
-        /** Instance unique non préinitialisée */
-        private final static ConnectorSingleton instance = new ConnectorSingleton();
-    }
-
-    /** Point d'accès pour l'instance unique du singleton */
-    public static ConnectorSingleton getInstance() {
-        return SingletonHolder.instance;
+        public void close() {
+            connPool.releaseConnection(conn);
+        }
     }
 }
