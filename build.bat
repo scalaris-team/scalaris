@@ -30,6 +30,10 @@ if not exist Emakefile (
     )
     echo ...done!
 )
+if not exist include/rt.hrl (
+    echo Creating include/rt.hrl using rt_chord...
+    echo -include^("rt_chord.hrl"^).>> include/rt.hrl
+)
 
 @echo on
 pushd "%~dp0""\contrib\log4erl\src"

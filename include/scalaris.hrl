@@ -25,7 +25,7 @@
 %%The RT macro determines which kind of routingtable is used. Uncomment the
 %%one that is desired.
 
--include("$RT").
+-include("rt.hrl").
 
 % special parameters to be passed to ets:new/2 (not only used on db_ets!)
 % note: keep access level at least at protected for dht_node_db_cache to work!
