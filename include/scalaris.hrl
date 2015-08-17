@@ -21,10 +21,8 @@
 %% Version of Scalaris
 -define(SCALARIS_VERSION, "0.8.2+git").
 
-%% userdevguide-begin scalaris:rt
-%%The RT macro determines which kind of routingtable is used. Uncomment the
-%%one that is desired.
-
+%% The RT macro is defined by the --with-rt configure parameter and determines
+%% which kind of routingtable is used.
 -include("rt.hrl").
 
 % special parameters to be passed to ets:new/2 (not only used on db_ets!)

@@ -40,9 +40,9 @@ defined using a so called `behaviour'.  The files \code{rt_simple} and
 \code{rt_chord} implement the behaviour `rt\_beh'.
 
 The macro \code{?RT} is used to select the current implementation of routing
-tables. It is defined in \code{include/scalaris.hrl}.
-
-\codesnippet{scalaris.hrl}{scalaris:rt}{../include/scalaris.hrl}
+tables. It is defined in a \code{rt_*.hrl} file in the \code{include} directory
+which is set during configuration. For \code{rt_simple}, the following call
+would include the proper files: \code{./configure --with-rt=rt_simple}.
 
 The functions, that have to be implemented for a routing mechanism are
 defined in the following file:
