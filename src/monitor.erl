@@ -187,7 +187,8 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
     comm:send_local(MyMonitor, {report_rrd, Process, Key, OldValue, Value}).
 
 %% @doc Retrieve individual RRDs from monitor
--spec get_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> list({atom(), key(), rrd:rrd() | undefined}).
+-spec get_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index()))
+        -> [{atom(), key(), rrd:rrd() | undefined}].
 get_rrds(MonitorPid, Keys) ->
     %% we peek into the ets table of the monitor process
     %% look-up ets tables which the monitor-pid owns
@@ -196,19 +197,33 @@ get_rrds(MonitorPid, Keys) ->
                     Tables = ets:all(),
                     OwnedTables = [ X || X <- Tables,
                                          MonitorPid =:= ets:info(X, owner) ],
-                    Tab = hd(OwnedTables),
-                    erlang:put({monitor_table, MonitorPid}, Tab),
-                    Tab;
+                    case OwnedTables of
+                        [Tab | _] ->
+                            erlang:put({monitor_table, MonitorPid}, Tab),
+                            Tab;
+                        [] ->
+                            % process not ready yet
+                            failed
+                    end;
                 X -> X
             end,
 
-    Res = [case get_rrd(Table, TableIndex) of
-         undefined when Process =:= api_tx andalso Key =:= 'req_list' ->
-             %% special case: always return an empty rrd for {api_tx, req_list}
-             {Process, Key, init_apitx_reqlist_rrd(os:timestamp())};
-         Value -> {Process, Key, Value}
-     end || {Process, Key} = TableIndex <- Keys],
-    Res.
+    case Table of
+        failed ->
+            [if Process =:= api_tx andalso Key =:= 'req_list' ->
+                    %% special case: always return an empty rrd for {api_tx, req_list}
+                    {Process, Key, init_apitx_reqlist_rrd(os:timestamp())};
+                true ->
+                    {Process, Key, undefined}
+             end || {Process, Key} <- Keys];
+        _ ->
+            [case get_rrd(Table, TableIndex) of
+                 undefined when Process =:= api_tx andalso Key =:= 'req_list' ->
+                     %% special case: always return an empty rrd for {api_tx, req_list}
+                     {Process, Key, init_apitx_reqlist_rrd(os:timestamp())};
+                 Value -> {Process, Key, Value}
+             end || {Process, Key} = TableIndex <- Keys]
+    end.
 
 -spec clear_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> ok.
 clear_rrds(MonitorPid, Keys) ->
