@@ -94,22 +94,20 @@ maximum_entries() -> config:read(rt_frt_max_entries).
 %% Key Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Initialize the trigger and the routing table. This function is supposed
-%%      to be called only on startup, as is sends a trigger message.
--spec init(nodelist:neighborhood()) -> rt().
-init(Neighbors) ->
-    % trigger a random lookup after initializing the table
+%% @doc This function is called during the startup of the rt_loop process and
+%%      is allowed to send trigger messages.
+-spec init() -> ok.
+init() ->
+    % initializse the trigger for random lookups
     case config:read(rt_frt_al) of
         true -> msg_delay:send_trigger(0, {trigger_random_lookup});
         false -> ok
-    end,
-    init_rt(Neighbors).
+    end.
 
-%% @doc Initialize the routing table only.
-%%      No trigger messages are sent, i.e. this function can be called during
-%%      normal operation.
--spec init_rt(nodelist:neighborhood()) -> rt().
-init_rt(Neighbors) ->
+%% @doc Activate the routing table.
+%%      This function is called during the activation of the routing table process.
+-spec activate(nodelist:neighborhood()) -> rt().
+activate(Neighbors) ->
     % ask the successor node for its routing table
     Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
@@ -148,7 +146,7 @@ init_stabilize(Neighbors, RT) ->
         true ->
             update_entries(Neighbors, RT) ;
         false -> % source node changed, replace the complete table
-            init_rt(Neighbors)
+            activate(Neighbors)
     end
     .
 %% userdevguide-end rt_frtchord:init_stabilize
@@ -398,6 +396,19 @@ get_random_key_from_generator(SourceNodeId, PredId, SuccId) ->
                                   Rand
                                  )),
     rt_chord:add_range(SourceNodeId, X).
+
+%% @doc Trigger need to be resend here w/o queuing to avoid trace infestation.
+-spec handle_custom_message_inactive(custom_message(), msg_queue:msg_queue()) ->
+    msg_queue:msg_queue().
+% resend trigger
+handle_custom_message_inactive({trigger_random_lookup}, MsgQueue) ->
+    Interval = config:read(rt_frt_al_interval),
+    msg_delay:send_trigger(Interval, {trigger_random_lookup}),
+    MsgQueue;
+% queue all other messages
+handle_custom_message_inactive(Msg, MsgQueue) ->
+    msg_queue:add(MsgQueue, Msg).
+
 
 %% userdevguide-begin rt_frtchord:handle_custom_message
 %% @doc Handle custom messages. The following messages can occur:

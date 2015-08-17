@@ -34,7 +34,8 @@
 -type key() :: term().
 
 -callback empty_ext(nodelist:neighborhood()) -> external_rt().
--callback init(nodelist:neighborhood()) -> rt().
+-callback init() -> ok.
+-callback activate(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
 -callback next_hop(nodelist:neighborhood(), external_rt(), key()) -> succ | comm:mypid().
@@ -65,6 +66,7 @@
 
 -callback to_list(dht_node_state:state()) -> [{key(), comm:mypid()}].
 -callback export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
+-callback handle_custom_message_inactive(comm:message(), msg_queue:msg_queue()) -> msg_queue:msg_queue().
 -callback handle_custom_message(comm:message(), rt_loop:state_active()) -> rt_loop:state_active() | unknown_event.
 
 -callback check(OldRT::rt(), NewRT::rt(), OldERT::external_rt(), Neighbors::nodelist:neighborhood(),
@@ -87,7 +89,9 @@ behaviour_info(callbacks) ->
      % create a default routing table
      {empty_ext, 1},
      % initialize a routing table
-     {init, 1},
+     {init, 0},
+     % activate a routing table
+     {activate, 1},
      % mapping: key space -> identifier space
      {hash_key, 1}, {get_random_node_id, 0},
      % routing
@@ -118,6 +122,9 @@ behaviour_info(callbacks) ->
      {to_list, 1},
      % convert from internal representation to version for dht_node
      {export_rt_to_dht_node, 2},
+     % handle messages specific to a certain routing-table implementation if
+     % rt_loop is in on_inactive state
+     {handle_custom_message_inactive, 2},
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods

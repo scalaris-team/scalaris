@@ -85,6 +85,7 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     %% generate trigger msg only once and then keep it repeating
     msg_delay:send_trigger(get_base_interval(), {trigger_rt}),
+    ?RT:init(),
     {inactive, msg_queue:new()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,7 +107,7 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     msg_queue:send(QueuedMessages),
     DHTNodePid = comm:make_local(node:pidX(nodelist:node(Neighbors))),
     gen_component:change_handler(
-      {Neighbors, ?RT:init(Neighbors), ?RT:empty_ext(Neighbors), DHTNodePid},
+      {Neighbors, ?RT:activate(Neighbors), ?RT:empty_ext(Neighbors), DHTNodePid},
       fun ?MODULE:on_active/2);
 
 on_inactive({trigger_rt}, State) ->
@@ -127,8 +128,10 @@ on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages} = State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
+% unknown message
 on_inactive(Msg, {inactive, MsgQueue}) ->
-    {inactive, msg_queue:add(MsgQueue, Msg)}.
+    MsgQueueNew = ?RT:handle_custom_message_inactive(Msg, MsgQueue),
+    {inactive, MsgQueueNew}.
 
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(message(), state_active())
@@ -179,7 +182,6 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT, OldERT, DHTPid}) ->
 % failure detector reported dead node
 on_active({fd_notify, crash, DeadPid, Reason}, {Neighbors, OldRT, OldERT, DHTPid}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid, Reason),
-    %% ?RT:check(OldRT, NewRT, Neighbors, false),
     NewERT = ?RT:check(OldRT, NewRT, OldERT, Neighbors, false),
     {Neighbors, NewRT, NewERT, DHTPid};
 on_active({fd_notify, _Event, _DeadPid, _Reason}, State) ->

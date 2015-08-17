@@ -51,9 +51,16 @@
 empty(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
-% @doc Initialize the routing table. This function is allowed to send messages.
--spec init(nodelist:neighborhood()) -> rt().
-init(Neighbors) -> empty(Neighbors).
+%% @doc This function is called during the startup of the rt_loop process and
+%%      is allowed to send trigger messages.
+%%      Noop in chord.
+-spec init() -> ok.
+init() -> ok.
+
+%% @doc Activate the routing table.
+%%      This function is called during the activation of the routing table process.
+-spec activate(nodelist:neighborhood()) -> rt().
+activate(Neighbors) -> empty(Neighbors).
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(binary() | client_key()) -> key().
@@ -414,6 +421,12 @@ check_config() ->
                                 "{int(), int()}");
             _ -> false
         end.
+
+%% @doc No special handling of messages, i.e. all messages are queued.
+-spec handle_custom_message_inactive(custom_message(), msg_queue:msg_queue()) ->
+    msg_queue:msg_queue().
+handle_custom_message_inactive(Msg, MsgQueue) ->
+    msg_queue:add(MsgQueue, Msg).
 
 %% userdevguide-begin rt_chord:handle_custom_message
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its

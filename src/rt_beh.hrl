@@ -21,7 +21,7 @@
 
 -export_type([key/0, rt/0, custom_message/0, external_rt/0]).
 
--export([empty_ext/1, init/1,
+-export([empty_ext/1, init/0, activate/1,
          hash_key/1, get_random_node_id/0, next_hop/3, succ/2,
          init_stabilize/2, update/3,
          filter_dead_node/3, to_pid_list/1, get_size/1, get_size_ext/1,
@@ -29,7 +29,7 @@
          n/0, get_range/2, get_random_in_interval/1, get_random_in_interval/2,
          get_split_key/3, get_split_keys/3,
          dump/1, to_list/1, export_rt_to_dht_node/2,
-         handle_custom_message/2,
+         handle_custom_message_inactive/2, handle_custom_message/2,
          check/5, check/6,
          check_config/0,
          client_key_to_binary/1,
