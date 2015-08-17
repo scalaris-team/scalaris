@@ -374,9 +374,6 @@ public class FetchFieldManager extends AbstractFieldManager {
             return new Date(dateValue);
         } else if (Enum.class.isAssignableFrom(mmd.getType())) {
             ColumnMetaData[] colmds = mmd.getColumnMetaData();
-            // boolean useNumeric = MetaDataUtils
-            // .persistColumnAsNumeric(colmds != null && colmds.length>0?
-            // colmds[0] : null);
             boolean useNumeric = true;
             if (useNumeric) {
                 return mmd.getType().getEnumConstants()[result
@@ -412,18 +409,11 @@ public class FetchFieldManager extends AbstractFieldManager {
                     coll.add(null);
                 } else {
                     Object value = array.get(i);
-                    if (value instanceof JSONObject) {
-                        Class cls = clr.classForName(
-                                ((JSONObject) value).getString("class"), true);
-                        coll.add(getNonpersistableObjectFromJSON(
-                                (JSONObject) value, cls, clr));
+                    if (elementCls != null) {
+                        coll.add(TypeConversionHelper.convertTo(value,
+                                elementCls));
                     } else {
-                        if (elementCls != null) {
-                            coll.add(TypeConversionHelper.convertTo(value,
-                                    elementCls));
-                        } else {
-                            coll.add(value);
-                        }
+                        coll.add(value);
                     }
                 }
             }
@@ -465,15 +455,8 @@ public class FetchFieldManager extends AbstractFieldManager {
 
                 Object jsonVal = mapValue.get((String) key);
                 Object val = jsonVal;
-                if (jsonVal instanceof JSONObject) {
-                    Class cls = clr.classForName(
-                            ((JSONObject) jsonVal).getString("class"), true);
-                    val = getNonpersistableObjectFromJSON((JSONObject) jsonVal,
-                            cls, clr);
-                } else {
-                    if (valCls != null) {
-                        val = TypeConversionHelper.convertTo(jsonVal, valCls);
-                    }
+                if (valCls != null) {
+                    val = TypeConversionHelper.convertTo(jsonVal, valCls);
                 }
                 map.put(key, val);
             }
@@ -493,21 +476,8 @@ public class FetchFieldManager extends AbstractFieldManager {
                     Array.set(array, i, null);
                 } else {
                     Object value = arrayJson.get(i);
-                    if (value instanceof JSONObject) {
-                        JSONObject valueJson = (JSONObject) value;
-                        Class valueCls = clr.classForName(valueJson
-                                .getString("class"));
-                        System.out.println("TYPE="
-                                + valueJson.getString("class"));
-                        Array.set(
-                                array,
-                                i,
-                                getNonpersistableObjectFromJSON(
-                                        (JSONObject) value, valueCls, clr));
-                    } else {
-                        Array.set(array, i, TypeConversionHelper.convertTo(
-                                value, mmd.getType().getComponentType()));
-                    }
+                    Array.set(array, i, TypeConversionHelper.convertTo(
+                            value, mmd.getType().getComponentType()));
                 }
             }
             return array;
@@ -531,7 +501,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                     .getTypeConverterForType(mmd.getType(), String.class);
             TypeConverter longConv = ec.getNucleusContext().getTypeManager()
                     .getTypeConverterForType(mmd.getType(), Long.class);
-
+            
             if (useLong && longConv != null) {
                 returnValue = longConv.toMemberType(result.getLong(memberName));
             } else if (!useLong && strConv != null) {
@@ -541,15 +511,8 @@ public class FetchFieldManager extends AbstractFieldManager {
                 returnValue = longConv.toMemberType(result.getLong(memberName));
             } else {
                 Object value = result.get(memberName);
-                if (value instanceof JSONObject) {
-                    Class cls = clr.classForName(
-                            ((JSONObject) value).getString("class"), true);
-                    returnValue = getNonpersistableObjectFromJSON(
-                            (JSONObject) value, cls, clr);
-                } else {
-                    returnValue = TypeConversionHelper.convertTo(
-                            result.get(memberName), mmd.getType());
-                }
+                returnValue = TypeConversionHelper.convertTo(
+                        result.get(memberName), mmd.getType());
             }
 
             if (op != null) {
@@ -697,156 +660,6 @@ public class FetchFieldManager extends AbstractFieldManager {
             // TODO If this turns out to be OK, updates must be handled in a similar manner
             
             return null;
-        }
-    }
-    
-    /**
-     * Deserialise from JSON to a non-persistable object.
-     * 
-     * @param jsonobj
-     *            JSONObject
-     * @param cls
-     *            The class of the object required
-     * @param clr
-     *            ClassLoader resolver
-     * @return The object
-     */
-    private Object getNonpersistableObjectFromJSON(final JSONObject jsonobj,
-            final Class cls, final ClassLoaderResolver clr) {
-        if (cls.getName().equals("com.google.appengine.api.users.User")) {
-            return getComGoogleAppengineApiUsersUserFromJSON(jsonobj, cls, clr);
-        } else if (cls.getName().equals(
-                "com.google.appengine.api.datastore.Key")) {
-            return getComGoogleAppengineApiDatastoreKeyFromJSON(jsonobj, cls,
-                    clr);
-        } else {
-            // Try to reconstruct the object as a Java bean
-            try {
-                return AccessController.doPrivileged(new PrivilegedAction() {
-                    public Object run() {
-                        try {
-                            Constructor c = ClassUtils
-                                    .getConstructorWithArguments(cls,
-                                            new Class[] {});
-                            c.setAccessible(true);
-                            Object obj = c.newInstance(new Object[] {});
-                            String[] fieldNames = JSONObject.getNames(jsonobj);
-                            for (int i = 0; i < jsonobj.length(); i++) {
-                                // ignore class field
-                                if (!fieldNames[i].equals("class")) {
-                                    Field field = cls.getField(fieldNames[i]);
-                                    field.setAccessible(true);
-                                    field.set(obj, jsonobj.get(fieldNames[i]));
-                                }
-                            }
-                            return obj;
-                        } catch (Exception e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
-                        return null;
-                    }
-                });
-            } catch (SecurityException ex) {
-                ex.printStackTrace();
-            }
-
-        }
-        return null;
-    }
-
-    /**
-     * Convenience method to create an AppEngine User from a JSON object. TODO
-     * Move this out somewhere else
-     * 
-     * @param jsonobj
-     *            The JSONObject
-     * @param cls
-     *            Class being represented (User)
-     * @param clr
-     *            ClassLoader resolver
-     * @return The Key
-     */
-    protected Object getComGoogleAppengineApiUsersUserFromJSON(
-            JSONObject jsonobj, Class cls, ClassLoaderResolver clr) {
-        String email = null;
-        String authDomain = null;
-        try {
-            email = jsonobj.getString("email");
-        } catch (JSONException e) {
-            // should not happen if the field exists
-        }
-        try {
-            authDomain = jsonobj.getString("authDomain");
-        } catch (JSONException e) {
-            // should not happen if the field exists
-        }
-        return ClassUtils.newInstance(cls, new Class[] { String.class,
-                String.class }, new String[] { email, authDomain });
-    }
-
-    /**
-     * Convenience method to create an AppEngine Key from a JSON object. TODO
-     * Move this out somewhere else
-     * 
-     * @param jsonobj
-     *            The JSONObject
-     * @param cls
-     *            Class being represented (Key)
-     * @param clr
-     *            ClassLoader resolver
-     * @return The Key
-     */
-    protected Object getComGoogleAppengineApiDatastoreKeyFromJSON(
-            JSONObject jsonobj, Class cls, ClassLoaderResolver clr) {
-        try {
-            Object parent = null;
-            if (jsonobj.has("parent") && !jsonobj.isNull("parent")) {
-                // if it's a JSONObject
-                JSONObject parentobj = jsonobj.getJSONObject("parent");
-                parent = getNonpersistableObjectFromJSON(parentobj,
-                        clr.classForName(jsonobj.getString("class")), clr);
-            }
-
-            if (jsonobj.has("appId")) {
-                String appId = jsonobj.getString("appId");
-                String kind = jsonobj.getString("kind");
-                Class keyFactory = clr.classForName(
-                        "com.google.appengine.api.datastore.KeyFactory",
-                        cls.getClassLoader(), false);
-                if (parent != null) {
-                    return ClassUtils.getMethodForClass(keyFactory,
-                            "createKey",
-                            new Class[] { cls, String.class, String.class })
-                            .invoke(null, new Object[] { parent, kind, appId });
-                } else {
-                    return ClassUtils.getMethodForClass(keyFactory,
-                            "createKey",
-                            new Class[] { String.class, String.class }).invoke(
-                            null, new Object[] { kind, appId });
-                }
-            } else {
-                long id = jsonobj.getLong("id");
-                String kind = jsonobj.getString("kind");
-                Class keyFactory = clr.classForName(
-                        "com.google.appengine.api.datastore.KeyFactory",
-                        cls.getClassLoader(), false);
-                if (parent != null) {
-                    return ClassUtils.getMethodForClass(keyFactory,
-                            "createKey",
-                            new Class[] { cls, String.class, long.class })
-                            .invoke(null,
-                                    new Object[] { parent, kind,
-                                            Long.valueOf(id) });
-                } else {
-                    return ClassUtils.getMethodForClass(keyFactory,
-                            "createKey",
-                            new Class[] { String.class, long.class }).invoke(
-                            null, new Object[] { kind, Long.valueOf(id) });
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
     }
 }
