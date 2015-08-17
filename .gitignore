@@ -39,3 +39,4 @@ Session.vim
 /jquery.tablesorter.min.js
 /contrib/toke
 /contrib/erlang_js
+slurm-R*.out
