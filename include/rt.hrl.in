@@ -1,1 +1,1 @@
--include("@RT@").
+-include("@RT@.hrl").

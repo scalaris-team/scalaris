@@ -354,10 +354,10 @@ AC_SUBST(YAWS_OPTIONS)
 #
 ###########################################################
 
-RT=rt_chord.hrl
+RT=rt_chord
 AC_ARG_WITH([rt],
             [AS_HELP_STRING([--with-rt[[=RTFILE]]],
-                            [optionally specify the routing table type (default=rt_chord.hrl)])],
+                            [optionally specify the routing table type (default=rt_chord)])],
             [if test "$withval"; then
                RT="$withval"
              fi],

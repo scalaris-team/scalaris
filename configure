@@ -1335,7 +1335,7 @@ Optional Packages:
                           use systemd, optionally specify the directory for
                           systemd service files
   --with-rt[=RTFILE]      optionally specify the routing table type
-                          (default=rt_chord.hrl)
+                          (default=rt_chord)
   --with-java-functions=JAVAFUNCTIONS
                           use the given java-functions script for
                           java-api/scalaris (default is
@@ -4199,7 +4199,7 @@ DIALYZER_FLAGS="${DIALYZER_FLAGS## }${YAWS_OPTIONS_DIALYZER}"
 #
 ###########################################################
 
-RT=rt_chord.hrl
+RT=rt_chord
 
 # Check whether --with-rt was given.
 if test "${with_rt+set}" = set; then :
