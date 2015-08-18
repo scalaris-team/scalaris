@@ -305,13 +305,15 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             try {
                 final long startTime = System.currentTimeMillis();
     
-                final String key = ScalarisUtils.getPersistableIdentity(op);
-                System.out.println("FETCH KEY: " + key);
+                final String objId = ScalarisUtils.getPersistableIdentity(op);
+                final String objClassName = op.getClassMetaData().getFullClassName();
+                final String objKey = ScalarisSchemaHandler.getObjectStorageKey(objClassName, objId);
+                System.out.println("FETCH KEY: " + objKey);
     
                 try {
                     Transaction t1 = new Transaction(conn);
     
-                    JSONObject result = new JSONObject(t1.read(key).stringValue());
+                    JSONObject result = new JSONObject(t1.read(objKey).stringValue());
                     if (ScalarisUtils.isDeletedRecord(result)) {
                         throw new NucleusObjectNotFoundException(
                                 "Record has been deleted");

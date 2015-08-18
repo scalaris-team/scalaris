@@ -166,24 +166,8 @@ public class ScalarisUtils {
                     System.out.println("GENERATED KEY: " + idKey);
                 }
             }
-
-            String identity = getPersistableIdentity(op);
-            if (op.getExternalObjectId() == null) {
-                // DataNucleus expects as internal object id an integer value if there is only one
-                // primary key member which is an integer. Otherwise it can be an arbitrary
-                // object.
-                if (pkFieldNumbers.length == 1) {
-                    op.setPostStoreNewObjectId(idKey);
-                } else {
-                    op.setPostStoreNewObjectId(identity);
-                }
-            }
-            return identity;
-        } else {
-            // nothing must be done
-            return IdentityUtils.getPersistableIdentityForId(op
-                    .getExternalObjectId());
         }
+        return getPersistableIdentity(op);
     }
 
     /**
@@ -194,7 +178,7 @@ public class ScalarisUtils {
      * @return Identity of object provided by op or null if at least one primary
      *         key field is not loaded.
      */
-    static String getPersistableIdentity(ObjectProvider op) {
+    public static String getPersistableIdentity(ObjectProvider op) {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String keySeparator = ":";
 
@@ -202,30 +186,46 @@ public class ScalarisUtils {
             // The primary key must be (partially) calculated by the data store.
             // There is no distinction between APPLICATION and DATASTORE
             // IdentityType (yet)
-            // ID structure is: <class-name>:<pk1>:<pk2>
+            // ID structure is: <pk1>:<pk2>
 
-            StringBuilder keyBuilder = new StringBuilder(cmd.getFullClassName());
+            StringBuilder keyBuilder = new StringBuilder();
 
             int[] pkFieldNumbers = cmd.getPKMemberPositions();
+            Object firstKey = null;
             for (int i = 0; i < pkFieldNumbers.length; i++) {
                 AbstractMemberMetaData mmd = cmd
                         .getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
 
-                keyBuilder.append(keySeparator);
-                keyBuilder.append(op.provideField(mmd.getAbsoluteFieldNumber()));
+                Object keyVal = op.provideField(mmd.getAbsoluteFieldNumber());
+                if (i == 0) {
+                    firstKey = keyVal;
+                } else {
+                    keyBuilder.append(keySeparator);    
+                }
+                keyBuilder.append(keyVal);
             }
-            return keyBuilder.toString();
-        } else {
-            // The data store has nothing to do with generating a key value
-            return IdentityUtils.getPersistableIdentityForId(op
-                    .getExternalObjectId());
+            String identity = keyBuilder.toString();
+            if (op.getExternalObjectId() == null) {
+                // DataNucleus expects as internal object id an integer value if there is only one
+                // primary key member which is an integer. Otherwise it can be an arbitrary
+                // object.
+                if (pkFieldNumbers.length == 1) {
+                    op.setPostStoreNewObjectId(firstKey);
+                } else {
+                    op.setPostStoreNewObjectId(identity);
+                }
+            }
         }
+
+        String id = IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
+        System.out.println(id);
+        return id;
     }
 
     /* **********************************************************************
      *                  HOOKS FOR ScalarisStoreManager
      * **********************************************************************/
-    static synchronized void performScalarisObjectInsert(ObjectProvider op, String keyToInsertTo, JSONObject json, Connection conn) 
+    static synchronized void performScalarisObjectInsert(ObjectProvider op, String objectId, JSONObject json, Connection conn) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, AbortException {
 
         Transaction t = new Transaction(conn);
@@ -234,15 +234,20 @@ public class ScalarisUtils {
         updateUniqueMemberKey(op, json, null, t);
         insertToForeignKeyAction(op, json, t);
 
-        t.write(keyToInsertTo, json.toString());
+        String className = op.getClassMetaData().getFullClassName();
+        String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+        t.write(storageKey, json.toString());
         t.commit();
     }
 
     @SuppressWarnings("unchecked")
-    static synchronized void performScalarisObjectUpdate(ObjectProvider op, String objectKey, JSONObject changedVals, Connection conn) 
+    static synchronized void performScalarisObjectUpdate(ObjectProvider op, String objectId, JSONObject changedVals, Connection conn) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
             NotFoundException, JSONException, AbortException {
         // get old value
+        String className = op.getClassMetaData().getFullClassName();
+        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+
         Transaction t = new Transaction(conn);
         JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
 
@@ -263,10 +268,13 @@ public class ScalarisUtils {
         t.write(objectKey, stored.toString());
         t.commit();
     }
-    
-    static synchronized void performScalarisObjectDelete(ObjectProvider op, String objectKey, Connection conn) 
+
+    static synchronized void performScalarisObjectDelete(ObjectProvider op, String objectId, Connection conn) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
             NotFoundException, JSONException, AbortException {
+
+        String className = op.getClassMetaData().getFullClassName();
+        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId); 
 
         Transaction t = new Transaction(conn);
         JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
@@ -313,7 +321,6 @@ public class ScalarisUtils {
         toAdd.add(new ErlangValue(objectStringIdentity));
         t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>());
     }
-
     /**
      * To support queries it is necessary to have the possibility to iterate
      * over all stored objects of a specific type. Since Scalaris stores only
@@ -466,19 +473,27 @@ public class ScalarisUtils {
                 ArrayList<String> foreignObjectIdsOld = new ArrayList<String>();
                 try {
                     if (isJoin) {
+                        String elementClassName = mmd.getCollection().getElementType();
                         JSONArray arrNew = changedFieldsNewVal.getJSONArray(fieldName);
                         JSONArray arrOld = new JSONArray();
                         if (changedFieldsOldVal != null) {
                             arrOld = changedFieldsOldVal.getJSONArray(fieldName);
                         }
                         for (int i = 0; i < arrNew.length(); i++) {
-                            foreignObjectIdsNew.add(arrNew.getString(i));
+                            foreignObjectIdsNew.add(
+                                    ScalarisSchemaHandler.getForeignKeyActionKey(
+                                            elementClassName, arrNew.getString(i)));
                         }
                         for (int i = 0; i < arrOld.length(); i++) {
-                            foreignObjectIdsOld.add(arrOld.getString(i));
+                            foreignObjectIdsOld.add(
+                                    ScalarisSchemaHandler.getForeignKeyActionKey(
+                                            elementClassName, arrOld.getString(i)));
                         }
                     } else {
-                        foreignObjectIdsNew.add(changedFieldsNewVal.getString(fieldName));
+                        String className = mmd.getType().getCanonicalName();
+                        foreignObjectIdsNew.add(
+                                ScalarisSchemaHandler.getForeignKeyActionKey(
+                                        className, changedFieldsNewVal.getString(fieldName)));
                     }
                 } catch (JSONException e) {
                     // not found -> this action will be skipped
@@ -494,18 +509,17 @@ public class ScalarisUtils {
                 // construct the FKA key for every foreign object id
                 for (ArrayList<String> changeList : 
                         new ArrayList[]{foreignObjectIdsNew, foreignObjectIdsNew}) {
-                    for (String foreignObjectId : changeList) {
-                        if (foreignObjectId == null) continue;
+                    for (String fkaKey : changeList) {
+                        if (fkaKey == null) continue;
 
                         List<String> newFka = new ArrayList<String>(2);
                         newFka.add(objectStringIdentity);
-
+                        newFka.add(cmd.getFullClassName());
                         if (isJoin) {
                             newFka.add(fieldName);
                         } else {
                             newFka.add(ScalarisSchemaHandler.FKA_DELETE_OBJ);
                         }
-                        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(foreignObjectId);
 
                         // check in which list we are currently in to choose the
                         // HashMap to which the action must be added to
@@ -543,12 +557,14 @@ public class ScalarisUtils {
     
     private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+        AbstractClassMetaData cmd = op.getClassMetaData();
+        String objClassName = cmd.getFullClassName();
         String objectStringIdentity = getPersistableIdentity(op);
         
         ExecutionContext ec = op.getExecutionContext();
         StoreManager storeMgr = ec.getStoreManager();
         
-        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(objectStringIdentity);
+        String fkaKey = ScalarisSchemaHandler.getForeignKeyActionKey(objClassName, objectStringIdentity);
         List<ErlangValue> attachedActions;
         try {
             attachedActions = t.read(fkaKey).listValue();
@@ -562,10 +578,9 @@ public class ScalarisUtils {
                 List<String> actionAsList = action.stringListValue();
                 
                 String objId = actionAsList.get(0);
-                String memberToDelete = actionAsList.get(1);
+                String toDeleteClassName = actionAsList.get(1);
+                String memberToDelete = actionAsList.get(2);
                 
-                String toDeleteClassName = storeMgr
-                        .getClassNameForObjectID(objId,  ec.getClassLoaderResolver(), ec);
                 AbstractClassMetaData obCmd = storeMgr.getMetaDataManager()
                         .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
                 Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
