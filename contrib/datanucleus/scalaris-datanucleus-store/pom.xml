@@ -63,7 +63,7 @@
         <dependency>
             <groupId>org.datanucleus</groupId>
             <artifactId>datanucleus-core</artifactId>
-            <version>[4.0.3,4.0.99)</version>
+            <version>4.1.0-release</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
