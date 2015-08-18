@@ -658,6 +658,8 @@ public class ScalarisUtils {
                 // that means we don't have to remove it any more
             }
         }
+        // all objects are gone
+        t.write(fkaKey, DELETED_RECORD_VALUE);
     }
 
     /* **********************************************************************
