@@ -358,7 +358,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                 returnValue = null;
             }
             if (op != null) {
-                SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), returnValue, true);
+                return SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), returnValue, true);
             }
         } else if (Boolean.class.isAssignableFrom(mmd.getType())) {
             return result.getBoolean(memberName);
@@ -513,7 +513,7 @@ public class FetchFieldManager extends AbstractFieldManager {
             }
 
             if (op != null) {
-                SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), returnValue, true);
+                return SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), returnValue, true);
             }
         }
         return returnValue;
@@ -559,7 +559,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                 }
 
                 if (op != null) {
-                    SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), coll, true);
+                    return SCOUtils.wrapSCOField(op, mmd.getAbsoluteFieldNumber(), coll, true);
                 }
                 return coll;
             } else if (mmd.hasArray()) {
