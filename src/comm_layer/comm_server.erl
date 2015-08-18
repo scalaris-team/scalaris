@@ -182,6 +182,7 @@ on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
     ConnPid = get_connection(Address, Port, Socket, Channel, Dir),
     Client ! {create_connection_done, ConnPid},
     State;
+
 on({send, Address, Port, Pid, Message, Options}, State) ->
     case lists:keytake(channel, 1, Options) of
         false -> Options1 = Options, Channel = main, Dir = 'send';
@@ -200,6 +201,16 @@ on({unregister_conn, Address, Port, Client}, State) ->
 on({set_local_address, Address, Port, Client}, State) ->
     ets:insert(?MODULE, {local_address_port, {Address, Port}}),
     Client ! {set_local_address_done},
+    State;
+
+on({get_number_of_chan, SourcePid}, State) ->
+    Dic = get(),
+    Channels = lists:filter(fun({{_Addr, _Port, Ch, _Dir}, _Pid}) ->
+                                    Ch =:= main orelse Ch =:= prio;
+                               (_Else) ->
+                                    false
+                            end, Dic),
+    comm:send(SourcePid, {get_number_of_chan_responce, comm:this(), length(Channels)}),
     State.
 
 -spec tcp_options(Channel::comm:channel()) -> [{term(), term()}].
