@@ -205,11 +205,8 @@ on({set_local_address, Address, Port, Client}, State) ->
 
 on({get_number_of_chan, SourcePid}, State) ->
     Dic = get(),
-    Channels = lists:filter(fun({{_Addr, _Port, Ch, _Dir}, _Pid}) ->
-                                    Ch =:= main orelse Ch =:= prio;
-                               (_Else) ->
-                                    false
-                            end, Dic),
+    Channels = [X || X = {{_Addr, _Port, Ch, _Dir}, _Pid} <- Dic,
+                     Ch =:= main orelse Ch =:= prio],
     comm:send(SourcePid, {get_number_of_chan_responce, comm:this(), length(Channels)}),
     State.
 
