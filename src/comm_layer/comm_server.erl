@@ -203,11 +203,11 @@ on({set_local_address, Address, Port, Client}, State) ->
     Client ! {set_local_address_done},
     State;
 
-on({get_number_of_chan, SourcePid}, State) ->
-    Dic = get(),
-    Channels = [X || X = {{_Addr, _Port, Ch, _Dir}, _Pid} <- Dic,
+on({get_no_of_ch, SourcePid}, State) ->
+    Dict = get(),
+    Channels = [X || X = {{_Addr, _Port, Ch, _Dir}, _Pid} <- Dict,
                      Ch =:= main orelse Ch =:= prio],
-    comm:send(SourcePid, {get_number_of_chan_responce, comm:this(), length(Channels)}),
+    comm:send(SourcePid, {get_no_of_ch_response, comm:this(), length(Channels)}),
     State.
 
 -spec tcp_options(Channel::comm:channel()) -> [{term(), term()}].

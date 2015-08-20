@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2]).
--export([get_stats/0]).
+-export([get_stats/0, get_no_of_ch/0]).
 
 -type state() :: {StartTime::erlang_timestamp(), RcvCnt::non_neg_integer(),
                   RcvBytes::non_neg_integer(), SendCnt::non_neg_integer(),
@@ -41,6 +41,18 @@ get_stats() ->
     receive {get_stats_response, RcvCnt, RcvBytes, SendCnt, SendBytes} ->
                 {RcvCnt, RcvBytes, SendCnt, SendBytes}
     end.
+
+%% @doc Get number of channels for the current VM.
+%%      The answer is collected synchronously, use only for debugging.
+-spec get_no_of_ch() -> {no_of_channels, comm:mypid(), pos_integer()}.
+get_no_of_ch() ->
+    Pid = pid_groups:find_a(comm_server),
+    comm:send_local(Pid, {get_no_of_ch, comm:this()}),
+    receive
+        ?SCALARIS_RECV({get_no_of_ch_response, CommServer, NoOfCh}, %% ->
+                       {no_of_channels, CommServer, NoOfCh})
+    end.
+
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
