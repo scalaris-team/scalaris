@@ -20,30 +20,21 @@ Contributors:
 package org.datanucleus.store.scalaris;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 
 import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
 import org.datanucleus.exceptions.NucleusException;
 import org.datanucleus.exceptions.NucleusObjectNotFoundException;
-import org.datanucleus.metadata.AbstractClassMetaData;
-import org.datanucleus.metadata.ClassMetaData;
-import org.datanucleus.metadata.ClassPersistenceModifier;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
-import org.datanucleus.store.StoreData;
 import org.datanucleus.store.connection.ManagedConnection;
-import org.datanucleus.store.schema.table.CompleteClassTable;
 
 import com.orange.org.json.JSONException;
 import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
-import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
