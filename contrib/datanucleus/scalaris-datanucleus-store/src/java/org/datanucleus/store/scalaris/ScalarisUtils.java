@@ -625,7 +625,8 @@ public class ScalarisUtils {
                     } else {
                         // if the member is not loaded it is way faster to directly alter the
                         // stored JSON object
-                        JSONObject objAsJson = new JSONObject(t.read(objId).stringValue());
+                        String objKey = ScalarisSchemaHandler.getObjectStorageKey(toDeleteClassName, objId);
+                        JSONObject objAsJson = new JSONObject(t.read(objKey).stringValue());
                         if (isDeletedRecord(objAsJson)) {
                             continue;
                         }

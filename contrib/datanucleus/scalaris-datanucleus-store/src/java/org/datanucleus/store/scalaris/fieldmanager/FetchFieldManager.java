@@ -50,6 +50,8 @@ import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.fieldmanager.AbstractFieldManager;
+import org.datanucleus.store.scalaris.ScalarisSchemaHandler;
+import org.datanucleus.store.scalaris.ScalarisUtils;
 import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.store.types.SCOUtils;
 import org.datanucleus.store.types.TypeManager;
@@ -128,6 +130,7 @@ public class FetchFieldManager extends AbstractFieldManager {
         this.result = result;
         this.op = null;
         this.storeMgr = ec.getStoreManager();
+        addToCache();
     }
 
     public FetchFieldManager(ObjectProvider op, JSONObject result) {
@@ -136,8 +139,16 @@ public class FetchFieldManager extends AbstractFieldManager {
         this.result = result;
         this.op = op;
         this.storeMgr = ec.getStoreManager();
+        addToCache();
     }
 
+    private void addToCache() {
+        String className = acmd.getFullClassName();
+        String id = ScalarisUtils.getPersistableIdentity(op);
+        String key = ScalarisSchemaHandler.getObjectStorageKey(className, id);
+        fetchCache.add(key, op.getObject());
+    }
+    
     public boolean fetchBooleanField(int fieldNumber) {
         String memberName = storeMgr
                 .getNamingFactory()
@@ -295,9 +306,6 @@ public class FetchFieldManager extends AbstractFieldManager {
     public Object fetchObjectField(int fieldNumber) {
         fetchCache.increaseActive();
         try {
-            fetchCache.add(IdentityUtils.getPersistableIdentityForId(
-                    op.getExternalObjectId()), 
-                    op.getObject());
             
             AbstractMemberMetaData mmd = acmd
                     .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
@@ -639,8 +647,10 @@ public class FetchFieldManager extends AbstractFieldManager {
     }
 
     private Object getNestedObjectById(String persistableId, AbstractClassMetaData acmd, ExecutionContext ec) {
-        if (fetchCache.exists(persistableId)) {
-            return fetchCache.lookUp(persistableId);
+        String className = acmd.getFullClassName();
+        String objKey = ScalarisSchemaHandler.getObjectStorageKey(className, persistableId);
+        if (fetchCache.exists(objKey)) {
+            return fetchCache.lookUp(objKey);
         }
         try {
             return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
