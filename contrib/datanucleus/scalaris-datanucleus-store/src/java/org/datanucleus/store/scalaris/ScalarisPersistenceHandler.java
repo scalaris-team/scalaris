@@ -43,7 +43,7 @@ import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.Transaction;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -293,77 +293,68 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      *             when an error occurs in the datastore communication
      */
     public void fetchObject(ObjectProvider op, int[] fieldNumbers) {
-        System.out.println("FETCH " + op.getObject().getClass().getName());
-
         ExecutionContext ec = op.getExecutionContext();
         ManagedConnection mconn = storeMgr.getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
-        // TODO: Reads should not require synchronization
-        synchronized(ScalarisUtils.class) {
+        try {
+            final long startTime = System.currentTimeMillis();
+
             try {
-                final long startTime = System.currentTimeMillis();
-    
-                final String objId = ScalarisUtils.getPersistableIdentity(op);
-                final String objClassName = op.getClassMetaData().getFullClassName();
-                final String objKey = ScalarisSchemaHandler.getObjectStorageKey(objClassName, objId);
-                System.out.println("FETCH KEY: " + objKey);
-    
-                try {
-                    Transaction t1 = new Transaction(conn);
-    
-                    JSONObject result = new JSONObject(t1.read(objKey).stringValue());
-                    if (ScalarisUtils.isDeletedRecord(result)) {
-                        throw new NucleusObjectNotFoundException(
-                                "Record has been deleted");
-                    }
-                    final String declaredClassQName = result.getString("class");
-                    final Class declaredClass = op.getExecutionContext()
-                            .getClassLoaderResolver()
-                            .classForName(declaredClassQName);
-                    final Class objectClass = op.getObject().getClass();
-    
-                    if (!objectClass.isAssignableFrom(declaredClass)) {
-                            System.out.println("Type found in db not compatible with requested type");
-                        throw new NucleusObjectNotFoundException(
-                                "Type found in db not compatible with requested type");
-                    }
-    
-                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
-    
-                    t1.commit();
-    
-                    if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
-                        NucleusLogger.DATASTORE_NATIVE
-                                .debug("GET " + result.toString());
-                    }
-                } catch (NotFoundException e) {
-                    throw new NucleusObjectNotFoundException(e.getMessage(), e);
-                } catch (ConnectionException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (UnknownException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (AbortException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
-                } catch (JSONException e) {
-                    throw new NucleusDataStoreException(e.getMessage(), e);
+
+                JSONObject result = ScalarisUtils.performScalarisObjectFetch(op, conn);
+
+                if (ScalarisUtils.isDeletedRecord(result)) {
+                    throw new NucleusObjectNotFoundException(
+                            "Record has been deleted");
                 }
 
-                if (ec.getStatistics() != null) {
-                    // Add to statistics
-                    ec.getStatistics().incrementNumReads();
-                    ec.getStatistics().incrementFetchCount();
+                final String declaredClassQName = result.getString("class");
+                final Class declaredClass = op.getExecutionContext()
+                        .getClassLoaderResolver()
+                        .classForName(declaredClassQName);
+                final Class objectClass = op.getObject().getClass();
+
+                if (!objectClass.isAssignableFrom(declaredClass)) {
+                        System.out.println("Type found in db not compatible with requested type");
+                    throw new NucleusObjectNotFoundException(
+                            "Type found in db not compatible with requested type");
                 }
-    
-                if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
-                    NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
-                            "Scalaris.ExecutionTime",
-                            (System.currentTimeMillis() - startTime)));
+
+                // TODO: This is a temporary solution.
+                // Synchronized access when reading should not be necessary.
+                synchronized(ScalarisUtils.WRITE_LOCK) {
+                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
                 }
-            } finally {
-                mconn.release();
+
+                if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
+                    NucleusLogger.DATASTORE_NATIVE
+                            .debug("GET " + result.toString());
+                }
+            } catch (NotFoundException e) {
+                throw new NucleusObjectNotFoundException(e.getMessage(), e);
+            } catch (ConnectionException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (UnknownException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
+            } catch (JSONException e) {
+                throw new NucleusDataStoreException(e.getMessage(), e);
             }
+
+            if (ec.getStatistics() != null) {
+                // Add to statistics
+                ec.getStatistics().incrementNumReads();
+                ec.getStatistics().incrementFetchCount();
+            }
+
+            if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
+                NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
+                        "Scalaris.ExecutionTime",
+                        (System.currentTimeMillis() - startTime)));
+            }
+        } finally {
+            mconn.release();
         }
     }
 
@@ -396,8 +387,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      *         instantiation work to us.
      */
     public Object findObject(ExecutionContext ec, Object id) {
-        System.out.println("FIND id=" + id.getClass());
-
         return null;
     }
 
@@ -436,31 +425,25 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
 
-        // TODO: Reads should not require synchronization
-        synchronized(ScalarisUtils.class) {
-            try {
-                // read the management key
-                Transaction t = new Transaction(conn);
-                List<String> idIndex = t.read(idIndexKey).stringListValue();
-    
-                // retrieve all values from the management key
-                for (String id : idIndex) {
-                    results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
-                }
-    
-                t.commit();
-            } catch (NotFoundException e) {
-                // the management key does not exist which means there
-                // are no instances of this class stored.
-            } catch (ConnectionException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (AbortException e) {
-                throw new NucleusException(e.getMessage(), e);
-            } catch (UnknownException e) {
-                throw new NucleusException(e.getMessage(), e);
+        try {
+            // read the management key
+            TransactionSingleOp t = new TransactionSingleOp(conn);
+            List<String> idIndex = t.read(idIndexKey).stringListValue();
+
+            // retrieve all values from the management key
+            for (String id : idIndex) {
+                results.add(IdentityUtils.getObjectFromPersistableIdentity(id, cmd, ec));
             }
-    
-            return results;
+
+        } catch (NotFoundException e) {
+            // the management key does not exist which means there
+            // are no instances of this class stored.
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
         }
+
+        return results;
     }
 }

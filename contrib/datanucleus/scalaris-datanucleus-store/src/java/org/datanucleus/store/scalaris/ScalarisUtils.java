@@ -35,6 +35,7 @@ import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -44,12 +45,18 @@ import de.zib.scalaris.UnknownException;
  */
 @SuppressWarnings("rawtypes")
 public class ScalarisUtils {
-    
+
+    /**
+     * Object which will be used for synchronization when performing
+     * write operations.
+     */
+    public static final Object WRITE_LOCK = new Object();
+
     /**
      * Value which will be used to signal a deleted key.
      */
     public static final String DELETED_RECORD_VALUE = new JSONObject().toString();
-    
+
     /* **********************************************************************
      *                  ID GENERATION
      * **********************************************************************/
@@ -225,68 +232,85 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  HOOKS FOR ScalarisStoreManager
      * **********************************************************************/
-    static synchronized void performScalarisObjectInsert(ObjectProvider op, String objectId, JSONObject json, Connection conn) 
+    static JSONObject performScalarisObjectFetch(ObjectProvider op, Connection conn)
+            throws ConnectionException, NotFoundException, UnknownException, JSONException {
+
+        final String objId = ScalarisUtils.getPersistableIdentity(op);
+        final String objClassName = op.getClassMetaData().getFullClassName();
+        final String objKey = ScalarisSchemaHandler.getObjectStorageKey(objClassName, objId);
+
+        TransactionSingleOp t = new TransactionSingleOp(conn);
+        return new JSONObject(t.read(objKey).stringValue());
+    }
+
+    static void performScalarisObjectInsert(ObjectProvider op, String objectId, JSONObject json, Connection conn)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, AbortException {
+        synchronized(WRITE_LOCK) {
+            Transaction t = new Transaction(conn);
 
-        Transaction t = new Transaction(conn);
+            insertObjectToIDIndex(op, t);
+            updateUniqueMemberKey(op, json, null, t);
+            insertToForeignKeyAction(op, json, t);
 
-        insertObjectToIDIndex(op, t);
-        updateUniqueMemberKey(op, json, null, t);
-        insertToForeignKeyAction(op, json, t);
-
-        String className = op.getClassMetaData().getFullClassName();
-        String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
-        t.write(storageKey, json.toString());
-        t.commit();
+            String className = op.getClassMetaData().getFullClassName();
+            String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+            t.write(storageKey, json.toString());
+            t.commit();
+        }
     }
 
     @SuppressWarnings("unchecked")
-    static synchronized void performScalarisObjectUpdate(ObjectProvider op, String objectId, JSONObject changedVals, Connection conn) 
+    static void performScalarisObjectUpdate(ObjectProvider op, String objectId, JSONObject changedVals, Connection conn)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
             NotFoundException, JSONException, AbortException {
-        // get old value
-        String className = op.getClassMetaData().getFullClassName();
-        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-        Transaction t = new Transaction(conn);
-        JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
+        synchronized(WRITE_LOCK) {
+            // get old value
+            String className = op.getClassMetaData().getFullClassName();
+            String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-        // update stored object values
-        JSONObject changedValsOld = new JSONObject();
-        Iterator<String> keyIter = changedVals.keys();
-        while (keyIter.hasNext()) {
-            String key = keyIter.next();
-            if (stored.has(key)) {
-                changedValsOld.put(key, stored.get(key));
+            Transaction t = new Transaction(conn);
+            JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
+
+            // update stored object values
+            JSONObject changedValsOld = new JSONObject();
+            Iterator<String> keyIter = changedVals.keys();
+            while (keyIter.hasNext()) {
+                String key = keyIter.next();
+                if (stored.has(key)) {
+                    changedValsOld.put(key, stored.get(key));
+                }
+                stored.put(key, changedVals.get(key));
             }
-            stored.put(key, changedVals.get(key));
+
+            updateUniqueMemberKey(op, changedVals, changedValsOld, t);
+            updateForeignKeyAction(op, changedVals, changedValsOld, t);
+
+            t.write(objectKey, stored.toString());
+            t.commit();
         }
-
-        updateUniqueMemberKey(op, changedVals, changedValsOld, t);
-        updateForeignKeyAction(op, changedVals, changedValsOld, t);
-
-        t.write(objectKey, stored.toString());
-        t.commit();
     }
 
-    static synchronized void performScalarisObjectDelete(ObjectProvider op, String objectId, Connection conn) 
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
+    static void performScalarisObjectDelete(ObjectProvider op, String objectId, Connection conn)
+            throws ConnectionException, ClassCastException, UnknownException, NotAListException,
             NotFoundException, JSONException, AbortException {
 
-        String className = op.getClassMetaData().getFullClassName();
-        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId); 
+        synchronized(WRITE_LOCK) {
+            String className = op.getClassMetaData().getFullClassName();
+            String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-        Transaction t = new Transaction(conn);
-        JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
+            Transaction t = new Transaction(conn);
+            JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
 
-        removeObjectFromIDIndex(op, t);
-        removeObjectFromUniqueMemberKey(op, oldJson, t);
-        performForeignKeyActionDelete(op, t);
+            removeObjectFromIDIndex(op, t);
+            removeObjectFromUniqueMemberKey(op, oldJson, t);
+            performForeignKeyActionDelete(op, t);
 
-        t.write(objectKey,  DELETED_RECORD_VALUE);
-        t.commit();
+            t.write(objectKey,  DELETED_RECORD_VALUE);
+            t.commit();
+        }
     }
-        
+
     /* **********************************************************************
      *               INDICIES OF ALL OBJECTS OF ONE TYPE (for queries)
      * **********************************************************************/
