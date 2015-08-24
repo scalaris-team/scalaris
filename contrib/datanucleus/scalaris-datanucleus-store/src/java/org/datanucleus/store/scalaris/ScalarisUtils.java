@@ -243,24 +243,27 @@ public class ScalarisUtils {
     }
 
     static void performScalarisObjectInsert(ObjectProvider<?> op, String objectId, JSONObject json, Connection conn)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException, AbortException {
+            throws ConnectionException, UnknownException, AbortException {
         synchronized(WRITE_LOCK) {
             Transaction t = new Transaction(conn);
 
-            insertObjectToIDIndex(op, t);
-            updateUniqueMemberKey(op, json, null, t);
-            insertToForeignKeyAction(op, json, t);
+            try {
+                insertObjectToIDIndex(op, t);
+                updateUniqueMemberKey(op, json, null, t);
+                insertToForeignKeyAction(op, json, t);
 
-            String className = op.getClassMetaData().getFullClassName();
-            String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
-            t.write(storageKey, json.toString());
-            t.commit();
+                String className = op.getClassMetaData().getFullClassName();
+                String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+                t.write(storageKey, json.toString());
+                t.commit();
+            } catch (NotAListException e) {
+                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
+            }
         }
     }
 
     static void performScalarisObjectUpdate(ObjectProvider<?> op, String objectId, JSONObject changedVals, Connection conn)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
-            NotFoundException, JSONException, AbortException {
+            throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
 
         synchronized(WRITE_LOCK) {
             // get old value
@@ -280,18 +283,20 @@ public class ScalarisUtils {
                 }
                 stored.put(key, changedVals.get(key));
             }
+            try {
+                updateUniqueMemberKey(op, changedVals, changedValsOld, t);
+                updateForeignKeyAction(op, changedVals, changedValsOld, t);
 
-            updateUniqueMemberKey(op, changedVals, changedValsOld, t);
-            updateForeignKeyAction(op, changedVals, changedValsOld, t);
-
-            t.write(objectKey, stored.toString());
-            t.commit();
+                t.write(objectKey, stored.toString());
+                t.commit();
+            } catch (NotAListException e) {
+                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
+            }
         }
     }
 
     static void performScalarisObjectDelete(ObjectProvider<?> op, String objectId, Connection conn)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException,
-            NotFoundException, JSONException, AbortException {
+            throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
 
         synchronized(WRITE_LOCK) {
             String className = op.getClassMetaData().getFullClassName();
@@ -300,12 +305,16 @@ public class ScalarisUtils {
             Transaction t = new Transaction(conn);
             JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
 
-            removeObjectFromIDIndex(op, t);
-            removeObjectFromUniqueMemberKey(op, oldJson, t);
-            performForeignKeyActionDelete(op, t);
+            try {
+                removeObjectFromIDIndex(op, t);
+                removeObjectFromUniqueMemberKey(op, oldJson, t);
+                performForeignKeyActionDelete(op, t);
 
-            t.write(objectKey,  DELETED_RECORD_VALUE);
-            t.commit();
+                t.write(objectKey,  DELETED_RECORD_VALUE);
+                t.commit();
+            } catch (NotAListException e) {
+                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
+            }
         }
     }
 
@@ -334,7 +343,7 @@ public class ScalarisUtils {
      * @throws NotAListException 
      */
     private static void insertObjectToIDIndex(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+            throws ConnectionException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
@@ -363,7 +372,7 @@ public class ScalarisUtils {
      * @throws ConnectionException 
      */
     private static void removeObjectFromIDIndex(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+            throws ConnectionException, UnknownException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
@@ -379,7 +388,7 @@ public class ScalarisUtils {
      * **********************************************************************/
     
     private static void updateUniqueMemberKey(ObjectProvider<?> op, JSONObject newJson, JSONObject oldJson, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
+            throws ConnectionException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
@@ -431,7 +440,7 @@ public class ScalarisUtils {
     }
     
     private static void removeObjectFromUniqueMemberKey(ObjectProvider<?> op, JSONObject oldJson, Transaction t) 
-            throws ConnectionException, ClassCastException, UnknownException {
+            throws ConnectionException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String className = cmd.getFullClassName();
         
@@ -460,14 +469,14 @@ public class ScalarisUtils {
      * **********************************************************************/
 
     private static void insertToForeignKeyAction(ObjectProvider<?> op, JSONObject objToInsert, Transaction t)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+            throws ConnectionException, UnknownException, NotAListException {
         updateForeignKeyAction(op, objToInsert, null, t);
     }
 
     @SuppressWarnings("unchecked")
     private static void updateForeignKeyAction(ObjectProvider<?> op, JSONObject changedFieldsNewVal, 
             JSONObject changedFieldsOldVal, Transaction t)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+            throws ConnectionException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
 
@@ -578,7 +587,7 @@ public class ScalarisUtils {
     }
     
     private static void performForeignKeyActionDelete(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, ClassCastException, UnknownException, NotAListException {
+            throws ConnectionException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objClassName = cmd.getFullClassName();
         String objectStringIdentity = getPersistableIdentity(op);
@@ -674,9 +683,9 @@ public class ScalarisUtils {
                 // the object we want to delete is already deleted 
                 // nothing must be done
             } catch (NotFoundException e) {
-                throw new NucleusException(e.getMessage(), e);
+                throw new NucleusObjectNotFoundException(e.getMessage(), e);
             } catch (JSONException e) {
-                throw new NucleusException(e.getMessage(), e);
+                throw new NucleusDataStoreException(e.getMessage(), e);
                 // the member containing the current object does not exist any more
                 // that means we don't have to remove it any more
             }

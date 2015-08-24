@@ -33,6 +33,7 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.scalaris.fieldmanager.FetchFieldManager;
 import org.datanucleus.store.scalaris.fieldmanager.StoreFieldManager;
+import org.datanucleus.transaction.NucleusTransactionException;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
 
@@ -41,7 +42,6 @@ import com.orange.org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
@@ -122,15 +122,11 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         (System.currentTimeMillis() - startTime)));
             }
         } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusTransactionException(e.getMessage(), e);
         } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (ClassCastException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (NotAListException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
             mconn.release();
         }
@@ -191,20 +187,16 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         (System.currentTimeMillis() - startTime)));
             }
         } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusTransactionException(e.getMessage(), e);
         }catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
+            throw new NucleusDataStoreException(e.getMessage(), e);
         }catch (NotFoundException e) {
             // if we have an update we should already have this object stored
-            throw new NucleusException("Could not update object since its original value was not found", e);
-        } catch (ClassCastException e) {
-            throw new NucleusException("The stored object has a broken structure", e);
-        } catch (NotAListException e) {
-            throw new NucleusException("The stored object has a broken structure", e);
+            throw new NucleusObjectNotFoundException("Could not update object since its original value was not found", e);
         } catch (JSONException e) {
-            throw new NucleusException("The stored object has a broken structure", e);
+            throw new NucleusDataStoreException("The stored object has a broken structure", e);
         } finally {
             mconn.release();
         }
@@ -262,13 +254,9 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         } catch (UnknownException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
         } catch (AbortException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (ClassCastException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (NotAListException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
+            throw new NucleusTransactionException(e.getMessage(), e);
         } catch (NotFoundException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
+            throw new NucleusObjectNotFoundException(e.getMessage(), e);
         } catch (JSONException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
