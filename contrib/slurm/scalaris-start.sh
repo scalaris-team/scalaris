@@ -58,8 +58,11 @@ function start_servers() {
 
     VM_IDX=1
     JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
+    # start first node on head node
     srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first start
     let VM_IDX+=1
+
+    # start vms at all the tail nodes
     for NODE in $TAILNODES; do
         PORT=14195
         YAWSPORT=8000
@@ -71,6 +74,8 @@ function start_servers() {
             let VM_IDX+=1
         done
     done
+
+    # start remaining VMs on head node
     PORT=14196
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do

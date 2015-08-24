@@ -10,11 +10,9 @@ export BEAMDIR=$SCALARIS_DIR/ebin
 export SHUFFLE_NODE_IDS=1
 
 function cleanup() {
-    NODES=$(scontrol show hostnames)
-    NODELIST=$(echo $NODES | sed 's/ /,/g')
-    echo "Nodelist of the cancelled job: $NODELIST"
+    echo "Nodelist of the cancelled job: $SLURM_NODELIST"
     echo -e "Use:
-    srun -p CSR -A csr --nodelist=\"$NODELIST\" cleanup.sh"
+    srun -p CSR -A csr --nodelist='$SLURM_NODELIST' cleanup.sh"
     echo "to clean up the nodes manually"
 
     # comment in for automatic cleanup
