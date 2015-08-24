@@ -889,11 +889,11 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                    dest_recon_pid = DestReconPid,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
-    Stats1 =
-        rr_recon_stats:set(
-          [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
     case Initiator of
         true ->
+            Stats1 =
+                rr_recon_stats:set(
+                  [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
             #merkle_params{p1e = P1ETotal,
                            ni_item_count = OtherItemsCount} = Params,
             MyItemCount = merkle_tree:get_item_count(MySyncStruct),
@@ -919,12 +919,15 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                          {oicount, OtherItemsCount}],
                                  kv_list = []};
         false ->
+            % tell the initiator to create its struct first, and then build ours
+            % (at this stage, we do not have any data in the merkle tree yet!)
+            DBItems = State#rr_recon_state.kv_list,
             MerkleI = merkle_tree:get_interval(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
             P1ETotal = get_p1e(),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
-            ItemCount = merkle_tree:get_item_count(MySyncStruct),
+            ItemCount = erlang:length(DBItems),
 %%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
 %%                     [self(), merkle_tree:size_detail(MySyncStruct),
 %%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
@@ -940,7 +943,23 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                              comm:make_global(OwnerL), SID,
                              {start_recon, merkle_tree, SyncParams}}),
-            State#rr_recon_state{stats = Stats1, params = MySyncParams,
+            
+            % finally create the real merkle tree containing data
+            % -> this way, the initiator can create its struct in parallel!
+            {BuildTime, SyncStruct} =
+                util:tc(fun() ->
+                                merkle_tree:new(MerkleI, DBItems,
+                                                [{keep_bucket, true},
+                                                 {branch_factor, MerkleV},
+                                                 {bucket_size, MerkleB}])
+                        end),
+            Stats1 =
+                rr_recon_stats:set(
+                  [{tree_size, merkle_tree:size_detail(SyncStruct)}], Stats),
+            Stats2 = rr_recon_stats:inc([{build_time, BuildTime}], Stats1),
+            
+            State#rr_recon_state{struct = SyncStruct,
+                                 stats = Stats2, params = MySyncParams,
                                  misc = [{p1e, P1ETotal2},
                                          {all_leaf_p1e, P1ETotal2},
                                          {icount, ItemCount}],
@@ -2278,21 +2297,28 @@ build_recon_struct(bloom, I, DBItems, _Params) ->
                         item_count = MaxItems, p1e = P1E};
 build_recon_struct(merkle_tree, I, DBItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    MOpts = case Params of
-                {} -> % merkle_tree only!
-                    [{branch_factor, get_merkle_branch_factor()},
-                     {bucket_size, get_merkle_bucket_size()}];
-                #merkle_params{branch_factor = BranchFactor,
-                               bucket_size = BucketSize} ->
-                    [{branch_factor, BranchFactor},
-                     {bucket_size, BucketSize}];
-                #art_recon_struct{branch_factor = BranchFactor,
-                                  bucket_size = BucketSize} ->
-                    [{branch_factor, BranchFactor},
+    case Params of
+        {} ->
+            % merkle_tree only at non-initiator!
+            MOpts = [{branch_factor, get_merkle_branch_factor()},
+                     {bucket_size, get_merkle_bucket_size()}],
+            % do not build the real tree here - build during begin_sync so that
+            % the initiator can start creating its struct earlier and in parallel
+            merkle_tree:new(I, [{keep_bucket, true} | MOpts]);
+        #merkle_params{branch_factor = BranchFactor,
+                       bucket_size = BucketSize} ->
+            % merkle_tree only at initiator!
+            MOpts = [{branch_factor, BranchFactor},
+                     {bucket_size, BucketSize}],
+            % build now
+            merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]);
+        #art_recon_struct{branch_factor = BranchFactor,
+                          bucket_size = BucketSize} ->
+            MOpts = [{branch_factor, BranchFactor},
                      {bucket_size, BucketSize},
-                     {leaf_hf, fun art:merkle_leaf_hf/2}]
-            end,
-    merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]);
+                     {leaf_hf, fun art:merkle_leaf_hf/2}],
+            merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts])
+    end;
 build_recon_struct(art, I, DBItems, _Params = {}) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     BranchFactor = get_merkle_branch_factor(),
