@@ -48,7 +48,7 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
      * these keys.
      **/
     
-    static String getObjectStorageKey(String objClassName, String objectId) {
+    public static String getObjectStorageKey(String objClassName, String objectId) {
         if (objectId.startsWith(objClassName)) {
             return objectId;
         }
@@ -71,7 +71,7 @@ public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
         return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
     }
     
-    public static String getForeignKeyActionKey(String foreignObjectClass, String foreignObjectId) {
+    static String getForeignKeyActionKey(String foreignObjectClass, String foreignObjectId) {
         String storageKey = getObjectStorageKey(foreignObjectClass, foreignObjectId);
         return String.format("%s_%s", storageKey, FKA_KEY_PREFIX);
     }
