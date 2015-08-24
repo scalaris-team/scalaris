@@ -130,6 +130,7 @@ add_list(#bloom{size = BFSize,
 % faster than lists:foldl
 -spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
                     BF1::binary(), Items::[key()]) -> BF2::binary().
+p_add_list_v1(_Hfs, _BFSize, BF, []) -> BF;
 p_add_list_v1(Hfs, BFSize, <<>>, Items) ->
     p_add_list_v1(Hfs, BFSize, <<0:BFSize>>, Items);
 p_add_list_v1(Hfs, BFSize, BF, Items) ->

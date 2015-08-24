@@ -66,6 +66,7 @@ prop_p_add_list(BF0Items, Items) ->
             ?BLOOM:p_add_list_v2(Hfs, BFSize, BFBin, Items)).
 
 tester_p_add_list(_) ->
+    prop_p_add_list([], []),
     prop_p_add_list([], [6,7,8]),
     prop_p_add_list([6,7,8], [88,103,15,128,219]),
     tester:test(?MODULE, prop_p_add_list, 2, 10000, [{threads, 2}]).
