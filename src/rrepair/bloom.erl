@@ -112,15 +112,8 @@ add_list(#bloom{size = BFSize,
            items_count = FilledCount,
            filter = Filter
           } = Bloom, Items) ->
-    % choose version according to the number of elements to add:
-    % when setting around 16*3 positions, V2 is faster
-    MinLengthForV2 = erlang:max(1, (16 * 3) div ?REP_HFS:size(Hfs)),
+    F = p_add_list_v2(Hfs, BFSize, Filter, Items),
     ItemsL = length(Items),
-    F = if ItemsL >= MinLengthForV2 ->
-               p_add_list_v2(Hfs, BFSize, Filter, Items);
-           true ->
-               p_add_list_v1(Hfs, BFSize, Filter, Items)
-        end,
     Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
 -compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
@@ -156,28 +149,29 @@ p_add_list_v2(Hfs, BFSize, BF, Items) ->
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,
     AccPosBF = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF, <<0:PreBitsNum>>, BF, BFSize).
+    p_add_list_v2_(Rest, AccPosBF, [<<0:PreBitsNum>>], PreBitsNum, BF, BFSize).
 
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF, BFSize) when Pos - erlang:bit_size(AccBF) < 8 ->
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - AccBFSize < 8 ->
     % Pos in same byte
     PosInByte = Pos rem 8,
     AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF, BF, BFSize);
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF, BFSize) ->
+    p_add_list_v2_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     PosInByte = Pos rem 8,
     PreBitsNum2 = Pos - PosInByte,
-    DiffBits = PreBitsNum2 - erlang:bit_size(AccBF) - 8,
+    DiffBits = PreBitsNum2 - AccBFSize - 8,
     % add AccPosBF to AccBF
-    AccBF2 = <<AccBF/binary, AccPosBF:8, 0:DiffBits>>,
+    AccBF2 = [<<AccPosBF:8, 0:DiffBits>> | AccBF],
     % make new AccPosBF
     AccPosBF2 = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF2, BF, BFSize);
-p_add_list_v2_([], AccPosBF, AccBF, BF, BFSize) ->
-    RestBits = BFSize - erlang:bit_size(AccBF) - 8,
+    p_add_list_v2_(Rest, AccPosBF2, AccBF2, AccBFSize + 8 + DiffBits, BF, BFSize);
+p_add_list_v2_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    RestBits = BFSize - AccBFSize - 8,
+    AccBFBin = erlang:list_to_binary(lists:reverse([<<AccPosBF:8, 0:RestBits>> | AccBF])),
     case BF of
-        <<>> -> <<AccBF/binary, AccPosBF:8, 0:RestBits>>;
+        <<>> -> AccBFBin;
         _ ->
-            <<AccBF2Nr:BFSize>> = <<AccBF/binary, AccPosBF:8, 0:RestBits>>,
+            <<AccBF2Nr:BFSize>> = AccBFBin,
             % merge AccBF2 and BF
             <<BFNr:BFSize>> = BF,
             ResultNr = AccBF2Nr bor BFNr,
