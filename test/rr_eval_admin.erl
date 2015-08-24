@@ -1137,53 +1137,27 @@ get_db_status(NodeList) ->
 get_db_status2(NodeList) ->
     DBSize = erlang:get(?DBSizeKey),
 
-    DB =
-        lists:sort(
-          lists:append(
-            util:par_map(
-              fun(Node) ->
-                      comm:send(
-                        Node,
-                        {get_chunk, self(), intervals:all(),
-                         fun(Item) -> not db_entry:is_empty(Item) end,
-                         fun(Item) ->
-                                 {lists:min(?RT:get_replica_keys(db_entry:get_key(Item))),
-                                  db_entry:get_version(Item)}
-                         end,
-                         all}),
-                      receive
-                          {get_chunk_response, {_, DBList}} -> DBList
-                      end
-              end, NodeList))),
-    {Stored, Outdated} = get_stored_and_outdated(DB, undefined, 0, 0),
+    {Stored, Outdated} =
+        lists:foldl(
+          fun({S, O}, {AS, AO}) -> {AS + S, AO + O} end,
+          {0, 0},
+          util:par_map(
+            fun(Node) ->
+                    comm:send(
+                      Node,
+                      {get_chunk, self(), intervals:all(),
+                       fun(Item) -> not db_entry:is_empty(Item) end,
+                       fun(Item) ->
+                               ?IIF(db_generator:is_old_value(
+                                      db_entry:get_value(Item)), 1, 0)
+                       end,
+                       all}),
+                    receive
+                        {get_chunk_response, {_, DBList}} ->
+                            {erlang:length(DBList), lists:sum(DBList)}
+                    end
+            end, NodeList)),
     {DBSize, Stored, DBSize - Stored, Outdated}.
-
--spec get_stored_and_outdated([{?RT:key(), db_dht:version()}],
-                              LastItem::{?RT:key(), [db_dht:version()]} | undefined,
-                              Stored, Outdated) -> {Stored, Outdated}
-    when is_subtype(Stored, non_neg_integer()),
-         is_subtype(Outdated, non_neg_integer()).
-get_stored_and_outdated([{Key, Version} | DB], undefined, Stored, Outdated) ->
-    get_stored_and_outdated(DB, {Key, [Version]}, Stored + 1, Outdated);
-get_stored_and_outdated([{Key, Version} | DB], {Key, Versions}, Stored, Outdated) ->
-    get_stored_and_outdated(DB, {Key, [Version | Versions]}, Stored + 1, Outdated);
-get_stored_and_outdated(DB0, {_LastKey, LastVersions}, Stored, Outdated) ->
-    ?ASSERT(length(LastVersions) =< 4),
-    NewestVersion = lists:max(LastVersions),
-    Outdated1 = lists:foldl(fun(V, AccOutdated) ->
-                                    if V < NewestVersion -> AccOutdated + 1;
-                                       true -> AccOutdated
-                                    end
-                            end, Outdated, LastVersions),
-    case DB0 of
-        [{Key, Version} | DB] ->
-            % different keys
-            ?ASSERT(Key =/= _LastKey),
-            get_stored_and_outdated(DB, {Key, [Version]}, Stored + 1, Outdated1);
-        [] -> {Stored, Outdated1}
-    end;
-get_stored_and_outdated([], undefined, Stored, Outdated) ->
-    {Stored, Outdated}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% BANDWIDTH MEASUREMENT WITH MPATH TRACE

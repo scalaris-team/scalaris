@@ -27,6 +27,7 @@
 -export([get_db/3, get_db/4]).
 -export([fill_ring/3]).
 -export([insert_db/1, remove_keys/1]).
+-export([is_old_value/1]).
 
 % for tester:
 -export([get_db_feeder/3, get_db_feeder/4]).
@@ -533,6 +534,12 @@ get_synthetic_value(new) ->
     val;
 get_synthetic_value(old) ->
     old.
+
+%% @doc Determines whether a given value is outdated as created by
+%%      get_synthetic_value/1.
+-spec is_old_value(db_dht:value()) -> boolean().
+is_old_value(old) -> true;
+is_old_value(_) -> false.
 
 -spec get_rep_group(?RT:key()) -> [db_entry:entry()].
 get_rep_group(Key) ->
