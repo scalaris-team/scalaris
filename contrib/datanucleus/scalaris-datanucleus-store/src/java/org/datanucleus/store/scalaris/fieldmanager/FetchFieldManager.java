@@ -19,19 +19,12 @@ Contributors:
 package org.datanucleus.store.scalaris.fieldmanager;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Locale;
 import java.util.Map;
 
 import org.datanucleus.ClassLoaderResolver;
@@ -43,9 +36,7 @@ import org.datanucleus.identity.IdentityUtils;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ColumnMetaData;
-import org.datanucleus.metadata.FieldRole;
 import org.datanucleus.metadata.JdbcType;
-import org.datanucleus.metadata.MetaDataUtils;
 import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
@@ -54,10 +45,8 @@ import org.datanucleus.store.scalaris.ScalarisSchemaHandler;
 import org.datanucleus.store.scalaris.ScalarisUtils;
 import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.store.types.SCOUtils;
-import org.datanucleus.store.types.TypeManager;
 import org.datanucleus.store.types.converters.TypeConverter;
 import org.datanucleus.store.types.converters.TypeConverterHelper;
-import org.datanucleus.util.ClassUtils;
 import org.datanucleus.util.TypeConversionHelper;
 
 import com.orange.org.json.JSONArray;
@@ -67,9 +56,8 @@ import com.orange.org.json.JSONObject;
 /**
  * FieldManager for fetching from JSON.
  */
-@SuppressWarnings("rawtypes")
 public class FetchFieldManager extends AbstractFieldManager {
-    protected final ObjectProvider op;
+    protected final ObjectProvider<?> op;
     protected final AbstractClassMetaData acmd;
     protected final ExecutionContext ec;
     protected final JSONObject result;
@@ -133,7 +121,7 @@ public class FetchFieldManager extends AbstractFieldManager {
         addToCache();
     }
 
-    public FetchFieldManager(ObjectProvider op, JSONObject result) {
+    public FetchFieldManager(ObjectProvider<?> op, JSONObject result) {
         this.acmd = op.getClassMetaData();
         this.ec = op.getExecutionContext();
         this.result = result;
@@ -339,19 +327,19 @@ public class FetchFieldManager extends AbstractFieldManager {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     protected Object fetchObjectFieldInternal_RelationTypeNone(
             AbstractMemberMetaData mmd, String memberName,
             ClassLoaderResolver clr) throws JSONException {
         final Object returnValue;
         if (mmd.getTypeConverterName() != null) {
             // User-defined converter
-            TypeConverter conv = ec.getNucleusContext().getTypeManager()
+            TypeConverter<Object,Object> conv = ec.getNucleusContext().getTypeManager()
                     .getTypeConverterForName(mmd.getTypeConverterName());
-            Class datastoreType = TypeConverterHelper
+            Class<?> datastoreType = TypeConverterHelper
                     .getDatastoreTypeForTypeConverter(conv, mmd.getType());
             if (datastoreType == String.class) {
-                returnValue = conv.toMemberType(result.getString(memberName));
+                returnValue = (Object)conv.toMemberType(result.getString(memberName));
             } else if (datastoreType == Boolean.class) {
                 returnValue = conv.toMemberType(result.getBoolean(memberName));
             } else if (datastoreType == Double.class) {
@@ -380,7 +368,6 @@ public class FetchFieldManager extends AbstractFieldManager {
             Long dateValue = result.getLong(memberName);
             return new Date(dateValue);
         } else if (Enum.class.isAssignableFrom(mmd.getType())) {
-            ColumnMetaData[] colmds = mmd.getColumnMetaData();
             boolean useNumeric = true;
             if (useNumeric) {
                 return mmd.getType().getEnumConstants()[result
@@ -397,7 +384,7 @@ public class FetchFieldManager extends AbstractFieldManager {
             // Collection<Non-PC>
             Collection<Object> coll;
             try {
-                Class instanceType = SCOUtils.getContainerInstanceType(
+                Class<?> instanceType = SCOUtils.getContainerInstanceType(
                         mmd.getType(), mmd.getOrderMetaData() != null);
                 coll = (Collection<Object>) instanceType.newInstance();
             } catch (Exception e) {
@@ -405,7 +392,7 @@ public class FetchFieldManager extends AbstractFieldManager {
             }
 
             JSONArray array = result.getJSONArray(memberName);
-            Class elementCls = null;
+            Class<?> elementCls = null;
             if (mmd.getCollection() != null
                     && mmd.getCollection().getElementType() != null) {
                 elementCls = clr.classForName(mmd.getCollection()
@@ -433,7 +420,7 @@ public class FetchFieldManager extends AbstractFieldManager {
             // Map<Non-PC, Non-PC>
             Map map;
             try {
-                Class instanceType = SCOUtils.getContainerInstanceType(
+                Class<?> instanceType = SCOUtils.getContainerInstanceType(
                         mmd.getType(), false);
                 map = (Map) instanceType.newInstance();
             } catch (Exception e) {
@@ -441,12 +428,12 @@ public class FetchFieldManager extends AbstractFieldManager {
             }
 
             JSONObject mapValue = result.getJSONObject(memberName);
-            Iterator keyIter = mapValue.keys();
-            Class keyCls = null;
+            Iterator<?> keyIter = mapValue.keys();
+            Class<?> keyCls = null;
             if (mmd.getMap() != null && mmd.getMap().getKeyType() != null) {
                 keyCls = clr.classForName(mmd.getMap().getKeyType());
             }
-            Class valCls = null;
+            Class<?> valCls = null;
             if (mmd.getMap() != null && mmd.getMap().getValueType() != null) {
                 valCls = clr.classForName(mmd.getMap().getValueType());
             }
@@ -515,7 +502,6 @@ public class FetchFieldManager extends AbstractFieldManager {
             } else if (!useLong && longConv != null) {
                 returnValue = longConv.toMemberType(result.getLong(memberName));
             } else {
-                Object value = result.get(memberName);
                 returnValue = TypeConversionHelper.convertTo(
                         result.get(memberName), mmd.getType());
             }
@@ -527,6 +513,7 @@ public class FetchFieldManager extends AbstractFieldManager {
         return returnValue;
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     protected Object fetchObjectFieldInternal(AbstractMemberMetaData mmd,
             String memberName, ClassLoaderResolver clr) throws JSONException {
 
@@ -550,7 +537,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                 JSONArray array = (JSONArray) result.get(memberName);
                 Collection<Object> coll;
                 try {
-                    Class instanceType = SCOUtils.getContainerInstanceType(
+                    Class<?> instanceType = SCOUtils.getContainerInstanceType(
                             mmd.getType(), mmd.getOrderMetaData() != null);
                     coll = (Collection<Object>) instanceType.newInstance();
                 } catch (Exception e) {
@@ -594,7 +581,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                 JSONObject mapVal = (JSONObject) result.get(memberName);
                 Map map;
                 try {
-                    Class instanceType = SCOUtils.getContainerInstanceType(
+                    Class<?> instanceType = SCOUtils.getContainerInstanceType(
                             mmd.getType(), false);
                     map = (Map) instanceType.newInstance();
                 } catch (Exception e) {
@@ -606,7 +593,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                 AbstractClassMetaData valCmd = mmd.getMap()
                         .getValueClassMetaData(clr, ec.getMetaDataManager());
 
-                Iterator keyIter = mapVal.keys();
+                Iterator<?> keyIter = mapVal.keys();
                 while (keyIter.hasNext()) {
                     Object jsonKey = keyIter.next();
                     Object key = null;
@@ -615,7 +602,7 @@ public class FetchFieldManager extends AbstractFieldManager {
                         String idStr = (String) jsonKey;
                         key = getNestedObjectById(idStr, keyCmd, ec);
                     } else {
-                        Class keyCls = ec.getClassLoaderResolver()
+                        Class<?> keyCls = ec.getClassLoaderResolver()
                                 .classForName(mmd.getMap().getKeyType());
                         key = TypeConversionHelper.convertTo(jsonKey, keyCls);
                     }

@@ -43,7 +43,6 @@ import de.zib.scalaris.UnknownException;
  * Scalaris. For example generating identities, managing all primary keys of a class to "iterate" over all stored 
  * instances, or ensuring uniqueness. 
  */
-@SuppressWarnings("rawtypes")
 public class ScalarisUtils {
 
     /**
@@ -71,7 +70,7 @@ public class ScalarisUtils {
      *            ObjectProvider of the object this ID is generated for.
      * @return A new ID.
      */
-    private synchronized static long generateNextIdentity(ObjectProvider op) {
+    private synchronized static long generateNextIdentity(ObjectProvider<?> op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         
         ExecutionContext ec = op.getExecutionContext();
@@ -134,7 +133,7 @@ public class ScalarisUtils {
      * @return Identity of object provided by op or null if at least one primary
      *         key field is not loaded.
      */
-    static String generatePersistableIdentity(ObjectProvider op) {
+    static String generatePersistableIdentity(ObjectProvider<?> op) {
         StoreManager storeMgr = op.getExecutionContext().getStoreManager();
         AbstractClassMetaData cmd = op.getClassMetaData();
 
@@ -151,7 +150,7 @@ public class ScalarisUtils {
 
                 if (storeMgr.isStrategyDatastoreAttributed(cmd,
                         pkFieldNumbers[i])) {
-                    Class mType = mmd.getType();
+                    Class<?> mType = mmd.getType();
                     if (!(mType.equals(Long.class) || mType.equals(long.class)
                             || mType.equals(Integer.class) || mType
                                 .equals(int.class))) {
@@ -185,7 +184,7 @@ public class ScalarisUtils {
      * @return Identity of object provided by op or null if at least one primary
      *         key field is not loaded.
      */
-    public static String getPersistableIdentity(ObjectProvider op) {
+    public static String getPersistableIdentity(ObjectProvider<?> op) {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String keySeparator = ":";
 
@@ -232,7 +231,7 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  HOOKS FOR ScalarisStoreManager
      * **********************************************************************/
-    static JSONObject performScalarisObjectFetch(ObjectProvider op, Connection conn)
+    static JSONObject performScalarisObjectFetch(ObjectProvider<?> op, Connection conn)
             throws ConnectionException, NotFoundException, UnknownException, JSONException {
 
         final String objId = ScalarisUtils.getPersistableIdentity(op);
@@ -243,7 +242,7 @@ public class ScalarisUtils {
         return new JSONObject(t.read(objKey).stringValue());
     }
 
-    static void performScalarisObjectInsert(ObjectProvider op, String objectId, JSONObject json, Connection conn)
+    static void performScalarisObjectInsert(ObjectProvider<?> op, String objectId, JSONObject json, Connection conn)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, AbortException {
         synchronized(WRITE_LOCK) {
             Transaction t = new Transaction(conn);
@@ -259,8 +258,7 @@ public class ScalarisUtils {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    static void performScalarisObjectUpdate(ObjectProvider op, String objectId, JSONObject changedVals, Connection conn)
+    static void performScalarisObjectUpdate(ObjectProvider<?> op, String objectId, JSONObject changedVals, Connection conn)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException, 
             NotFoundException, JSONException, AbortException {
 
@@ -274,9 +272,9 @@ public class ScalarisUtils {
 
             // update stored object values
             JSONObject changedValsOld = new JSONObject();
-            Iterator<String> keyIter = changedVals.keys();
+            Iterator<?> keyIter = changedVals.keys();
             while (keyIter.hasNext()) {
-                String key = keyIter.next();
+                String key = (String) keyIter.next();
                 if (stored.has(key)) {
                     changedValsOld.put(key, stored.get(key));
                 }
@@ -291,7 +289,7 @@ public class ScalarisUtils {
         }
     }
 
-    static void performScalarisObjectDelete(ObjectProvider op, String objectId, Connection conn)
+    static void performScalarisObjectDelete(ObjectProvider<?> op, String objectId, Connection conn)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException,
             NotFoundException, JSONException, AbortException {
 
@@ -335,7 +333,7 @@ public class ScalarisUtils {
      * @throws ConnectionException 
      * @throws NotAListException 
      */
-    private static void insertObjectToIDIndex(ObjectProvider op, Transaction t) 
+    private static void insertObjectToIDIndex(ObjectProvider<?> op, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
@@ -364,7 +362,7 @@ public class ScalarisUtils {
      * @throws ClassCastException 
      * @throws ConnectionException 
      */
-    private static void removeObjectFromIDIndex(ObjectProvider op, Transaction t) 
+    private static void removeObjectFromIDIndex(ObjectProvider<?> op, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -380,7 +378,7 @@ public class ScalarisUtils {
      *                  ACTIONS TO GUARANTEE UNIQUENESS
      * **********************************************************************/
     
-    private static void updateUniqueMemberKey(ObjectProvider op, JSONObject newJson, JSONObject oldJson, Transaction t) 
+    private static void updateUniqueMemberKey(ObjectProvider<?> op, JSONObject newJson, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
@@ -432,7 +430,7 @@ public class ScalarisUtils {
         }
     }
     
-    private static void removeObjectFromUniqueMemberKey(ObjectProvider op, JSONObject oldJson, Transaction t) 
+    private static void removeObjectFromUniqueMemberKey(ObjectProvider<?> op, JSONObject oldJson, Transaction t) 
             throws ConnectionException, ClassCastException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String className = cmd.getFullClassName();
@@ -461,13 +459,13 @@ public class ScalarisUtils {
      *                  FOREIGN KEY ACTIONS
      * **********************************************************************/
 
-    private static void insertToForeignKeyAction(ObjectProvider op, JSONObject objToInsert, Transaction t)
+    private static void insertToForeignKeyAction(ObjectProvider<?> op, JSONObject objToInsert, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         updateForeignKeyAction(op, objToInsert, null, t);
     }
 
     @SuppressWarnings("unchecked")
-    private static void updateForeignKeyAction(ObjectProvider op, JSONObject changedFieldsNewVal, 
+    private static void updateForeignKeyAction(ObjectProvider<?> op, JSONObject changedFieldsNewVal, 
             JSONObject changedFieldsOldVal, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -531,8 +529,8 @@ public class ScalarisUtils {
                 }
 
                 // construct the FKA key for every foreign object id
-                for (ArrayList<String> changeList : 
-                        new ArrayList[]{foreignObjectIdsNew, foreignObjectIdsNew}) {
+                ArrayList<String>[] bothNewAndOld = new ArrayList[]{foreignObjectIdsOld, foreignObjectIdsNew};
+                for (ArrayList<String> changeList : bothNewAndOld) {
                     for (String fkaKey : changeList) {
                         if (fkaKey == null) continue;
 
@@ -579,7 +577,7 @@ public class ScalarisUtils {
         }
     }
     
-    private static void performForeignKeyActionDelete(ObjectProvider op, Transaction t) 
+    private static void performForeignKeyActionDelete(ObjectProvider<?> op, Transaction t)
             throws ConnectionException, ClassCastException, UnknownException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objClassName = cmd.getFullClassName();
@@ -615,7 +613,7 @@ public class ScalarisUtils {
                 } else {
                     // remove the object reference of the deleted object from the collection
     
-                    ObjectProvider toDelOp = ec.findObjectProvider(obj);
+                    ObjectProvider<?> toDelOp = ec.findObjectProvider(obj);
     
                     int memberId = toDelOp.getClassMetaData().getAbsolutePositionOfMember(memberToDelete);
     
@@ -625,13 +623,13 @@ public class ScalarisUtils {
                         Object objColl = toDelOp.provideField(memberId);
     
                         if (objColl instanceof Collection) {
-                            Collection collection = (Collection) objColl;
+                            Collection<?> collection = (Collection<?>) objColl;
     
                             ArrayList<Object> toRemove = new ArrayList<Object>();
-                            Iterator iter = collection.iterator();
+                            Iterator<?> iter = collection.iterator();
                             while (iter.hasNext()) {
                                 Object item = iter.next();
-                                ObjectProvider itemOp = ec.findObjectProvider(item);
+                                ObjectProvider<?> itemOp = ec.findObjectProvider(item);
                                 String itemId = getPersistableIdentity(itemOp);
     
                                 if (itemId.equals(objectStringIdentity)) {

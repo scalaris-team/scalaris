@@ -36,7 +36,6 @@ import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ColumnMetaData;
 import org.datanucleus.metadata.JdbcType;
-import org.datanucleus.metadata.MetaDataUtils;
 import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
@@ -56,7 +55,7 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
     final JSONObject jsonobj;
     final StoreManager storeMgr;
 
-    public StoreFieldManager(ObjectProvider op, JSONObject jsonobj,
+    public StoreFieldManager(ObjectProvider<?> op, JSONObject jsonobj,
             boolean insert) {
         super(op, insert);
 
@@ -240,6 +239,7 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
         }
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     protected void storeObjectFieldInternal(int fieldNumber, Object value,
             AbstractMemberMetaData mmd, ClassLoaderResolver clr)
             throws JSONException {
@@ -269,11 +269,6 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                 Date dateValue = (Date) value;
                 jsonobj.put(name, dateValue.getTime());
             } else if (value instanceof Enum) {
-                ColumnMetaData[] colmds = mmd.getColumnMetaData();
-                // test is faulty
-                // boolean useNumeric =
-                // MetaDataUtils.persistColumnAsNumeric(colmds != null ?
-                // colmds[0] : null);
                 boolean useNumeric = true;
                 if (useNumeric) {
                     jsonobj.put(name, ((Enum) value).ordinal());
@@ -348,8 +343,8 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
             // Collection/Map/Array
             if (mmd.hasCollection()) {
                 final Collection<String> idColl = new ArrayList<String>();
-                final Collection coll = (Collection) value;
-                final Iterator collIter = coll.iterator();
+                final Collection<?> coll = (Collection<?>) value;
+                final Iterator<?> collIter = coll.iterator();
                 while (collIter.hasNext()) {
                     final Object element = collIter.next();
                     final Object elementPC = op

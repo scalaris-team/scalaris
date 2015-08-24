@@ -46,7 +46,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
-@SuppressWarnings({ "rawtypes", "unchecked" })
+@SuppressWarnings("rawtypes")
 public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
     /** Setup localizer for messages. */
@@ -314,7 +314,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                 final Class declaredClass = op.getExecutionContext()
                         .getClassLoaderResolver()
                         .classForName(declaredClassQName);
-                final Class objectClass = op.getObject().getClass();
+                final Class<?> objectClass = op.getObject().getClass();
 
                 if (!objectClass.isAssignableFrom(declaredClass)) {
                         System.out.println("Type found in db not compatible with requested type");
