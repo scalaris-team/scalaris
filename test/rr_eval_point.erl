@@ -176,35 +176,20 @@ generate_ep(ID,
              {ring_config, NC, DC, FProb, _FDest, _Rounds},
              {rc_config, RCMethod, RcP1E, MBU, MBR, ArtCF, ArtLF, ArtIF, _AlignToBytes}},
             MP) ->
-    %% MEAN %%
+    %% MEAN, STDDEV, MIN, MAX %%
     %DB stats
-    {MeanM, ErrM}       = mean_w_error(4, MP),
-    {MeanR, ErrR}       = mean_w_error(5, MP),
-    {MeanO, ErrO}       = mean_w_error(6, MP),
-    {MeanU, ErrU}       = mean_w_error(7, MP),
+    {MeanM, ErrM, MinM, MaxM}       = mean_w_error(4, MP),
+    {MeanR, ErrR, MinR, MaxR}       = mean_w_error(5, MP),
+    {MeanO, ErrO, MinO, MaxO}       = mean_w_error(6, MP),
+    {MeanU, ErrU, MinU, MaxU}       = mean_w_error(7, MP),
     %RC, RC2, RS
-    {MeanRCS, ErrRCS}   = mean_w_error(8, MP),
-    {MeanRCM, ErrRCM}   = mean_w_error(9, MP),
-    {MeanRC2S, ErrRC2S} = mean_w_error(10, MP),
-    {MeanRC2M, ErrRC2M} = mean_w_error(11, MP),
-    {MeanRSS, ErrRSS}   = mean_w_error(12, MP),
-    {MeanRSM, ErrRSM}   = mean_w_error(13, MP),
-    {MeanRSK, ErrRSK}   = mean_w_error(14, MP),
-    
-    %% MIN/MAX %%
-    %DB stats
-    {MinM, MaxM}        = min_max_element(4, MP),
-    {MinR, MaxR}        = min_max_element(5, MP),
-    {MinO, MaxO}        = min_max_element(6, MP),
-    {MinU, MaxU}        = min_max_element(7, MP),
-    %RC, RC2, RS
-    {MinRCS, MaxRCS}    = min_max_element(8, MP),
-    {MinRCM, MaxRCM}    = min_max_element(9, MP),
-    {MinRC2S, MaxRC2S}  = min_max_element(10, MP),
-    {MinRC2M, MaxRC2M}  = min_max_element(11, MP),
-    {MinRSS, MaxRSS}    = min_max_element(12, MP),
-    {MinRSM, MaxRSM}    = min_max_element(13, MP),
-    {MinRSK, MaxRSK}    = min_max_element(14, MP),
+    {MeanRCS, ErrRCS, MinRCS, MaxRCS}   = mean_w_error(8, MP),
+    {MeanRCM, ErrRCM, MinRCM, MaxRCM}   = mean_w_error(9, MP),
+    {MeanRC2S, ErrRC2S, MinRC2S, MaxRC2S} = mean_w_error(10, MP),
+    {MeanRC2M, ErrRC2M, MinRC2M, MaxRC2M} = mean_w_error(11, MP),
+    {MeanRSS, ErrRSS, MinRSS, MaxRSS}   = mean_w_error(12, MP),
+    {MeanRSM, ErrRSM, MinRSM, MaxRSM}   = mean_w_error(13, MP),
+    {MeanRSK, ErrRSK, MinRSK, MaxRSK}   = mean_w_error(14, MP),
 
     {ID,
      NC, 4 * DC, FProb, element(3, hd(MP)),
@@ -230,22 +215,18 @@ dist_to_name(Dist) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec mean_w_error(integer(), [tuple()]) -> {Mean::float(), StdError::float()}.
+-spec mean_w_error(integer(), [tuple()])
+        -> {Len::non_neg_integer(), Mean::float(), StdError::float(),
+            Min::integer(), Max::integer()}.
 mean_w_error(_ElementPos, []) ->
-    {0, 0};
-mean_w_error(ElementPos, [_|_] = TList) ->
-    {Sum, Sum2} = lists:foldl(fun(T, {X1, X2}) ->
-                                      E = element(ElementPos, T),
-                                      {X1 + E, X2 + E * E}
-                              end, {0, 0}, TList),
-    Len = length(TList),
+    {0, 0, 0, 0};
+mean_w_error(ElementPos, [H | TL]) ->
+    {Len, Sum, Sum2, Min, Max} =
+        lists:foldl(
+          fun(T, {L, X1, X2, Min, Max}) ->
+                  E = element(ElementPos, T),
+                  {L + 1, X1 + E, X2 + E * E,
+                   erlang:min(E, Min), erlang:max(E, Max)}
+          end, {1, H, H * H, H, H}, TL),
     % pay attention to possible loss of precision here:
-    {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len))}.
-
--spec min_max_element(Element::integer(), [tuple()])
-        -> {Min::integer(), Max::integer()}.
-min_max_element(_Pos, []) ->
-    {0, 0};
-min_max_element(Pos, [_|_] = TList) ->
-    List = [element(Pos, X) || X <- TList],
-    { lists:min(List), lists:max(List) }.
+    {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len)), Min, Max}.
