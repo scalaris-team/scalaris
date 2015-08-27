@@ -310,11 +310,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                             "Type found in db not compatible with requested type");
                 }
 
-                // TODO: This is a temporary solution.
-                // Synchronized access when reading should not be necessary.
-                synchronized(ScalarisUtils.WRITE_LOCK) {
-                    op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
-                }
+                op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
 
                 if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
                     NucleusLogger.DATASTORE_NATIVE
