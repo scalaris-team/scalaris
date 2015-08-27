@@ -1013,7 +1013,7 @@ lists_split([X], _Partitions) -> [[X]];
 lists_split([_|_] = List, 1) -> [lists:reverse(List)];
 lists_split([_|_] = List, Partitions) ->
     BlockSize = length(List) div Partitions,
-    case BlockSize < 1 of
+    case BlockSize =< 1 of
         true -> lists:foldl(fun(E, Acc) -> [[E] | Acc] end, [], List);
         _    -> lists_split(List, BlockSize, 0, [], [])
     end;
