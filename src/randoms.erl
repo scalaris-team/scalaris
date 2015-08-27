@@ -49,7 +49,7 @@ rand_uniform_feeder(X, X) -> {X, X + 1}.
 %% @doc Generates a random number N between Lo &lt;= N &lt; Hi using the crypto
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
-rand_uniform(Lo, Hi) when Lo < Hi ->
+rand_uniform(Lo, Hi) ->
     crypto:rand_uniform(Lo, Hi).
 
 %% @doc Stops the crypto module's server.
