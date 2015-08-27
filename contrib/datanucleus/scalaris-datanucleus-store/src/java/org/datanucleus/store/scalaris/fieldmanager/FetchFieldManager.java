@@ -46,9 +46,9 @@ import org.datanucleus.store.types.converters.TypeConverter;
 import org.datanucleus.store.types.converters.TypeConverterHelper;
 import org.datanucleus.util.TypeConversionHelper;
 
-import com.orange.org.json.JSONArray;
-import com.orange.org.json.JSONException;
-import com.orange.org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * FieldManager for fetching from JSON.

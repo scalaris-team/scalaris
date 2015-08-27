@@ -43,8 +43,8 @@ import org.datanucleus.store.fieldmanager.AbstractStoreFieldManager;
 import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.store.types.converters.TypeConverter;
 
-import com.orange.org.json.JSONException;
-import com.orange.org.json.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * FieldManager for inserting data into the provided JSONObject from the

@@ -23,9 +23,10 @@ import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.transaction.NucleusTransactionException;
 
 import com.ericsson.otp.erlang.OtpErlangLong;
-import com.orange.org.json.JSONArray;
-import com.orange.org.json.JSONException;
-import com.orange.org.json.JSONObject;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;

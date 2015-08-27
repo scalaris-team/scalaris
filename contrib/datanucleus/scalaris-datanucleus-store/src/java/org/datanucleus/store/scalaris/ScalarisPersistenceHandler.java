@@ -37,8 +37,8 @@ import org.datanucleus.transaction.NucleusTransactionException;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
 
-import com.orange.org.json.JSONException;
-import com.orange.org.json.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;

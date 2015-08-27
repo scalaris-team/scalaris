@@ -31,8 +31,8 @@ import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
 import org.datanucleus.store.connection.ManagedConnection;
 
-import com.orange.org.json.JSONException;
-import com.orange.org.json.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
