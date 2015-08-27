@@ -37,6 +37,7 @@ import org.datanucleus.metadata.AbstractMemberMetaData;
 import org.datanucleus.metadata.ColumnMetaData;
 import org.datanucleus.metadata.JdbcType;
 import org.datanucleus.metadata.RelationType;
+import org.datanucleus.state.LifeCycleState;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.fieldmanager.AbstractStoreFieldManager;
@@ -334,9 +335,17 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
             final Object valueId = op.getExecutionContext().getApiAdapter()
                     .getIdForObject(valuePC);
             if (valueId != null) {
-                // ORANGE : added test
                 jsonobj.put(name,
                         IdentityUtils.getPersistableIdentityForId(valueId));
+
+                ObjectProvider<?> intern = ec.findObjectProvider(valuePC);
+                if (intern.getLifecycleState().stateType() == LifeCycleState.P_NEW) {
+                    // Loaded flags must be cleared for the internal object in case
+                    // it was only persisted indirectly via PersistenceManager.
+                    // This prevents registering updates on the objects if it is
+                    // not fetched once before.
+                    intern.clearLoadedFlags();
+                }
             }
             return;
         } else if (RelationType.isRelationMultiValued(relationType)) {
