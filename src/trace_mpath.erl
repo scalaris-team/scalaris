@@ -45,7 +45,9 @@
 -export([start/0, start/1, start/2, stop/0]).
 -export([infected/0]).
 -export([clear_infection/0, restore_infection/0]).
--export([get_trace/0, get_trace/1, get_trace_raw/1, cleanup/0, cleanup/1]).
+-export([get_trace/0, get_trace/1, get_trace/2,
+         get_trace_raw/1, get_trace_raw/2,
+         cleanup/0, cleanup/1]).
 -export([thread_yield/0]).
 
 %% trace analysis
@@ -184,7 +186,11 @@ get_trace() -> get_trace(default).
 
 -spec get_trace(trace_id()) -> trace().
 get_trace(TraceId) ->
-    LogRaw = get_trace_raw(TraceId),
+    get_trace(TraceId, none).
+
+-spec get_trace(trace_id(), Option::cleanup | none) -> trace().
+get_trace(TraceId, Option) ->
+    LogRaw = get_trace_raw(TraceId, Option),
     Trace =
         [case Event of
              {log_send, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}, LorG}
@@ -260,8 +266,12 @@ convert_msg(Msg) -> Msg.
 
 -spec get_trace_raw(trace_id()) -> trace().
 get_trace_raw(TraceId) ->
+    get_trace_raw(TraceId, none).
+
+-spec get_trace_raw(trace_id(), Option::cleanup | none) -> trace().
+get_trace_raw(TraceId, Option) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
-    comm:send_local(LoggerPid, {get_trace, comm:this(), TraceId}),
+    comm:send_local(LoggerPid, {get_trace, comm:this(), TraceId, Option}),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_trace_reply, Log}, Log)
@@ -872,7 +882,16 @@ on({log_recv, _Time, TraceId, _From, _To, _UMsg} = Msg, State) ->
 on({log_info, _Time, TraceId, _From, _UMsg} = Msg, State) ->
     state_add_log_event(State, TraceId, Msg);
 
-on({get_trace, Pid, TraceId}, State) ->
+on({get_trace, Pid, TraceId, cleanup}, State) ->
+    case lists:keytake(TraceId, 1, State) of
+        false ->
+            comm:send(Pid, {get_trace_reply, no_trace_found}),
+            State;
+        {value, {TraceId, Msgs}, TupleList2} ->
+            comm:send(Pid, {get_trace_reply, lists:reverse(Msgs)}),
+            TupleList2
+    end;
+on({get_trace, Pid, TraceId, none}, State) ->
     case lists:keyfind(TraceId, 1, State) of
         false ->
             comm:send(Pid, {get_trace_reply, no_trace_found});

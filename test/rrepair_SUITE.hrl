@@ -181,8 +181,7 @@ mpath(Config) ->
     waitForSyncRoundEnd([SKey, CKey], true),
     trace_mpath:stop(),
     %TRACE
-    A = trace_mpath:get_trace(TraceName),
-    trace_mpath:cleanup(TraceName),
+    A = trace_mpath:get_trace(TraceName, cleanup),
     B = [X || X = {log_send, _Time, _TraceID,
                    {{_FIP,_FPort,_FPid}, _FName},
                    {{_TIP,_TPort,_TPid}, _TName},

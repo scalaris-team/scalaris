@@ -734,8 +734,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
                                                                   {filter_fun, fun bw_filter_fun/1}]),
                                     RunRound(NodeList),
                                     trace_mpath:stop(),
-                                    Trace = trace_mpath:get_trace(TraceName),
-                                    trace_mpath:cleanup(TraceName),
+                                    Trace = trace_mpath:get_trace(TraceName, cleanup),
                                     
                                     MP = get_measure_point(EPId, ActI, 1, InitMP, Trace, NodeList),
                                     
