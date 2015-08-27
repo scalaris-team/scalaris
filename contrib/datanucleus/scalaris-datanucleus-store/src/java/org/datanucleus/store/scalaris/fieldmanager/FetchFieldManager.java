@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -41,8 +40,6 @@ import org.datanucleus.metadata.RelationType;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.fieldmanager.AbstractFieldManager;
-import org.datanucleus.store.scalaris.ScalarisSchemaHandler;
-import org.datanucleus.store.scalaris.ScalarisUtils;
 import org.datanucleus.store.schema.naming.ColumnType;
 import org.datanucleus.store.types.SCOUtils;
 import org.datanucleus.store.types.converters.TypeConverter;
@@ -63,54 +60,6 @@ public class FetchFieldManager extends AbstractFieldManager {
     protected final JSONObject result;
     protected StoreManager storeMgr;
 
-    /**
-     * FetchCache contains all object references of objects currently fetched
-     * from the data store. This is necessary to prevent StackOverFlowErrors 
-     * in case of circular references of the stored object (e.g. Bidirectional
-     * relationships) which are all in the same fetch group, since 
-     * the PersistenceHandlers fetchObject method is called (indirectly) whenever 
-     * the FetchFieldManager must populate a member referencing to another object
-     * in the store. 
-     * Whenever the (most outer) fetch operation is completed the cache is cleared. 
-     * This is caused by activeCount reaching 0 (see fetchObjectField(int)). 
-     * 
-     * TODO: DataNucleas manages already several caches in which (theoretically) 
-     * each fetched object is inserted into, to handle exactly the same problem
-     * than the ObjectFetchCache. Unfortunately this is not working. This could be
-     * caused by the PersistenceHandlers method to generate new IDs for keys using
-     * IdGeneratorStrategy.Identity.(?)
-    **/
-    private static final ObjectFetchCache fetchCache = new ObjectFetchCache();
-    private static class ObjectFetchCache {
-        private HashMap<String, Object> cache;
-        private int activeCount;
-        
-        private ObjectFetchCache(){
-            cache = new HashMap<String, Object>();
-            activeCount = 0;
-        };
-        
-        void increaseActive() {
-            activeCount++;
-        }
-        void decreaseActive() {
-            activeCount = Math.max(0, activeCount-1);
-            if (activeCount <= 0) {
-                // clear 
-                cache = new HashMap<String, Object>();
-            }
-        }
-        boolean exists(String key) {
-            return cache.containsKey(key);
-        }
-        Object lookUp(String key) {
-            return cache.get(key);
-        }
-        void add(String key, Object value) {
-            cache.put(key, value);
-        }
-    }
-    
     public FetchFieldManager(ExecutionContext ec, AbstractClassMetaData acmd,
             JSONObject result) {
         this.acmd = acmd;
@@ -118,7 +67,6 @@ public class FetchFieldManager extends AbstractFieldManager {
         this.result = result;
         this.op = null;
         this.storeMgr = ec.getStoreManager();
-        addToCache();
     }
 
     public FetchFieldManager(ObjectProvider<?> op, JSONObject result) {
@@ -127,16 +75,8 @@ public class FetchFieldManager extends AbstractFieldManager {
         this.result = result;
         this.op = op;
         this.storeMgr = ec.getStoreManager();
-        addToCache();
     }
 
-    private void addToCache() {
-        String className = acmd.getFullClassName();
-        String id = ScalarisUtils.getPersistableIdentity(op);
-        String key = ScalarisSchemaHandler.getObjectStorageKey(className, id);
-        fetchCache.add(key, op.getObject());
-    }
-    
     public boolean fetchBooleanField(int fieldNumber) {
         String memberName = storeMgr
                 .getNamingFactory()
@@ -292,38 +232,30 @@ public class FetchFieldManager extends AbstractFieldManager {
     }
 
     public Object fetchObjectField(int fieldNumber) {
-        fetchCache.increaseActive();
+        AbstractMemberMetaData mmd = acmd
+                .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
+        String memberName = storeMgr.getNamingFactory().getColumnName(mmd,
+                ColumnType.COLUMN);
+        System.out.println("looking for field " + memberName + " "
+                + acmd.getEntityName());
+
+        if (result.isNull(memberName)) {
+            return null;
+        }
+
+        // Special cases
+        ClassLoaderResolver clr = ec.getClassLoaderResolver();
+        RelationType relationType = mmd.getRelationType(clr);
+        if (RelationType.isRelationSingleValued(relationType)
+                && mmd.isEmbedded()) {
+            throw new NucleusException(
+                    "Don't currently support embedded fields");
+        }
+
         try {
-            
-            AbstractMemberMetaData mmd = acmd
-                    .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
-            String memberName = storeMgr.getNamingFactory().getColumnName(mmd,
-                    ColumnType.COLUMN);
-            System.out.println("looking for field " + memberName + " "
-                    + acmd.getEntityName());
-            
-            if (result.isNull(memberName)) {
-                return null;
-            }
-    
-            // Special cases
-            ClassLoaderResolver clr = ec.getClassLoaderResolver();
-            RelationType relationType = mmd.getRelationType(clr);
-            if (RelationType.isRelationSingleValued(relationType)
-                    && mmd.isEmbedded()) {
-                // Persistable object embedded into table of this object TODO
-                // Support this
-                throw new NucleusException(
-                        "Don't currently support embedded fields");
-            }
-    
-            try {
-                return fetchObjectFieldInternal(mmd, memberName, clr);
-            } catch (JSONException e) {
-                throw new NucleusException(e.getMessage(), e);
-            }
-        } finally {
-            fetchCache.decreaseActive();
+            return fetchObjectFieldInternal(mmd, memberName, clr);
+        } catch (JSONException e) {
+            throw new NucleusException(e.getMessage(), e);
         }
     }
 
@@ -634,11 +566,6 @@ public class FetchFieldManager extends AbstractFieldManager {
     }
 
     private Object getNestedObjectById(String persistableId, AbstractClassMetaData acmd, ExecutionContext ec) {
-        String className = acmd.getFullClassName();
-        String objKey = ScalarisSchemaHandler.getObjectStorageKey(className, persistableId);
-        if (fetchCache.exists(objKey)) {
-            return fetchCache.lookUp(objKey);
-        }
         try {
             return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
         } catch (NucleusObjectNotFoundException e) {
