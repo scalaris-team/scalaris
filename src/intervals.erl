@@ -230,17 +230,12 @@ is_subset(A, B) -> A =:= intersection(A, B).
 %% @doc X \in I. Precondition: is_well_formed_simple(I).
 -spec in_simple(X::key(), I::simple_interval()) -> boolean().
 % inline is_between/5 for performance (+15-20%):
-in_simple(X, {'(', Begin, End, ']'}) ->
-    X > Begin andalso End >= X;
-in_simple(X, {'[', Begin, End, ')'}) ->
-    X >= Begin andalso End > X;
-in_simple(X, {'[', Begin, End, ']'}) ->
-    X >= Begin andalso End >= X;
-in_simple(X, {'(', Begin, End, ')'}) ->
-    X > Begin andalso End > X;
-in_simple(_, all)          -> true;
-in_simple(X, {X}) -> true;
-in_simple(_, {_}) -> false.
+in_simple(X, {LBr, Begin, End, RBr}) ->
+    (X > Begin andalso End > X) orelse
+        (LBr =:= '[' andalso X =:= Begin) orelse
+        (RBr =:= ']' andalso X =:= End);
+in_simple(_, all) -> true;
+in_simple(X, {E}) -> X =:= E.
 
 %% @doc X \in I. Precondition: is_well_formed(I).
 -spec in(X::key(), I::interval()) -> boolean().
@@ -660,14 +655,10 @@ wraps_around(_LeftBr, _First, _Last, _RightBr) ->
 % @doc Begin &lt;= X &lt;= End
 % precondition Begin &lt;= End
 -spec is_between(BeginBr::left_bracket(), Begin::key(), X::key(), End::key(), EndBr::right_bracket()) -> boolean().
-is_between('(', Begin, X, End, ']') ->
-    X > Begin andalso End >= X;
-is_between('[', Begin, X, End, ')') ->
-    X >= Begin andalso End > X;
-is_between('[', Begin, X, End, ']') ->
-    X >= Begin andalso End >= X;
-is_between('(', Begin, X, End, ')') ->
-    X > Begin andalso End > X.
+is_between(LBr, Begin, X, End, RBr) ->
+    (X > Begin andalso End > X) orelse
+        (LBr =:= '[' andalso X =:= Begin) orelse
+        (RBr =:= ']' andalso X =:= End).
 
 %% @doc X and Y are adjacent and Y follows X
 -spec is_left_of(interval(), interval()) -> boolean().
