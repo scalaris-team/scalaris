@@ -437,7 +437,7 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     {GoodKeys, FKeys} = util:pop_randomsubset(FCount, Keys),
-    GoodDB = lists:append([get_rep_group(Key) || Key <- GoodKeys]),
+    GoodDB = lists:flatmap(fun get_rep_group/1, GoodKeys),
     {DB, O} = lists:foldl(fun(FKey, {AccAll, Out}) ->
                                   {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
                                   {lists:append(RList, AccAll), Out + NewOut}

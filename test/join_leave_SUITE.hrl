@@ -143,7 +143,7 @@ add_3_rm_3_data(Config, Incremental) ->
 
     RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
     % note: there may be hash collisions -> count the number of unique DB entries!
-    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
+    RandomHashedKeys = lists:flatmap(fun(K) -> ?RT:get_replica_keys(?RT:hash_key(K)) end, RandomKeys),
     ExpLoad = length(lists:usort(RandomHashedKeys)),
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
@@ -257,7 +257,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
 
     RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
     % note: there may be hash collisions -> count the number of unique DB entries!
-    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
+    RandomHashedKeys = lists:flatmap(fun(K) -> ?RT:get_replica_keys(?RT:hash_key(K)) end, RandomKeys),
     ExpLoad = length(lists:usort(RandomHashedKeys)),
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),

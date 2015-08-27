@@ -159,7 +159,7 @@ del_nodes_by_name(Names, Graceful) ->
               end, {[], []}, Specs);
         [_|_] when not Graceful ->
             Pids = [Pid || {{_Id, Pid, _Type, _}, _Name} <- Specs],
-            AllChildren = lists:append([sup:sup_get_all_children(Pid) || Pid <- Pids]),
+            AllChildren = lists:flatmap(fun sup:sup_get_all_children/1, Pids),
             comm:send_local(erlang:whereis(fd), {del_all_subscriptions, AllChildren}),
             sup:sup_terminate_childs(Pids),
             lists:foldr(
@@ -336,8 +336,8 @@ get_dump() ->
     GetKeys =
         fun(DumpsX, ElementX) ->
                 lists:usort(
-                  lists:append(
-                    [gb_trees:keys(element(ElementX, DumpX)) || DumpX <- DumpsX]))
+                  lists:flatmap(fun(X) -> gb_trees:keys(element(ElementX, X)) end,
+                                DumpsX))
         end,
     ReceivedKeys = GetKeys(Dumps, 1),
     SentKeys = GetKeys(Dumps, 2),

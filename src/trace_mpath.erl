@@ -227,13 +227,13 @@ resolve_remote_pids(Trace) ->
     % -> find (a) and replace (b):
     DictResolved =
         dict:from_list(
-          lists:append(
-            [begin
-                 Pid1 = element(4, Event),
-                 Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),
-                 % known pids
-                 [{PidX, X} || X = {PidX, InfoX} <- [Pid1, Pid2], is_tuple(InfoX)]
-             end || Event <- Trace])),
+          lists:flatmap(
+            fun(Event) ->
+                    Pid1 = element(4, Event),
+                    Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),
+                    % known pids
+                    [{PidX, X} || X = {PidX, InfoX} <- [Pid1, Pid2], is_tuple(InfoX)]
+            end, Trace)),
     [begin
          Pid1 = element(4, Event),
          Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),

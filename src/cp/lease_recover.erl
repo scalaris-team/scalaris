@@ -27,7 +27,7 @@
 
 -spec recover(list(prbr:state())) -> lease_list:lease_list().
 recover(LeaseDBs) ->
-    AllLeases = lists:append([prbr:tab2list(DB) || DB <- LeaseDBs]),
+    AllLeases = lists:flatmap(fun prbr:tab2list/1, LeaseDBs),
     Candidates = [L || {Id, L} <- AllLeases,
                        L =/= prbr_bottom, %% ??
                        Id =:= l_on_cseq:get_id(L), %% is first replica?

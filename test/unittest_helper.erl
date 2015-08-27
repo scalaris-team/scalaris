@@ -698,8 +698,11 @@ check_ring_data() ->
 
 -spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> boolean().
 check_ring_data(Timeout, Retries) ->
-    Data = lists:append(
-             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- get_ring_data(full)]),
+    Data = lists:flatmap(
+             fun({_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result}) -> Data;
+                (_) -> []
+             end,
+             get_ring_data(full)),
     case Retries < 1 of
         true ->
             check_ring_data_all(Data, true);

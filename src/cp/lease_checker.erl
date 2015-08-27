@@ -70,7 +70,7 @@ check_local_leases(DHTNode) ->
 lease_checker(TargetSize) ->
     LeaseLists = get_all_leases(),
     ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
-    PassiveLeases = lists:append([lease_list:get_passive_leases(LL) || LL <- LeaseLists]),
+    PassiveLeases = lists:flatmap(fun lease_list:get_passive_leases/1, LeaseLists),
     ActiveIntervals = [l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty],
     NormalizedActiveIntervals = intervals:union(ActiveIntervals),
     %log:log("Lease-Checker: ~w ~w ~w", [ActiveLeases, ActiveIntervals, PassiveLeases]),
