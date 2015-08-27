@@ -216,17 +216,17 @@ dist_to_name(Dist) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec mean_w_error(integer(), [tuple()])
-        -> {Len::non_neg_integer(), Mean::float(), StdError::float(),
-            Min::integer(), Max::integer()}.
+        -> {Mean::float(), StdError::float(), Min::integer(), Max::integer()}.
 mean_w_error(_ElementPos, []) ->
     {0, 0, 0, 0};
 mean_w_error(ElementPos, [H | TL]) ->
+    HE = element(ElementPos, H),
     {Len, Sum, Sum2, Min, Max} =
         lists:foldl(
           fun(T, {L, X1, X2, Min, Max}) ->
                   E = element(ElementPos, T),
                   {L + 1, X1 + E, X2 + E * E,
                    erlang:min(E, Min), erlang:max(E, Max)}
-          end, {1, H, H * H, H, H}, TL),
+          end, {1, HE, HE * HE, HE, HE}, TL),
     % pay attention to possible loss of precision here:
     {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len)), Min, Max}.
