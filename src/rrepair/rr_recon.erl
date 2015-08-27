@@ -27,7 +27,8 @@
 -include("client_types.hrl").
 
 -export([init/1, on/2, start/2, check_config/0]).
--export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
+-export([map_key_to_interval/2, map_key_to_quadrant/2, map_rkeys_to_quadrant/2,
+         map_interval/2,
          quadrant_intervals/0]).
 -export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
 %-export([compress_kv_list/4, calc_signature_size_nm_pair/4]).
@@ -2415,10 +2416,16 @@ key_dist(Key1, Key2) ->
     Dist2 = ?RT:get_range(Key2, Key1),
     erlang:min(Dist1, Dist2).
 
-%% @doc Maps an abitrary key to its associated key in replication quadrant N.
+%% @doc Maps an abitrary key to its associated key in replication quadrant Q.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
 map_key_to_quadrant(Key, Q) ->
     RKeys = ?RT:get_replica_keys(Key),
+    map_rkeys_to_quadrant(RKeys, Q).
+
+%% @doc Returns a key in the given replication quadrant Q from a list of
+%%      replica keys.
+-spec map_rkeys_to_quadrant([?RT:key(),...], quadrant()) -> ?RT:key().
+map_rkeys_to_quadrant(RKeys, Q) ->
     SegM = case lists:member(?MINUS_INFINITY, RKeys) of
                true -> Q rem config:read(replication_factor) + 1;
                _ -> Q

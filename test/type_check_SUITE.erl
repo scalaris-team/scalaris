@@ -423,6 +423,7 @@ tester_type_check_rrepair(_Config) ->
              {fill_wiki, 2}, %% no (suitable) wiki file to import
              {gen_kvv, 3}, %% tested via feeder
              {p_gen_kvv, 6}, %% tested via feeder
+             {get_error_key, 2}, %% keys must be replica keys, i.e. one per quadrant!
 
              {gen_random, 3}, %% needs feeder
              {gen_random_gb_sets, 5}, %% needs feeder
@@ -444,6 +445,7 @@ tester_type_check_rrepair(_Config) ->
              {init, 1}, %% registers a monitor (only one allowed per PID)
              {on, 2}, %% tries to send messages, needs valid state with pid
              {start, 2}, %% tries to spawn processes
+             {map_rkeys_to_quadrant, 2}, %% keys must be replica keys, i.e. one per quadrant!
              {map_interval, 2}, %% second interval must be in a single quadrant
 
              {merkle_compress_hashlist, 4}, %% needs merkle nodes with hashes

@@ -551,7 +551,7 @@ get_rep_group(Key) ->
           {[db_entry:entry()], Outdated::0 | 1}.
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
-    EKey = get_error_key(Key, RepKeys, FDest),
+    EKey = get_error_key(RepKeys, FDest),
     VersionNew = randoms:rand_uniform(?VersionMin, ?VersionMax),
     ValueNew = get_synthetic_value(new),
     RGrp = [db_entry:new(K, ValueNew, VersionNew) || K <- RepKeys, K =/= EKey],
@@ -573,12 +573,11 @@ get_failure_type(mixed) ->
 get_failure_type(Type) -> Type.
 
 % @doc Returns one key of KeyList which is in any quadrant out of DestList.
--spec get_error_key(?RT:key(), [?RT:key(),...], failure_dest()) -> ?RT:key().
-get_error_key(Key, RepKeys, Dest) ->
-    case Dest of
-        all -> util:randomelem(RepKeys);
-        QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
-    end.
+-spec get_error_key([?RT:key(),...], failure_dest()) -> ?RT:key().
+get_error_key(RepKeys, all) ->
+    util:randomelem(RepKeys);
+get_error_key(RepKeys, QList) ->
+    rr_recon:map_rkeys_to_quadrant(RepKeys, util:randomelem(QList)).
 
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
