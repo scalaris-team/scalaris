@@ -42,7 +42,7 @@
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
 -compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1,
-                   run_leaf_hf/3, run_inner_hf/2]}).
+                   run_leaf_hf/4, run_inner_hf/2]}).
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -151,9 +151,10 @@ new(I, ConfParams) ->
 -spec new(intervals:interval(), EntryList::mt_bucket(), mt_config_params())
         -> merkle_tree().
 new(I, EntryList, ConfParams) ->
+    % remove duplicates and speed up keys_to_intervals/2 by sorting
     KeyList = lists:ukeysort(1, EntryList),
     Config = build_config(ConfParams),
-    [Root] = build_childs([{I, length(KeyList), KeyList}], Config, []),
+    {[Root], _} = build_childs([{I, length(KeyList), KeyList}], Config, [], 0),
     {merkle_tree, Config, Root}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -363,29 +364,28 @@ insert_to_node(Key, CheckKey, {Hash, Count, ItemCount, Interval,
 p_bulk_build({_H, ItemCount, _Bkt, Interval}, Config, KeyList) ->
     ChildsI = intervals:split(Interval, Config#mt_config.branch_factor),
     IKList = keys_to_intervals(KeyList, ChildsI),
-    ChildNodes = build_childs(IKList, Config, []),
-    NCount = lists:foldl(fun(N, AccN) ->
-                                 AccN + node_size(N)
-                         end, 0, ChildNodes),
+    {ChildNodes, NCount} = build_childs(IKList, Config, [], 0),
     % hash the bucket now:
     Hash = run_inner_hf(ChildNodes, Config#mt_config.inner_hf),
     {Hash, 1 + NCount, ItemCount + length(KeyList), Interval, ChildNodes}.
 
 -spec build_childs([{I::intervals:continuous_interval(), Count::non_neg_integer(),
-                     mt_bucket()}], mt_config(), Acc::[mt_node()]) -> [mt_node()].
-build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
-    BucketSize = Config#mt_config.bucket_size,
-    KeepBucket = Config#mt_config.keep_bucket,
-    Node = if Count > BucketSize ->
+                     mt_bucket()}],
+                   mt_config(), Acc::[mt_node()], NCount::non_neg_integer())
+        -> {[mt_node()], NCount::non_neg_integer()}.
+build_childs([{Interval, Count, Bucket} | T], Config, Acc, NCount) ->
+    Node = if Count > Config#mt_config.bucket_size ->
                   p_bulk_build({nil, 0, [], Interval}, Config, Bucket);
               true ->
                   % hash the bucket now:
-                  {Bucket1, Hash} = run_leaf_hf(Bucket, Interval, Config#mt_config.leaf_hf),
-                  {Hash, Count, ?IIF(KeepBucket, Bucket1, []), Interval}
+                  {Bucket1, Hash} = run_leaf_hf(Bucket, Interval,
+                                                Config#mt_config.leaf_hf, false),
+                  {Hash, Count,
+                   ?IIF(Config#mt_config.keep_bucket, Bucket1, []), Interval}
            end,
-    build_childs(T, Config, [Node | Acc]);
-build_childs([], _, Acc) ->
-    Acc.
+    build_childs(T, Config, [Node | Acc], NCount + node_size(Node));
+build_childs([], _, Acc, NCount) ->
+    {Acc, NCount}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -424,7 +424,7 @@ gen_hash_node({Hash, _ICnt, _Bkt = [], _I} = N, _InnerHf,
 gen_hash_node({_OldHash, ICnt, Bucket, Interval},
               _InnerHf, LeafHf, true, CleanBuckets) ->
     % leaf node, keep_bucket true
-    {Bucket1, Hash} = run_leaf_hf(Bucket, Interval, LeafHf),
+    {Bucket1, Hash} = run_leaf_hf(Bucket, Interval, LeafHf, true),
     {Hash, ICnt, ?IIF(CleanBuckets, [], Bucket1), Interval}.
 
 %% @doc Hashes an inner node based on its childrens' hashes.
@@ -432,16 +432,24 @@ gen_hash_node({_OldHash, ICnt, Bucket, Interval},
 run_inner_hf(Childs, InnerHf) ->
     InnerHf([get_hash(C) || C <- Childs]).
 
-%% @doc Hashes a leaf with the given (sorted!) bucket.
--spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::leaf_hash_fun())
-        -> {mt_bucket(), mt_node_key()}.
-run_leaf_hf(Bucket0, I, LeafHf) ->
-    Bucket = lists:keysort(1, Bucket0),
-    ?DBG_ASSERT(lists:ukeysort(1, Bucket) =:= Bucket),
+%% @doc Hashes a leaf with the given bucket.
+-spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::leaf_hash_fun(),
+                  MaybeUnsorted::boolean()) -> {mt_bucket(), mt_node_key()}.
+run_leaf_hf(Bucket0, I, LeafHf, false) ->
+    % either reversed or correct (during bulk build due to keys_to_intervals/2)
+    Bucket = case Bucket0 of
+                 [E1, E2 | _] when element(1, E1) > element(1, E2) ->
+                     lists:reverse(Bucket0);
+                 _ ->
+                     Bucket0
+             end,
+    ?DBG_ASSERT2(lists:ukeysort(1, Bucket) =:= Bucket, {not_sorted, Bucket}),
     Hash = LeafHf(Bucket, I),
     Size = erlang:bit_size(Hash),
     <<SmallHash:Size/integer-unit:1>> = Hash,
-    {Bucket, SmallHash}.
+    {Bucket, SmallHash};
+run_leaf_hf(Bucket0, I, LeafHf, true) ->
+    run_leaf_hf(lists:keysort(1, Bucket0), I, LeafHf, false).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -600,19 +608,23 @@ build_config(ParamList) ->
 -spec decode_key(Key::mt_bucket_entry()) -> ?RT:key().
 decode_key(Key) -> element(1, Key).
 
-%% @doc Inserts Key into its matching interval
+%% @doc Inserts Key into its matching interval (represented as a tuple of
+%%      bucket tuples). For each key, it starts at Last and continuously
+%%      checks further tuples until index High is reached.
 %%      PreCond: Key fits into one of the given intervals,
 %%               CheckKey is the decoded Key (see decode_key/1)
--spec p_key_in_I(Key::mt_bucket_entry(), CheckKey::?RT:key(),
-                 Right::[Bucket,...]) -> [Bucket,...] when
-    is_subtype(Bucket, {I::intervals:continuous_interval(), Count::non_neg_integer(), mt_bucket()}).
-p_key_in_I(Key, _CheckKey, [{I1, C1, L1}]) ->
-    ?DBG_ASSERT(intervals:in(_CheckKey, I1)),
-    [{I1, C1 + 1, [Key | L1]}];
-p_key_in_I(Key, CheckKey, [{I1, C1, L1} = B1 | L]) ->
-     case intervals:in(CheckKey, I1) of
-        true  -> [{I1, C1 + 1, [Key | L1]} | L];
-        false -> [B1 | p_key_in_I(Key, CheckKey, L)]
+-spec p_key_in_I(Key::mt_bucket_entry(), CheckKey::?RT:key(), Acc) -> Acc when
+    is_subtype(Acc,  {ITuple::tuple(), Last::pos_integer(), High::pos_integer()}).
+p_key_in_I(Key, CheckKey, {ITuple, Last, High}) ->
+    % find first tuple for key
+    {I, Len, Keys} = element(Last, ITuple),
+    case intervals:in(CheckKey, I) of
+        true  ->
+            {setelement(Last, ITuple, {I, Len + 1, [Key | Keys]}), Last, Last};
+        false ->
+            Next = Last rem tuple_size(ITuple) + 1,
+            ?ASSERT2(Next =/= High, loop_detected), % item does not belong in any interval!
+            p_key_in_I(Key, CheckKey, {ITuple, Next, High})
     end.
 
 %% @doc Inserts the given keys into the given intervals.
@@ -621,10 +633,13 @@ p_key_in_I(Key, CheckKey, [{I1, C1, L1} = B1 | L]) ->
      is_subtype(I, intervals:continuous_interval()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    % note: no need to preserve the keys' order -> use the 10% faster foldl:
-    lists:foldl(fun(Key, Acc) ->
-                        p_key_in_I(Key, decode_key(Key), Acc)
-                end, IBucket, KList).
+    % pay attention to the key order - run_leaf_hf/4 relies on it being either
+    % correct or reversed (which is exactly what p_key_in_I/3 does)
+    {IBucket2, _, _} =
+        lists:foldl(fun(Key, Acc) ->
+                            p_key_in_I(Key, decode_key(Key), Acc)
+                    end, {list_to_tuple(IBucket), 1, 1}, KList),
+    tuple_to_list(IBucket2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
