@@ -255,7 +255,15 @@ extract_from_tlog(Entry, _Key, Op, EnDecode) ->
                             {fail, not_a_list}}
                     end
             end;
-        ?not_found -> {Entry, {fail, not_found}};
+        ?not_found ->
+            Res = {fail, not_found},
+            case Op of
+                random_from_list ->
+                    {tx_tlog:set_entry_status(Entry, ?fail), Res};
+                {sublist, _Start, _Len} ->
+                    {tx_tlog:set_entry_status(Entry, ?fail), Res};
+                _ -> {Entry, Res}
+            end;
         {?fail, ?empty_list} when Op =:= random_from_list -> {Entry, {fail, empty_list}};
         {?fail, ?not_a_list} -> {Entry, {fail, not_a_list}}
     end.
