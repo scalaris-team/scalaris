@@ -551,7 +551,7 @@ tester_type_check_tx(_Config) ->
              {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
              {set_entry_value, 3} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
            ],
-           [ {first_req_for_key, 4} %% no type spec available (a 1-element list may not be specified anyway)
+           [ {read_op_for_key, 5} %% no type spec available (a 1-element list may not be specified anyway)
            ]},
           {tx_tm_rtm,
            [ {commit, 4},
