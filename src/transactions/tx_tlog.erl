@@ -220,7 +220,7 @@ first_req_per_key_not_in_tlog(SortedTLog, SortedReqList) ->
 first_req_per_key_not_in_tlog_iter(_, [], Acc) -> Acc;
 first_req_per_key_not_in_tlog_iter([] = USTLog, [Req | _] = SReqList, Acc) ->
     ReqKey = rdht_tx:req_get_key(Req),
-    {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], false),
+    {Req2, RTail2} = read_op_for_key(ReqKey, SReqList, [], false, false),
     first_req_per_key_not_in_tlog_iter(USTLog, RTail2, Req2 ++ Acc);
 first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
                                    [Req | _RTail] = SReqList,
@@ -229,14 +229,14 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
     ReqKey = rdht_tx:req_get_key(Req),
     if TKey =:= ReqKey ->
            HaveValue = get_entry_operation(TEntry) =:= ?write,
-           {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], HaveValue),
+           {Req2, RTail2} = read_op_for_key(ReqKey, SReqList, [], HaveValue, true),
            first_req_per_key_not_in_tlog_iter
              (USTLog, RTail2, Req2 ++ Acc);
        TKey < ReqKey ->
            %% jump to next Tlog entry
            first_req_per_key_not_in_tlog_iter(TTail, SReqList, Acc);
        true -> % TKey > ReqKey
-           {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], false),
+           {Req2, RTail2} = read_op_for_key(ReqKey, SReqList, [], false, false),
            first_req_per_key_not_in_tlog_iter(USTLog, RTail2, Req2 ++ Acc)
     end.
 
@@ -245,34 +245,34 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
 %%      as requested.
 %% note: it does not matter which request is actually returned here as long as
 %%       we get a full read op if needed!
-first_req_for_key(_Key, [] = SReqList, TmpReq, _HaveValue) ->
+read_op_for_key(_Key, [] = SReqList, TmpReq, _HaveValue, _HavePartialValue) ->
     {TmpReq, SReqList};
-first_req_for_key(Key, [Req | RTail] = SReqList, TmpReq, HaveValue) ->
+read_op_for_key(Key, [Req | RTail] = SReqList, TmpReq, HaveValue, HavePartialValue) ->
     ReqKey = rdht_tx:req_get_key(Req),
     if Key =:= ReqKey andalso HaveValue ->
            % consume further requests with the same key (there already is a full read)
-           first_req_for_key(Key, RTail, TmpReq, HaveValue);
+           read_op_for_key(Key, RTail, TmpReq, HaveValue, HavePartialValue);
        Key =:= ReqKey -> %andalso not HaveValue
            % no full read yet
            {ReqNeedsFullRead, ReqWorksAfterAnyPartialRead, ReqProvidesFullRead} = rdht_tx:req_props(Req),
            if ReqNeedsFullRead ->
                   % req in TmpReq (if any) does not matter
                   % -> this op requires a full read and there is none yet!
-                  first_req_for_key(Key, RTail, [Req], ReqProvidesFullRead);
-              TmpReq =/= [] andalso ReqWorksAfterAnyPartialRead ->
-                  % there is a previous request but it does not provide a full value
+                  read_op_for_key(Key, RTail, [Req], ReqProvidesFullRead, true);
+              HavePartialValue andalso ReqWorksAfterAnyPartialRead ->
+                  % there is a previous request or TLog entry but it does not provide a full value
                   % -> must be a partial read
                   % this op is e.g. a write which works after any partial read
-                  first_req_for_key(Key, RTail, TmpReq, ReqProvidesFullRead);
-              TmpReq =/= [] ->
-                  % there is a previous request but it does not provide a full value
+                  read_op_for_key(Key, RTail, TmpReq, ReqProvidesFullRead, true);
+              HavePartialValue ->
+                  % there is a previous request or TLog entry but it does not provide a full value
                   % -> must be a partial read
-                  % this op can not operate on every partial read
+                  % this op can not operate on any partial read
                   % -> create a full read
                   NewReq = {read, ReqKey},
-                  first_req_for_key(Key, RTail, [NewReq], true);
-              true -> % TmpReq =:= []
-                  first_req_for_key(Key, RTail, [Req], ReqProvidesFullRead)
+                  read_op_for_key(Key, RTail, [NewReq], true, true);
+              true -> % no information available yet -> use the given request
+                  read_op_for_key(Key, RTail, [Req], ReqProvidesFullRead, true)
            end;
        true -> {TmpReq, SReqList}
     end.
