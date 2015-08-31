@@ -1042,11 +1042,11 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
 -spec compress_kv_list(KVList::db_chunk_kv(), Bin,
                        SigSize::signature_size(), VSize::signature_size())
         -> Bin when is_subtype(Bin, bitstring()).
-compress_kv_list([], Bin, _SigSize, _VSize) ->
-    Bin;
 compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
     KBin = compress_key(K0, SigSize),
-    compress_kv_list(TL, <<Bin/bitstring, KBin/bitstring, V:VSize>>, SigSize, VSize).
+    compress_kv_list(TL, <<Bin/bitstring, KBin/bitstring, V:VSize>>, SigSize, VSize);
+compress_kv_list([], Bin, _SigSize, _VSize) ->
+    Bin.
 
 -spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
 -> NrItems::non_neg_integer().
