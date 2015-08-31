@@ -1208,12 +1208,16 @@ compress_key(Key, SigSize) ->
                         DBChunkLen::non_neg_integer(), ResultIdx::[non_neg_integer()],
                         LastPos::non_neg_integer(), Max::non_neg_integer())
         -> CompressedIndices::bitstring().
+compress_idx_list([Pos | Rest], DBChunkLen, AccResult, LastPos, Max) ->
+    CurIdx = Pos - LastPos,
+    compress_idx_list(Rest, DBChunkLen, [CurIdx | AccResult], Pos + 1,
+                      erlang:max(CurIdx, Max));
 compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
     IdxSize = if Max =:= 0 -> 1;
                  true      -> bits_for_number(Max)
               end,
-    Bin = lists:foldl(fun(Pos, Acc) ->
-                              <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
+    Bin = lists:foldr(fun(Pos, Acc) ->
+                              <<Acc/bitstring, Pos:IdxSize/integer-unit:1>>
                       end, <<>>, AccResult),
     case Bin of
         <<>> ->
@@ -1221,11 +1225,7 @@ compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
         _ ->
             IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
             <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>
-    end;
-compress_idx_list([Pos | Rest], DBChunkLen, AccResult, LastPos, Max) ->
-    CurIdx = Pos - LastPos,
-    compress_idx_list(Rest, DBChunkLen, [CurIdx | AccResult], Pos + 1,
-                      erlang:max(CurIdx, Max)).
+    end.
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5 or
 %%      shash_compress_k_list/7 into a list of keys from the original key list.
