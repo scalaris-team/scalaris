@@ -180,8 +180,10 @@
 -type message() ::
     % API
     request() |
-    % trivial sync messages
+    % trivial/shash/bloom sync messages
     {resolve_req, BinReqIdxPos::bitstring()} |
+    {resolve_req, DBChunk::bitstring(), DiffIdx::bitstring, SigSize::signature_size(),
+     VSize::signature_size(), SenderPid::comm:mypid()} |
     {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
      VSize::signature_size(), SenderPid::comm:mypid()} |
     % merkle tree sync messages
@@ -189,7 +191,7 @@
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer()} |
     {resolve_req, Hashes::bitstring()} |
-    {resolve_req, Hashes::bitstring(), BinKeyList::[bitstring()]} |
+    {resolve_req, Hashes::bitstring(), BinIdxList::[bitstring()]} |
     {resolve_req, BinKeyList::[bitstring()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
