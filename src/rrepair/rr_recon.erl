@@ -1334,19 +1334,7 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
                             Max::non_neg_integer())
         -> CompressedIndices::bitstring().
 shash_compress_k_list(_, <<>>, _SigSize, DBChunkLen, AccResult, _LastPos, Max) ->
-    IdxSize = if Max =:= 0 -> 1;
-                 true      -> bits_for_number(Max)
-              end,
-    Bin = lists:foldl(fun(Pos, Acc) ->
-                              <<Pos:IdxSize/integer-unit:1, Acc/bitstring>>
-                      end, <<>>, AccResult),
-    case Bin of
-        <<>> ->
-            <<>>;
-        _ ->
-            IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
-            <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>
-    end;
+    compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max);
 shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos, Max) ->
     <<KeyBin:SigSize/bitstring, T/bitstring>> = Bin,
     NextPos = AccPos + 1,
