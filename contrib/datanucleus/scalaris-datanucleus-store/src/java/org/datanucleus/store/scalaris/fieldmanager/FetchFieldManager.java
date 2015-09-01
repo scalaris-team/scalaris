@@ -481,8 +481,14 @@ public class FetchFieldManager extends AbstractFieldManager {
                                 ec.getMetaDataManager());
                 for (int i = 0; i < array.length(); i++) {
                     String idStr = (String) array.get(i);
-                    Object element = getNestedObjectById(idStr, elementCmd, ec);
-                    coll.add(element);
+                    if (idStr == null) {
+                        coll.add(idStr);
+                    } else {
+                        Object element = getNestedObjectById(idStr, elementCmd, ec);
+                        if (element != null) {
+                            coll.add(element);
+                        }
+                    }
                 }
 
                 if (op != null) {
@@ -500,8 +506,12 @@ public class FetchFieldManager extends AbstractFieldManager {
                                 ec.getMetaDataManager());
                 for (int i = 0; i < array.length(); i++) {
                     String idStr = (String) array.get(i);
-                    Object element = getNestedObjectById(idStr, elementCmd, ec);
-                    Array.set(arrayField, i, element);
+                    if (idStr == null) {
+                        Array.set(arrayField, i, idStr);
+                    } else {
+                        Object element = getNestedObjectById(idStr, elementCmd, ec);
+                        Array.set(arrayField, i, element);
+                    }
                 }
 
                 if (op != null) {
@@ -569,13 +579,10 @@ public class FetchFieldManager extends AbstractFieldManager {
         try {
             return IdentityUtils.getObjectFromPersistableIdentity(persistableId, acmd, ec);
         } catch (NucleusObjectNotFoundException e) {
-            // TODO Is this a bad idea (Probably yes...)?
-            // Instead to update references on deletion check when retrieving an object
-            // if it still exists. If not, than it was deleted
-            // What happens if this is a data store error and it is not found because
-            // of other reasons?
-            // TODO If this turns out to be OK, updates must be handled in a similar manner
-            
+            // TODO This can happen when an object currently in use in the external
+            // application has references to other objects, which in its lifetime are deleted but the
+            // reference stored is not updated yet
+            // This happening should be prevented.
             return null;
         }
     }
