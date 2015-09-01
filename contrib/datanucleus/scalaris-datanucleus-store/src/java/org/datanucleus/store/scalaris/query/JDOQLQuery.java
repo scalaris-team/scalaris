@@ -27,8 +27,6 @@ import java.util.Map;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.query.evaluator.JavaQueryEvaluator;
-import org.datanucleus.query.expression.CreatorExpression;
-import org.datanucleus.query.expression.Expression;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
