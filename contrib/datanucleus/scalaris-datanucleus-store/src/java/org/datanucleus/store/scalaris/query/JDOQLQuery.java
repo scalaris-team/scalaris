@@ -102,30 +102,16 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
                 candidates = new ArrayList<Object>(candidateCollection);
             }
 
-            // JDOQLEvaluator's ResultClassMapper (needed when using JDOQLs INTO keyword)
-            // does not support alias
-            
             // execute query
             JavaQueryEvaluator resultMapper = new ScalarisJDOQLEvaluator(this,
                     candidateClass, candidates, compilation, parameters,
                     ec.getClassLoaderResolver(), ec);
-            Collection result = resultMapper.execute(true, true, true, false, true);
-
-            // apply a custom ResultClassMapper because the mapper used by 
-            // DataNucleus does not support alias' while wrapping
-            Expression[] expResult = compilation.getExprResult();
-            if (expResult != null && getResultClass() != null && !(expResult[0] instanceof CreatorExpression)){
-                return mapResultClass(result, expResult);
-            }
+            Collection result = resultMapper.execute(true, true, true, true, true);
 
             return result;
         } finally {
             mconn.release();
         }
     }
-    
-    Collection<?> mapResultClass(Collection<?> result, Expression[] expResult) {
-        return new ScalarisJDOQLResultClassMapper(getResultClass()).map(result, expResult);
-    }
-    
+
 }

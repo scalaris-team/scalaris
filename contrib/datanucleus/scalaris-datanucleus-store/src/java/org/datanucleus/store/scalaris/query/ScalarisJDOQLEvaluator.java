@@ -13,6 +13,7 @@ import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.query.QueryUtils;
 import org.datanucleus.query.compiler.QueryCompilation;
 import org.datanucleus.query.evaluator.JDOQLEvaluator;
+import org.datanucleus.query.expression.CreatorExpression;
 import org.datanucleus.query.expression.Expression;
 import org.datanucleus.query.inmemory.InMemoryExpressionEvaluator;
 import org.datanucleus.query.inmemory.InMemoryFailure;
@@ -40,6 +41,7 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
 
     @Override
     public Collection execute(boolean applyFilter, boolean applyOrdering, boolean applyResult, boolean applyResultClass, boolean applyRange) {
+        // execute sub-queries
         String[] subqueryAliases = compilation.getSubqueryAliases();
         if (subqueryAliases != null) {
             for (int i=0;i<subqueryAliases.length;i++) {
@@ -64,13 +66,24 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
             }
         }
 
+        // apply filter
         List resultList = new ArrayList(candidates);
         Expression filter = compilation.getExprFilter();
         if (applyFilter && filter != null) {
-            // the super method to handle filters throws an VariableNotSetException when working with sub-queries
+            // super.handleFilter throws an VariableNotSetException when working with sub-queries
             candidates = handleFilter(resultList);
         }
-        return super.execute(false, applyOrdering, applyResult, applyResultClass, applyRange);
+        Collection queryResult = super.execute(false, applyOrdering, applyResult, false, applyRange);
+
+        if (applyResultClass) {
+            // apply a custom ResultClassMapper because the class-mapper used by 
+            // DataNucleus does not support alias' when mapping 
+            Expression[] expResult = compilation.getExprResult();
+            if (expResult != null && query.getResultClass() != null && !(expResult[0] instanceof CreatorExpression)){
+                return mapResultClass(queryResult, expResult);
+            }
+        }
+        return queryResult;
     }
 
     // TODO: Execute sub-queries only once
@@ -181,5 +194,14 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
             eval.removeVariableValue(vnse.getVariableExpression().getId());
             return Boolean.FALSE;
         }
+    }
+
+    /**
+     * Constructs ResultClassMapper and calls its map function
+     * @param resultSet The resultSet containing the instances handled by setResult
+     * @return The resultSet containing instances of the Class defined by setResultClass
+     */
+    Collection<?> mapResultClass(Collection<?> result, Expression[] expResult) {
+        return new ScalarisJDOQLResultClassMapper(query.getResultClass()).map(result, expResult);
     }
 }
