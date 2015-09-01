@@ -26,7 +26,6 @@ import java.util.Map;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.metadata.AbstractClassMetaData;
-import org.datanucleus.query.evaluator.JDOQLEvaluator;
 import org.datanucleus.query.evaluator.JavaQueryEvaluator;
 import org.datanucleus.query.expression.CreatorExpression;
 import org.datanucleus.query.expression.Expression;
@@ -107,20 +106,18 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
             // does not support alias
             
             // execute query
-            JavaQueryEvaluator resultMapper = new JDOQLEvaluator(this,
-                    candidates, compilation, parameters,
-                    ec.getClassLoaderResolver());
-            Collection result = resultMapper.execute(true, true, true, false,
-                    true);
-            
+            JavaQueryEvaluator resultMapper = new ScalarisJDOQLEvaluator(this,
+                    candidateClass, candidates, compilation, parameters,
+                    ec.getClassLoaderResolver(), ec);
+            Collection result = resultMapper.execute(true, true, true, false, true);
+
             // apply a custom ResultClassMapper because the mapper used by 
             // DataNucleus does not support alias' while wrapping
-            
             Expression[] expResult = compilation.getExprResult();
             if (expResult != null && getResultClass() != null && !(expResult[0] instanceof CreatorExpression)){
                 return mapResultClass(result, expResult);
             }
-            
+
             return result;
         } finally {
             mconn.release();
@@ -130,4 +127,5 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
     Collection<?> mapResultClass(Collection<?> result, Expression[] expResult) {
         return new ScalarisJDOQLResultClassMapper(getResultClass()).map(result, expResult);
     }
+    
 }
