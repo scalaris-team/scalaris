@@ -181,15 +181,15 @@ joiner_helper(Current, Target) ->
 
 synchronous_join(TargetSize) ->
     AllDHTNodes = pid_groups:find_all(dht_node),
-    add_bp_on_successful_split(),
-    add_bp_on_successful_handover(),
+    _ = add_bp_on_successful_split(),
+    _ = add_bp_on_successful_handover(),
     _ = api_vm:add_nodes(1),
     log:log("wait for successful split"),
     wait_for_successful_split(),
-    delete_bp_on_successful_split(AllDHTNodes),
+    _ = delete_bp_on_successful_split(AllDHTNodes),
     log:log("wait for successful handover"),
     wait_for_successful_handover(),
-    delete_bp_on_successful_handover(AllDHTNodes),
+    _ = delete_bp_on_successful_handover(AllDHTNodes),
     log:log("wait for ring size ~w", [TargetSize]),
     lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for ring to stabilize in sync. join"),
@@ -231,7 +231,7 @@ listen_for_split(Pid) ->
             case Message of
                 {l_on_cseq, split_reply_step4, _L1, _R1, _R2, _Keep, _ReplyTo, _PostAux,
                  {qwrite_done, _ReqId, _Round, _L2}} ->
-                    comm:send_local(Pid, successful_split),
+                    comm:send_local(Pid, {successful_split}),
                     false;
                 {l_on_cseq, split_reply_step4, _L1, _R1, _R2, _Keep, _ReplyTo, _PostAux,
                  {qwrite_deny, _ReqId, _Round, _L2, {content_check_failed,
@@ -248,7 +248,7 @@ listen_for_handover(Pid) ->
             case Message of
                 {l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, _Value},
                  _ReplyTo, _NewOwner, _New} ->
-                    comm:send_local(Pid, successful_handover),
+                    comm:send_local(Pid, {successful_handover}),
                     false;
                 {l_on_cseq, handover_reply,
                  {qwrite_deny, _ReqId, _Round, _Value,
@@ -267,7 +267,7 @@ add_bp_on_successful_split() ->
 
 wait_for_successful_split() ->
     receive
-        successful_split ->
+        {successful_split} ->
             ok
     end.
 
@@ -280,7 +280,7 @@ add_bp_on_successful_handover() ->
 
 wait_for_successful_handover() ->
     receive
-        successful_handover ->
+        {successful_handover} ->
             ok
     end.
 
