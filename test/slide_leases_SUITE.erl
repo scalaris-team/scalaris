@@ -180,7 +180,16 @@ joiner_helper(Current, Target) ->
     joiner_helper(Current+1, Target).
 
 synchronous_join(TargetSize) ->
+    AllDHTNodes = pid_groups:find_all(dht_node),
+    add_bp_on_successful_split(),
+    add_bp_on_successful_handover(),
     _ = api_vm:add_nodes(1),
+    log:log("wait for successful split"),
+    wait_for_successful_split(),
+    delete_bp_on_successful_split(AllDHTNodes),
+    log:log("wait for successful handover"),
+    wait_for_successful_handover(),
+    delete_bp_on_successful_handover(AllDHTNodes),
     log:log("wait for ring size ~w", [TargetSize]),
     lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for ring to stabilize in sync. join"),
@@ -217,4 +226,63 @@ leave_until(CurrentSize, TargetSize) ->
     ct:pal("shuting down node: success"),
     leave_until(CurrentSize - 1, TargetSize).
 
+listen_for_split(Pid) ->
+    fun (Message, _State) ->
+            case Message of
+                {l_on_cseq, split_reply_step4, _L1, _R1, _R2, _Keep, _ReplyTo, _PostAux,
+                 {qwrite_done, _ReqId, _Round, _L2}} ->
+                    comm:send_local(Pid, successful_split),
+                    false;
+                {l_on_cseq, split_reply_step4, _L1, _R1, _R2, _Keep, _ReplyTo, _PostAux,
+                 {qwrite_deny, _ReqId, _Round, _L2, {content_check_failed,
+                                                    {Reason, _Current, _Next}}}} ->
+                    log:log("split failed: ~w", [Reason]),
+                    false;
+                _ ->
+                    false
+            end
+    end.
 
+listen_for_handover(Pid) ->
+    fun (Message, _State) ->
+            case Message of
+                {l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, _Value},
+                 _ReplyTo, _NewOwner, _New} ->
+                    comm:send_local(Pid, successful_handover),
+                    false;
+                {l_on_cseq, handover_reply,
+                 {qwrite_deny, _ReqId, _Round, _Value,
+                  {content_check_failed, {Reason, _Current, _Next}}},
+                 _ReplyTo, _NewOwner, _New} ->
+                    log:log("handover failed: ~w", [Reason]),
+                    false;
+                _ ->
+                    false
+            end
+    end.
+
+add_bp_on_successful_split() ->
+    [gen_component:bp_set_cond(Node, listen_for_split(self()), listen_split) ||
+        Node <- pid_groups:find_all(dht_node)].
+
+wait_for_successful_split() ->
+    receive
+        successful_split ->
+            ok
+    end.
+
+delete_bp_on_successful_split(Nodes) ->
+    [gen_component:bp_del(Node, listen_split) || Node <- Nodes].
+
+add_bp_on_successful_handover() ->
+    [gen_component:bp_set_cond(Node, listen_for_handover(self()), listen_handover) ||
+        Node <- pid_groups:find_all(dht_node)].
+
+wait_for_successful_handover() ->
+    receive
+        successful_handover ->
+            ok
+    end.
+
+delete_bp_on_successful_handover(Nodes) ->
+    [gen_component:bp_del(Node, listen_handover) || Node <- Nodes].
