@@ -37,7 +37,7 @@
     {rm, {cy_cache, Cache::[node:node_type()]}} |
     {rm, node_info_response, NodeDetails::node_details:node_details()} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
-    {rm, buffer_response, OtherNeighbors::nodelist:neighborhood()}).
+    {rm, buffer_response, OtherNodes::nodelist:non_empty_snodelist()}).
 
 -define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
 
@@ -131,18 +131,18 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
                    intervals:new('(', OtherNodeUpdId, OtherLastSuccId, ')'),
                    intervals:new('(', OtherLastPredId, OtherNodeUpdId, ')')),
     NeighborsToSend =
-        nodelist:filter_min_length(
-          NeighborsToSendTmp,
-          fun(N) -> intervals:in(node:id(N), OtherRange) end,
-          RequestPredsMinCount, RequestSuccsMinCount),
+        tl(nodelist:to_list(
+             nodelist:filter_min_length(
+               NeighborsToSendTmp,
+               fun(N) -> intervals:in(node:id(N), OtherRange) end,
+               RequestPredsMinCount, RequestSuccsMinCount))),
     comm:send(node:pidX(OtherNode),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
     {{node_discovery}, {NewNeighborhood, RandViewSize, CacheUpd, Churn}};
 
-handle_custom_message({rm, buffer_response, OtherNeighbors},
+handle_custom_message({rm, buffer_response, OtherNodes},
    {Neighborhood, RandViewSize, Cache, Churn}) ->
     % similar to "{rm, buffer,...}" handling above:
-    OtherNodes = nodelist:to_list(OtherNeighbors),
     CacheUpd = element(1, nodelist:lupdate_ids(Cache, OtherNodes)),
     MyRndView = get_RndView(RandViewSize, CacheUpd),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNodes),
