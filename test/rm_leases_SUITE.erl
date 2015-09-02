@@ -80,7 +80,7 @@ init_per_testcase(TestCase, Config) ->
     case TestCase of
         test_network_partition ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Ids = unittest_helper:get_evenly_spaced_keys(8),
+            Ids = api_rt:get_evenly_spaced_keys(8),
             unittest_helper:make_ring_with_ids(Ids, [{scale_ring_size_by, 2},
                                                      {config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
@@ -349,7 +349,8 @@ synchronous_add(Current, _TargetSize) ->
     ct:pal("wait for correct ring"),
     lease_helper:wait_for_correct_ring(),
     ct:pal("wait for correct leases"),
-    lease_helper:wait_for_correct_leases(Current + 1),
+    util:wait_for(fun () -> admin:check_leases(Current + 1) end, 10000),
+    %lease_helper:wait_for_correct_leases(Current + 1),
     ct:pal("================================== adding node done ========================").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
