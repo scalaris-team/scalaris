@@ -27,7 +27,7 @@
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
          number_of_nodes/0,
-         check_leases/0]).
+         check_leases/0, check_leases/1]).
 
 -include("scalaris.hrl").
 
@@ -295,6 +295,11 @@ check_ring_deep_foldl(_, Previous) ->
 check_leases() ->
     lease_checker:check_leases_for_all_nodes() andalso
         lease_checker:check_leases_for_the_ring().
+
+-spec check_leases(pos_integer()) -> boolean().
+check_leases(TargetSize) ->
+    lease_checker:check_leases_for_all_nodes() andalso
+        lease_checker:check_leases_for_the_ring(TargetSize).
 
 -spec number_of_nodes() -> non_neg_integer() | timeout.
 number_of_nodes() ->

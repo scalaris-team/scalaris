@@ -36,8 +36,8 @@
 
 -spec wait_for_correct_leases(pos_integer()) -> ok.
 wait_for_correct_leases(TargetSize) ->
-    util:wait_for(lease_checker(TargetSize), 1000),
-    ct:pal("have correct lease_checker"),
+    util:wait_for(fun () -> admin:check_leases(TargetSize) end, 1000),
+    ct:pal("have correct leases"),
     util:wait_for(fun check_leases_per_node/0, 1000),
     ct:pal("have correct leases_per_node"),
     ok.
@@ -180,35 +180,3 @@ check_local_leases(DHTNode) ->
     MyRange = get_dht_node_state(DHTNode, my_range),
     LocalCorrect = MyRange =:= ActiveInterval,
     length(PassiveLeases) == 0 andalso LocalCorrect.
-
-lease_checker(TargetSize) ->
-    fun () ->
-            LeaseLists = get_all_leases(),
-            ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
-            PassiveLeases = lists:flatten([lease_list:get_passive_leases(LL) || LL <- LeaseLists]),
-            ActiveIntervals = [l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty],
-            NormalizedActiveIntervals = intervals:union(ActiveIntervals),
-            %log:log("Lease-Checker: ~w ~w ~w", [ActiveLeases, ActiveIntervals, PassiveLeases]),
-            %ct:pal("ActiveIntervals: ~p", [ActiveIntervals]),
-            %ct:pal("PassiveLeases: ~p", [PassiveLeases]),
-            IsAll = intervals:is_all(NormalizedActiveIntervals),
-            IsDisjoint = is_disjoint(ActiveIntervals),
-            HaveAllActiveLeases = length(ActiveLeases) == TargetSize,
-            HaveNoPassiveLeases = length(PassiveLeases) == 0,
-            HaveAllAuxEmpty = lists:all(fun(L) ->
-                                                L =/= empty andalso l_on_cseq:get_aux(L) =:= empty
-                                        end, ActiveLeases),
-            ct:pal("lease checker: ~w ~w ~w ~w~n~w~n~w~n", [IsAll, IsDisjoint, HaveAllActiveLeases, HaveNoPassiveLeases,PassiveLeases, NormalizedActiveIntervals]),
-            case IsAll of
-                false ->
-                    %print_all_active_leases(),
-                    ok;
-                true ->
-                    ok
-            end,
-            IsAll andalso
-                HaveAllAuxEmpty andalso
-                IsDisjoint andalso
-                HaveAllActiveLeases andalso % @todo enable after garbage collection is implemented
-                HaveNoPassiveLeases
-    end.
