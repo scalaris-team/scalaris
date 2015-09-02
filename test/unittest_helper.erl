@@ -24,7 +24,6 @@
 -define(TRACE_RING_DATA(), ok).
 
 -export([get_scalaris_port/0, get_yaws_port/0,
-         get_evenly_spaced_keys/1,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2, make_ring_recover/1,
          make_symmetric_ring/0, make_symmetric_ring/1,
          stop_ring/0, stop_ring/1,
@@ -127,13 +126,6 @@ prepare_config_helper([Option | Rest], OldConfigFound) ->
         end,
     [NewOption | prepare_config_helper(Rest, ConfigFound)].
 
-%% @doc Create N evenly spaced keys.
--spec get_evenly_spaced_keys(N::pos_integer()) -> list(?RT:key()).
-get_evenly_spaced_keys(4) ->
-    ?RT:get_replica_keys(?MINUS_INFINITY);
-get_evenly_spaced_keys(N) ->
-    [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, N)].
-
 %% @doc Creates a symmetric ring.
 -spec make_symmetric_ring() -> pid().
 make_symmetric_ring() ->
@@ -147,10 +139,10 @@ make_symmetric_ring(Options) ->
         fun() ->
                 Ids = case lists:keyfind(scale_ring_size_by, 1, Options) of
                           {scale_ring_size_by, Scale} ->
-                              unittest_helper:get_evenly_spaced_keys(
+                              api_rt:get_evenly_spaced_keys(
                                 Scale * config:read(replication_factor));
                           false ->
-                              unittest_helper:get_evenly_spaced_keys(
+                              api_rt:get_evenly_spaced_keys(
                                 config:read(replication_factor))
                       end,
                 [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}])
