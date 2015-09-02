@@ -25,6 +25,7 @@
 
 -export([check_leases_for_all_nodes/0]).
 -export([check_leases_for_the_ring/0]).
+-export([check_leases_for_the_ring/1]).
 -export([get_random_save_node/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,6 +42,11 @@ check_leases_for_all_nodes() ->
 check_leases_for_the_ring() ->
     io:format("======= global test ==========~n"),
     lease_checker(admin:number_of_nodes()).
+
+-spec check_leases_for_the_ring(pos_integer()) -> boolean().
+check_leases_for_the_ring(TargetSize) ->
+    io:format("======= global test ==========~n"),
+    lease_checker(TargetSize).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
