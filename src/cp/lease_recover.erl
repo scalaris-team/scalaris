@@ -28,17 +28,26 @@
 -spec recover(list(prbr:state())) -> lease_list:lease_list().
 recover(LeaseDBs) ->
     AllLeases = lists:flatmap(fun prbr:tab2list/1, LeaseDBs),
-    Candidates = [L || {Id, L} <- AllLeases,
-                       L =/= prbr_bottom, %% ??
-                       Id =:= l_on_cseq:get_id(L), %% is first replica?
-                       l_on_cseq:has_timed_out(L)],
-    %% log:log("candidates ~p~n", [Candidates]),
-    case Candidates of
+    LocalLeases = [L || {Id, L} <- AllLeases,
+                        L =/= prbr_bottom, %% ??
+                        Id =:= l_on_cseq:get_id(L) %% is this the first replica?],
+                  ],
+    MaxTimeout = lists:max([l_on_cseq:get_timeout(L) || L <- LocalLeases]),
+    WaitTime = timer:now_diff(MaxTimeout, os:timestamp()) * 1000,
+    if
+        WaitTime >= 0 ->
+            time:sleep(WaitTime);
+        true ->
+            ok
+    end,
+    ?DBG_ASSERT(lists:all([l_on_cseq:has_timed_out(L) || L <- LocalLeases])),
+    %% log:log("candidates ~p~n", [LocalLeases]),
+    case LocalLeases of
         [] -> lease_list:empty();
         [Lease] -> % one potentially active lease: set active lease
             lease_list:make_lease_list(Lease, [], []);
         [_, _] -> % could be an ongoing split or an ongoing merge: finish operation
-            log:log("leases: ~p~n", [Candidates]),
+            log:log("leases: ~p~n", [LocalLeases]),
             ts = nyi, % ts: not yet implemented
             lease_list:empty()
     end.
