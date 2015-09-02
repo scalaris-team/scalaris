@@ -30,7 +30,7 @@ recover(LeaseDBs) ->
     AllLeases = lists:flatmap(fun prbr:tab2list/1, LeaseDBs),
     LocalLeases = [L || {Id, L} <- AllLeases,
                         L =/= prbr_bottom, %% ??
-                        Id =:= l_on_cseq:get_id(L) %% is this the first replica?],
+                        Id =:= l_on_cseq:get_id(L) %% is this the first replica?,
                   ],
     MaxTimeout = lists:max([l_on_cseq:get_timeout(L) || L <- LocalLeases]),
     WaitTime = timer:now_diff(MaxTimeout, os:timestamp()) * 1000,
@@ -40,7 +40,7 @@ recover(LeaseDBs) ->
         true ->
             ok
     end,
-    ?DBG_ASSERT(lists:all([l_on_cseq:has_timed_out(L) || L <- LocalLeases])),
+    ?DBG_ASSERT(lists:all(fun l_on_cseq:has_timed_out/1, LocalLeases)),
     %% log:log("candidates ~p~n", [LocalLeases]),
     case LocalLeases of
         [] -> lease_list:empty();
