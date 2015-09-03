@@ -41,7 +41,7 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
 
     @Override
     public Collection execute(boolean applyFilter, boolean applyOrdering, boolean applyResult, boolean applyResultClass, boolean applyRange) {
-        // execute sub-queries
+        // execute subqueries
         String[] subqueryAliases = compilation.getSubqueryAliases();
         if (subqueryAliases != null) {
             for (int i=0;i<subqueryAliases.length;i++) {
@@ -86,20 +86,32 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
         return queryResult;
     }
 
-    // TODO: Execute sub-queries only once
     @Override
-    protected Collection evaluateSubquery(Query query, QueryCompilation compilation, Collection candidates,
+    protected Collection evaluateSubquery(Query subquery, QueryCompilation compilation, Collection candidates,
             Object outerCandidate){
-        if (!query.getCandidateClass().equals(candidateClass)) {
+        // check if this sub-query was already executed
+        String[] subqueryAliases = compilation.getSubqueryAliases();
+        if (subqueryAliases != null) {
+            for (String subqueryAlias : subqueryAliases) {
+                Query<?> tmpSubquery = query.getSubqueryForVariable(subqueryAlias).getQuery();
+                if (tmpSubquery.equals(subquery)) {
+                    if (state.containsKey(subqueryAlias)) {
+                        return (Collection) state.get(subqueryAlias);
+                    }
+                }
+            }
+        }
+
+        if (!subquery.getCandidateClass().equals(candidateClass)) {
             // if the sub-query queries over a different candidate class, all objects of this
             // class must be fetched beforehand
             ManagedConnection mconn = ec.getStoreManager().getConnection(ec);
             AbstractClassMetaData cmd = ec.getMetaDataManager()
-                    .getMetaDataForClass(query.getCandidateClass(),ec.getClassLoaderResolver());
+                    .getMetaDataForClass(subquery.getCandidateClass(),ec.getClassLoaderResolver());
             candidates = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
-                    .getObjectsOfCandidateType(ec, mconn, query.getCandidateClass(), cmd);
+                    .getObjectsOfCandidateType(ec, mconn, subquery.getCandidateClass(), cmd);
         }
-        return super.evaluateSubquery(query, compilation, candidates, outerCandidate);
+        return super.evaluateSubquery(subquery, compilation, candidates, outerCandidate);
     }
 
     /*
