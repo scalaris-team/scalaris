@@ -19,26 +19,13 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
-import org.datanucleus.exceptions.NucleusException;
-import org.datanucleus.exceptions.NucleusObjectNotFoundException;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
-import org.datanucleus.store.connection.ManagedConnection;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import de.zib.scalaris.AbortException;
-import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.Transaction;
-import de.zib.scalaris.UnknownException;
 
 public class ScalarisStoreManager extends AbstractStoreManager {
     public ScalarisStoreManager(ClassLoaderResolver clr,
@@ -56,59 +43,4 @@ public class ScalarisStoreManager extends AbstractStoreManager {
     public NucleusConnection getNucleusConnection(ExecutionContext om) {
         throw new UnsupportedOperationException();
     }
-
-    @Override
-    public String getClassNameForObjectID(Object id, ClassLoaderResolver clr,
-            ExecutionContext ec) {
-
-        Map<String, String> options = new HashMap<String, String>();
-        ManagedConnection mconn = this.getConnection(ec, options);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
-
-        String myType = null;
-
-        try {
-            Transaction t1 = new Transaction(conn);
-            JSONObject result = new JSONObject(t1.read(id.toString())
-                    .stringValue());
-
-            if (ScalarisUtils.isDeletedRecord(result)) {
-                throw new NucleusObjectNotFoundException(
-                        "Record has been deleted");
-            }
-            myType = result.getString("class");
-
-            System.out.println("CLASS " + myType + " for " + id.toString());
-
-            t1.commit();
-            return myType;
-        } catch (ConnectionException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusException(e.getMessage(), e);
-        }
-
-        catch (JSONException e) {
-
-            throw new NucleusException(e.getMessage(), e);
-        } catch (NotFoundException e) {
-
-        } catch (ClassCastException e) {
-            throw new NucleusException(e.getMessage(), e);
-        }
-
-        System.out.println("!!! -> connection");
-        if (myType == null) {
-            // revert to default implementation for special cases
-            myType = super.getClassNameForObjectID(id, clr, ec);
-        }
-
-        System.out.println("!!!!!!!!!" + myType);
-
-        return myType;
-    }
-
 }
