@@ -199,17 +199,6 @@ test_add_snapshot_data(Data) ->
     db_dht:close(NewDB),
     true.
 
-
-
--spec make_even_db_entry_list(non_neg_integer()) -> [db_entry:entry()].
-make_even_db_entry_list(N) ->
-    Step = (?PLUS_INFINITY - 1) / N,
-    [db_entry:new(K, ?VALUE(V), 1) ||
-    {K, V} <- lists:foldl(fun(X, Acc) -> [{erlang:round(Step / 2 + Step * X),
-                                           "Foo"} | Acc] end,
-                         [],
-                         lists:seq(0, N - 1))].
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snapshot-related local tx operation tests (validate, commit, abort)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
