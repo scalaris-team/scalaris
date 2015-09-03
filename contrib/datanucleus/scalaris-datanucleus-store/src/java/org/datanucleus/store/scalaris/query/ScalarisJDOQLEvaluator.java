@@ -178,14 +178,11 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
             }
 
             if (vnse.getValues() == null || vnse.getValues().length == 0) {
-                // No values available for this variable, so just put null and see the result
-                eval.setVariableValue(vnse.getVariableExpression().getId(), null);
+                // No values available for this variable, so the result is interpreted as false
                 if (NucleusLogger.QUERY.isDebugEnabled()) {
                     NucleusLogger.QUERY.debug(Localiser.msg("021025", vnse.getVariableExpression().getId(), "(null)"));
                 }
-                if (Boolean.TRUE.equals(evaluateBooleanExpression(expr, eval))) {
-                    return Boolean.TRUE;
-                }
+                return Boolean.FALSE;
             } else {
                 // Set this variable and start iteration over the possible variable values
                 for (int i=0;i<vnse.getValues().length;i++) {
