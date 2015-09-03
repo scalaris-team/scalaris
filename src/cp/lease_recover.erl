@@ -44,9 +44,10 @@ recover(LeaseDBs) ->
     %% log:log("candidates ~p~n", [LocalLeases]),
     case LocalLeases of
         [] -> lease_list:empty();
-        [Lease] -> % one potentially active lease: set active lease
+        [Lease] -> %% one potentially active lease: set active lease
+            l_on_cseq:lease_recover(Lease, active),
             lease_list:make_lease_list(Lease, [], []);
-        [_, _] -> % could be an ongoing split or an ongoing merge: finish operation
+        [_, _] -> %% could be an ongoing split or an ongoing merge: finish operation
             log:log("leases: ~p~n", [LocalLeases]),
             ts = nyi, % ts: not yet implemented
             lease_list:empty()
