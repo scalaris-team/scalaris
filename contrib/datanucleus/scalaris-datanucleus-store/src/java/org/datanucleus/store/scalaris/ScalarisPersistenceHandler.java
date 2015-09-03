@@ -430,4 +430,42 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
         return results;
     }
+
+    /**
+     * Returns an object persisted in the store by an unique member value.
+     * If there is no such object, null is returned
+     * @param ec
+     * @param mconn Connection used to connect to the store.
+     * @param objectClass Class of the object
+     * @param memberName The (simple) name of the unique member which is used to retrieve
+     *      the object. The object is only correctly returned if the member has an 
+     *      '@Unique' annotation.
+     * @param memberValue Value of the unique member
+     * @return The persisted object, or null if there is no such object.
+     */
+    public Object getObjectByUniqueMember(ExecutionContext ec, ManagedConnection mconn,
+                Class<?> objectClass, String memberName, String memberValue) {
+        AbstractClassMetaData cmd = ec.getMetaDataManager()
+                .getMetaDataForClass(objectClass,
+                        ec.getClassLoaderResolver());
+        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
+                .getConnection();
+
+        String uniqueMemberValueKey = ScalarisSchemaHandler.getUniqueMemberKey(
+                objectClass.getCanonicalName(), memberName, memberValue);
+        TransactionSingleOp t = new TransactionSingleOp(conn);
+        try {
+            String uniqueObjectId = t.read(uniqueMemberValueKey).stringValue();
+            if (!ScalarisUtils.isDeletedRecord(uniqueObjectId)) {
+               return IdentityUtils.getObjectFromPersistableIdentity(uniqueObjectId, cmd, ec);
+            }
+        } catch (ConnectionException e) {
+            throw new NucleusException(e.getMessage(), e);
+        } catch (NotFoundException e) {
+            // there does not exist an object with the unique member value
+        } catch (UnknownException e) {
+            throw new NucleusException(e.getMessage(), e);
+        }
+        return null;
+    }
 }
