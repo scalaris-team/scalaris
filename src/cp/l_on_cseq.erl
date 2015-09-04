@@ -50,7 +50,6 @@
 -export([on/2]).
 
 -export([lease_renew/2, lease_renew/3]).
--export([lease_recover/2]).
 -export([lease_handover/3]).
 -export([lease_takeover/2]).
 -export([lease_takeover_after/3]).
@@ -149,12 +148,6 @@ lease_renew(Lease, Mode) ->
 lease_renew(Pid, Lease, Mode) ->
     comm:send_local(Pid,
                     {l_on_cseq, renew, Lease, Mode}),
-    ok.
-
--spec lease_recover(lease_t(), active | passive) -> ok.
-lease_recover(Lease, Mode) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, recover, Lease, Mode}),
     ok.
 
 -spec lease_handover(lease_t(), comm:mypid(), comm:erl_local_pid()) -> ok.
@@ -269,91 +262,10 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% lease recover
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, recover, Old = #lease{owner=Owner,epoch=OldEpoch},
-    Mode}, State) ->
-    %% we are trying to recover
-    log:log("~p: trying to recover: owner=~p id=~p, self=~p",
-            [pid_groups:my_groupname(), Owner, get_id(Old), comm:this()]),
-    New = Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0,
-                    timeout=new_timeout()},
-    ContentCheck = generic_content_check(Old, New, recover),
-    %% @todo New passed for debugging only:
-    ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, recover_reply, '_', New, Mode}),
-    update_lease(ReplyTo, ContentCheck, Old, New, State),
-    State;
-
-on({l_on_cseq, recover_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, State) ->
-    %% log:pal("successful renew~n~w~n~w~n", [Value, l_on_cseq:get_id(Value)]),
-    case lease_list:contains_lease(Value, State, Mode) of
-        true ->
-            State1 = lease_list:update_next_round(l_on_cseq:get_id(Value), Round, State),
-            lease_list:update_lease_in_dht_node_state(Value, State1, Mode, recover);
-        false ->
-            State
-    end;
-
-on({l_on_cseq, recover_reply,
-    {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}},
-    _New, Mode}, State) ->
-    % @todo retry
-    ?TRACE_ERROR("recover denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
-    ?TRACE_ERROR("id: ~p~n", [dht_node_state:get(State, node_id)]),
-    ?TRACE_ERROR("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
-    ?TRACE_ERROR("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
-    case Reason of
-        lease_does_not_exist ->
-            case Value of %@todo is this necessary?
-                prbr_bottom ->
-                    State;
-                _ ->
-                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State,
-                                                                Mode)
-            end;
-        unexpected_owner ->
-            CurrentOwner = get_owner(Value),
-            case comm:this() of
-                CurrentOwner ->
-                    %% the owner was already changed in a recover
-                    State;
-                _ ->
-                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode)
-            end;
-        unexpected_aux     ->
-            case get_aux(Value) of
-                empty                  ->
-                    renew_and_update_round(Value, Round, Mode, State);
-                {invalid, split, _, _} ->
-                    renew_and_update_round(Value, Round, Mode, State);
-                {invalid, merge, _, _} ->
-                    renew_and_update_round(Value, Round, Mode, State);
-                {valid, split, _, _}   ->
-                    renew_and_update_round(Value, Round, Mode, State);
-                {valid, merge, _, _}   ->
-                    renew_and_update_round(Value, Round, Mode, State);
-                {change_owner, _Pid}  ->
-                    renew_and_update_round(Value, Round, Mode, State)
-            end;
-        unexpected_range   ->
-            renew_and_update_round(Value, Round, Mode, State);
-        unexpected_timeout ->
-            renew_and_update_round(Value, Round, Mode, State);
-        unexpected_epoch   ->
-            renew_and_update_round(Value, Round, Mode, State);
-        unexpected_version ->
-            renew_and_update_round(Value, Round, Mode, State);
-        timeout_is_not_newer_than_current_lease ->
-            renew_and_update_round(Value, Round, Mode, State)
-    end;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 % lease renewal
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, renew, Old = #lease{version=OldVersion}, Mode},
+on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion}, Mode},
    State) ->
     %log:pal("on renew ~w (~w, ~w)~n", [Old, Mode, self()]),
     Self = comm:this(),
@@ -367,7 +279,16 @@ on({l_on_cseq, renew, Old = #lease{version=OldVersion}, Mode},
                     {change_owner, Self} ->
                         {Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()}, renew};
                     _ ->
-                        {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew}
+                        case comm:this() of
+                            Owner ->
+                                {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
+                            _ ->
+                                % we are trying to recover
+                                log:log("~p: trying to recover: owner=~p id=~p, self=~p",
+                                        [pid_groups:my_groupname(), Owner, get_id(Old), comm:this()]),
+                                {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0,
+                                           timeout=new_timeout()}, renew_recover}
+                        end
                 end
           end,
     ContentCheck = generic_content_check(Old, New, Renew),
@@ -390,7 +311,7 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Re
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
-    _New, Mode, _Renew}, State) ->
+    _New, Mode, Renew}, State) ->
     % @todo retry
     ?TRACE_ERROR("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
     ?TRACE_ERROR("id: ~p~n", [dht_node_state:get(State, node_id)]),
@@ -406,7 +327,14 @@ on({l_on_cseq, renew_reply,
                                                                 Mode)
             end;
         unexpected_owner   ->
-            lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode);
+            CurrentOwner = get_owner(Value),
+            case {comm:this(), Renew} of
+                {CurrentOwner, renew_recover} ->
+                    % the owner was already changed in a recover
+                    State;
+                _ ->
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value), State, Mode)
+            end;
         unexpected_aux     ->
             case get_aux(Value) of
                 empty                  ->
