@@ -36,7 +36,7 @@ recover(LeaseDBs) ->
     WaitTime = timer:now_diff(MaxTimeout, os:timestamp()) * 1000,
     if
         WaitTime >= 0 ->
-            time:sleep(WaitTime);
+            timer:sleep(WaitTime);
         true ->
             ok
     end,
