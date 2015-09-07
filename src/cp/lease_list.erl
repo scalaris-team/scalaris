@@ -122,6 +122,7 @@ remove_next_round(Id, State) ->
                                      active | passive,
                                      renew | received_lease | unittest | handover |
                                      takeover |
+                                     recover |
                                      merge_reply_step1 | merge_reply_step2 |
                                      merge_reply_step3 |
                                      split_reply_step1 | split_reply_step2 |
