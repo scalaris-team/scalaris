@@ -484,8 +484,6 @@ tester_type_check_rrepair(_Config) ->
              {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 6}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
-             {merkle_resolve_compare_inner_leaf, 9}, %% needs special bitstring
-             {merkle_resolve, 9}, % tries to send messages
              {merkle_resolve_leaves_send, 4}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_receive, 8}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 7}, % needs same-length lists

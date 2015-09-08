@@ -370,7 +370,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                end,
 
            % let the non-initiator's rr_recon process identify the remaining keys
-           ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OtherDBChunk1)] ++ ToReqIdx1),
+           ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OtherDBChunk1)]
+                                    ++ ToReqIdx1),
            ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
@@ -1761,56 +1762,56 @@ merkle_resolve_leaves_send(Sync, Stats, Params, P1EOneLeaf) ->
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats),
     {Hashes, NStats}.
 
-%% @doc Helper for resolving an inner-leaf mismatch.
--spec merkle_resolve_compare_inner_leaf(
-        P1EOneLeaf::float(), MyMaxItemsCount::non_neg_integer(),
-        BucketSizeBits::pos_integer(), MyKVItems::merkle_tree:mt_bucket(),
-        Hashes::bitstring(), ToSend::[?RT:key()], ToReq::[?RT:key()],
-        ToResolve::[bitstring()], ResolveNonEmptyAcc::boolean())
-        -> {NHashes::bitstring(), ToSend1::[?RT:key()], ToReq1::[?RT:key()],
-            ToResolve1::[bitstring()], ResolveNonEmpty1::boolean()}.
-merkle_resolve_compare_inner_leaf(P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
-                                  MyBuckets, Hashes, ToSend, ToReq,
-                                  ToResolve, ResolveNonEmptyAcc) ->
-    {NHashes, OBucketTree, OrigDBChunkLen, SigSize, VSize} =
-        merkle_resolve_retrieve_leaf_hashes(Hashes, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
-    {ToSend1, ToReqIdx1, OBucketTree1} =
-        get_full_diff(MyBuckets, OBucketTree, ToSend, [], SigSize, VSize),
-    ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)] ++ ToReqIdx1),
-    ToResolve1 = [compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0) | ToResolve],
-    ResolveNonEmptyAcc1 = ?IIF(ReqIdx =/= [], true, ResolveNonEmptyAcc),
-    {NHashes, ToSend1, ToReq, ToResolve1, ResolveNonEmptyAcc1}.
-
-%% @doc Helper for the final resolve step during merkle sync.
--spec merkle_resolve(
-        DestRRPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid(),
-        ToSend::[?RT:key()], ToReq::[?RT:key()], ToResolve::[bitstring()],
-        ResolveNonEmpty::boolean(), LeafNodesAcc::non_neg_integer(),
-        Initiator::boolean())
+%% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/4
+%%      and resolves them returning a compressed idx list each with keys to
+%%      request.
+-spec merkle_resolve_leaves_receive(
+        Sync::[merkle_sync_rcv()], Hashes::bitstring(), DestRRPid::comm:mypid(),
+        Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{},
+        P1EOneLeaf::float(), IsInitiator::boolean())
         -> {HashesReq::[bitstring()], NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
-               ResolveNonEmpty, LeafNAcc, Initiator) ->
+merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
+                              P1EOneLeaf, IsInitiator) ->
+    BucketSizeBits = merkle_max_bucket_size_bits(Params),
+    {<<>>, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc} =
+        lists:foldl(
+          fun({MyMaxItemsCount, MyKVItems, LeafCount},
+              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc}) ->
+                  % inner-leaf mismatch to resolve
+                  {NHashes, OBucketTree, OrigDBChunkLen, SigSize, VSize} =
+                      merkle_resolve_retrieve_leaf_hashes(
+                        HashesAcc, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
+                  % calc diff (trivial sync)
+                  {ToSend1, ToReqIdx1, OBucketTree1} =
+                      get_full_diff(
+                        MyKVItems, OBucketTree, ToSend, [], SigSize, VSize),
+                  ReqIdx = lists:usort(
+                             [Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)]
+                                 ++ ToReqIdx1),
+                  MyResolve = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
+                  {NHashes, ToSend1, [MyResolve | ToResolve],
+                   ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
+                   LeafNAcc + LeafCount}
+          end, {Hashes, [], [], false, 0}, Sync),
+
+    % send resolve message:
     SID = rr_recon_stats:get(session_id, Stats),
     % resolve the leaf-leaf comparison's items as key_upd:
     % note: the resolve request is counted at the initiator and
     %       thus from_my_node must be set accordingly on this node!
     KeyUpdResReqs =
-        if ToSend =/= [] orelse ToReq =/= [] ->
+        if ToSend =/= [] ->
                ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
                             {non_unique_send_list, ToSend}),
-               ?DBG_ASSERT2(length(ToReq) =:= length(lists:usort(ToReq)),
-                            {non_unique_req_list, ToReq}),
-               ?ASSERT2(ToReq =:= [], {req_nonempty, ToReq}),
                send_local(OwnerL, {request_resolve, SID,
-                                   {key_upd_send, DestRRPid, ToSend, ToReq},
-                                   [{from_my_node, ?IIF(Initiator, 1, 0)},
+                                   {key_upd_send, DestRRPid, ToSend, _ToReq = []},
+                                   [{from_my_node, ?IIF(IsInitiator, 1, 0)},
                                     {feedback_request, comm:make_global(OwnerL)}]}),
                1;
            true ->
                0
         end,
-
     % let the other node's rr_recon process identify the remaining keys;
     % it will use key_upd_send (if non-empty) and we must thus increase
     % the number of resolve processes here!
@@ -1828,33 +1829,6 @@ merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
                                  {resolve_started, KeyUpdResReqs + MerkleResReqs}],
                                 Stats),
     {ToResolve1, NStats}.
-
-%% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/4
-%%      and resolves them returning a compressed idx list each with keys to
-%%      request.
--spec merkle_resolve_leaves_receive(
-        Sync::[merkle_sync_rcv()], Hashes::bitstring(), DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{},
-        P1EOneLeaf::float(), IsInitiator::boolean())
-        -> {HashesReq::[bitstring()], NewStats::Stats}
-    when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
-                              P1EOneLeaf, IsInitiator) ->
-    BucketSizeBits = merkle_max_bucket_size_bits(Params),
-    {<<>>, ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc} =
-        lists:foldl(
-          fun({MyMaxItemsCount, MyKVItems, LeafCount},
-              {HashesAcc, ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc}) ->
-                  {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1} =
-                      merkle_resolve_compare_inner_leaf(
-                        P1EOneLeaf, MyMaxItemsCount, BucketSizeBits,
-                        MyKVItems, HashesAcc, ToSend,
-                        ToReq, ToResolve, ResolveNonEmpty),
-                  {NHashes, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
-                   LeafNAcc + LeafCount}
-          end, {Hashes, [], [], [], false, 0}, Sync),
-    merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
-                   ResolveNonEmpty, LeafNAcc, IsInitiator).
 
 %% @doc Decodes all requested keys from merkle_resolve_leaves_receive/8 (as a
 %%      result of sending resolve requests) and resolves the appropriate entries
