@@ -1707,13 +1707,6 @@ merkle_max_bucket_size_bits(Params) ->
          bloom:resize(BucketSizeBits0, 8),
          BucketSizeBits0).
 
-%% @doc Gets the number of bits needed to encode the given number.
--spec bits_for_number(Number::pos_integer()) -> pos_integer();
-                     (0) -> 0.
-bits_for_number(0) -> 0;
-bits_for_number(Number) ->
-    erlang:max(1, util:ceil(util:log2(Number + 1))).
-
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
 -spec merkle_resolve_add_leaf_hash(
@@ -1955,6 +1948,13 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Gets the number of bits needed to encode the given number.
+-spec bits_for_number(Number::pos_integer()) -> pos_integer();
+                     (0) -> 0.
+bits_for_number(0) -> 0;
+bits_for_number(Number) ->
+    erlang:max(1, util:ceil(util:log2(Number + 1))).
 
 %% @doc Splits P1E into N equal independent sub-processes and returns the P1E
 %%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
