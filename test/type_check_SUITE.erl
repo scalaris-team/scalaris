@@ -479,19 +479,16 @@ tester_type_check_rrepair(_Config) ->
              {decompress_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 9}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 14}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 13}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 6}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
              {merkle_resolve_compare_inner_leaf, 9}, %% needs special bitstring
              {merkle_resolve, 9}, % tries to send messages
-             {merkle_resolve_leaves_noninit, 4}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_noninit, 6}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_init, 7}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_init, 13}, % needs only leaf nodes in node list
-             {merkle_resolve_req_keys_noninit, 14}, % needs only leaf nodes in node list, same-length lists
-             {merkle_resolve_req_keys_init, 8}, % needs same-length lists
+             {merkle_resolve_leaves_send, 4}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_receive, 8}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_ckidx, 7}, % needs same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
