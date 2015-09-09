@@ -21,23 +21,25 @@ plotCount = exists("srcFile4") ? 4 : exists("srcFile3") ? 3 : exists("srcFile2")
 files = srcFile1 . (plotCount >= 2 ? " " . srcFile2 : "") . (plotCount >= 3 ? " " . srcFile3 : "") . (plotCount >= 4 ? " " . srcFile4 : "")
 get_file(i) = (i == 4) ? srcFile4 : (i == 3) ? srcFile3 : (i == 2) ? srcFile2 : srcFile1
 get_title(i) = (i == 4) ? srcFile4_title : (i == 3) ? srcFile3_title : (i == 2) ? srcFile2_title : srcFile1_title
+
+# http://colorbrewer2.org/?type=qualitative&scheme=Set1&n=5
+# (#e41a1c, #377eb8, #4daf4a, #984ea3, #ff7f00)
+# -> a little brighter version:
+set style line 1 lw 2 lt 1 lc rgb '#ff191b' pt 5 # dark red
+set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
+set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
+set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
+set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
+
+set style line 101 lw 3 lt 1 lc rgb '#ff191b' pt 0 # dark red
+set style line 102 lw 3 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
+set style line 103 lw 3 lt 1 lc rgb '#59c955' pt 0 # dark green
+set style line 104 lw 3 lt 1 lc rgb '#b05abd' pt 0 # dark purple
+set style line 105 lw 3 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
+
 if (plotCount == 4) {
-  set style line 1 lw 3 lc -1 pt 5 lt 1
-  set style line 2 lw 3 lc 1 pt 9 lt 1
-  set style line 3 lw 3 lc rgb "#32CD32" pt 7 lt 1
-  set style line 4 lw 3 lc 3 pt 4 lt 3
-  set style line 101 lw 3 lc -1 pt 0 lt 1
-  set style line 102 lw 3 lc 1 pt 0 lt 1
-  set style line 103 lw 3 lc rgb "#32CD32" pt 0 lt 1
-  set style line 104 lw 3 lc 3 pt 0 lt 1
   plotShift(x, i) = (i == 4) ? (x + (x / 1.9)) : (i == 3) ? (x + (x / 6.5)) : (i == 2) ? (x - (x / 7.9)) : (x - (x / 2.95))
 } else {
-  set style line 1 lw 3 lc 1 pt 5 lt 1
-  set style line 2 lw 3 lc rgb "#32CD32" pt 9 lt 1
-  set style line 3 lw 3 lc 3 pt 7 lt 1
-  set style line 101 lw 3 lc 1 pt 0 lt 1
-  set style line 102 lw 3 lc rgb "#32CD32" pt 0 lt 1
-  set style line 103 lw 3 lc 3 pt 0 lt 1
   if (plotCount == 3) {
     plotShift(x, i) = (i == 3) ? (x + (x / 2.3)) : (i == 2) ? (x) : (x - (x / 3.2))
   } else {
@@ -152,11 +154,11 @@ arrow_dx=.166666666667 # grid spacing in x
 arrow_di=0 # added to each i in loop - arrows drawn at (i+arrow_di)*arrow_dx
 arrow_xpoints=6 # TODO: adapt if number of data points changes!
 
-set style line 100 lw 3 lc -1 pt 0 lt 1
+set style line 100 lw 2 lc -1 pt 0 lt 1
 
 #--------------------------------- ALL
 set boxwidth plot_boxwidth relative
-set style fill solid 0.75 noborder
+set style fill solid 1 border -1
 set xtics scale 0.1
 set ytics scale 0.8
 set grid noxtics nomxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
@@ -281,11 +283,13 @@ LABEL = "naïve approach"
 set label 10 at 22,112000*(128+32)/8/1024 LABEL front center font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.3, \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorlines notitle ls (plotCount > 1 ? (100+i) : 100), \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with lines notitle ls (plotCount > 1 ? (100+i) : 100), \
+     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
  u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
 
@@ -299,10 +303,12 @@ set grid y2tics
 set y2tics mirror format "%-4.0f" scale 0.8
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.3, \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorlines notitle ls (plotCount > 1 ? (100+i) : 100), \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with lines notitle ls (plotCount > 1 ? (100+i) : 100), \
+     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
  u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5

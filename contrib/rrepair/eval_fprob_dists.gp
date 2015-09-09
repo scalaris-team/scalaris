@@ -90,24 +90,16 @@ set grid layerdefault   linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 
 set style line 100 lw 2 lc -1 pt 0 lt 1
 
-set style line 11 lw 2 lc 1 pt 5 lt 1
-set style line 12 lw 2 lc 1 pt 4 lt 1
-set style line 13 lw 2 lc 1 pt 9 lt 1
-set style line 14 lw 2 lc 1 pt 8 lt 1
-set style line 15 lw 2 lc 1 pt 7 lt 1
-set style line 16 lw 2 lc 1 pt 6 lt 1
-
-set style line 21 lw 2 lc rgb "#32CD32" pt 5 lt 3
-set style line 22 lw 2 lc rgb "#32CD32" pt 4 lt 3
-set style line 23 lw 2 lc rgb "#32CD32" pt 9 lt 3
-set style line 24 lw 2 lc rgb "#32CD32" pt 8 lt 3
-set style line 25 lw 2 lc rgb "#32CD32" pt 7 lt 3
-set style line 26 lw 2 lc rgb "#32CD32" pt 6 lt 3
+set style line 1 lw 2 lt 1 lc rgb '#ff191b' pt 5 # dark red
+set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
+set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
+set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
+set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
 #--------------------------------- ALL
 set xrange [-(0.5*step_size):(5.5*step_size)]
 set boxwidth plot_boxwidth relative
-set style fill solid 0.75 noborder
+set style fill solid 1 border -1
 set xtics scale 0.1
 set mxtics 2
 set grid noxtics mxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
@@ -137,11 +129,11 @@ set ytics mirror offset -2,0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") sc
 unset key
 
 plot "<awk '$" . col_ftype . " == \"update\" {Acc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 12 lc 1, \
+ u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
- u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
      "" \
- u (plotShift($1,3)):(($14+$15 - $16-$17)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 16 lc 3
+ u (plotShift($1,3)):(($14+$15 - $16-$17)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 3
 
 set origin 0.49,acc_pos_y
 unset key
@@ -153,11 +145,11 @@ set y2tics mirror offset (largeRCdiff ? 5 : 4),0 right format (largeRCdiff ? "%+
 set y2range [-acc_max_abs:acc_max_abs]
 
 plot "<awk '$" . col_ftype . " == \"regen\" {Acc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 12 lc 1, \
+ u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 1, \
      "" \
- u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 2, \
      "" \
- u (plotShift($1,3)):(($14+$15 - $16-$17)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" axes x1y2 with boxes ls 16 lc 3
+ u (plotShift($1,3)):(($14+$15 - $16-$17)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" axes x1y2 with boxes ls 3
 
 unset y2tics
 set grid noy2tics
@@ -177,11 +169,11 @@ set ytics mirror offset -2,0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f")
 unset key
 
 plot "<awk '$" . col_ftype . " == \"update\" {Red[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 12 lc 1, \
+ u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
- u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
      "" \
- u (plotShift($1,3)):(redundancy($11, $12, $13)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 16 lc 3
+ u (plotShift($1,3)):(redundancy($11, $12, $13)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 3
 
 set size all_width_r,red_height
 set origin 0.49,red_pos_y
@@ -193,11 +185,11 @@ set grid y2tics
 set y2tics mirror offset (largeRCdiff ? 5 : 4),0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") scale 0.8
 
 plot "<awk '$" . col_ftype . " == \"regen\" {Red[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 12 lc 1, \
+ u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 1, \
      "" \
- u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 2, \
      "" \
- u (plotShift($1,3)):(redundancy($11, $12, $13)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" axes x1y2 with boxes ls 16 lc 3
+ u (plotShift($1,3)):(redundancy($11, $12, $13)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" axes x1y2 with boxes ls 3
 
 unset y2tics
 set grid noy2tics
@@ -215,11 +207,11 @@ set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
 set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
 
 plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(100*($3/$2)-100) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 12 lc 1, \
+ u (plotShift($1,1)):(100*($3/$2)-100) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
- u (plotShift($1,2)):(100*($4/$2)-100) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(100*($4/$2)-100) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
      "" \
- u (plotShift($1,3)):(100*($5/$2)-100) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 16 lc 3
+ u (plotShift($1,3)):(100*($5/$2)-100) t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" with boxes ls 3
 
 set size all_width_r,bw_height
 set origin 0.49,0
@@ -230,8 +222,8 @@ set grid y2tics
 set y2tics mirror offset (largeRCdiff ? 7 : 6),0 right format "%+1.1f_{ }%%" scale 0.8
 
 plot "<awk '$" . col_ftype . " == \"regen\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
- u (plotShift($1,1)):(100*($3/$2)-100) axes x1y2 with boxes t "data_{rand}   , fail_{bin_{0.2 }}" ls 12 lc 1, \
+ u (plotShift($1,1)):(100*($3/$2)-100) axes x1y2 with boxes t "data_{rand}   , fail_{bin_{0.2 }}" ls 1, \
      "" \
- u (plotShift($1,2)):(100*($4/$2)-100) axes x1y2 with boxes t "data_{bin_{0.2 }} , fail_{rand}  " ls 15 lc rgb "#32CD32", \
+ u (plotShift($1,2)):(100*($4/$2)-100) axes x1y2 with boxes t "data_{bin_{0.2 }} , fail_{rand}  " ls 2, \
      "" \
- u (plotShift($1,3)):(100*($5/$2)-100) axes x1y2 with boxes t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" ls 16 lc 3
+ u (plotShift($1,3)):(100*($5/$2)-100) axes x1y2 with boxes t "data_{bin_{0.2 }} , fail_{bin_{0.2 }" ls 3
