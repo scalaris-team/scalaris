@@ -1702,7 +1702,7 @@ p_process_tree_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN
 %%      the given merkle params.
 -spec merkle_max_bucket_size_bits(Params::#merkle_params{}) -> pos_integer().
 merkle_max_bucket_size_bits(Params) ->
-    BucketSizeBits0 = bits_for_number(Params#merkle_params.bucket_size + 1),
+    BucketSizeBits0 = bits_for_number(Params#merkle_params.bucket_size),
     ?IIF(config:read(rr_align_to_bytes),
          bloom:resize(BucketSizeBits0, 8),
          BucketSizeBits0).
