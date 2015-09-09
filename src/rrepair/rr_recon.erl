@@ -592,7 +592,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
            ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
     ?TRACE1(_Msg, State),
     NewStats =
-        case decompress_k_list(BinReqIdxPos, KList) of
+        case decompress_idx_to_k_list(BinReqIdxPos, KList) of
             [] -> Stats;
             ReqKeys ->
                 SID = rr_recon_stats:get(session_id, Stats),
@@ -619,7 +619,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
     OrigDBChunkLen = calc_items_in_chunk(OtherDBChunk, SigSize + VSize),
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize, 0),
-    MyDiffKeys = [Key || Key <- decompress_k_list_kv(MyDiffIdx, KVList),
+    MyDiffKeys = [Key || Key <- decompress_idx_to_k_list_kv(MyDiffIdx, KVList),
                                 not gb_trees:is_defined(compress_key(Key, SigSize),
                                                         DBChunkTree)],
 
@@ -1206,16 +1206,18 @@ compress_key(Key, SigSize) ->
     end.
 
 %% @doc Creates a compressed version of a (key-)position list.
+%%      MaxPosBound represents an upper bound on the biggest value in the list;
+%%      when decoding, the same bound must be known!
 %% @see shash_compress_k_list/7
 -spec compress_idx_list(SortedIdxList::[non_neg_integer()],
-                        DBChunkLen::non_neg_integer(), ResultIdx::[non_neg_integer()],
+                        MaxPosBound::non_neg_integer(), ResultIdx::[non_neg_integer()],
                         LastPos::non_neg_integer(), Max::non_neg_integer())
         -> CompressedIndices::bitstring().
-compress_idx_list([Pos | Rest], DBChunkLen, AccResult, LastPos, Max) ->
+compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max) ->
     CurIdx = Pos - LastPos,
-    compress_idx_list(Rest, DBChunkLen, [CurIdx | AccResult], Pos + 1,
+    compress_idx_list(Rest, MaxPosBound, [CurIdx | AccResult], Pos + 1,
                       erlang:max(CurIdx, Max));
-compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
+compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
     IdxSize = if Max =:= 0 -> 1;
                  true      -> bits_for_number(Max)
               end,
@@ -1226,62 +1228,53 @@ compress_idx_list([], DBChunkLen, AccResult, _LastPos, Max) ->
         <<>> ->
             <<>>;
         _ ->
-            IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
+            IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
             <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>
     end.
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5 or
 %%      shash_compress_k_list/7 into a list of keys from the original key list.
--spec decompress_k_list(CompressedBin::bitstring(), KList::[?RT:key()])
+-spec decompress_idx_to_k_list(CompressedBin::bitstring(), KList::[?RT:key()])
         -> ResKeys::[?RT:key()].
-decompress_k_list(<<>>, _KList) ->
+decompress_idx_to_k_list(<<>>, _KList) ->
     [];
-decompress_k_list(Bin, KList) ->
-    DBChunkLen = length(KList),
-    IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
+decompress_idx_to_k_list(Bin, KList) ->
+    IdxBitsSize = bits_for_number(bits_for_number(length(KList))),
     <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
-    decompress_k_list_(Bin2, KList, SigSize).
+    decompress_idx_to_k_list_(Bin2, KList, SigSize).
 
-%% @doc Helper for decompress_k_list/2.
--spec decompress_k_list_(CompressedBin::bitstring(), KList::[?RT:key()],
-                         SigSize::signature_size()) -> ResKeys::[?RT:key()].
-decompress_k_list_(<<>>, _, _SigSize) ->
+%% @doc Helper for decompress_idx_to_k_list/2.
+-spec decompress_idx_to_k_list_(CompressedBin::bitstring(), KList::[?RT:key()],
+                                SigSize::signature_size()) -> ResKeys::[?RT:key()].
+decompress_idx_to_k_list_(<<>>, _, _SigSize) ->
     [];
-decompress_k_list_(Bin, KList, SigSize) ->
+decompress_idx_to_k_list_(Bin, KList, SigSize) ->
     <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
     [Key | KList2] = lists:nthtail(KeyPosInc, KList),
-    [Key | decompress_k_list_(T, KList2, SigSize)].
+    [Key | decompress_idx_to_k_list_(T, KList2, SigSize)].
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5 or
 %%      shash_compress_k_list/7 into a list of keys from the original KV list.
--spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv())
+%%      NOTE: This is essentially the same as decompress_idx_to_k_list/2 but we
+%%            need the separation because of the opaque RT keys.
+-spec decompress_idx_to_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv())
         -> ResKeys::[?RT:key()].
-decompress_k_list_kv(Bin, KVList) ->
-    decompress_k_list_kv(Bin, KVList, length(KVList)).
-
-%% @doc De-compresses a bitstring with indices from compress_idx_list/5 or
-%%      shash_compress_k_list/7 into a list of keys from the original KV list.
--spec decompress_k_list_kv(CompressedBin::bitstring(), KVList::db_chunk_kv(),
-                           KVListLen::non_neg_integer())
-        -> ResKeys::[?RT:key()].
-decompress_k_list_kv(<<>>, _KVList, _KVListLen) ->
-    ?DBG_ASSERT(length(_KVList) =:= _KVListLen),
+decompress_idx_to_k_list_kv(<<>>, _KVList) ->
     [];
-decompress_k_list_kv(Bin, KVList, DBChunkLen) ->
-    ?DBG_ASSERT(length(KVList) =:= DBChunkLen),
-    IdxBitsSize = bits_for_number(bits_for_number(DBChunkLen)),
+decompress_idx_to_k_list_kv(Bin, KVList) ->
+    IdxBitsSize = bits_for_number(bits_for_number(length(KVList))),
     <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
-    decompress_k_list_kv_(Bin2, KVList, SigSize).
+    decompress_idx_to_k_list_kv_(Bin2, KVList, SigSize).
 
-%% @doc Helper for decompress_k_list_kv/3.
--spec decompress_k_list_kv_(CompressedBin::bitstring(), KVList::db_chunk_kv(),
-                            SigSize::signature_size()) -> ResKeys::[?RT:key()].
-decompress_k_list_kv_(<<>>, _, _SigSize) ->
+%% @doc Helper for decompress_idx_to_k_list_kv/2.
+-spec decompress_idx_to_k_list_kv_(CompressedBin::bitstring(), KVList::db_chunk_kv(),
+                                   SigSize::signature_size()) -> ResKeys::[?RT:key()].
+decompress_idx_to_k_list_kv_(<<>>, _, _SigSize) ->
     [];
-decompress_k_list_kv_(Bin, KVList, SigSize) ->
+decompress_idx_to_k_list_kv_(Bin, KVList, SigSize) ->
      <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
     [{Key, _Version} | KVList2] = lists:nthtail(KeyPosInc, KVList),
-    [Key | decompress_k_list_kv_(T, KVList2, SigSize)].
+    [Key | decompress_idx_to_k_list_kv_(T, KVList2, SigSize)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SHash specific
@@ -1547,18 +1540,21 @@ check_node(Hashes, Tree, SigSizeI, SigSizeL,
       is_subtype(Count,    non_neg_integer()),
       is_subtype(Sync,     {[merkle_sync_send()], [merkle_sync_rcv()]}).
 p_check_node([], [], _SigSizeI, _SigSizeL,
-             _MyMaxItemsCount, _OtherMaxItemsCount, _Params, Stats, FlagsAcc, AccN,
+             _MyMaxItemsCount, _OtherMaxItemsCount, _Params, Stats, FlagsAcc, RestTreeAcc,
              MerkleSyncAccSend, MerkleSyncAccRcv, {MerkleSyncInSend, MerkleSyncInRcv},
              AccCmp, AccSkip) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp},
                                  {tree_compareSkipped, AccSkip}], Stats),
-    AccMIC = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- AccN]]),
-    {FlagsAcc, lists:reverse(AccN),
+    % note: we can safely include all leaf nodes here although only inner nodes
+    %       should go into MIC - every inner node always has more items than
+    %       any leaf node (otherwise it would have been a leaf node)
+    AccMIC = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- RestTreeAcc]]),
+    {FlagsAcc, lists:reverse(RestTreeAcc),
      {lists:reverse(MerkleSyncAccSend, MerkleSyncInSend),
       lists:reverse(MerkleSyncAccRcv, MerkleSyncInRcv)}, NStats, AccMIC};
 p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats, FlagsAcc,
-             AccN, MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN, AccCmp, AccSkip) ->
+             RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN, AccCmp, AccSkip) ->
     IsLeafNode = merkle_tree:is_leaf(Node),
     NodeHash0 = merkle_tree:get_hash(Node),
     if IsLeafHash ->
@@ -1572,14 +1568,14 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            Skipped = merkle_tree:size(Node) - 1,
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_ok:2>>, AccN,
+                        <<FlagsAcc/bitstring, ?recon_ok:2>>, RestTreeAcc,
                         MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
                         AccCmp + 1, AccSkip + Skipped);
        (not IsLeafNode) andalso (not IsLeafHash) ->
            Childs = merkle_tree:get_childs(Node),
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, lists:reverse(Childs, AccN),
+                        <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, lists:reverse(Childs, RestTreeAcc),
                         MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
                         AccCmp + 1, AccSkip);
        (not IsLeafNode) andalso IsLeafHash ->
@@ -1587,7 +1583,7 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            Sync = {MyMaxItemsCount, MyKVItems, LeafCount},
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, AccN,
+                        <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, RestTreeAcc,
                         MerkleSyncAccSend, [Sync | MerkleSyncAccRcv], MerkleSyncIN,
                         AccCmp + 1, AccSkip);
        IsLeafNode ->
@@ -1598,7 +1594,7 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                    merkle_tree:get_item_count(Node)},
            p_check_node(TK, TN, SigSizeI, SigSizeL,
                         MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>, AccN,
+                        <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>, RestTreeAcc,
                         [Sync | MerkleSyncAccSend], MerkleSyncAccRcv, MerkleSyncIN,
                         AccCmp + 1, AccSkip)
     end.
@@ -1648,6 +1644,9 @@ p_process_tree_cmp_result(<<>>, [], _SigSizeI, _SigSizeL,
                           AccCmp, AccSkip) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp},
                                  {tree_compareSkipped, AccSkip}], Stats),
+    % note: we can safely include all leaf nodes here although only inner nodes
+    %       should go into MIC - every inner node always has more items than
+    %       any leaf node (otherwise it would have been a leaf node)
     AccMIC = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- RestTreeAcc]]),
      {lists:reverse(RestTreeAcc),
       {lists:reverse(MerkleSyncAccSend, MerkleSyncInSend),
@@ -1834,7 +1833,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
 merkle_resolve_leaves_ckidx([{_OtherMaxItemsCount, MyKVItems, _LeafCount} | TL],
                              [ReqKeys | BinKeyList],
                              DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
-    ToSend1 = decompress_k_list_kv(ReqKeys, MyKVItems, length(MyKVItems)) ++ ToSend,
+    ToSend1 = decompress_idx_to_k_list_kv(ReqKeys, MyKVItems) ++ ToSend,
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL,
                                 ToSend1, IsInitiator);
 merkle_resolve_leaves_ckidx([], [], DestRRPid, Stats, OwnerL, [_|_] = ToSend, IsInitiator) ->

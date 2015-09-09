@@ -472,11 +472,10 @@ tester_type_check_rrepair(_Config) ->
              {shash_decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
              {shash_compress_k_list, 7}, %% needs a special binary to correspond to a number of bits
-             {decompress_k_list, 2}, %% needs a special binary to correspond to a number of bits
-             {decompress_k_list_, 3}, %% needs a special binary to correspond to a number of bits
-             {decompress_k_list_kv, 2}, %% needs a special binary to correspond to a number of bits
-             {decompress_k_list_kv, 3}, %% needs a special binary to correspond to a number of bits
-             {decompress_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_k_list, 2}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_k_list_, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_k_list_kv, 2}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
              {check_node, 9}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
