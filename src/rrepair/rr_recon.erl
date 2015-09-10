@@ -674,6 +674,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                     misc = [{p1e, P1E_I},
                                             {all_leaf_p1e, P1EAllLeaves},
                                             {icount, MyMaxItemsCount}]},
+%%     log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(RTree)]),
+
     if RTree =:= [] andalso MerkleSyncNew =:= {[], []} ->
            shutdown(sync_finished, NewState#rr_recon_state{stats = NStats});
        RTree =:= [] ->
@@ -718,7 +720,8 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                 MyLastMaxItemsCount, OtherLastMaxItemsCount,
                                 MerkleSync, Params, Stats),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
-    
+%%     log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(RTree)]),
+
     if RTree =:= [] andalso MerkleSyncNew =:= {[], []} ->
            shutdown(sync_finished,
                     NewState#rr_recon_state{stats = NStats,
@@ -934,10 +937,6 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             P1ETotal = get_p1e(),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
             ItemCount = erlang:length(DBItems),
-%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-%%                     [self(), merkle_tree:size_detail(MySyncStruct),
-%%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-%%                                    merkle_tree:get_item_count(L) =:= 0])]),
 
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
@@ -963,6 +962,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                 rr_recon_stats:set(
                   [{tree_size, merkle_tree:size_detail(SyncStruct)}], Stats),
             Stats2 = rr_recon_stats:inc([{build_time, BuildTime}], Stats1),
+%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+%%                     [self(), merkle_tree:size_detail(SyncStruct),
+%%                      length([ok || L <- merkle_tree:get_leaves(SyncStruct),
+%%                                    merkle_tree:get_item_count(L) =:= 0])]),
             
             State#rr_recon_state{struct = SyncStruct,
                                  stats = Stats2, params = MySyncParams,
