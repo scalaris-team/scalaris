@@ -27,6 +27,7 @@
 -include("scalaris.hrl").
 
 -export([new/1, new/2, new/3,
+         keys_to_intervals/2,
          insert/2, insert_list/2,
          lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
@@ -472,6 +473,11 @@ size_detail({merkle_tree, _, Root}) ->
     Result = {_Inner, _Leafs, _Items} = size_detail_node([Root], 0, 0, 0),
     ?DBG_ASSERT(_Leafs =:= get_leaf_count(Root)),
     ?DBG_ASSERT(_Items =:= get_item_count(Root)),
+    Result;
+size_detail(Nodes) when is_list(Nodes) ->
+    Result = {_Inner, _Leafs, _Items} = size_detail_node(Nodes, 0, 0, 0),
+    ?DBG_ASSERT(_Leafs =:= lists:sum([get_leaf_count(N) || N <- Nodes])),
+    ?DBG_ASSERT(_Items =:= lists:sum([get_item_count(N) || N <- Nodes])),
     Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),

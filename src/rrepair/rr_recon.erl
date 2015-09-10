@@ -109,6 +109,7 @@
          interval       = ?required(merkle_param, interval)       :: intervals:interval(),
          reconPid       = undefined                               :: comm:mypid() | undefined,
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
+         num_trees      = ?required(merkle_param, num_trees)      :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
          p1e            = ?required(merkle_param, p1e)            :: float(),
          ni_item_count  = ?required(merkle_param, ni_item_count)  :: non_neg_integer()
@@ -903,22 +904,22 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             Stats1 =
                 rr_recon_stats:set(
                   [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
-            #merkle_params{p1e = P1ETotal,
+            #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
                            ni_item_count = OtherItemsCount} = Params,
-            MyItemCount = merkle_tree:get_item_count(MySyncStruct),
+            MyItemCount = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
 %%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
 %%                     [self(), merkle_tree:size_detail(MySyncStruct),
 %%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
 %%                                    merkle_tree:get_item_count(L) =:= 0])]),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
+            P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+%%             log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(MySyncStruct)]),
 
             {P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL} =
-                merkle_next_signature_sizes(Params, P1ETotal2, MyItemCount,
+                merkle_next_signature_sizes(Params, P1ETotal3, MyItemCount,
                                             OtherItemsCount),
 
-            RootNode = merkle_tree:get_root(MySyncStruct),
-
-            Req = merkle_compress_hashlist([RootNode], <<>>, NextSigSizeI, NextSigSizeL),
+            Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
             send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount}),
             State#rr_recon_state{stats = Stats1,
                                  misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
@@ -934,13 +935,24 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             MerkleI = merkle_tree:get_interval(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
+            NumTrees = get_merkle_num_trees(),
             P1ETotal = get_p1e(),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
-            ItemCount = erlang:length(DBItems),
+            
+            % split interval first and create NumTrees merkle trees later
+            {BuildTime1, ICBList} =
+                util:tc(fun() ->
+                                merkle_tree:keys_to_intervals(
+                                  DBItems, intervals:split(MerkleI, NumTrees))
+                        end),
+            ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
+            P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+%%             log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(ICBList)]),
 
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
                                           bucket_size = MerkleB,
+                                          num_trees = NumTrees,
                                           p1e = P1ETotal,
                                           ni_item_count = ItemCount},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
@@ -951,17 +963,19 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             
             % finally create the real merkle tree containing data
             % -> this way, the initiator can create its struct in parallel!
-            {BuildTime, SyncStruct} =
+            {BuildTime2, SyncStruct} =
                 util:tc(fun() ->
-                                merkle_tree:new(MerkleI, DBItems,
-                                                [{keep_bucket, true},
-                                                 {branch_factor, MerkleV},
-                                                 {bucket_size, MerkleB}])
+                                [merkle_tree:get_root(
+                                   merkle_tree:new(SubI, Bucket,
+                                                   [{keep_bucket, true},
+                                                    {branch_factor, MerkleV},
+                                                    {bucket_size, MerkleB}]))
+                                   || {SubI, _Count, Bucket} <- ICBList]
                         end),
             Stats1 =
                 rr_recon_stats:set(
                   [{tree_size, merkle_tree:size_detail(SyncStruct)}], Stats),
-            Stats2 = rr_recon_stats:inc([{build_time, BuildTime}], Stats1),
+            Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
 %%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
 %%                     [self(), merkle_tree:size_detail(SyncStruct),
 %%                      length([ok || L <- merkle_tree:get_leaves(SyncStruct),
@@ -969,7 +983,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             
             State#rr_recon_state{struct = SyncStruct,
                                  stats = Stats2, params = MySyncParams,
-                                 misc = [{p1e, P1ETotal2},
+                                 misc = [{p1e, P1ETotal3},
                                          {all_leaf_p1e, P1ETotal2},
                                          {icount, ItemCount}],
                                  kv_list = []}
@@ -2134,19 +2148,25 @@ build_recon_struct(merkle_tree, I, DBItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     case Params of
         {} ->
-            % merkle_tree only at non-initiator!
+            % merkle_tree - at non-initiator!
             MOpts = [{branch_factor, get_merkle_branch_factor()},
                      {bucket_size, get_merkle_bucket_size()}],
             % do not build the real tree here - build during begin_sync so that
             % the initiator can start creating its struct earlier and in parallel
+            % the actual build process is executed in begin_sync/3
             merkle_tree:new(I, [{keep_bucket, true} | MOpts]);
         #merkle_params{branch_factor = BranchFactor,
-                       bucket_size = BucketSize} ->
-            % merkle_tree only at initiator!
+                       bucket_size = BucketSize,
+                       num_trees = NumTrees} ->
+            % merkle_tree - at initiator!
             MOpts = [{branch_factor, BranchFactor},
                      {bucket_size, BucketSize}],
             % build now
-            merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]);
+            RootsI = intervals:split(I, NumTrees),
+            ICBList = merkle_tree:keys_to_intervals(DBItems, RootsI),
+            [merkle_tree:get_root(
+               merkle_tree:new(SubI, Bucket, [{keep_bucket, true} | MOpts]))
+               || {SubI, _Count, Bucket} <- ICBList];
         #art_recon_struct{branch_factor = BranchFactor,
                           bucket_size = BucketSize} ->
             MOpts = [{branch_factor, BranchFactor},
@@ -2441,6 +2461,8 @@ check_config() ->
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
         config:cfg_is_greater_than(rr_merkle_bucket_size, 0) andalso
+        config:cfg_is_integer(rr_merkle_num_trees) andalso
+        config:cfg_is_greater_than(rr_merkle_num_trees, 0) andalso
         check_percent(rr_art_inner_fpr) andalso
         check_percent(rr_art_leaf_fpr) andalso
         config:cfg_is_integer(rr_art_correction_factor) andalso
@@ -2473,6 +2495,11 @@ get_max_items() ->
 -spec get_merkle_branch_factor() -> pos_integer().
 get_merkle_branch_factor() ->
     config:read(rr_merkle_branch_factor).
+
+%% @doc Merkle number of childs per inner node.
+-spec get_merkle_num_trees() -> pos_integer().
+get_merkle_num_trees() ->
+    config:read(rr_merkle_num_trees).
 
 %% @doc Merkle max items in a leaf node.
 -spec get_merkle_bucket_size() -> pos_integer().
