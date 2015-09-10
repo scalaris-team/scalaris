@@ -30,7 +30,6 @@ import org.datanucleus.store.connection.AbstractConnectionFactory;
 import org.datanucleus.store.connection.AbstractManagedConnection;
 import org.datanucleus.store.connection.ManagedConnection;
 
-import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
@@ -161,15 +160,15 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
      */
     public class ManagedConnectionImpl extends AbstractManagedConnection {
 
-        private Connection conn;
-        
         public ManagedConnectionImpl(final Map optionsl) {
             // TODO: handle options?
         }
 
         public Object getConnection() {
             try {
-                conn = connPool.getConnection();
+                if (conn == null) {
+                    conn = connPool.getConnection();
+                }
             } catch (ConnectionException e) {
                 throw new NucleusDataStoreException("Could not create a connection", e);
             }
@@ -181,7 +180,10 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
         }
 
         public void close() {
-            connPool.releaseConnection(conn);
+            if (conn != null) {
+                 connPool.releaseConnection((de.zib.scalaris.Connection) conn);
+                conn = null;
+            }
         }
     }
 }

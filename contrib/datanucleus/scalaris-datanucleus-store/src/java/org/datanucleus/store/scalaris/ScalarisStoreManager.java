@@ -35,7 +35,6 @@ public class ScalarisStoreManager extends AbstractStoreManager {
         // Handler for persistence process
         persistenceHandler = new ScalarisPersistenceHandler(this);
         schemaHandler = new ScalarisSchemaHandler(this);
-        connectionMgr.disableConnectionPool();
 
         logConfiguration();
     }
