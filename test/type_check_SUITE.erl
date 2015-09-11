@@ -477,10 +477,8 @@ tester_type_check_rrepair(_Config) ->
              {decompress_idx_to_k_list_kv, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 8}, %% needs a special binary to correspond to a number of bits
-             {check_node, 9}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 15}, %% needs merkle_tree/nodes with hashes
-             {process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
+             {check_node, 15}, %% needs merkle_tree/nodes with hashes
+             {process_tree_cmp_result, 14}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 6}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
              {merkle_resolve_leaves_send, 4}, % needs only leaf nodes in node list

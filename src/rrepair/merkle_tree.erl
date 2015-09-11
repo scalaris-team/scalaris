@@ -468,7 +468,7 @@ node_size({_H, _ICnt, _Bkt, _I}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns a triple with number of inner nodes, leaf nodes and hashed items.
--spec size_detail(merkle_tree()) -> mt_size().
+-spec size_detail(merkle_tree() | [mt_node()]) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
     Result = {_Inner, _Leafs, _Items} = size_detail_node([Root], 0, 0, 0),
     ?DBG_ASSERT(_Leafs =:= get_leaf_count(Root)),

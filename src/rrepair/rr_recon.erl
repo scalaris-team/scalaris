@@ -657,7 +657,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = merkle_tree,      merkle_sync = MerkleSync,
                            params = #merkle_params{} = Params,
-                           struct = Tree,             stats = Stats,
+                           struct = TreeNodes,        stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{p1e, LastP1ETotal},
                                    {all_leaf_p1e, P1EAllLeaves},
@@ -668,8 +668,9 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                     OtherMaxItemsCount),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
     {FlagsBin, RTree, MerkleSyncNew, NStats, MyMaxItemsCount} =
-        check_node(ToCheck, Tree, SigSizeI, SigSizeL,
-                   MyLastMaxItemsCount, OtherMaxItemsCount, MerkleSync, Params, Stats),
+        check_node(ToCheck, TreeNodes, SigSizeI, SigSizeL,
+                   MyLastMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                   <<>>, [], [], [], MerkleSync, 0, 0),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew,
                                     misc = [{p1e, P1E_I},
@@ -709,7 +710,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = merkle_tree,          merkle_sync = MerkleSync,
                            params = #merkle_params{} = Params,
-                           struct = Tree,                 stats = Stats,
+                           struct = TreeNodes,            stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, {SigSizeI, SigSizeL}},
                                    {p1e, P1ETotal_I},
@@ -717,9 +718,9 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
     {RTree, MerkleSyncNew, NStats, MyMaxItemsCount} =
-        process_tree_cmp_result(FlagsBin, Tree, SigSizeI, SigSizeL,
+        process_tree_cmp_result(FlagsBin, TreeNodes, SigSizeI, SigSizeL,
                                 MyLastMaxItemsCount, OtherLastMaxItemsCount,
-                                MerkleSync, Params, Stats),
+                                MerkleSync, Params, Stats, [], [], [], 0, 0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
 %%     log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(RTree)]),
 
@@ -1520,35 +1521,14 @@ merkle_decompress_hashlist(Bin, SigSizeI, SigSizeL) ->
 %%      (executed on non-initiator).
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
--spec check_node(Hashes::[merkle_cmp_request()],
-                 merkle_tree:merkle_tree() | NodeList,
+-spec check_node(Hashes::[merkle_cmp_request()], MyNodes::NodeList,
                  SigSizeI::signature_size(), SigSizeL::signature_size(),
-                 MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer(),
-                 MerkleSyncIn::Sync, #merkle_params{}, Stats)
-        -> {Flags::bitstring(), RestTree::NodeList,
-            MerkleSyncOut::Sync, Stats, MaxItemsCount::non_neg_integer()}
-    when is_subtype(NodeList, [merkle_tree:mt_node()]),
-         is_subtype(Stats,    rr_recon_stats:stats()),
-         is_subtype(Sync,     {[merkle_sync_send()], [merkle_sync_rcv()]}).
-check_node(Hashes, Tree, SigSizeI, SigSizeL,
-           MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats) ->
-    TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
-                    false -> Tree;
-                    true -> [merkle_tree:get_root(Tree)]
-                end,
-    p_check_node(Hashes, TreeNodes, SigSizeI, SigSizeL,
-                 MyMaxItemsCount, OtherMaxItemsCount, Params, Stats, <<>>, [], [], [],
-                 MerkleSyncIn, 0, 0).
-
-%% @doc Helper for check_node/7.
--spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::NodeList,
-                   SigSizeI::signature_size(), SigSizeL::signature_size(),
-                   MyMaxItemsCount::non_neg_integer(),
-                   OtherMaxItemsCount::non_neg_integer(), #merkle_params{},
-                   Stats, FlagsAcc::bitstring(), RestTreeAcc::NodeList,
-                   MerkleSyncAccSend::[merkle_sync_send()],
-                   MerkleSyncAccRcv::[merkle_sync_rcv()], MerkleSyncIn::Sync,
-                   AccCmp::Count, AccSkip::Count)
+                 MyMaxItemsCount::non_neg_integer(),
+                 OtherMaxItemsCount::non_neg_integer(), #merkle_params{},
+                 Stats, FlagsAcc::bitstring(), RestTreeAcc::NodeList,
+                 MerkleSyncAccSend::[merkle_sync_send()],
+                 MerkleSyncAccRcv::[merkle_sync_rcv()], MerkleSyncIn::Sync,
+                 AccCmp::Count, AccSkip::Count)
         -> {FlagsOUT::bitstring(), RestTreeOut::NodeList,
             MerkleSyncOUT::Sync, Stats, MaxItemsCount::Count}
     when
@@ -1556,10 +1536,10 @@ check_node(Hashes, Tree, SigSizeI, SigSizeL,
       is_subtype(Stats,    rr_recon_stats:stats()),
       is_subtype(Count,    non_neg_integer()),
       is_subtype(Sync,     {[merkle_sync_send()], [merkle_sync_rcv()]}).
-p_check_node([], [], _SigSizeI, _SigSizeL,
-             _MyMaxItemsCount, _OtherMaxItemsCount, _Params, Stats, FlagsAcc, RestTreeAcc,
-             MerkleSyncAccSend, MerkleSyncAccRcv, {MerkleSyncInSend, MerkleSyncInRcv},
-             AccCmp, AccSkip) ->
+check_node([], [], _SigSizeI, _SigSizeL,
+           _MyMaxItemsCount, _OtherMaxItemsCount, _Params, Stats, FlagsAcc, RestTreeAcc,
+           MerkleSyncAccSend, MerkleSyncAccRcv, {MerkleSyncInSend, MerkleSyncInRcv},
+           AccCmp, AccSkip) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp},
                                  {tree_compareSkipped, AccSkip}], Stats),
     % note: we can safely include all leaf nodes here although only inner nodes
@@ -1569,9 +1549,9 @@ p_check_node([], [], _SigSizeI, _SigSizeL,
     {FlagsAcc, lists:reverse(RestTreeAcc),
      {lists:reverse(MerkleSyncAccSend, MerkleSyncInSend),
       lists:reverse(MerkleSyncAccRcv, MerkleSyncInRcv)}, NStats, AccMIC};
-p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
-             MyMaxItemsCount, OtherMaxItemsCount, Params, Stats, FlagsAcc,
-             RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN, AccCmp, AccSkip) ->
+check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
+           MyMaxItemsCount, OtherMaxItemsCount, Params, Stats, FlagsAcc,
+           RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN, AccCmp, AccSkip) ->
     IsLeafNode = merkle_tree:is_leaf(Node),
     NodeHash0 = merkle_tree:get_hash(Node),
     if IsLeafHash ->
@@ -1583,64 +1563,41 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
     end,
     if Hash =:= NodeHash andalso IsLeafHash =:= IsLeafNode ->
            Skipped = merkle_tree:size(Node) - 1,
-           p_check_node(TK, TN, SigSizeI, SigSizeL,
-                        MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_ok:2>>, RestTreeAcc,
-                        MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
-                        AccCmp + 1, AccSkip + Skipped);
+           check_node(TK, TN, SigSizeI, SigSizeL,
+                      MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                      <<FlagsAcc/bitstring, ?recon_ok:2>>, RestTreeAcc,
+                      MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
+                      AccCmp + 1, AccSkip + Skipped);
        (not IsLeafNode) andalso (not IsLeafHash) ->
            Childs = merkle_tree:get_childs(Node),
-           p_check_node(TK, TN, SigSizeI, SigSizeL,
-                        MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, lists:reverse(Childs, RestTreeAcc),
-                        MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
-                        AccCmp + 1, AccSkip);
+           check_node(TK, TN, SigSizeI, SigSizeL,
+                      MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                      <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>, lists:reverse(Childs, RestTreeAcc),
+                      MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN,
+                      AccCmp + 1, AccSkip);
        (not IsLeafNode) andalso IsLeafHash ->
            {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
            Sync = {MyMaxItemsCount, MyKVItems, LeafCount},
-           p_check_node(TK, TN, SigSizeI, SigSizeL,
-                        MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, RestTreeAcc,
-                        MerkleSyncAccSend, [Sync | MerkleSyncAccRcv], MerkleSyncIN,
-                        AccCmp + 1, AccSkip);
+           check_node(TK, TN, SigSizeI, SigSizeL,
+                      MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                      <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, RestTreeAcc,
+                      MerkleSyncAccSend, [Sync | MerkleSyncAccRcv], MerkleSyncIN,
+                      AccCmp + 1, AccSkip);
        IsLeafNode ->
            MaxItemsCount = if IsLeafHash -> Params#merkle_params.bucket_size;
                               true       -> OtherMaxItemsCount
                            end,
            Sync = {MaxItemsCount, merkle_tree:get_bucket(Node),
                    merkle_tree:get_item_count(Node)},
-           p_check_node(TK, TN, SigSizeI, SigSizeL,
-                        MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                        <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>, RestTreeAcc,
-                        [Sync | MerkleSyncAccSend], MerkleSyncAccRcv, MerkleSyncIN,
-                        AccCmp + 1, AccSkip)
+           check_node(TK, TN, SigSizeI, SigSizeL,
+                      MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                      <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>, RestTreeAcc,
+                      [Sync | MerkleSyncAccSend], MerkleSyncAccRcv, MerkleSyncIN,
+                      AccCmp + 1, AccSkip)
     end.
 
 %% @doc Processes compare results from check_node/7 on the initiator.
 -spec process_tree_cmp_result(
-        bitstring(), merkle_tree:merkle_tree() | NodeList,
-        SigSizeI::signature_size(), SigSizeL::signature_size(),
-        MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer(),
-        MerkleSyncIn::Sync, #merkle_params{}, Stats)
-        -> {RestTree::NodeList, MerkleSyncOut::Sync, NewStats::Stats,
-            MaxItemsCount::non_neg_integer()}
-    when
-      is_subtype(NodeList, [merkle_tree:mt_node()]),
-      is_subtype(Stats,    rr_recon_stats:stats()),
-      is_subtype(Sync,     {[merkle_sync_send()], [merkle_sync_rcv()]}).
-process_tree_cmp_result(CmpResult, Tree, SigSizeI, SigSizeL,
-                        MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn,
-                        Params, Stats) ->
-    TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
-                    false -> Tree;
-                    true -> [merkle_tree:get_root(Tree)]
-                end,
-    p_process_tree_cmp_result(CmpResult, TreeNodes, SigSizeI, SigSizeL,
-                              MyMaxItemsCount, OtherMaxItemsCount,
-                              MerkleSyncIn, Params, Stats, [], [], [], 0, 0).
-
-%% @doc Helper for process_tree_cmp_result/10.
--spec p_process_tree_cmp_result(
         bitstring(), RestTree::NodeList,
         SigSizeI::signature_size(), SigSizeL::signature_size(),
         MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer(),
@@ -1654,11 +1611,11 @@ process_tree_cmp_result(CmpResult, Tree, SigSizeI, SigSizeL,
       is_subtype(Stats,    rr_recon_stats:stats()),
       is_subtype(Count,    non_neg_integer()),
       is_subtype(Sync,     {[merkle_sync_send()], [merkle_sync_rcv()]}).
-p_process_tree_cmp_result(<<>>, [], _SigSizeI, _SigSizeL,
-                          _MyMaxItemsCount, _OtherMaxItemsCount,
-                          {MerkleSyncInSend, MerkleSyncInRcv} , _Params, Stats,
-                          RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv,
-                          AccCmp, AccSkip) ->
+process_tree_cmp_result(<<>>, [], _SigSizeI, _SigSizeL,
+                        _MyMaxItemsCount, _OtherMaxItemsCount,
+                        {MerkleSyncInSend, MerkleSyncInRcv} , _Params, Stats,
+                        RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv,
+                        AccCmp, AccSkip) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp},
                                  {tree_compareSkipped, AccSkip}], Stats),
     % note: we can safely include all leaf nodes here although only inner nodes
@@ -1669,50 +1626,50 @@ p_process_tree_cmp_result(<<>>, [], _SigSizeI, _SigSizeL,
       {lists:reverse(MerkleSyncAccSend, MerkleSyncInSend),
        lists:reverse(MerkleSyncAccRcv, MerkleSyncInRcv)},
       NStats, AccMIC};
-p_process_tree_cmp_result(<<?recon_ok:2, TR/bitstring>>, [Node | TN],
-                          SigSizeI, SigSizeL,
-                          MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                          RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
+process_tree_cmp_result(<<?recon_ok:2, TR/bitstring>>, [Node | TN],
+                        SigSizeI, SigSizeL,
+                        MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                        RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
     Skipped = merkle_tree:size(Node) - 1,
-    p_process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
-                              MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                              RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv,
-                              AccCmp + 1, AccSkip + Skipped);
-p_process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
-                          SigSizeI, SigSizeL,
-                          MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                          RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
+    process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
+                            MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                            RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv,
+                            AccCmp + 1, AccSkip + Skipped);
+process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
+                        SigSizeI, SigSizeL,
+                        MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                        RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
     Sync = case merkle_tree:is_leaf(Node) of
                true  -> {Params#merkle_params.bucket_size,
                          merkle_tree:get_bucket(Node), 1};
                false -> {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
                         {MyMaxItemsCount, MyKVItems, LeafCount}
            end,
-    p_process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
-                              MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                              RestTreeAcc, MerkleSyncAccSend, [Sync | MerkleSyncAccRcv],
-                              AccCmp + 1, AccSkip);
-p_process_tree_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN],
-                          SigSizeI, SigSizeL,
-                          MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                          RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
+    process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
+                            MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                            RestTreeAcc, MerkleSyncAccSend, [Sync | MerkleSyncAccRcv],
+                            AccCmp + 1, AccSkip);
+process_tree_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN],
+                        SigSizeI, SigSizeL,
+                        MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                        RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     Sync = {OtherMaxItemsCount, merkle_tree:get_bucket(Node),
             merkle_tree:get_item_count(Node)},
-    p_process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
-                              MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                              RestTreeAcc, [Sync | MerkleSyncAccSend], MerkleSyncAccRcv,
-                              AccCmp + 1, AccSkip);
-p_process_tree_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN],
-                          SigSizeI, SigSizeL,
-                          MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                          RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
+    process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
+                            MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                            RestTreeAcc, [Sync | MerkleSyncAccSend], MerkleSyncAccRcv,
+                            AccCmp + 1, AccSkip);
+process_tree_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN],
+                        SigSizeI, SigSizeL,
+                        MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                        RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
     ?DBG_ASSERT(not merkle_tree:is_leaf(Node)),
     Childs = merkle_tree:get_childs(Node),
-    p_process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
-                              MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
-                              lists:reverse(Childs, RestTreeAcc), MerkleSyncAccSend, MerkleSyncAccRcv,
-                              AccCmp + 1, AccSkip).
+    process_tree_cmp_result(TR, TN, SigSizeI, SigSizeL,
+                            MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
+                            lists:reverse(Childs, RestTreeAcc), MerkleSyncAccSend, MerkleSyncAccRcv,
+                            AccCmp + 1, AccSkip).
 
 %% @doc Gets the number of bits needed to encode all possible bucket sizes with
 %%      the given merkle params.
