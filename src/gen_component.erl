@@ -878,6 +878,7 @@ on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) -
     process_flag(priority, low),
     timer:sleep(Time),
     process_flag(priority, normal),
+    log:log(warn, "[ ~p ] about_to_kill timeout hit without being killed", [self()]),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, GCState);
 on_gc_msg({'$gen_component', remove_monitor, Pid, Source} = _Msg, UState, GCState) ->
@@ -1100,6 +1101,7 @@ on_bp_req_in_bp(Msg, State,
     process_flag(priority, low),
     timer:sleep(Time),
     process_flag(priority, normal),
+    log:log(warn, "[ ~p ] about_to_kill timeout hit without being killed", [self()]),
     wait_for_bp_leave(Msg, State, true).
 
 
