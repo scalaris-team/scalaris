@@ -19,7 +19,7 @@
 %% @version $Id:  $
 -module(rr_eval_point).
 
--include("scalaris.hrl").
+-include("rr_records.hrl").
 
 -export([generate_ep/3, generate_ep_rounds/4, column_names/0, mp_column_names/0]).
 
@@ -78,8 +78,8 @@
                        SD_Updated       :: float(),
                        SD_BW_RC_Size    :: float(),
                        SD_BW_RC_Msg     :: float(),
-                       SD_BW_RC2_Size    :: float(),
-                       SD_BW_RC2_Msg     :: float(),
+                       SD_BW_RC2_Size   :: float(),
+                       SD_BW_RC2_Msg    :: float(),
                        SD_BW_RS_Size    :: float(),
                        SD_BW_RS_Msg     :: float(),
                        SD_BW_RS_KVV     :: float(),
@@ -108,12 +108,13 @@
                        MAX_BW_RS_KVV    :: integer(),
                        % ADDITIONAL PARAMETERS
                        RC_METHOD        :: rr_recon:method(),
-                       RING_TYPE        :: rr_eval_admin:ring_type(),
-                       DDIST            :: rr_eval_admin:data_distribution(),
+                       RING_TYPE        :: ring_type(),
+                       DDIST            :: data_distribution(),
                        FTYPE            :: db_generator:failure_type(),
-                       FDIST            :: rr_eval_admin:fail_distribution(),
+                       FDIST            :: fail_distribution(),
                        DTYPE            :: db_generator:db_type(),
-                       TPROB            :: 0..100
+                       TPROB            :: 0..100,
+                       Merkle_NumTrees  :: pos_integer()
                       }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -156,7 +157,7 @@ mp_column_names() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec generate_ep_rounds(point_id(), rr_eval_admin:ring_setup(), [measure_point()],
+-spec generate_ep_rounds(point_id(), ring_setup(), [measure_point()],
                          Rounds::non_neg_integer()) -> [eval_point()].
 generate_ep_rounds(ID, Conf, MPList, Rounds) ->
     lists:foldl(fun(Round, Acc) ->
@@ -169,12 +170,16 @@ generate_ep_rounds(ID, Conf, MPList, Rounds) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec generate_ep(point_id(), rr_eval_admin:ring_setup(), [measure_point()])
+-spec generate_ep(point_id(), ring_setup(), [measure_point()])
         -> eval_point().
 generate_ep(ID,
-            {{scenario, RingType, DDist, FType, FDist, DType, TProb},
-             {ring_config, NC, DC, FProb, _FDest, _Rounds},
-             {rc_config, RCMethod, RcP1E, MBU, MBR, ArtCF, ArtLF, ArtIF, _AlignToBytes}},
+            {#scenario{ring_type = RingType, data_distribution = DDist,
+                       data_failure_type = FType, fail_distribution = FDist,
+                       data_type = DType, trigger_prob = TProb},
+             #ring_config{node_count = NC, data_count = DC, data_failure_prob = FProb},
+             #rc_config{recon_method = RCMethod, recon_p1e = RcP1E, merkle_bucket= MBU,
+                        merkle_branch = MBR, art_corr_factor = ArtCF,
+                        art_leaf_fpr = ArtLF, art_inner_fpr = ArtIF}},
             MP) ->
     %% MEAN, STDDEV, MIN, MAX %%
     %DB stats

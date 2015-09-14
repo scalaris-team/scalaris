@@ -18,8 +18,7 @@
 %% @version $Id:  $
 -module(rr_eval_admin).
 
--include("scalaris.hrl").
--include("record_helpers.hrl").
+-include("rr_records.hrl").
 
 % for external scripts
 -export([% trivial
@@ -54,55 +53,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export_type([scenario/0, ring_config/0, rc_config/0, ring_setup/0,
-              ring_type/0, data_distribution/0, fail_distribution/0]).
-
--type ring_type() :: uniform | random.
 
 -type init_mp() :: {Missing::non_neg_integer(),
                     Outdated::non_neg_integer()}.
-
--type fail_distribution() :: random | uniform | {binomial, P::float()}.
--type data_distribution() :: random | uniform | {binomial, P::float()}.
--record(scenario,
-        {
-         ring_type                  :: ring_type(),
-         data_distribution          :: data_distribution(),
-         data_failure_type          :: db_generator:failure_type(),
-         fail_distribution          :: fail_distribution(),
-         data_type                  :: db_generator:db_type(),
-         trigger_prob       = 100   :: 0..100
-        }).
--type scenario() :: #scenario{}.
-
--type step_param() :: node_count | data_count | fprob | rounds |
-                      recon_p1e | merkle_bucket | merkle_branch | art_corr_factor |
-                      art_leaf_fpr | art_inner_fpr.
--type step_size() :: pos_integer() | float().
--type p1e() :: float() | pos_integer().
-
--record(ring_config, {
-                      node_count         = ?required(rc_config, node_count)   :: integer(),
-                      data_count         = ?required(rc_config, data_count)   :: integer(),
-                      data_failure_prob  = ?required(rc_config, fprob)        :: 0..100,        % probability of data failure
-                      fquadrants         = all                                :: all | [1..4],
-                      round              = 1                                  :: integer()
-                     }).
--type ring_config() :: #ring_config{}.
-
--record(rc_config, {
-                    recon_method    = ?required(rc_config, recon_method) :: rr_recon:method(),
-                    recon_p1e       = 0.1                                :: p1e(),
-                    merkle_bucket   = 25                                 :: pos_integer(), %shared with art
-                    merkle_branch   = 4                                  :: pos_integer(), %shared with art
-                    art_corr_factor = 2                                  :: non_neg_integer(),
-                    art_leaf_fpr    = 0.1                                :: float(),
-                    art_inner_fpr   = 0.01                               :: float(),
-                    align_to_bytes  = true                               :: boolean()
-                   }).
--type rc_config() :: #rc_config{}.
-
--type ring_setup() :: {scenario(), ring_config(), rc_config()}.
 
 -type eval_option() :: {eval_dir, string()} |
                        {filename, string()} |
