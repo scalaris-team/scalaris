@@ -817,14 +817,13 @@ on({resolve_req, BinKeyList} = _Msg,
     %       received after the {resolve_req, Hashes} message from the other node!
   when is_list(BinKeyList) ->
     ?TRACE1(_Msg, State),
-    if BinKeyList =:= [] ->
-           NStats = Stats,
-           ok;
-       true ->
-           NStats =
-               merkle_resolve_leaves_ckidx(
-                 MerkleSyncSend, BinKeyList, DestRRPid, Stats, OwnerL, [], IsInitiator)
-    end,
+    NStats = if BinKeyList =:= [] ->
+                    Stats;
+                true ->
+                    merkle_resolve_leaves_ckidx(
+                      MerkleSyncSend, BinKeyList, DestRRPid, Stats, OwnerL,
+                      [], IsInitiator)
+             end,
     shutdown(sync_finished, State#rr_recon_state{merkle_sync = {[], []},
                                                  stats = NStats}).
 
