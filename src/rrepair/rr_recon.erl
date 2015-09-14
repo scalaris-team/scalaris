@@ -52,6 +52,8 @@
                [Msg, State#rr_recon_state.method, State#rr_recon_state.stage,
                 State#rr_recon_state.initiator, State#rr_recon_state.dest_interval,
                 ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
+-define(MERKLE_DEBUG(X,Y), ok).
+%-define(MERKLE_DEBUG(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -676,7 +678,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                     misc = [{p1e, P1E_I},
                                             {all_leaf_p1e, P1EAllLeaves},
                                             {icount, MyMaxItemsCount}]},
-%%     log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(RTree)]),
+    ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B", [length(RTree)]),
 
     if RTree =:= [] andalso MerkleSyncNew =:= {[], []} ->
            shutdown(sync_finished, NewState#rr_recon_state{stats = NStats});
@@ -688,12 +690,15 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
            P1EOneLeaf = calc_n_subparts_p1e(
                           length(MerkleSyncNewSend) + length(MerkleSyncNewRcv),
                           P1EAllLeaves),
-%%            log:pal("merkle [ ~p ] (NI) LeafSync#: ~p (send), ~p (receive)\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p",
-%%                    [self(), length(MerkleSyncNewSend), length(MerkleSyncNewRcv), P1EAllLeaves, P1EOneLeaf]),
+           ?MERKLE_DEBUG("merkle (NI) - LeafSync#: ~p (send), ~p (receive)\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p ItemsToSend: ~B",
+                   [length(MerkleSyncNewSend), length(MerkleSyncNewRcv),
+                    P1EAllLeaves, P1EOneLeaf,
+                    lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend])]),
            if MerkleSyncNewSend =/= [] ->
                   {Hashes, NStats2} =
                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats,
                                                  Params, P1EOneLeaf),
+                  ?MERKLE_DEBUG("merkle (NI) - HashesSize: ~B", [erlang:byte_size(Hashes)]),
                   ?DBG_ASSERT(Hashes =/= <<>>),
                   send(DestReconPid, {resolve_req, Hashes}),
                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
@@ -722,7 +727,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                 MyLastMaxItemsCount, OtherLastMaxItemsCount,
                                 MerkleSync, Params, Stats, [], [], [], 0, 0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
-%%     log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(RTree)]),
+    ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B", [length(RTree)]),
 
     if RTree =:= [] andalso MerkleSyncNew =:= {[], []} ->
            shutdown(sync_finished,
@@ -736,12 +741,15 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
            P1EOneLeaf = calc_n_subparts_p1e(
                           length(MerkleSyncNewSend) + length(MerkleSyncNewRcv),
                           P1EAllLeaves),
-%%            log:pal("merkle [ ~p ] (I) LeafSync#: ~p (send), ~p (receive)\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p",
-%%                    [self(), length(MerkleSyncNewSend), length(MerkleSyncNewRcv), P1EAllLeaves, P1EOneLeaf]),
+           ?MERKLE_DEBUG("merkle (I) - LeafSync#: ~p (send), ~p (receive)\tP1EAllLeaves: ~p\tP1EOneLeaf: ~p ItemsToSend: ~B",
+                   [length(MerkleSyncNewSend), length(MerkleSyncNewRcv),
+                    P1EAllLeaves, P1EOneLeaf,
+                    lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend])]),
            if MerkleSyncNewSend =/= [] ->
                   {Hashes, NStats2} =
                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats,
                                                  Params, P1EOneLeaf),
+                  ?MERKLE_DEBUG("merkle (I) - HashesSize: ~B", [erlang:byte_size(Hashes)]),
                   ?DBG_ASSERT(Hashes =/= <<>>),
                   send(DestReconPid, {resolve_req, Hashes}),
                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
@@ -908,13 +916,13 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
                            ni_item_count = OtherItemsCount} = Params,
             MyItemCount = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
-%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-%%                     [self(), merkle_tree:size_detail(MySyncStruct),
-%%                      length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-%%                                    merkle_tree:get_item_count(L) =:= 0])]),
+            ?MERKLE_DEBUG("merkle (I) - Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                    [merkle_tree:size_detail(MySyncStruct),
+                     length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
+                                   merkle_tree:get_item_count(L) =:= 0])]),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
             P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
-%%             log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(MySyncStruct)]),
+            ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B", [length(MySyncStruct)]),
 
             {P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL} =
                 merkle_next_signature_sizes(Params, P1ETotal3, MyItemCount,
@@ -948,7 +956,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                         end),
             ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
             P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
-%%             log:pal("merkle [ ~p ] CurrentNodes: ~B", [self(), length(ICBList)]),
+            ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B", [length(ICBList)]),
 
             MySyncParams = #merkle_params{interval = MerkleI,
                                           branch_factor = MerkleV,
@@ -977,10 +985,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                 rr_recon_stats:set(
                   [{tree_size, merkle_tree:size_detail(SyncStruct)}], Stats),
             Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
-%%             log:pal("merkle [ ~p ] Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-%%                     [self(), merkle_tree:size_detail(SyncStruct),
-%%                      length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-%%                                    merkle_tree:get_item_count(L) =:= 0])]),
+            ?MERKLE_DEBUG("merkle (NI) - Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                    [merkle_tree:size_detail(SyncStruct),
+                     length([ok || L <- merkle_tree:get_leaves(SyncStruct),
+                                   merkle_tree:get_item_count(L) =:= 0])]),
             
             State#rr_recon_state{struct = SyncStruct,
                                  stats = Stats2, params = MySyncParams,
@@ -1451,10 +1459,10 @@ merkle_next_signature_sizes(
     NextSigSizeL = min_max(util:ceil(util:log2((2 * BucketSize) / P1E_L)),
                            get_min_hash_bits(), 160),
 
-%%     log:pal("merkle [ ~p ] MyMI: ~B, \tOtMI: ~B~n"
-%%             "P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B",
-%%             [self(), MyMaxItemsCount, OtherMaxItemsCount,
-%%              P1E_I, P1E_L, NextSigSizeI, NextSigSizeL]),
+    ?MERKLE_DEBUG("merkle - MyMI: ~B, \tOtMI: ~B~n"
+            "P1E_I: ~p, \tP1E_L: ~p, \tSigSizeI: ~B, \tSigSizeL: ~B",
+            [MyMaxItemsCount, OtherMaxItemsCount,
+             P1E_I, P1E_L, NextSigSizeI, NextSigSizeL]),
     {P1E_I, P1E_L, NextSigSizeI, NextSigSizeL}.
 
 -compile({nowarn_unused_function, {min_max_feeder, 3}}).
