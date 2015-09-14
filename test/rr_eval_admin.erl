@@ -560,15 +560,20 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
     EvalRepeats = proplists:get_value(eval_repeats, Options),
     ?ASSERT(EvalRepeats =/= undefined),
     
-    EPFile = rr_eval_export:create_file([{filename, FileName},
-                                      {dir, Dir},
-                                      {comment, [io_lib:format("CREATED ~p-~p-~p~c~p:~p:~p", [YY, MM, DD, ?TAB, Hour, Min, Sec])]},
-                                      {column_names, rr_eval_point:column_names()}]),
-    MPFile = rr_eval_export:create_file([{filename, string:join(["MP_", FileName], "")},
-                                      {dir, filename:join([Dir, "raw"])},
-                                      {comment, [io_lib:format("CREATED ~p-~p-~p~c~p:~p:~p", [YY, MM, DD, ?TAB, Hour, Min, Sec])]},
-                                      {column_names, rr_eval_point:mp_column_names()}]),
-    NOptions = [{ep_file, EPFile}, {mp_file, MPFile} | Options],
+    CreatedComment = io_lib:format("CREATED ~p-~p-~p~c~p:~p:~p",
+                                   [YY, MM, DD, ?TAB, Hour, Min, Sec]),
+    {EPFileDevice, _EPFilePath} =
+        rr_eval_export:create_file(
+          [{filename, FileName}, {dir, Dir},
+           {comment, [CreatedComment]},
+           {column_names, rr_eval_point:column_names()}]),
+    {MPFileDevice, _MPFilePath} =
+        rr_eval_export:create_file(
+          [{filename, string:join(["MP_", FileName], "")},
+           {dir, filename:join([Dir, "raw"])},
+           {comment, [CreatedComment]},
+           {column_names, rr_eval_point:mp_column_names()}]),
+    NOptions = [{ep_file, EPFileDevice}, {mp_file, MPFileDevice} | Options],
     
     StartT = os:timestamp(),
     
@@ -579,8 +584,8 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
 
               SetupText = eval_setup_comment(Scenario, RingP, StepParam, StepSize, EvalRepeats),
               ReconText = rc_conf_comment(ReconP),
-              rr_eval_export:append_ds(EPFile, {[{comment, lists:append(SetupText, [ReconText])}], []}),
-              rr_eval_export:append_ds(MPFile, {[{comment, lists:append(SetupText, [ReconText])}], []}),
+              rr_eval_export:write_ds(EPFileDevice, {[{comment, lists:append(SetupText, [ReconText])}], []}),
+              rr_eval_export:write_ds(MPFileDevice, {[{comment, lists:append(SetupText, [ReconText])}], []}),
               
               RingSetup = {Scenario, RingP, ReconP},
               % NOTE - Mode=Sys only supports StepParam=rounds
@@ -589,11 +594,11 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
                                          sys -> system_sync(RingSetup, NOptions, StepCount, EPId);
                                          pair -> pair_sync(RingSetup, NOptions, StepParam, StepSize, StepCount, {[], [], EPId})
                                      end,
-              
-              rr_eval_export:close_ds(EPFile),
-              rr_eval_export:close_ds(MPFile),
               NextEPId
       end, StartEPId, Setups),
+    
+    rr_eval_export:close_file(EPFileDevice),
+    rr_eval_export:close_file(MPFileDevice),
     
     TimeDiff = erlang:round(timer:now_diff(os:timestamp(), StartT) / (1000*1000)),
     {_, {NH, NM, NS}} = erlang:localtime(),
@@ -713,9 +718,9 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
     
     % WRITE LINE
     EPFile =/= null andalso
-        rr_eval_export:append_ds(EPFile, {[], [tuple_to_list(EP)]}),
+        rr_eval_export:write_ds(EPFile, {[], [tuple_to_list(EP)]}),
     MPFile =/= null andalso
-        rr_eval_export:append_ds(MPFile, {[], [tuple_to_list(Row) || Row <- MPList]}),
+        rr_eval_export:write_ds(MPFile, {[], [tuple_to_list(Row) || Row <- MPList]}),
     
     pair_sync(Setup, Options, IncParam, IncSize, StepCount - 1, {[EP | AccEP], lists:append(MPList, AccMP), EPId + 1}).
 
@@ -785,9 +790,9 @@ system_sync({Scen, RingP, ReconP}, Options, Rounds, EPId) ->
     
     % WRITE LINE
     EPFile =/= null andalso
-        rr_eval_export:append_ds(EPFile, {[], [tuple_to_list(EPRow) || EPRow <- EPList]}),
+        rr_eval_export:write_ds(EPFile, {[], [tuple_to_list(EPRow) || EPRow <- EPList]}),
     MPFile =/= null andalso
-        rr_eval_export:append_ds(MPFile, {[], [tuple_to_list(Row) || Row <- MPList]}),
+        rr_eval_export:write_ds(MPFile, {[], [tuple_to_list(Row) || Row <- MPList]}),
     
     {EPList, MPList, EPId + Rounds}.
 
