@@ -32,7 +32,7 @@ num_executions() ->
     5.
 
 repeater_num_executions() ->
-    5.
+    4.
 
 ring_size() ->
     4.
@@ -54,7 +54,7 @@ groups() ->
     {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
     {remove_node_repeater, [sequence, {repeat, num_executions()}], [remove_node]},
 
-    {repeater, [{repeat, 10}], [{group, make_ring_group_repeater}, 
+    {repeater, [{repeat, 1}], [{group, make_ring_group_repeater},
                                 {group, remove_node_group_repeater}]}
 
   ].
