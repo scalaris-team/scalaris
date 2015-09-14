@@ -33,7 +33,8 @@ groups() ->
                                         test_crash_recovery_one_outdated_node,
                                         test_crash_recovery_bad_owner_pids,
                                         test_crash_recovery_two_outdated_nodes
-                                       ]}
+                                       ]},
+     {repeater, [{repeat, 10}], [{group, crash_recovery_tests}]}
     ].
 
 all() ->

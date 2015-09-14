@@ -31,6 +31,9 @@
 num_executions() ->
     5.
 
+repeater_num_executions() ->
+    5.
+
 ring_size() ->
     4.
 
@@ -43,7 +46,17 @@ groups() ->
     {make_ring_group, [sequence], [test_make_ring, write, {group, recover_data_group}]},
     {recover_data_group, [sequence, {repeat, num_executions()}], [read]},
     {remove_node_group, [sequence], [write, {group, remove_node}]},
-    {remove_node, [sequence, {repeat, num_executions()}], [remove_node]}
+    {remove_node, [sequence, {repeat, num_executions()}], [remove_node]},
+
+    {make_ring_group_repeater, [sequence], [test_make_ring, write, 
+                                            {group, recover_data_group_repeater}]},
+    {recover_data_group_repeater, [sequence, {repeat, num_executions()}], [read]},
+    {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
+    {remove_node_repeater, [sequence, {repeat, num_executions()}], [remove_node]},
+
+    {repeater, [{repeat, 10}], [{group, make_ring_group_repeater}, 
+                                {group, remove_node_group_repeater}]}
+
   ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].

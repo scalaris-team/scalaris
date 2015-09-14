@@ -146,6 +146,10 @@ test-skipped: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg -ct_hooks scalaris_cth -noshell | tee ct-skipped.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
 
+test-repeated: compile
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-repeated.cfg -ct_hooks scalaris_cth -noshell | tee ct-repeated.log ; \
+	! grep -E " [1-9]+ failed" ct-repeated.log
+
 SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
 
 ${SUITES}: compile
