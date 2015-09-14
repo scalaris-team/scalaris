@@ -1721,10 +1721,10 @@ merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
 -spec merkle_resolve_leaves_send(
-        Sync::[merkle_sync_send()], Stats, Params::#merkle_params{},
+        Sync::[merkle_sync_send(),...], Stats, Params::#merkle_params{},
         P1EOneLeaf::float()) -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_send(Sync, Stats, Params, P1EOneLeaf) ->
+merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf) ->
     BucketSizeBits = merkle_max_bucket_size_bits(Params),
     {Hashes, LeafCount} =
         lists:foldl(fun({OtherMaxItemsCount, MyKVItems, MyItemCount},
