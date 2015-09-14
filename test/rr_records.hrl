@@ -53,6 +53,7 @@
                     recon_p1e       = 0.1                                :: p1e(),
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art
+                    merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),
                     art_corr_factor = 2                                  :: non_neg_integer(),
                     art_leaf_fpr    = 0.1                                :: float(),
                     art_inner_fpr   = 0.01                               :: float(),

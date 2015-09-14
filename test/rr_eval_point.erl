@@ -143,7 +143,7 @@ column_names() ->
      min_bw_rs_size, max_bw_rs_size, min_bw_rs_msg, max_bw_rs_msg,
      min_bw_rs_kvv, max_bw_rs_kvv,
      % additional parameters originally missing
-     rc_method, ring_type, ddist, ftype, fdist, dtype, tprob
+     rc_method, ring_type, ddist, ftype, fdist, dtype, tprob, merkle_num_trees
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,8 +177,9 @@ generate_ep(ID,
                        data_failure_type = FType, fail_distribution = FDist,
                        data_type = DType, trigger_prob = TProb},
              #ring_config{node_count = NC, data_count = DC, data_failure_prob = FProb},
-             #rc_config{recon_method = RCMethod, recon_p1e = RcP1E, merkle_bucket= MBU,
-                        merkle_branch = MBR, art_corr_factor = ArtCF,
+             #rc_config{recon_method = RCMethod, recon_p1e = RcP1E,
+                        merkle_bucket= MBU, merkle_branch = MBR,
+                        merkle_num_trees = MNT, art_corr_factor = ArtCF,
                         art_leaf_fpr = ArtLF, art_inner_fpr = ArtIF}},
             MP) ->
     %% MEAN, STDDEV, MIN, MAX %%
@@ -207,7 +208,7 @@ generate_ep(ID,
      MinRCS, MaxRCS, MinRCM, MaxRCM, MinRC2S, MaxRC2S, MinRC2M, MaxRC2M,
      MinRSS, MaxRSS, MinRSM, MaxRSM, MinRSK, MaxRSK,
      RCMethod, RingType, dist_to_name(DDist), FType, dist_to_name(FDist),
-     DType, TProb}.
+     DType, TProb, MNT}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().
 dist_to_name({binomial, P}) ->
