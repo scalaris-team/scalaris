@@ -36,6 +36,16 @@ if [ "${DIRECTORY:0:1}" != "/" ]; then
 fi
 mkdir -p "${DIRECTORY}"
 
+# track git status (use sub-shell so we can change the directory)
+$(
+cd "${scriptdir}/../../"
+echo "> git status --untracked-files=no -s -b" > "${DIRECTORY}/git.status"
+git status --untracked-files=no -s -b >> "${DIRECTORY}/git.status"
+echo "" >> "${DIRECTORY}/git.status"
+echo "> git log -1" >> "${DIRECTORY}/git.status"
+git log -1 >> "${DIRECTORY}/git.status"
+)
+
 # GPSCRIPT_REL=$(realpath --relative-to="${DIRECTORY}" ${GPSCRIPT})
 # COLDEFS_REL=$(realpath --relative-to="${DIRECTORY}" coldefs_eval_point.gp)
 GPSCRIPT_REL=$(python -c "import os.path; print os.path.relpath('${GPSCRIPT}', '${DIRECTORY}')")
