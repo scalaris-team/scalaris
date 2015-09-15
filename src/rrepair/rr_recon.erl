@@ -1513,9 +1513,9 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSizeI, SigSizeL) ->
     H1 = merkle_tree:get_hash(N1),
     case merkle_tree:is_leaf(N1) of
         true ->
-            Bin2 = case merkle_tree:get_item_count(N1) of
-                       0 -> <<Bin/bitstring, 1:1, 0:1>>;
-                       _ -> <<Bin/bitstring, 1:1, 1:1, H1:SigSizeL>>
+            Bin2 = case merkle_tree:is_empty(N1) of
+                       true  -> <<Bin/bitstring, 1:1, 0:1>>;
+                       false -> <<Bin/bitstring, 1:1, 1:1, H1:SigSizeL>>
                    end,
             merkle_compress_hashlist(TL, Bin2, SigSizeI, SigSizeL);
         false ->
@@ -1578,14 +1578,17 @@ check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            MyMaxItemsCount, OtherMaxItemsCount, Params, Stats, FlagsAcc,
            RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, MerkleSyncIN, AccCmp, AccSkip) ->
     IsLeafNode = merkle_tree:is_leaf(Node),
-    NodeHash0 = merkle_tree:get_hash(Node),
-    if IsLeafHash ->
-           <<NodeHash:SigSizeL/integer-unit:1>> = <<NodeHash0:SigSizeL>>,
-           ok;
-       true ->
-           <<NodeHash:SigSizeI/integer-unit:1>> = <<NodeHash0:SigSizeI>>,
-           ok
-    end,
+    EmptyNode = merkle_tree:is_empty(Node),
+    NodeHash =
+        if IsLeafNode andalso EmptyNode ->
+               none; % to match with the hash from merkle_decompress_hashlist/3
+           IsLeafNode ->
+               <<X:SigSizeL/integer-unit:1>> = <<(merkle_tree:get_hash(Node)):SigSizeL>>,
+               X;
+           true ->
+               <<X:SigSizeI/integer-unit:1>> = <<(merkle_tree:get_hash(Node)):SigSizeI>>,
+               X
+        end,
     if Hash =:= NodeHash andalso IsLeafHash =:= IsLeafNode ->
            Skipped = merkle_tree:size(Node) - 1,
            check_node(TK, TN, SigSizeI, SigSizeL,
