@@ -97,6 +97,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             // prepare object
+            ScalarisUtils.generatePersistableIdentity(op);
             JSONObject jsonobj = new JSONObject();
             populateJsonObj(jsonobj, op);
 
