@@ -80,7 +80,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
 
     public void insertObject(ObjectProvider op) {
-        System.out.println("INSERT");
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
@@ -99,7 +98,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
             // prepare object
             JSONObject jsonobj = new JSONObject();
-            String id = ScalarisUtils.generatePersistableIdentity(op);
             populateJsonObj(jsonobj, op);
 
             if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
@@ -108,7 +106,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             // insert object
-            ScalarisUtils.performScalarisObjectInsert(op, id, jsonobj, conn);
+            ScalarisUtils.performScalarisObjectInsert(op, jsonobj, conn);
 
             if (ec.getStatistics() != null) {
                 // Add to statistics
@@ -133,7 +131,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     }
 
     public void updateObject(ObjectProvider op, int[] updatedFieldNumbers) {
-        System.out.println("UPDATE " + ScalarisUtils.getPersistableIdentity(op));
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
@@ -161,26 +158,13 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId(), fieldStr.toString()));
             }
 
-            JSONObject changedVals = new JSONObject();
-            final String id = ScalarisUtils.getPersistableIdentity(op);
-            op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
-                    changedVals, false));
-
-            System.out.println("update id=" + id);
-
-            if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
-                NucleusLogger.DATASTORE_NATIVE.debug("PUT "
-                        + changedVals.toString());
-            }
-
-            ScalarisUtils.performScalarisObjectUpdate(op, id, changedVals, conn);
+            ScalarisUtils.performScalarisObjectUpdate(op, updatedFieldNumbers, conn);
 
             if (ec.getStatistics() != null) {
                 // Add to statistics
                 ec.getStatistics().incrementNumWrites();
                 ec.getStatistics().incrementUpdateCount();
             }
-
             if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_PERSIST.debug(Localiser.msg(
                         "Scalaris.ExecutionTime",
@@ -217,7 +201,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      *             when an error occurs in the datastore communication
      */
     public void deleteObject(ObjectProvider op) {
-        System.out.println("DELETE");
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
 
@@ -234,10 +217,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId()));
             }
 
-            final String id = ScalarisUtils.getPersistableIdentity(op);
-            System.out.println("deleting object with key=" + id);
-
-            ScalarisUtils.performScalarisObjectDelete(op, id, conn);
+            ScalarisUtils.performScalarisObjectDelete(op, conn);
 
             if (ec.getStatistics() != null) {
                 ec.getStatistics().incrementNumWrites();
@@ -290,9 +270,7 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             final long startTime = System.currentTimeMillis();
 
             try {
-
                 JSONObject result = ScalarisUtils.performScalarisObjectFetch(op, conn);
-
                 if (ScalarisUtils.isDeletedRecord(result)) {
                     throw new NucleusObjectNotFoundException(
                             "Record has been deleted");
@@ -450,7 +428,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         ec.getClassLoaderResolver());
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
-
         String uniqueMemberValueKey = ScalarisSchemaHandler.getUniqueMemberKey(
                 objectClass.getCanonicalName(), memberName, memberValue);
         TransactionSingleOp t = new TransactionSingleOp(conn);

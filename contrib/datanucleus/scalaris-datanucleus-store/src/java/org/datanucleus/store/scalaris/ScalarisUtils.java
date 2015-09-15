@@ -20,7 +20,9 @@ import org.datanucleus.metadata.UniqueMetaData;
 import org.datanucleus.state.ObjectProvider;
 import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
+import org.datanucleus.store.scalaris.fieldmanager.StoreFieldManager;
 import org.datanucleus.transaction.NucleusTransactionException;
+import org.datanucleus.util.NucleusLogger;
 
 import com.ericsson.otp.erlang.OtpErlangLong;
 
@@ -47,6 +49,12 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisUtils {
 
     /**
+     * Placeholder to signal a foreign key action deleting the whole object,
+     * instead of an element of a collection.
+     */
+    private static final String FKA_DELETE_OBJ = "_DEL_OBJECT";
+
+    /**
      * Object which will be used for synchronization when performing
      * write operations.
      */
@@ -60,12 +68,12 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                  ID GENERATION
      * **********************************************************************/
-    
+
     /**
      * Generate a new ID which can be used to store a value at an unique key.
      * Every time this function is called the value stored at key ID_GEN_KEY is
      * incremented by one. The value stored there is the value which is returned by
-     * this function. All object classes share the same ID generator key.
+     * this function. Every object class has its own ID generator key
      * 
      * @param op
      *            ObjectProvider of the object this ID is generated for.
@@ -122,11 +130,11 @@ public class ScalarisUtils {
     }
 
     /**
-     * Returns the object identity as string which can be used of the key-value
-     * store as key to uniquely identify the object. ATTENTION: If the data
-     * store is (partially) responsible to generate an ID (e.g. because of
-     * IdGeneratorStrategy.IDENTITY). This method may change primary key
-     * attribute values. This method should be used only to insert a new object
+     * Generates the ID of an object which will be persisted, but is not persisted yet, 
+     * in the data store.  
+     * ATTENTION: If the data store is (partially) responsible to generate an ID (e.g. 
+     * because of IdGeneratorStrategy.IDENTITY). This method may change primary key
+     * attribute values. This method should be used only when inserting a new object
      * in the data store, otherwise consider using getPersitableIdentity.
      * 
      * @param op
@@ -170,7 +178,10 @@ public class ScalarisUtils {
                     } else {
                         op.replaceField(mmd.getAbsoluteFieldNumber(), idKey);
                     }
-                    System.out.println("GENERATED KEY: " + idKey);
+                    if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
+                        NucleusLogger.DATASTORE_PERSIST.debug("Generated ID " + idKey + " for object " +
+                        		"of class " + cmd.getFullClassName());
+                    }
                 }
             }
         }
@@ -178,8 +189,8 @@ public class ScalarisUtils {
     }
 
     /**
-     * Returns the object identity as string which can be used of the key-value
-     * store as key to uniquely identify the object.
+     * Returns the object identity as string. If this ObjectProvider has not yet
+     * set its external object id, it is set to the returned ID.
      * 
      * @param op
      * @return Identity of object provided by op or null if at least one primary
@@ -193,7 +204,6 @@ public class ScalarisUtils {
             // The primary key must be (partially) calculated by the data store.
             // There is no distinction between APPLICATION and DATASTORE
             // IdentityType (yet)
-            // ID structure is: <pk1>:<pk2>
 
             StringBuilder keyBuilder = new StringBuilder();
 
@@ -217,7 +227,7 @@ public class ScalarisUtils {
                 // primary key member which is an integer. Otherwise it can be an arbitrary
                 // object.
                 if (pkFieldNumbers.length == 1) {
-                    op.setPostStoreNewObjectId(firstKey);
+                    op.setPostStoreNewObjectId(firstKey.toString());
                 } else {
                     op.setPostStoreNewObjectId(identity);
                 }
@@ -225,13 +235,21 @@ public class ScalarisUtils {
         }
 
         String id = IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
-        System.out.println(id);
         return id;
     }
 
     /* **********************************************************************
      *                  HOOKS FOR ScalarisStoreManager
      * **********************************************************************/
+ 
+    /**
+     * Retrieves an object from Scalaris based on the ObjectProviders ID and class.
+     * @param op 
+     *      ObjectProvider representing the stored object in DataNucleus
+     * @param conn 
+     *      Connection used for the operation
+     * @return The stored object
+     */
     static JSONObject performScalarisObjectFetch(ObjectProvider<?> op, Connection conn)
             throws ConnectionException, NotFoundException, UnknownException, JSONException {
 
@@ -243,12 +261,24 @@ public class ScalarisUtils {
         return new JSONObject(t.read(objKey).stringValue());
     }
 
-    static void performScalarisObjectInsert(ObjectProvider<?> op, String objectId, JSONObject json, Connection conn)
+    /**
+     * Inserts an object into Scalaris and performs all necessary management operations (updating indices etc.)
+     * ScalarisUtils.WRITE_LOCK is used to ensure thread safety.
+     * @param op
+     *      ObjectPrevider representing the object to be inserted 
+     * @param json
+     *      The JSON representation of the object
+     * @param conn
+     *      Connection used for the operation
+     */
+    static void performScalarisObjectInsert(ObjectProvider<?> op, JSONObject json, Connection conn)
             throws ConnectionException, UnknownException, AbortException {
+
         synchronized(WRITE_LOCK) {
             Transaction t = new Transaction(conn);
-
             try {
+                String objectId = ScalarisUtils.getPersistableIdentity(op);
+
                 insertObjectToIDIndex(op, t);
                 updateUniqueMemberKey(op, json, null, t);
                 insertToForeignKeyAction(op, json, t);
@@ -263,16 +293,32 @@ public class ScalarisUtils {
         }
     }
 
-    static void performScalarisObjectUpdate(ObjectProvider<?> op, String objectId, JSONObject changedVals, Connection conn)
+    /**
+     * Updates a stored object and performs all necessary management operations (updating indices etc.)
+     * ScalarisUtils.WRITE_LOCK is used to ensure thread safety.
+     * @param op
+     *      ObjectProvider representing the updated state of the object 
+     * @param updatedFieldNumbers
+     *      The ObjectProviders fields which shall be updated 
+     * @param conn
+     *      Connection used for the operation
+     */
+    static void performScalarisObjectUpdate(ObjectProvider<?> op, int[] updatedFieldNumbers, Connection conn)
             throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
 
         synchronized(WRITE_LOCK) {
+            String objectId = ScalarisUtils.getPersistableIdentity(op);
+
             // get old value
             String className = op.getClassMetaData().getFullClassName();
             String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
             Transaction t = new Transaction(conn);
             JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
+
+            JSONObject changedVals = new JSONObject();
+            op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
+                    changedVals, true));
 
             // update stored object values
             JSONObject changedValsOld = new JSONObject();
@@ -284,6 +330,7 @@ public class ScalarisUtils {
                 }
                 stored.put(key, changedVals.get(key));
             }
+
             try {
                 updateUniqueMemberKey(op, changedVals, changedValsOld, t);
                 updateForeignKeyAction(op, changedVals, changedValsOld, t);
@@ -296,10 +343,19 @@ public class ScalarisUtils {
         }
     }
 
-    static void performScalarisObjectDelete(ObjectProvider<?> op, String objectId, Connection conn)
+    /**
+     * Deletes a stored object and performs all necessary management operations (updating indices etc.)
+     * ScalarisUtils.WRITE_LOCK is used to ensure thread safety.
+     * @param op
+     *      ObjectProvider representing the object to be deleted 
+     * @param conn
+     *      Connection used for the operation
+     */
+    static void performScalarisObjectDelete(ObjectProvider<?> op, Connection conn)
             throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
 
         synchronized(WRITE_LOCK) {
+            String objectId = ScalarisUtils.getPersistableIdentity(op);
             String className = op.getClassMetaData().getFullClassName();
             String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
@@ -320,31 +376,26 @@ public class ScalarisUtils {
     }
 
     /* **********************************************************************
-     *               INDICIES OF ALL OBJECTS OF ONE TYPE (for queries)
+     *          INDICIES OF ALL OBJECTS OF ONE TYPE (used for queries)
      * **********************************************************************/
-    
+
     /**
      * To support queries it is necessary to have the possibility to iterate
      * over all stored objects of a specific type. Since Scalaris stores only
      * key-value pairs without structured tables, this is not "natively"
      * supported. Therefore an extra key is added to the store containing all
-     * keys of available objects of a type. This key has the structure
-     * <full-class-name><ALL_ID_PREFIX>. The value is an JSON-array containing
-     * all keys of <full-class-name> instances.
+     * keys of available objects of a type.
      * 
      * This methods adds another entry to such a key based on the passed
      * ObjectProvider. If no such key-value pair exists, it is created.
      * 
      * @param op
      *            The data source
-     * @throws JSONException 
-     * @throws UnknownException 
-     * @throws ClassCastException 
-     * @throws ConnectionException 
-     * @throws NotAListException 
+     * @throws ConnectionException
+     * @throws NotAListExceptionn
      */
     private static void insertObjectToIDIndex(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, UnknownException, NotAListException {
+            throws ConnectionException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
@@ -353,27 +404,24 @@ public class ScalarisUtils {
         toAdd.add(new ErlangValue(objectStringIdentity));
         t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>());
     }
+
     /**
      * To support queries it is necessary to have the possibility to iterate
      * over all stored objects of a specific type. Since Scalaris stores only
      * key-value pairs without structured tables, this is not "natively"
      * supported. Therefore an extra key is added to the store containing all
-     * keys of available objects of a type. This key has the structure
-     * <full-class-name><ALL_KEY_PREFIX>. The value is an JSON-array containing
-     * all keys of <full-class-name> instances.
+     * keys of available objects of a type.
      * 
      * This methods removes an entry of such a key based on the passed
      * ObjectProvider. If no such key-value pair exists, nothing happens.
      * 
      * @param op
      *            The data source
-     * @throws JSONException 
-     * @throws UnknownException 
-     * @throws ClassCastException 
+     * @throws NotAListException 
      * @throws ConnectionException 
      */
     private static void removeObjectFromIDIndex(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, UnknownException, NotAListException {
+            throws ConnectionException, NotAListException {
         
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
@@ -383,17 +431,37 @@ public class ScalarisUtils {
         toRemove.add(new ErlangValue(objectStringIdentity));
         t.addDelOnList(key, new ArrayList<ErlangValue>(), toRemove);
     }
-    
+
     /* **********************************************************************
      *                  ACTIONS TO GUARANTEE UNIQUENESS
      * **********************************************************************/
-    
+
+    /**
+     * To support unique member values (@Unique annotation) an extra key is
+     * inserted to signal the object ID whose object has stored the given value.
+     * Removed the keys belonging to the old state of the object and inserts new
+     * keys according to the new state.
+     * If this method is called and it turns out that the updated member value is
+     * stored by a different object a NucleusDataStoreException is thrown.
+     * @param op
+     *      The data source representing the object
+     * @param newJson
+     *      The new state of the object in JSON form
+     * @param oldJson
+     *      The old state of the object in JSON form. If this is null it is assumed
+     *      that this object is inserted for the first time and thus no old value will
+     *      be deleted
+     * @param t
+     *      The transaction used for the performed operations. 
+     * @throws ConnectionException
+     * @throws UnknownException
+     */
     private static void updateUniqueMemberKey(ObjectProvider<?> op, JSONObject newJson, JSONObject oldJson, Transaction t) 
             throws ConnectionException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
         String className = cmd.getFullClassName();
-        
+       
         for (int field : cmd.getAllMemberPositions()) {
             AbstractMemberMetaData mmd = cmd.getMetaDataForManagedMemberAtAbsolutePosition(field);
             UniqueMetaData umd = mmd.getUniqueMetaData();
@@ -439,7 +507,20 @@ public class ScalarisUtils {
             }
         }
     }
-    
+
+    /**
+     * To support unique member values (@Unique annotation) an extra key is
+     * inserted to signal the object ID whose object has stored the given value.
+     * Deletes the keys belonging to the object represented by the ObjectProvider
+     * @param op
+     *      The data source representing the object
+     * @param oldJson
+     *      The current state of the object in JSON form.
+     * @param t
+     *      The transaction used for the performed operations. 
+     * @throws ConnectionException
+     * @throws UnknownException
+     */
     private static void removeObjectFromUniqueMemberKey(ObjectProvider<?> op, JSONObject oldJson, Transaction t) 
             throws ConnectionException, UnknownException {
         AbstractClassMetaData cmd = op.getClassMetaData();
@@ -469,15 +550,54 @@ public class ScalarisUtils {
      *                  FOREIGN KEY ACTIONS
      * **********************************************************************/
 
+    /**
+     * All foreign key action of an object are stored at a separate key.
+     * If (persisted) object A has a ForeignKeyAction.CASCADE annotation at a member
+     * whose value is (persisted) object B, An entry is added to B's FKA-index.
+     * If an persisted object is deleted, all entries of its FKA-index will be processed.
+     *
+     * Checks a newly inserted object for foreign key actions.
+     *
+     * @param op
+     *      The data source of the object
+     * @param objToInsert
+     *      The JSON representation of the object.
+     * @param t
+     *      The transaction used to perform the operations
+     * @throws ConnectionException
+     * @throws NotAListException
+     */
     private static void insertToForeignKeyAction(ObjectProvider<?> op, JSONObject objToInsert, Transaction t)
-            throws ConnectionException, UnknownException, NotAListException {
+            throws ConnectionException, NotAListException {
         updateForeignKeyAction(op, objToInsert, null, t);
     }
 
+    /**
+     * All foreign key action of an object are stored at a separate key.
+     * If (persisted) object A has a ForeignKeyAction.CASCADE annotation at a member
+     * whose value is (persisted) object B, An entry is added to B's FKA-index.
+     * If an persisted object is deleted, all entries of its FKA-index will be processed.
+     *
+     * Deletes the FKAs of the old objects state and adds new FKAs according to its new state.
+     *
+     * @param op
+     *      The data source of the object
+     * @param changedFiledsNewVal
+     *      The JSON representation of the objects new state. It is sufficient if the JSON
+     *      only contains the changed fields value.
+     * @param changedFiledsOldVal
+     *      The JSON representation of the objects old state. It is sufficient if the JSON
+     *      only contains the changed fields value. If this is null this operation is treated
+     *      as an insert of new object, thus not deleting any old FKAs
+     * @param t
+     *      The transaction used to perform the operations
+     * @throws ConnectionException
+     * @throws NotAListException
+     */
     @SuppressWarnings("unchecked")
     private static void updateForeignKeyAction(ObjectProvider<?> op, JSONObject changedFieldsNewVal, 
             JSONObject changedFieldsOldVal, Transaction t)
-            throws ConnectionException, UnknownException, NotAListException {
+            throws ConnectionException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objectStringIdentity = getPersistableIdentity(op);
 
@@ -550,7 +670,7 @@ public class ScalarisUtils {
                         if (isJoin) {
                             newFka.add(fieldName);
                         } else {
-                            newFka.add(ScalarisSchemaHandler.FKA_DELETE_OBJ);
+                            newFka.add(FKA_DELETE_OBJ);
                         }
 
                         // check in which list we are currently in to choose the
@@ -586,9 +706,25 @@ public class ScalarisUtils {
             }
         }
     }
-    
+
+    /**
+     * All foreign key action of an object are stored at a separate key.
+     * If (persisted) object A has a ForeignKeyAction.CASCADE annotation at a member
+     * whose value is (persisted) object B, An entry is added to B's FKA-index.
+     * If an persisted object is deleted, all entries of its FKA-index will be processed.
+     *
+     * This method will perform all foreign key actions of the object represented by the
+     * passed ObjectProvider.
+     *
+     * @param op
+     *      The data source of the object
+     * @param t
+     *      The transaction used to perform the operations
+     * @throws ConnectionException
+     * @throws NotAListException
+     */
     private static void performForeignKeyActionDelete(ObjectProvider<?> op, Transaction t)
-            throws ConnectionException, UnknownException, NotAListException {
+            throws ConnectionException, NotAListException {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String objClassName = cmd.getFullClassName();
         String objectStringIdentity = getPersistableIdentity(op);
@@ -617,7 +753,7 @@ public class ScalarisUtils {
                         .getMetaDataForClass(toDeleteClassName, ec.getClassLoaderResolver());
                 Object obj = IdentityUtils.getObjectFromPersistableIdentity(objId, obCmd, ec);
                 
-                if (ScalarisSchemaHandler.FKA_DELETE_OBJ.equals(memberToDelete)) {
+                if (FKA_DELETE_OBJ.equals(memberToDelete)) {
                     // delete the complete object
                     ec.deleteObject(obj);
                 } else {
@@ -698,15 +834,16 @@ public class ScalarisUtils {
     /* **********************************************************************
      *                     MISC
      * **********************************************************************/
-    
+
     /**
      * Scalaris does not support deletion (in a usable way). Therefore, deletion
      * is simulated by overwriting an object with a "deleted" value.
      * 
-     * This method returns true if json is a json of a deleted record.
+     * This method returns true if record is a JSON of a deleted record.
      * 
      * @param record
-     * @return
+     *      The JSON to check.
+     * @return true if record is JSON of a deleted record, false otherwise.
      */
     public static boolean isDeletedRecord(final JSONObject record) {
         return record == null || isDeletedRecord(record.toString());

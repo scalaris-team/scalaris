@@ -236,8 +236,6 @@ public class FetchFieldManager extends AbstractFieldManager {
                 .getMetaDataForManagedMemberAtAbsolutePosition(fieldNumber);
         String memberName = storeMgr.getNamingFactory().getColumnName(mmd,
                 ColumnType.COLUMN);
-        System.out.println("looking for field " + memberName + " "
-                + acmd.getEntityName());
 
         if (result.isNull(memberName)) {
             return null;
@@ -406,7 +404,6 @@ public class FetchFieldManager extends AbstractFieldManager {
             }
             return array;
         } else {
-            System.out.println("FALLBACK");
             // Fallback to built-in type converters
             boolean useLong = false;
             ColumnMetaData[] colmds = mmd.getColumnMetaData();

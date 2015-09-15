@@ -368,8 +368,6 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                         idColl.add(objId);
                     }
                 }
-                System.out.println("name=" + name + " idColl.size()="
-                        + idColl.size() + " idColl=" + idColl);
 
                 jsonobj.put(name, idColl);
                 return;

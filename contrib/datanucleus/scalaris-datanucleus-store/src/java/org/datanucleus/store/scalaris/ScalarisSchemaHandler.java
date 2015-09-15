@@ -4,75 +4,109 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.schema.AbstractStoreSchemaHandler;
 
 public class ScalarisSchemaHandler extends AbstractStoreSchemaHandler {
-    
-    
-    static final String FKA_DELETE_OBJ = "_DEL_OBJECT";
-    
+
     /**
-     * Used to signal a key in which all instances of a single foreign key action is stored.
+     * Used to signal a key at which all foreign key actions for an object are stored.
      */
-    private static final String FKA_KEY_PREFIX = "FKA";
-    
+    private static final String FKA_KEY_SUFFIX = "FKA";
+
     /**
-     * Key prefix used to signal a key in which a collection of all key IDs of the same 
-     * type is stored. This is necessary for queries which need access to all stored
-     * instances of the same type.
+     * Used to signal a key at which the IDs of all persisted objects of the same
+     * class are stored.
      */
-    private static final String ALL_ID_PREFIX = "ALL_IDS";
-    
+    private static final String ALL_ID_SUFFIX = "ALL_IDS";
+
     /**
-     * Key prefix used to signal a key which is used for identity generation. Its value
-     * is an integer which is incremented every time an ID is generated.
+     * Key prefix used to signal a key which is used for identity generation.
      */
-    private static final String ID_GEN_PREXIF = "ID_GEN";
-    
+    private static final String ID_GEN_SUFFIX = "ID_GEN";
+
     /**
-     * Key prefix used to store values of members which are marked as "@Unique".
-     * For each stored value two of these keys are needed.
-     * 1. classname:member:value -> id-of-instance-storing-this-value 
-     *      When an object with an Unique member is inserted into the data store,
-     *      this key is used to check if this value already exists
-     * 2. id-of-instance-storing-this-value:member -> value 
-     *      Needed to find the first key when updating/deleting the value,
-     *      since the old value might not be accessible anymore
+     * Used to signal a key at which the persisted object ID is stored which
+     * belongs to a given unique member value. 
      */
-    private static final String UNIQUE_MEMBER_PREFIX = "UNIQUE";
-    
-    
+    private static final String UNIQUE_MEMBER_SUFFIX = "UNIQUE";
+
+
     public ScalarisSchemaHandler(StoreManager storeMgr) {
         super(storeMgr);
     }
+
     /**
-     * The following methods can be used to generate keys with special meaning which are needed
-     * to provide functionality not natively supported by Scalaris. See doc of the constants for meaning of 
-     * these keys.
-     **/
-    
+     * Returns the Scalaris key used to store object with full class name 
+     * objClassName and ID objectId.
+     * @param objClassName 
+     *      The full class name of the object
+     * @param objectId 
+     *      The ID of the object
+     * @return The Scalaris key
+     */
     public static String getObjectStorageKey(String objClassName, String objectId) {
         if (objectId.startsWith(objClassName)) {
             return objectId;
         }
         return String.format("%s:%s", objClassName, objectId);
     }
-    
+
+    /**
+     * Returns the Scalaris key at which the IDs of all persisted 
+     * objects of a given class are stored.
+     * @param clazz 
+     *      The objects class
+     * @return The Scalaris key
+     */
     static String getIDIndexKeyName(Class<?> clazz) {
         return getIDIndexKeyName(clazz.getCanonicalName());
     }
 
+    /**
+     * Returns the Scalaris key at which the IDs of all persisted 
+     * objects of a given class are stored.
+     * @param clazz 
+     *      The objects class
+     * @return The Scalaris key
+     */
     static String getIDIndexKeyName(String className) {
-        return String.format("%s_%s", className, ALL_ID_PREFIX);
+        return String.format("%s_%s", className, ALL_ID_SUFFIX);
+    }
+ 
+    /**
+     * Returns the Scalaris key used for generating IDs for new object instances
+     * persisted in the data store.
+     * @param className 
+     *      The full class name of the object the ID will be generated for.
+     * @return The Scalaris key
+     */
+    static String getIDGeneratorKeyName(String className) {
+        return String.format("%s_%s", className, ID_GEN_SUFFIX);
     }
 
-    static String getIDGeneratorKeyName(String className) {
-        return String.format("%s_%s", className, ID_GEN_PREXIF);
-    }
-    
+    /**
+     * Returns the Scalaris key used to store which persisted object
+     * has stored the given unique value.
+     * @param className
+     *      Class of the object with the unique member annotation
+     * @param memberName
+     *      Simple member name which has an 'unique' annotation
+     * @param memberValue
+     *      The unique value of the member
+     * @return The Scalaris key
+     */
     static String getUniqueMemberKey(String className, String memberName, String memberValue) {
-        return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_PREFIX);
+        return String.format("%s_%s_%s_%s", className, memberName, memberValue, UNIQUE_MEMBER_SUFFIX);
     }
-    
+
+    /**
+     * Returns the Scalaris key used to store all foreign key actions
+     * of the given object.
+     * @param foreignObjectClass
+     *      Class of the object
+     * @param foreignObjectId
+     *      ID of the object
+     * @return The Scalaris key
+     */
     static String getForeignKeyActionKey(String foreignObjectClass, String foreignObjectId) {
         String storageKey = getObjectStorageKey(foreignObjectClass, foreignObjectId);
-        return String.format("%s_%s", storageKey, FKA_KEY_PREFIX);
+        return String.format("%s_%s", storageKey, FKA_KEY_SUFFIX);
     }
 }
