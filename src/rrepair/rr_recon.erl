@@ -138,7 +138,7 @@
 -type recon_dest() :: ?RT:key() | random.
 
 -type merkle_sync_rcv() ::
-          {OtherMaxItemsCount::non_neg_integer(),
+          {MyMaxItemsCount::non_neg_integer(),
            MyKVItems::merkle_tree:mt_bucket(), LeafCount::pos_integer()}.
 -type merkle_sync_send() ::
           {OtherMaxItemsCount::non_neg_integer(),
@@ -1603,8 +1603,11 @@ check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                       MerkleSyncAccSend, [Sync | MerkleSyncAccRcv], MerkleSyncIN,
                       AccCmp + 1, AccSkip);
        IsLeafNode ->
-           MaxItemsCount = if IsLeafHash -> Params#merkle_params.bucket_size;
-                              true       -> OtherMaxItemsCount
+           MaxItemsCount = if IsLeafHash ->
+                                  erlang:min(Params#merkle_params.bucket_size,
+                                             OtherMaxItemsCount);
+                              true ->
+                                  OtherMaxItemsCount
                            end,
            Sync = {MaxItemsCount, merkle_tree:get_bucket(Node),
                    merkle_tree:get_item_count(Node)},
@@ -1659,8 +1662,9 @@ process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                         MyMaxItemsCount, OtherMaxItemsCount, MerkleSyncIn, Params, Stats,
                         RestTreeAcc, MerkleSyncAccSend, MerkleSyncAccRcv, AccCmp, AccSkip) ->
     Sync = case merkle_tree:is_leaf(Node) of
-               true  -> {Params#merkle_params.bucket_size,
-                         merkle_tree:get_bucket(Node), 1};
+               true  -> MaxItemsCount = erlang:min(Params#merkle_params.bucket_size,
+                                                   MyMaxItemsCount),
+                        {MaxItemsCount, merkle_tree:get_bucket(Node), 1};
                false -> {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
                         {MyMaxItemsCount, MyKVItems, LeafCount}
            end,
