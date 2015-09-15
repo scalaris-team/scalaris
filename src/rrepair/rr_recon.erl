@@ -53,7 +53,7 @@
                 State#rr_recon_state.initiator, State#rr_recon_state.dest_interval,
                 ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
 -define(MERKLE_DEBUG(X,Y), ok).
-%-define(MERKLE_DEBUG(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+%-define(MERKLE_DEBUG(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X, [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -702,7 +702,10 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                   {Hashes, NStats2} =
                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats,
                                                  Params, P1EOneLeaf),
-                  ?MERKLE_DEBUG("merkle (NI) - HashesSize: ~B", [erlang:byte_size(Hashes)]),
+                  ?MERKLE_DEBUG("merkle (NI) - HashesSize: ~B (~B compressed)",
+                                [erlang:byte_size(Hashes),
+                                 erlang:byte_size(
+                                   erlang:term_to_binary(Hashes, [compressed]))]),
                   ?DBG_ASSERT(Hashes =/= <<>>),
                   send(DestReconPid, {resolve_req, Hashes}),
                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
@@ -757,7 +760,10 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                   {Hashes, NStats2} =
                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats,
                                                  Params, P1EOneLeaf),
-                  ?MERKLE_DEBUG("merkle (I) - HashesSize: ~B", [erlang:byte_size(Hashes)]),
+                  ?MERKLE_DEBUG("merkle (I) - HashesSize: ~B (~B compressed)",
+                                [erlang:byte_size(Hashes),
+                                 erlang:byte_size(
+                                   erlang:term_to_binary(Hashes, [compressed]))]),
                   ?DBG_ASSERT(Hashes =/= <<>>),
                   send(DestReconPid, {resolve_req, Hashes}),
                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
