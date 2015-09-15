@@ -243,9 +243,9 @@ prop_merkle_compress_hashlist(Nodes0, SigSizeI, SigSizeL) ->
                      H0 = merkle_tree:get_hash(N),
                      case merkle_tree:is_leaf(N) of
                          true ->
-                             case merkle_tree:get_item_count(N) of
-                                 0 -> H = none;
-                                 _ -> <<H:SigSizeL/integer-unit:1>> = <<H0:SigSizeL>>
+                             case merkle_tree:is_empty(N) of
+                                 true  -> H = none;
+                                 false -> <<H:SigSizeL/integer-unit:1>> = <<H0:SigSizeL>>
                              end;
                          false ->
                              <<H:SigSizeI/integer-unit:1>> = <<H0:SigSizeI>>

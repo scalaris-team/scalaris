@@ -125,9 +125,11 @@ get_root(_) -> undefined.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether the merkle tree has any children or elements.
--spec is_empty(merkle_tree()) -> boolean().
-is_empty({merkle_tree, _, {_H, _ICnt = 0, _Bkt = [], _I}}) -> true;
-is_empty(_) -> false.
+-spec is_empty(merkle_tree() | mt_node()) -> boolean().
+is_empty({merkle_tree, _, Root}) -> is_empty(Root);
+is_empty({_H, _ICnt = 0, _Bkt = [], _I}) -> true;
+is_empty({_H, _Cnt, _ICnt, _I, _CL}) -> false;
+is_empty({_H, _ICnt, _Bkt, _I}) -> false. % inner node (must have children!)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

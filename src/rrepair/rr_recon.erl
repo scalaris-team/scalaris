@@ -933,7 +933,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                           "Inner/Leaf/Items: ~p, EmptyLeaves: ~B, Items/Leaf: ~g",
                           [length(MySyncStruct), merkle_tree:size_detail(MySyncStruct),
                            length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-                                         merkle_tree:get_item_count(L) =:= 0]),
+                                         merkle_tree:is_empty(L)]),
                            lists:sum([merkle_tree:get_item_count(M) || M <- MySyncStruct]) /
                                lists:sum([merkle_tree:get_leaf_count(M) || M <- MySyncStruct])]),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
@@ -1003,7 +1003,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                           "Inner/Leaf/Items: ~p, EmptyLeaves: ~B, Items/Leaf: ~g",
                           [length(SyncStruct), merkle_tree:size_detail(SyncStruct),
                            length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-                                         merkle_tree:get_item_count(L) =:= 0]),
+                                         merkle_tree:is_empty(L)]),
                            lists:sum([merkle_tree:get_item_count(M) || M <- SyncStruct]) /
                                lists:sum([merkle_tree:get_leaf_count(M) || M <- SyncStruct])]),
             
