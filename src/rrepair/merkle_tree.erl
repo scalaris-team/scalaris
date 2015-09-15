@@ -118,9 +118,8 @@ get_branch_factor({merkle_tree, Config, _}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the root node of a merkle tree.
--spec get_root(merkle_tree()) -> mt_node() | undefined.
-get_root({merkle_tree, _, Root}) -> Root;
-get_root(_) -> undefined.
+-spec get_root(merkle_tree()) -> mt_node().
+get_root({merkle_tree, _, Root}) -> Root.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

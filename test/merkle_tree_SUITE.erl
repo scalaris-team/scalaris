@@ -256,13 +256,7 @@ prop_insert_list(L, R, Count) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, Count, uniform, [{output, list_keytpl}]),
     Tree = merkle_tree:insert_list(DB, merkle_tree:new(I, [{keep_bucket, true}])),
-    ItemCount = iterate(merkle_tree:iterator(Tree),
-                        fun(N, Acc) -> Acc + case merkle_tree:is_leaf(N) of
-                                                 true -> merkle_tree:get_item_count(N);
-                                                 false -> 0
-                                             end
-                        end,
-                        0),
+    ItemCount = merkle_tree:get_item_count(Tree),
     ?equals_w_note(Count, ItemCount,
                    io_lib:format("DB=~p~nTree=~p~nCount=~p; DBSize=~p; TreeCount=~p",
                                  [DB, Tree, Count, length(DB), ItemCount])).
