@@ -250,17 +250,26 @@ public class ScalarisUtils {
      *      Connection used for the operation
      * @return The stored object
      */
-    static JSONObject performScalarisObjectFetch(ObjectProvider<?> op, Connection conn)
-            throws ConnectionException, NotFoundException, UnknownException, JSONException {
+    static JSONObject performScalarisObjectFetch(ObjectProvider<?> op, Transaction scalarisTransaction)
+            throws ConnectionException, NotFoundException {
+
+        final String objId = ScalarisUtils.getPersistableIdentity(op);
+        final String objClassName = op.getClassMetaData().getFullClassName();
+        final String objKey = ScalarisSchemaHandler.getObjectStorageKey(objClassName, objId);
+        
+        return new JSONObject(scalarisTransaction.read(objKey).stringValue());
+    }
+    
+    static JSONObject performScalarisObjectFetch(ObjectProvider<?> op, Connection scalarisConnection)
+            throws ConnectionException, NotFoundException {
 
         final String objId = ScalarisUtils.getPersistableIdentity(op);
         final String objClassName = op.getClassMetaData().getFullClassName();
         final String objKey = ScalarisSchemaHandler.getObjectStorageKey(objClassName, objId);
 
-        TransactionSingleOp t = new TransactionSingleOp(conn);
-        return new JSONObject(t.read(objKey).stringValue());
+        TransactionSingleOp scalarisTransaction = new TransactionSingleOp(scalarisConnection);
+        return new JSONObject(scalarisTransaction.read(objKey).stringValue());
     }
-
     /**
      * Inserts an object into Scalaris and performs all necessary management operations (updating indices etc.)
      * ScalarisUtils.WRITE_LOCK is used to ensure thread safety.
@@ -271,22 +280,21 @@ public class ScalarisUtils {
      * @param conn
      *      Connection used for the operation
      */
-    static void performScalarisObjectInsert(ObjectProvider<?> op, JSONObject json, Connection conn)
-            throws ConnectionException, UnknownException, AbortException {
+    static void performScalarisObjectInsert(ObjectProvider<?> op, JSONObject json, Transaction scalarisTransaction)
+            throws ConnectionException {
 
         synchronized(WRITE_LOCK) {
-            Transaction t = new Transaction(conn);
             try {
                 String objectId = ScalarisUtils.getPersistableIdentity(op);
 
-                insertObjectToIDIndex(op, t);
-                updateUniqueMemberKey(op, json, null, t);
-                insertToForeignKeyAction(op, json, t);
+                insertObjectToIDIndex(op, scalarisTransaction);
+                updateUniqueMemberKey(op, json, null, scalarisTransaction);
+                insertToForeignKeyAction(op, json, scalarisTransaction);
 
                 String className = op.getClassMetaData().getFullClassName();
                 String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
-                t.write(storageKey, json.toString());
-                t.commit();
+                
+                scalarisTransaction.write(storageKey, json.toString());
             } catch (NotAListException e) {
                 throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
             }
@@ -303,18 +311,17 @@ public class ScalarisUtils {
      * @param conn
      *      Connection used for the operation
      */
-    static void performScalarisObjectUpdate(ObjectProvider<?> op, int[] updatedFieldNumbers, Connection conn)
-            throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
+    static void performScalarisObjectUpdate(ObjectProvider<?> op, int[] updatedFieldNumbers, Transaction scalarisTransaction)
+            throws ConnectionException, NotFoundException {
 
         synchronized(WRITE_LOCK) {
             String objectId = ScalarisUtils.getPersistableIdentity(op);
-
+           
             // get old value
             String className = op.getClassMetaData().getFullClassName();
             String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-            Transaction t = new Transaction(conn);
-            JSONObject stored = new JSONObject(t.read(objectKey).stringValue());
+            JSONObject stored = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
 
             JSONObject changedVals = new JSONObject();
             op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
@@ -330,13 +337,14 @@ public class ScalarisUtils {
                 }
                 stored.put(key, changedVals.get(key));
             }
-
+            if (className.equals("eu.iescities.server.accountinterface.Application")) {
+                System.out.println("Update:\nOld:"+changedValsOld+"\nNew:"+changedVals+"\n");
+            }
             try {
-                updateUniqueMemberKey(op, changedVals, changedValsOld, t);
-                updateForeignKeyAction(op, changedVals, changedValsOld, t);
+                updateUniqueMemberKey(op, changedVals, changedValsOld, scalarisTransaction);
+                updateForeignKeyAction(op, changedVals, changedValsOld, scalarisTransaction);
 
-                t.write(objectKey, stored.toString());
-                t.commit();
+                scalarisTransaction.write(objectKey, stored.toString());
             } catch (NotAListException e) {
                 throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
             }
@@ -351,24 +359,22 @@ public class ScalarisUtils {
      * @param conn
      *      Connection used for the operation
      */
-    static void performScalarisObjectDelete(ObjectProvider<?> op, Connection conn)
-            throws ConnectionException, UnknownException, NotFoundException, JSONException, AbortException {
+    static void performScalarisObjectDelete(ObjectProvider<?> op, Transaction scalarisTransaction)
+            throws ConnectionException, NotFoundException {
 
         synchronized(WRITE_LOCK) {
             String objectId = ScalarisUtils.getPersistableIdentity(op);
             String className = op.getClassMetaData().getFullClassName();
             String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-            Transaction t = new Transaction(conn);
-            JSONObject oldJson = new JSONObject(t.read(objectKey).stringValue());
+            JSONObject oldJson = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
 
             try {
-                removeObjectFromIDIndex(op, t);
-                removeObjectFromUniqueMemberKey(op, oldJson, t);
-                performForeignKeyActionDelete(op, t);
+                removeObjectFromIDIndex(op, scalarisTransaction);
+                removeObjectFromUniqueMemberKey(op, oldJson, scalarisTransaction);
+                performForeignKeyActionDelete(op, scalarisTransaction);
 
-                t.write(objectKey,  DELETED_RECORD_VALUE);
-                t.commit();
+                scalarisTransaction.write(objectKey,  DELETED_RECORD_VALUE);
             } catch (NotAListException e) {
                 throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
             }
@@ -399,7 +405,6 @@ public class ScalarisUtils {
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
-
         List<ErlangValue> toAdd = new ArrayList<ErlangValue>();
         toAdd.add(new ErlangValue(objectStringIdentity));
         t.addDelOnList(key, toAdd, new ArrayList<ErlangValue>());

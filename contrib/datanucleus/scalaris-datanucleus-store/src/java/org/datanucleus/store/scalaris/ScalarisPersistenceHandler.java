@@ -33,16 +33,15 @@ import org.datanucleus.store.StoreManager;
 import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.scalaris.fieldmanager.FetchFieldManager;
 import org.datanucleus.store.scalaris.fieldmanager.StoreFieldManager;
-import org.datanucleus.transaction.NucleusTransactionException;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
@@ -82,13 +81,20 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
     public void insertObject(ObjectProvider op) {
         // Check if read-only so update not permitted
         assertReadOnlyForUpdateOfObject(op);
-
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+        boolean dnTransactionStarted = scalarisTransaction != null;
 
+        ManagedConnection mConn = null;
         try {
+            if (!dnTransactionStarted) {
+                mConn = storeMgr.getConnection(ec);
+                de.zib.scalaris.Connection scalarisConnection =
+                        (de.zib.scalaris.Connection) mConn.getConnection();
+                scalarisTransaction = new Transaction(scalarisConnection);
+            }
+
             long startTime = System.currentTimeMillis();
             if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_PERSIST.debug(Localiser.msg(
@@ -107,8 +113,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
 
             // insert object
-            ScalarisUtils.performScalarisObjectInsert(op, jsonobj, conn);
-
+            ScalarisUtils.performScalarisObjectInsert(op, jsonobj, scalarisTransaction);
+            if (!dnTransactionStarted) {
+                scalarisTransaction.commit();
+            }
             if (ec.getStatistics() != null) {
                 // Add to statistics
                 ec.getStatistics().incrementNumWrites();
@@ -120,14 +128,16 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         "Scalaris.ExecutionTime",
                         (System.currentTimeMillis() - startTime)));
             }
-        } catch (AbortException e) {
-            throw new NucleusTransactionException(e.getMessage(), e);
         } catch (UnknownException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
         } catch (ConnectionException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
-            mconn.release();
+            if (mConn != null) {
+                mConn.release();
+            }
         }
     }
 
@@ -136,11 +146,19 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         assertReadOnlyForUpdateOfObject(op);
 
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+        boolean dnTransactionStarted = scalarisTransaction != null;
 
+        ManagedConnection mConn = null;
         try {
+            if (!dnTransactionStarted) {
+                mConn = storeMgr.getConnection(ec);
+                de.zib.scalaris.Connection scalarisConnection =
+                        (de.zib.scalaris.Connection) mConn.getConnection();
+                scalarisTransaction = new Transaction(scalarisConnection);
+            }
+            
             AbstractClassMetaData cmd = op.getClassMetaData();
 
             long startTime = System.currentTimeMillis();
@@ -159,8 +177,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId(), fieldStr.toString()));
             }
 
-            ScalarisUtils.performScalarisObjectUpdate(op, updatedFieldNumbers, conn);
-
+            ScalarisUtils.performScalarisObjectUpdate(op, updatedFieldNumbers, scalarisTransaction);
+            if (!dnTransactionStarted) {
+                scalarisTransaction.commit();
+            }
             if (ec.getStatistics() != null) {
                 // Add to statistics
                 ec.getStatistics().incrementNumWrites();
@@ -173,17 +193,15 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
         } catch (ConnectionException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusTransactionException(e.getMessage(), e);
-        }catch (UnknownException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
         }catch (NotFoundException e) {
             // if we have an update we should already have this object stored
             throw new NucleusObjectNotFoundException("Could not update object since its original value was not found", e);
-        } catch (JSONException e) {
-            throw new NucleusDataStoreException("The stored object has a broken structure", e);
+        } catch (AbortException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
-            mconn.release();
+            if (mConn != null) {
+                mConn.release();
+            }
         }
     }
 
@@ -206,11 +224,19 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
         assertReadOnlyForUpdateOfObject(op);
 
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+        boolean dnTransactionStarted = scalarisTransaction != null;
 
+        ManagedConnection mConn = null;
         try {
+            if (!dnTransactionStarted) {
+                mConn = storeMgr.getConnection(ec);
+                de.zib.scalaris.Connection scalarisConnection =
+                        (de.zib.scalaris.Connection) mConn.getConnection();
+                scalarisTransaction = new Transaction(scalarisConnection);
+            }
+
             long startTime = System.currentTimeMillis();
             if (NucleusLogger.DATASTORE_PERSIST.isDebugEnabled()) {
                 NucleusLogger.DATASTORE_PERSIST.debug(Localiser.msg(
@@ -218,8 +244,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         op.getInternalObjectId()));
             }
 
-            ScalarisUtils.performScalarisObjectDelete(op, conn);
-
+            ScalarisUtils.performScalarisObjectDelete(op, scalarisTransaction);
+            if (!dnTransactionStarted) {
+                scalarisTransaction.commit();
+            }
             if (ec.getStatistics() != null) {
                 ec.getStatistics().incrementNumWrites();
                 ec.getStatistics().incrementDeleteCount();
@@ -232,16 +260,14 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             }
         } catch (ConnectionException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (UnknownException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusTransactionException(e.getMessage(), e);
         } catch (NotFoundException e) {
             throw new NucleusObjectNotFoundException(e.getMessage(), e);
-        } catch (JSONException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
+        } catch (AbortException e) {
+            throw new NucleusObjectNotFoundException(e.getMessage(), e);
         } finally {
-            mconn.release();
+            if (mConn != null) {
+                mConn.release();
+            }
         }
     }
 
@@ -263,61 +289,70 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      */
     public void fetchObject(ObjectProvider op, int[] fieldNumbers) {
         ExecutionContext ec = op.getExecutionContext();
-        ManagedConnection mconn = storeMgr.getConnection(ec);
-        de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
-                .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+
+        final long startTime = System.currentTimeMillis();
 
         try {
-            final long startTime = System.currentTimeMillis();
-
-            try {
-                JSONObject result = ScalarisUtils.performScalarisObjectFetch(op, conn);
-                if (ScalarisUtils.isDeletedRecord(result)) {
-                    throw new NucleusObjectNotFoundException(
-                            "Record has been deleted");
+            JSONObject result;
+            if (scalarisTransaction != null) {
+                result = ScalarisUtils.performScalarisObjectFetch(op, scalarisTransaction);
+            } else {
+                // non transactional read
+                ManagedConnection mConn = storeMgr.getConnection(ec);
+                try {
+                    de.zib.scalaris.Connection scalarisConnection =
+                            (de.zib.scalaris.Connection) mConn.getConnection();
+                    result = ScalarisUtils.performScalarisObjectFetch(op, scalarisConnection);
+                } finally {
+                    mConn.release();
                 }
-
-                final String declaredClassQName = result.getString("class");
-                final Class declaredClass = op.getExecutionContext()
-                        .getClassLoaderResolver()
-                        .classForName(declaredClassQName);
-                final Class<?> objectClass = op.getObject().getClass();
-
-                if (!objectClass.isAssignableFrom(declaredClass)) {
-                        System.out.println("Type found in db not compatible with requested type");
-                    throw new NucleusObjectNotFoundException(
-                            "Type found in db not compatible with requested type");
-                }
-
-                op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
-
-                if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
-                    NucleusLogger.DATASTORE_NATIVE
-                            .debug("GET " + result.toString());
-                }
-            } catch (NotFoundException e) {
-                throw new NucleusObjectNotFoundException(e.getMessage(), e);
-            } catch (ConnectionException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (UnknownException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
-            } catch (JSONException e) {
-                throw new NucleusDataStoreException(e.getMessage(), e);
             }
 
-            if (ec.getStatistics() != null) {
-                // Add to statistics
-                ec.getStatistics().incrementNumReads();
-                ec.getStatistics().incrementFetchCount();
+            if (ScalarisUtils.isDeletedRecord(result)) {
+                throw new NucleusObjectNotFoundException(
+                        "Record has been deleted");
             }
 
-            if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
-                NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
-                        "Scalaris.ExecutionTime",
-                        (System.currentTimeMillis() - startTime)));
+            final String declaredClassQName = result.getString("class");
+            final Class declaredClass = op.getExecutionContext()
+                    .getClassLoaderResolver()
+                    .classForName(declaredClassQName);
+            final Class<?> objectClass = op.getObject().getClass();
+
+            if (objectClass.getCanonicalName().equals("eu.iescities.server.accountinterface.Application")) {
+                System.out.println("FETCH:\n"+result+"\n");
             }
-        } finally {
-            mconn.release();
+
+            if (!objectClass.isAssignableFrom(declaredClass)) {
+                    System.out.println("Type found in db not compatible with requested type");
+                throw new NucleusObjectNotFoundException(
+                        "Type found in db not compatible with requested type");
+            }
+
+            op.replaceFields(fieldNumbers, new FetchFieldManager(op, result));
+
+            if (NucleusLogger.DATASTORE_NATIVE.isDebugEnabled()) {
+                NucleusLogger.DATASTORE_NATIVE
+                        .debug("GET " + result.toString());
+            }
+        } catch (NotFoundException e) {
+            throw new NucleusObjectNotFoundException(e.getMessage(), e);
+        } catch (ConnectionException e) {
+            throw new NucleusDataStoreException(e.getMessage(), e);
+        }
+
+        if (ec.getStatistics() != null) {
+            // Add to statistics
+            ec.getStatistics().incrementNumReads();
+            ec.getStatistics().incrementFetchCount();
+        }
+
+        if (NucleusLogger.DATASTORE_RETRIEVE.isDebugEnabled()) {
+            NucleusLogger.DATASTORE_RETRIEVE.debug(Localiser.msg(
+                    "Scalaris.ExecutionTime",
+                    (System.currentTimeMillis() - startTime)));
         }
     }
 
@@ -387,11 +422,19 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
 
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+        boolean dnTransactionStarted = scalarisTransaction != null;
 
         try {
             // read the management key
-            TransactionSingleOp t = new TransactionSingleOp(conn);
-            List<String> idIndex = t.read(idIndexKey).stringListValue();
+            List<String> idIndex;
+            if (dnTransactionStarted) {
+                idIndex = scalarisTransaction.read(idIndexKey).stringListValue();
+            } else {
+                TransactionSingleOp t = new TransactionSingleOp(conn);
+                idIndex = t.read(idIndexKey).stringListValue();
+            }
 
             // retrieve all values from the management key
             for (String id : idIndex) {
@@ -429,11 +472,21 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         ec.getClassLoaderResolver());
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
+        Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
+                .getScalarisTransaction(ec);
+        boolean dnTransactionStarted = scalarisTransaction != null;
+
         String uniqueMemberValueKey = ScalarisSchemaHandler.getUniqueMemberKey(
                 objectClass.getCanonicalName(), memberName, memberValue);
-        TransactionSingleOp t = new TransactionSingleOp(conn);
         try {
-            String uniqueObjectId = t.read(uniqueMemberValueKey).stringValue();
+            String uniqueObjectId;
+            if (dnTransactionStarted) {
+                uniqueObjectId = scalarisTransaction.read(uniqueMemberValueKey).stringValue();
+            } else {
+                TransactionSingleOp t = new TransactionSingleOp(conn);
+                uniqueObjectId = t.read(uniqueMemberValueKey).stringValue();
+            }
+
             if (!ScalarisUtils.isDeletedRecord(uniqueObjectId)) {
                return IdentityUtils.getObjectFromPersistableIdentity(uniqueObjectId, cmd, ec);
             }
