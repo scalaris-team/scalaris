@@ -486,6 +486,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_resolve_leaves_ckidx, 7}, % needs same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
+             {send_resolve_request, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
              {art_get_sync_leaves, 6}, %% needs non-empty bloom filters
              {send, 2}, %% tries to send messages

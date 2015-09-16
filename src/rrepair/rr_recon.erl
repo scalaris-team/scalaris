@@ -403,11 +403,11 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
-   State = #rr_recon_state{stage = reconciliation,     initiator = true,
+   State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = shash,
                            params = #shash_recon_struct{sig_size = SigSize,
-                                                        p1e = P1E} = Params,
-                           stats = Stats,              kv_list = KVList,
+                                                      p1e = P1E} = Params,
+                           stats = Stats,             kv_list = KVList,
                            misc = [{db_chunk, OtherDBChunk},
                                    {oicount, OtherItemCount}],
                            dest_recon_pid = DestReconPid,
@@ -464,14 +464,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   % no need to send resolve_req message - the non-initiator already shut down
                   % the other node does not have any items but there is a diff at our node!
                   % start a resolve here:
-                  SID = rr_recon_stats:get(session_id, Stats),
                   KList = [element(1, KV) || KV <- NewKVList],
-                  send_local(OwnerL, {request_resolve, SID,
-                                      {key_upd_send, DestRRPid, KList, []},
-                                      [{feedback_request, comm:make_global(OwnerL)},
-                                       {from_my_node, 1}]}),
-                  % we will get one reply from a subsequent ?key_upd resolve
-                  NewStats = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+                  NewStats = send_resolve_request(
+                               Stats, KList, OwnerL, DestRRPid, true, false),
                   NewState2 = NewState#rr_recon_state{stats = NewStats, stage = resolve},
                   shutdown(sync_finished, NewState2);
               OtherItemCount =:= 0 ->
@@ -484,10 +479,10 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
-   State = #rr_recon_state{stage = reconciliation,     initiator = true,
+   State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E},
-                           stats = Stats,              kv_list = KVList,
+                           stats = Stats,             kv_list = KVList,
                            misc = [{bloom, BF}],
                            dest_recon_pid = DestReconPid,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
@@ -537,13 +532,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   % no need to send resolve_req message - the non-initiator already shut down
                   % empty BF with diff at our node -> the other node does not have any items!
                   % start a resolve here:
-                  SID = rr_recon_stats:get(session_id, Stats),
-                  send_local(OwnerL, {request_resolve, SID,
-                                      {key_upd_send, DestRRPid, [element(1, KV) || KV <- NewKVList], []},
-                                      [{feedback_request, comm:make_global(OwnerL)},
-                                       {from_my_node, 1}]}),
-                  % we will get one reply from a subsequent ?key_upd resolve
-                  NewStats = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+                  NewStats = send_resolve_request(
+                               Stats, [element(1, KV) || KV <- NewKVList], OwnerL,
+                               DestRRPid, true, false),
                   NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
                                                   kv_list = NewKVList},
                   shutdown(sync_finished, NewState);
@@ -598,23 +589,8 @@ on({resolve_req, BinReqIdxPos} = _Msg,
            ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
     ?TRACE1(_Msg, State),
     NewStats =
-        case decompress_idx_to_k_list(BinReqIdxPos, KList) of
-            [] -> Stats;
-            ReqKeys ->
-                SID = rr_recon_stats:get(session_id, Stats),
-                ?TRACE("Resolve ~s Session=~p ; ToSend=~p",
-                       [RMethod, SID, length(ReqKeys)]),
-                ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
-                             {non_unique_send_list, ReqKeys}),
-                % note: the resolve request is counted at the initiator and
-                %       thus from_my_node must be set accordingly on this node!
-                send_local(OwnerL, {request_resolve, SID,
-                                    {key_upd_send, DestRRPid, ReqKeys, []},
-                                    [{feedback_request, comm:make_global(OwnerL)},
-                                     {from_my_node, ?IIF(Initiator, 1, 0)}]}),
-                % we will get one reply from a subsequent ?key_upd resolve
-                rr_recon_stats:inc([{resolve_started, 1}], Stats)
-        end,
+        send_resolve_request(Stats, decompress_idx_to_k_list(BinReqIdxPos, KList),
+                             OwnerL, DestRRPid, Initiator, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
@@ -1420,7 +1396,7 @@ shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos, Max) ->
     end.
 
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
-%%      processes in phase 2 (trivial RC).
+%%      processes in phase 2 (trivial RC) at the non-initiator.
 -spec shash_bloom_perform_resolve(
         State::state(), DBChunkTree::kvi_tree(), OrigDBChunkLen::non_neg_integer(),
         SigSize::signature_size(), VSize::signature_size(),
@@ -1434,23 +1410,11 @@ shash_bloom_perform_resolve(
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod},
   DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
-    SID = rr_recon_stats:get(session_id, Stats),
     {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
-    ?TRACE("Resolve ~S Session=~p ; ToSend=~p",
-           [_RMethod, SID, length(ToSendKeys1)]),
-    ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
-                 {non_unique_send_list, ToSendKeys1}),
-
-    % note: the resolve request was counted at the initiator and
-    %       thus from_my_node must be 0 on this node!
-    send_local(OwnerL, {request_resolve, SID,
-                        {key_upd_send, DestRRPid, ToSendKeys1, []},
-                        [{from_my_node, 0},
-                         {feedback_request, comm:make_global(OwnerL)}]}),
-    % we will get one reply from a subsequent feedback response
-    NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+    NewStats1 = send_resolve_request(Stats, ToSendKeys1, OwnerL, DestRRPid,
+                                     false, false),
 
     % let the initiator's rr_recon process identify the remaining keys
     ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(DBChunkTree1)] ++ ToReqIdx1),
@@ -1800,26 +1764,9 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf,
                             {<<Hashes/bitstring, 0:BucketSizeBits>>, LeafNAcc + 1, MyKItems ++ ToSend}
                     end, {<<>>, 0, []}, Sync),
 
-    % send resolve message:
-    SID = rr_recon_stats:get(session_id, Stats),
     % resolve the leaf-leaf comparison's items as key_upd:
-    % note: the resolve request is counted at the initiator and
-    %       thus from_my_node must be set accordingly on this node!
-    KeyUpdResReqs =
-        if ToSend =/= [] ->
-               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
-                            {non_unique_send_list, ToSend}),
-               send_local(OwnerL, {request_resolve, SID,
-                                   {key_upd_send, DestRRPid, ToSend, _ToReq = []},
-                                   [{from_my_node, ?IIF(IsInitiator, 1, 0)},
-                                    {feedback_request, comm:make_global(OwnerL)}]}),
-               1;
-           true ->
-               0
-        end,
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
-                                 {resolve_started, KeyUpdResReqs}],
-                                Stats),
+    Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
+    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats1),
     {Hashes, NStats}.
 
 %% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/4
@@ -1856,22 +1803,8 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
           end, {Hashes, [], [], false, 0}, Sync),
 
     % send resolve message:
-    SID = rr_recon_stats:get(session_id, Stats),
     % resolve the leaf-leaf comparison's items as key_upd:
-    % note: the resolve request is counted at the initiator and
-    %       thus from_my_node must be set accordingly on this node!
-    KeyUpdResReqs =
-        if ToSend =/= [] ->
-               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
-                            {non_unique_send_list, ToSend}),
-               send_local(OwnerL, {request_resolve, SID,
-                                   {key_upd_send, DestRRPid, ToSend, _ToReq = []},
-                                   [{from_my_node, ?IIF(IsInitiator, 1, 0)},
-                                    {feedback_request, comm:make_global(OwnerL)}]}),
-               1;
-           true ->
-               0
-        end,
+    Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
     % let the other node's rr_recon process identify the remaining keys;
     % it will use key_upd_send (if non-empty) and we must thus increase
     % the number of resolve processes here!
@@ -1882,12 +1815,12 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
            ToResolve1 = [],
            MerkleResReqs = 0
     end,
-    
-    ?TRACE("resolve_req Merkle Session=~p ; key_upd_send=~p ; merkle_resolve=~p",
-           [SID, KeyUpdResReqs, MerkleResReqs]),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
-                                 {resolve_started, KeyUpdResReqs + MerkleResReqs}],
-                                Stats),
+                                 {resolve_started, MerkleResReqs}],
+                                Stats1),
+    ?TRACE("resolve_req Merkle Session=~p ; resolve started=~B",
+           [rr_recon_stats:get(session_id, Stats),
+            rr_recon_stats:get(resolve_started, NStats)]),
     {ToResolve1, NStats}.
 
 %% @doc Decodes all requested keys from merkle_resolve_leaves_receive/8 (as a
@@ -1909,18 +1842,8 @@ merkle_resolve_leaves_ckidx([{_MyKVItems, _MyItemCount} | TL],
                              DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL,
                                 ToSend, IsInitiator);
-merkle_resolve_leaves_ckidx([], [], DestRRPid, Stats, OwnerL, [_|_] = ToSend, IsInitiator) ->
-    SID = rr_recon_stats:get(session_id, Stats),
-    % note: the resolve request is counted at the initiator and
-    %       thus from_my_node must be set accordingly on this node!
-    send_local(OwnerL, {request_resolve, SID,
-                        {key_upd_send, DestRRPid, ToSend, []},
-                        [{feedback_request, comm:make_global(OwnerL)},
-                         {from_my_node, ?IIF(IsInitiator, 1, 0)}]}),
-    % we will get one reply from a subsequent ?key_upd resolve
-    rr_recon_stats:inc([{resolve_started, 1}], Stats);
-merkle_resolve_leaves_ckidx([], [], _DestRRPid, Stats, _OwnerL, [], _IsInitiator) ->
-    Stats.
+merkle_resolve_leaves_ckidx([], [], DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
+    send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% art recon
@@ -2020,6 +1943,32 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends a request_resolve message to the rrepair layer which sends the
+%%      entries from the given keys to the other node with a feedback request.
+-spec send_resolve_request(Stats, ToSend::[?RT:key()], OwnerL::comm:erl_local_pid(),
+                           DestRRPid::comm:mypid(), IsInitiator::boolean(),
+                           SkipIfEmpty::boolean()) -> Stats
+    when is_subtype(Stats, rr_recon_stats:stats()).
+send_resolve_request(Stats, [] = _ToSend, _OwnerL, _DestRRPid, _IsInitiator,
+                     true = _SkipIfEmpty) ->
+    ?TRACE("Resolve Session=~p ; ToSend=~p",
+           [rr_recon_stats:get(session_id, Stats), 0]),
+    Stats;
+send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator,
+                     _SkipIfEmpty) ->
+    SID = rr_recon_stats:get(session_id, Stats),
+    ?TRACE("Resolve Session=~p ; ToSend=~p", [SID, length(ToSend)]),
+    % note: the resolve request is counted at the initiator and
+    %       thus from_my_node must be set accordingly on this node!
+    ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                 {non_unique_send_list, ToSend}),
+    send_local(OwnerL, {request_resolve, SID,
+                        {key_upd_send, DestRRPid, ToSend, _ToReq = []},
+                        [{from_my_node, ?IIF(IsInitiator, 1, 0)},
+                         {feedback_request, comm:make_global(OwnerL)}]}),
+    % we will get one reply from a subsequent ?key_upd resolve
+    rr_recon_stats:inc([{resolve_started, 1}], Stats).
 
 %% @doc Gets the number of bits needed to encode the given number.
 -spec bits_for_number(Number::pos_integer()) -> pos_integer();
