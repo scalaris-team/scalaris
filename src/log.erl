@@ -73,8 +73,8 @@ start_link() ->
             log4erl:change_format(file, config:read(log_format_file)),
 
             % remove the default error_logger's file and tty handlers
-            error_logger:delete_report_handler(error_logger_file_h),
-            error_logger:delete_report_handler(error_logger_tty_h),
+            error_logger:logfile(close),
+            error_logger:tty(false),
             error_logger:delete_report_handler(error_logger),
             % there should not be any previous log4erl handler - just in case, delete it:
             error_logger:delete_report_handler(error_logger_log4erl_h),
