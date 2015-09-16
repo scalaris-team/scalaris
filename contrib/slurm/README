@@ -6,8 +6,8 @@ sets the desired parameters and enqueues the tasks via `sbatch`. For an example
 see `bench.sh`.
 
 The queued tasks execute another script on the nodes
-of the cumulus cluster (cumu-n00 - cumu-n32), performing the actual tasks. For
-examples see `example-job-script` and `bench-script.sh`.
+of the cumulus cluster (cumu01-00 - cumu01-15 and cumu02-00-cumu02-15), performing
+the actual tasks. For examples see `example-job-script` and `bench-script.sh`.
 
 The rest of the scripts are scripts for default tasks, like starting and stopping
 Scalaris.
@@ -51,9 +51,9 @@ Scalaris.
 
 The web interface of a running Scalaris node can be accessed through
 
-    `http://cumu-<Node-Nr>.zib.de:8000/index.yaws`
+    `http://cumu01-<Node-Nr>.zib.de:8000/index.yaws`
 e.g.
-    [http://cumu-n03.zib.de:8000/index.yaws](http://cumu-n03.zib.de:8000/index.yaws)
+    [http://cumu01-n03.zib.de:8000/index.yaws](http://cumu01-03.zib.de:8000/index.yaws)
 
 from every PC that has access to the cumulus cluster.
 
@@ -63,7 +63,7 @@ from every PC that has access to the cumulus cluster.
     * Beware: Anyone can access this node now
 * an interactive shell can now be opened on the respective node with
 
-        $ srun -p CSR -A csr --nodelist=cumu-n00 --pty bash
+        $ srun -p CUMU -A csr --nodelist=cumu01-00 --pty bash
 
 * attach to the screen session running the Scalaris node
 
@@ -81,9 +81,9 @@ A script (`cleanup.sh`) is provided for this purpose. The script needs to be
 executed on all nodes used by the canceled
 job, run e.g.
 
-        $ srun -p CSR -A csr --nodelist="cumu-n03,cumu-n04" cleanup.sh
+        $ srun -p CUMU -A csr --nodelist="cumu01-03,cumu01-04" cleanup.sh
 
-to cleanup the nodes cumu-n[03,04]. The list of used nodes can be found in the
+to cleanup the nodes cumu01-[03,04]. The list of used nodes can be found in the
 logfile of the cancelled job.
 
 The `scalaris-start.sh` script also cancels still running Scalaris nodes, so if
