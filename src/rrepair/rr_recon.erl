@@ -1337,7 +1337,7 @@ decompress_idx_to_k_list_kv_(Bin, KVList, SigSize) ->
 %%      if the x'th position is in the list. The final bitstring may be
 %%      created with erlang:list_to_bitstring(lists:reverse(Result)).
 %%      A total of FinalSize bits will be used.
-%%      PreCond: sorted list Pos, 0 &le; every pos &lt; FinalSize
+%%      PreCond: sorted list Pos, 0 &lt;= every pos &lt; FinalSize
 -spec pos_to_bitstring(Pos::[non_neg_integer()], AccBin::[bitstring()],
                        BitsSet::non_neg_integer(), FinalSize::non_neg_integer())
         -> Result::[bitstring()].
