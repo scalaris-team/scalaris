@@ -157,6 +157,7 @@ p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - 
     AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
     p_add_list_v2_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
 p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    % Pos in next byte
     PosInByte = Pos rem 8,
     PreBitsNum2 = Pos - PosInByte,
     DiffBits = PreBitsNum2 - AccBFSize - 8,

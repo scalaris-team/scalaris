@@ -36,6 +36,7 @@
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
+-export([pos_to_bitstring/4, bitstring_to_k_list_kv/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -197,7 +198,7 @@
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer(), DirectResolves::non_neg_integer()} |
     {resolve_req, Hashes::bitstring()} |
-    {resolve_req, BinKeyList::[bitstring()]} |
+    {resolve_req, idx, BinKeyList::bitstring()} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -809,7 +810,7 @@ on({resolve_req, Hashes} = _Msg,
         merkle_resolve_leaves_receive(MerkleSyncRcv, Hashes, DestRRPid, Stats,
                                       OwnerL, Params, P1EOneLeaf, IsInitiator),
     ?DBG_ASSERT(Hashes =/= <<>>),
-    comm:send(DestRCPid, {resolve_req, BinIdxList}),
+    comm:send(DestRCPid, {resolve_req, idx, BinIdxList}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {MerkleSyncSend, []},
                                     stats = NStats, misc = [{one_leaf_p1e, P1EOneLeaf}]},
@@ -821,22 +822,27 @@ on({resolve_req, Hashes} = _Msg,
        true -> NewState
     end;
 
-on({resolve_req, BinKeyList} = _Msg,
+on({resolve_req, idx, BinKeyList} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = merkle_tree,
                            merkle_sync = {MerkleSyncSend, []},
+                           params = Params,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            stats = Stats})
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
-  when is_list(BinKeyList) ->
+  when is_bitstring(BinKeyList) ->
+    ?MERKLE_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed",
+                  [?IIF(IsInitiator, "I", "NI"),
+                   erlang:byte_size(
+                     erlang:term_to_binary(BinKeyList, [compressed]))]),
     ?TRACE1(_Msg, State),
-    NStats = if BinKeyList =:= [] ->
+    NStats = if BinKeyList =:= <<>> ->
                     Stats;
                 true ->
                     merkle_resolve_leaves_ckidx(
                       MerkleSyncSend, BinKeyList, DestRRPid, Stats, OwnerL,
-                      [], IsInitiator)
+                      Params, [], IsInitiator)
              end,
     shutdown(sync_finished, State#rr_recon_state{merkle_sync = {[], []},
                                                  stats = NStats}).
@@ -1327,6 +1333,34 @@ decompress_idx_to_k_list_kv_(Bin, KVList, SigSize) ->
     [{Key, _Version} | KVList2] = lists:nthtail(KeyPosInc, KVList),
     [Key | decompress_idx_to_k_list_kv_(T, KVList2, SigSize)].
 
+%% @doc Converts a list of positions to a bitstring where the x'th bit is set
+%%      if the x'th position is in the list. The final bitstring may be
+%%      created with erlang:list_to_bitstring(lists:reverse(Result)).
+%%      A total of FinalSize bits will be used.
+%%      PreCond: sorted list Pos, 0 &le; every pos &lt; FinalSize
+-spec pos_to_bitstring(Pos::[non_neg_integer()], AccBin::[bitstring()],
+                       BitsSet::non_neg_integer(), FinalSize::non_neg_integer())
+        -> Result::[bitstring()].
+pos_to_bitstring([Pos | Rest], AccBin, BitsSet, FinalSize) ->
+    New = <<0:(Pos - BitsSet), 1:1>>,
+    pos_to_bitstring(Rest, [New | AccBin], Pos + 1, FinalSize);
+pos_to_bitstring([], AccBin, BitsSet, FinalSize) ->
+    [<<0:(FinalSize - BitsSet)>> | AccBin].
+
+%% @doc Converts the bitstring from pos_to_bitstring/4 into keys at the
+%%      appropriate positions in KVList. Result is reversly sorted.
+-spec bitstring_to_k_list_kv(PosBitString::bitstring(), KVList::db_chunk_kv(),
+                             Acc::[?RT:key()]) -> Result::[?RT:key()].
+bitstring_to_k_list_kv(<<1:1, RestBits/bitstring>>, [{Key, _Version} | RestKV], Acc) ->
+    bitstring_to_k_list_kv(RestBits, RestKV, [Key | Acc]);
+bitstring_to_k_list_kv(<<0:1, RestBits/bitstring>>, [{_Key, _Version} | RestKV], Acc) ->
+    bitstring_to_k_list_kv(RestBits, RestKV, Acc);
+bitstring_to_k_list_kv(RestBits, [], Acc) ->
+    % there may be rest bits, but all should be 0:
+    BitCount = erlang:bit_size(RestBits),
+    ?ASSERT(<<0:BitCount>> =:= RestBits),
+    Acc.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SHash specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1776,7 +1810,7 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf,
         Sync::[merkle_sync_rcv()], Hashes::bitstring(), DestRRPid::comm:mypid(),
         Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{},
         P1EOneLeaf::float(), IsInitiator::boolean())
-        -> {HashesReq::[bitstring()], NewStats::Stats}
+        -> {HashesReq::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                               P1EOneLeaf, IsInitiator) ->
@@ -1786,7 +1820,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
           fun({MyMaxItemsCount, MyKVItems, LeafCount},
               {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc}) ->
                   % inner-leaf mismatch to resolve
-                  {NHashes, OBucketTree, OrigDBChunkLen, SigSize, VSize} =
+                  {NHashes, OBucketTree, _OrigDBChunkLen, SigSize, VSize} =
                       merkle_resolve_retrieve_leaf_hashes(
                         HashesAcc, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
                   % calc diff (trivial sync)
@@ -1796,8 +1830,9 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                   ReqIdx = lists:usort(
                              [Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)]
                                  ++ ToReqIdx1),
-                  MyResolve = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
-                  {NHashes, ToSend1, [MyResolve | ToResolve],
+                  ToResolve1 = pos_to_bitstring(ReqIdx, ToResolve, 0,
+                                                Params#merkle_params.bucket_size + 1),
+                  {NHashes, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
                    LeafNAcc + LeafCount}
           end, {Hashes, [], [], false, 0}, Sync),
@@ -1809,10 +1844,10 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
     % it will use key_upd_send (if non-empty) and we must thus increase
     % the number of resolve processes here!
     if ResolveNonEmpty -> 
-           ToResolve1 = lists:reverse(ToResolve),
+           ToResolve1 = erlang:list_to_bitstring(lists:reverse(ToResolve)),
            MerkleResReqs = 1;
        true ->
-           ToResolve1 = [],
+           ToResolve1 = <<>>,
            MerkleResReqs = 0
     end,
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
@@ -1827,22 +1862,27 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
 %%      result of sending resolve requests) and resolves the appropriate entries
 %%      (if non-empty) with our data using a key_upd_send.
 -spec merkle_resolve_leaves_ckidx(
-        Sync::[merkle_sync_send()], BinKeyList::[bitstring()], DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid(), ToSend::[?RT:key()], IsInitiator::boolean())
+        Sync::[merkle_sync_send()], BinKeyList::bitstring(), DestRRPid::comm:mypid(),
+        Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{},
+        ToSend::[?RT:key()], IsInitiator::boolean())
         -> NewStats::Stats
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_ckidx([{_OtherMaxItemsCount, MyKVItems, _LeafCount} | TL],
-                             [ReqKeys | BinKeyList],
-                             DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
-    ToSend1 = decompress_idx_to_k_list_kv(ReqKeys, MyKVItems) ++ ToSend,
-    merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL,
+                             BinKeyList0,
+                             DestRRPid, Stats, OwnerL, Params, ToSend, IsInitiator) ->
+    Positions = Params#merkle_params.bucket_size + 1,
+    <<ReqKeys:Positions/bitstring-unit:1, BinKeyList/bitstring>> = BinKeyList0,
+    ToSend1 = bitstring_to_k_list_kv(ReqKeys, MyKVItems, ToSend),
+    merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
                                 ToSend1, IsInitiator);
 merkle_resolve_leaves_ckidx([{_MyKVItems, _MyItemCount} | TL],
-                             [<<>> | BinKeyList],
-                             DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
-    merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL,
+                             BinKeyList0,
+                             DestRRPid, Stats, OwnerL, Params, ToSend, IsInitiator) ->
+    Positions = Params#merkle_params.bucket_size + 1,
+    <<0:Positions, BinKeyList/bitstring>> = BinKeyList0,
+    merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
                                 ToSend, IsInitiator);
-merkle_resolve_leaves_ckidx([], [], DestRRPid, Stats, OwnerL, ToSend, IsInitiator) ->
+merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params, ToSend, IsInitiator) ->
     send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

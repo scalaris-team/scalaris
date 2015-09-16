@@ -45,7 +45,8 @@ groups() ->
                            tester_map_key_to_quadrant,
                            tester_map_interval,
                            tester_find_sync_interval,
-                           tester_merkle_compress_hashlist%,
+                           tester_merkle_compress_hashlist,
+                           tester_merkle_pos_to_bitstring%,
 %%                            tester_merkle_compress_cmp_result
                                 ]},
      {basic,  [parallel], [
@@ -253,6 +254,20 @@ prop_merkle_compress_hashlist(Nodes0, SigSizeI, SigSizeL) ->
                      {H, merkle_tree:is_leaf(N)}
                  end || N <- Nodes],
     ?equals(rr_recon:merkle_decompress_hashlist(Bin, SigSizeI, SigSizeL), HashesRed).
+
+tester_merkle_pos_to_bitstring(_) ->
+    tester:test(?MODULE, prop_merkle_pos_to_bitstring, 2, 1000, [{threads, 4}]).
+
+-spec prop_merkle_pos_to_bitstring(Positions::[0..160], FinalSize::1..160) -> true.
+prop_merkle_pos_to_bitstring(Positions0, FinalSize0) ->
+    Positions = lists:usort(Positions0),
+    FinalSize = erlang:max(FinalSize0, lists:max([0 | Positions]) + 1),
+    Bin = erlang:list_to_bitstring(
+            lists:reverse(
+              rr_recon:pos_to_bitstring(Positions, [], 0, FinalSize))),
+    KVList = [{K, 1} || K <- lists:seq(0, FinalSize - 1)],
+    ?equals(lists:reverse(rr_recon:bitstring_to_k_list_kv(Bin, KVList, [])),
+            Positions).
 
 tester_merkle_compress_hashlist(_) ->
     tester:test(?MODULE, prop_merkle_compress_hashlist, 3, 1000, [{threads, 4}]).

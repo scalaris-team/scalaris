@@ -449,7 +449,9 @@ tester_type_check_rrepair(_Config) ->
              {map_interval, 2}, %% second interval must be in a single quadrant
 
              {merkle_compress_hashlist, 4}, %% needs merkle nodes with hashes
-             {merkle_decompress_hashlist, 3} %% needs a special binary to correspond to a number of bits
+             {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
+             {pos_to_bitstring, 4}, % needs to fulfil certain preconditions
+             {bitstring_to_k_list_kv, 3} % needs a special binary to correspond to a number of KV entries
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -483,7 +485,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
              {merkle_resolve_leaves_send, 7}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_receive, 8}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_ckidx, 7}, % needs same-length lists
+             {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {send_resolve_request, 6}, %% tries to send messages
