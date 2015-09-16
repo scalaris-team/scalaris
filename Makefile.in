@@ -138,17 +138,11 @@ contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 
 test-all: all_TESTS java-test python-test ruby-test interop-test
 
-test: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -ct_hooks scalaris_cth -noshell | tee ct.log ; \
-	grep " 0 failed" ct.log
+test: default_TESTS
 
-test-skipped: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg -ct_hooks scalaris_cth -noshell | tee ct-skipped.log ; \
-	! grep -E " [1-9]+ failed" ct-skipped.log
+test-skipped: skipped_TESTS
 
-test-repeated: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-repeated.cfg -ct_hooks scalaris_cth -noshell | tee ct-repeated.log ; \
-	! grep -E " [1-9]+ failed" ct-repeated.log
+test-repeated: repeated_TESTS
 
 SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
 
@@ -157,7 +151,7 @@ ${SUITES}: compile
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
 	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
-	grep " 0 failed" ct_$@.log
+	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 # define targets for single test cases of the form <test-suite>:<test-case>:
 define TEST_CASE_TARGET
@@ -166,17 +160,17 @@ $(1)\:%: compile
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
 	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
-	grep " 0 failed" ct_$(1).$$*.log
+	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$(1).$$*.log
 endef
 $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 
 %_SUITE-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct.log ; \
-	grep " 0 failed" ct.log
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 %_TESTS: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
-	! grep -E " [1-9]+ failed" ct_$@.log
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 test-vts: compile
 	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
