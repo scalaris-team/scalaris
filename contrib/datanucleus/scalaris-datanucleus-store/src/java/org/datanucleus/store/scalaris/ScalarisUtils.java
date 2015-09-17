@@ -110,15 +110,7 @@ public class ScalarisUtils {
             throw new NucleusTransactionException(
                     "Could not generate a new ID becasue of transaction failure",
                     e);
-        } catch (ClassCastException e) {
-            // This happens if the key does not exist
-            // which means no ID was generated yet.
-            throw new NucleusTransactionException(
-                    "The value of the ID generator key was altered to an invalid value",
-                    e);
         } catch (NotANumberException e) {
-            // this should never ever happen since the ClassCastException
-            // is thrown before we can try to increment the number
             throw new NucleusTransactionException(
                     "The value of the ID generator key was altered to an invalid value",
                     e);
