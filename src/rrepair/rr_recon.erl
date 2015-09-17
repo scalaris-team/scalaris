@@ -1355,6 +1355,8 @@ bitstring_to_k_list_kv(<<1:1, RestBits/bitstring>>, [{Key, _Version} | RestKV], 
     bitstring_to_k_list_kv(RestBits, RestKV, [Key | Acc]);
 bitstring_to_k_list_kv(<<0:1, RestBits/bitstring>>, [{_Key, _Version} | RestKV], Acc) ->
     bitstring_to_k_list_kv(RestBits, RestKV, Acc);
+bitstring_to_k_list_kv(<<>>, _KVList, Acc) ->
+    Acc; % last 0 bits may  be truncated, e.g. by setting FinalSize in pos_to_bitstring/4 accordingly
 bitstring_to_k_list_kv(RestBits, [], Acc) ->
     % there may be rest bits, but all should be 0:
     BitCount = erlang:bit_size(RestBits),
