@@ -267,6 +267,9 @@ prop_merkle_pos_to_bitstring(Positions0, FinalSize0) ->
               rr_recon:pos_to_bitstring(Positions, [], 0, FinalSize))),
     KVList = [{K, 1} || K <- lists:seq(0, FinalSize - 1)],
     ?equals(lists:reverse(rr_recon:bitstring_to_k_list_kv(Bin, KVList, [])),
+            Positions),
+    KList = [K || K <- lists:seq(0, FinalSize - 1)],
+    ?equals(lists:reverse(rr_recon:bitstring_to_k_list_k(Bin, KList, [])),
             Positions).
 
 tester_merkle_compress_hashlist(_) ->

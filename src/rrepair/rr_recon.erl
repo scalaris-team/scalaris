@@ -36,7 +36,7 @@
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
--export([pos_to_bitstring/4, bitstring_to_k_list_kv/3]).
+-export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -192,6 +192,7 @@
      VSize::signature_size(), SenderPid::comm:mypid()} |
     {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
      VSize::signature_size(), SenderPid::comm:mypid()} |
+    {resolve_req, BinReqIdxPos::bitstring()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
@@ -582,24 +583,24 @@ on({'DOWN', MonitorRef, process, _Owner, _Info}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({resolve_req, BinReqIdxPos} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = Initiator,
-                           method = RMethod,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = trivial,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           k_list = KList,            stats = Stats})
-  when (RMethod =:= trivial andalso not Initiator) orelse
-           ((RMethod =:= bloom orelse RMethod =:= shash) andalso Initiator) ->
+                           k_list = KList,            stats = Stats}) ->
     ?TRACE1(_Msg, State),
     NewStats =
         send_resolve_request(Stats, decompress_idx_to_k_list(BinReqIdxPos, KList),
-                             OwnerL, DestRRPid, Initiator, true),
+                             OwnerL, DestRRPid, _Initiator = false, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = shash,            kv_list = KVList}) ->
     ?TRACE1(_Msg, State),
+%%     log:pal("[ ~p ] CKIdx1: ~B (~B compressed)",
+%%             [self(), erlang:byte_size(MyDiffIdx),
+%%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
 
-    OrigDBChunkLen = calc_items_in_chunk(OtherDBChunk, SigSize + VSize),
     DBChunkTree =
         decompress_kv_list(OtherDBChunk, [], SigSize, VSize, 0),
     MyDiffKeys = [Key || Key <- decompress_idx_to_k_list_kv(MyDiffIdx, KVList),
@@ -607,7 +608,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
                                                         DBChunkTree)],
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, MyDiffKeys,
+                  State, DBChunkTree, SigSize, VSize, DestReconPid, MyDiffKeys,
                   % nothing to do if the chunk is empty and no items to send
                   gb_trees:is_empty(DBChunkTree) andalso MyDiffIdx =:= <<>>),
 
@@ -618,14 +619,28 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                            method = bloom}) ->
     ?TRACE1(_Msg, State),
     
-    OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize + VSize),
     DBChunkTree = decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, [],
+                  State, DBChunkTree, SigSize, VSize, DestReconPid, [],
                   % nothing to do if the chunk is empty
                   gb_trees:is_empty(DBChunkTree)),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
+
+on({resolve_req, BinReqIdxPos} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = true,
+                           method = RMethod,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
+                           k_list = KList,            stats = Stats})
+  when (RMethod =:= bloom orelse RMethod =:= shash) ->
+    ?TRACE1(_Msg, State),
+%%     log:pal("[ ~p ] CKIdx2: ~B (~B compressed)",
+%%             [self(), erlang:byte_size(BinReqIdxPos),
+%%              erlang:byte_size(erlang:term_to_binary(BinReqIdxPos, [compressed]))]),
+    NewStats =
+        send_resolve_request(Stats, bitstring_to_k_list_k(BinReqIdxPos, KList, []),
+                             OwnerL, DestRRPid, _Initiator = true, true),
+    shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
@@ -1348,6 +1363,24 @@ pos_to_bitstring([], AccBin, BitsSet, FinalSize) ->
     [<<0:(FinalSize - BitsSet)>> | AccBin].
 
 %% @doc Converts the bitstring from pos_to_bitstring/4 into keys at the
+%%      appropriate positions in KList. Result is reversly sorted.
+%%      NOTE: This is essentially the same as bitstring_to_k_list_kv/3 but we
+%%            need the separation because of the opaque RT keys.
+-spec bitstring_to_k_list_k(PosBitString::bitstring(), KList::[?RT:key()],
+                            Acc::[?RT:key()]) -> Result::[?RT:key()].
+bitstring_to_k_list_k(<<1:1, RestBits/bitstring>>, [Key | RestK], Acc) ->
+    bitstring_to_k_list_k(RestBits, RestK, [Key | Acc]);
+bitstring_to_k_list_k(<<0:1, RestBits/bitstring>>, [_Key | RestK], Acc) ->
+    bitstring_to_k_list_k(RestBits, RestK, Acc);
+bitstring_to_k_list_k(<<>>, _KList, Acc) ->
+    Acc; % last 0 bits may  be truncated, e.g. by setting FinalSize in pos_to_bitstring/4 accordingly
+bitstring_to_k_list_k(RestBits, [], Acc) ->
+    % there may be rest bits, but all should be 0:
+    BitCount = erlang:bit_size(RestBits),
+    ?ASSERT(<<0:BitCount>> =:= RestBits),
+    Acc.
+
+%% @doc Converts the bitstring from pos_to_bitstring/4 into keys at the
 %%      appropriate positions in KVList. Result is reversly sorted.
 -spec bitstring_to_k_list_kv(PosBitString::bitstring(), KVList::db_chunk_kv(),
                              Acc::[?RT:key()]) -> Result::[?RT:key()].
@@ -1434,18 +1467,18 @@ shash_compress_k_list(KVSet, Bin, SigSize, AccPos, AccResult, LastPos, Max) ->
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
 %%      processes in phase 2 (trivial RC) at the non-initiator.
 -spec shash_bloom_perform_resolve(
-        State::state(), DBChunkTree::kvi_tree(), OrigDBChunkLen::non_neg_integer(),
+        State::state(), DBChunkTree::kvi_tree(),
         SigSize::signature_size(), VSize::signature_size(),
         DestReconPid::comm:mypid(), FBItems::[?RT:key()],
         SkipResolve::boolean()) -> rr_recon_stats:stats().
-shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunkTree, _OrigDBChunkLen,
+shash_bloom_perform_resolve(#rr_recon_state{stats = Stats}, _DBChunkTree,
                             _SigSize, _VSize, _DestReconPid, [], true) ->
     Stats;
 shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod},
-  DBChunkTree, OrigDBChunkLen, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
+  DBChunkTree, SigSize, VSize, DestReconPid, FBItems, _SkipResolve) ->
     {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
@@ -1454,9 +1487,12 @@ shash_bloom_perform_resolve(
 
     % let the initiator's rr_recon process identify the remaining keys
     ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(DBChunkTree1)] ++ ToReqIdx1),
-    ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
-    ?TRACE("resolve_req ~s Session=~p ; ToReq=~p (~p bits)",
-           [_RMethod, SID, length(ToReq2), erlang:bit_size(ToReq2)]),
+    ToReq2 = erlang:list_to_bitstring(
+               lists:reverse(
+                 pos_to_bitstring(
+                   ReqIdx, [], 0, ?IIF(ReqIdx =:= [], 1, lists:last(ReqIdx) + 1)))),
+    ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
+           [_RMethod, SID, erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
     if ReqIdx =/= [] ->
            rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
