@@ -7,6 +7,10 @@ for faster executions) and made. The latter can be repeated with
 > make scalaris
 
 The EVAL_REPEATS variable sets the number of repetitions (100 by default).
+The SYSTEM_SIZE variable sets the number of data items of a full DB without
+replicas (100000 by default) for non-scale simulations, SYSTEM_SIZE_SCALE
+(default: 4000) sets the number of data items to start with in scale
+simulations.
 Parallel builds are supported.
 
 Example:
