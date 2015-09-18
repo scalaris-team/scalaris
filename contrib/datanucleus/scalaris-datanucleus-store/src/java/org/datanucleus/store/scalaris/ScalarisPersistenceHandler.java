@@ -321,10 +321,6 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                     .classForName(declaredClassQName);
             final Class<?> objectClass = op.getObject().getClass();
 
-            if (objectClass.getCanonicalName().equals("eu.iescities.server.accountinterface.Application")) {
-                System.out.println("FETCH:\n"+result+"\n");
-            }
-
             if (!objectClass.isAssignableFrom(declaredClass)) {
                     System.out.println("Type found in db not compatible with requested type");
                 throw new NucleusObjectNotFoundException(

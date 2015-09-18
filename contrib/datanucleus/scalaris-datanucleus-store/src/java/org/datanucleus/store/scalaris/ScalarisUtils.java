@@ -329,9 +329,6 @@ public class ScalarisUtils {
                 }
                 stored.put(key, changedVals.get(key));
             }
-            if (className.equals("eu.iescities.server.accountinterface.Application")) {
-                System.out.println("Update:\nOld:"+changedValsOld+"\nNew:"+changedVals+"\n");
-            }
             try {
                 updateUniqueMemberKey(op, changedVals, changedValsOld, scalarisTransaction);
                 updateForeignKeyAction(op, changedVals, changedValsOld, scalarisTransaction);
