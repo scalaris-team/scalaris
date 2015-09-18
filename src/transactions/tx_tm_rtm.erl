@@ -326,7 +326,7 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
                 {delete, Decision} ->
                     %% we delete the local state. As we have to maintain opentxnum
                     %% we send a message to ourselves:
-                    log:log("Trigger tx_tm_rtm_delete in ~p~n", [state_get_role(State)]),
+                    %% log:log("Trigger tx_tm_rtm_delete in ~p~n", [state_get_role(State)]),
                     comm:send_local(self(), {?tx_tm_rtm_delete, TxId, Decision});
                 delay ->
                     msg_delay:send_local((config:read(tx_timeout) * 2)
