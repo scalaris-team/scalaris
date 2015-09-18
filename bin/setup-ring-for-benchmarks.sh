@@ -43,8 +43,8 @@ start_ring(){
             YAWSPORT=$SCALARIS_YAWS_PORT
         else
             STARTTYPE="joining"
-            let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx
-            let YAWSPORT=$SCALARIS_YAWS_PORT+$idx
+            let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx-1
+            let YAWSPORT=$SCALARIS_YAWS_PORT+$idx-1
         fi
 
         ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
