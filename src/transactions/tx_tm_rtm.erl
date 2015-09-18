@@ -287,10 +287,20 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             %% can happen when already cleaned up at tm
             ok;
         ok ->
+            Maj = quorum:majority_for_accept(config:read(replication_factor)),
             WhatToDo =
-                case tx_state_is_decided(TxState) of
-                    ?abort -> {delete, ?abort};
-                    ?commit -> {delete, ?commit};
+                case tx_state_is_decided(TxState)
+                of
+                    ?abort ->
+                        case Maj > tx_state_get_numcommitack(TxState) of
+                            true -> delay;
+                            false -> {delete, ?abort}
+                        end;
+                    ?commit ->
+                        case Maj > tx_state_get_numcommitack(TxState) of
+                            true -> delay;
+                            false -> {delete, ?commit}
+                        end;
                     ?undecided ->
                         %% This tx is a bit slow. Start fds on the participants
                         %% and then take over on crash messages.  When not enough
