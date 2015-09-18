@@ -29,7 +29,6 @@ import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
 import org.datanucleus.store.connection.ManagedConnection;
-import org.datanucleus.transaction.NucleusTransactionException;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
@@ -78,8 +77,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
         } catch (ConnectionException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
         } catch (AbortException e) {
-            e.printStackTrace();
-            throw new NucleusTransactionException(e.getMessage(), e);
+            throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
             transactionMap.remove(ec.getTransaction());
         }
