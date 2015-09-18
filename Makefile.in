@@ -184,9 +184,9 @@ test-clean:
 bench: compile
 	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node start && \
 	echo "running bench:increment(10, 500)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
+	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
 	echo "running bench:quorum_read(10, 5000)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
+	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
 	FAILED=$$? ; \
 	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \
@@ -226,7 +226,7 @@ java-test: compile java
 
 java-bench: compile java
 	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix jbench_node start && \
-	SCALARIS_JAPI_NODE="jbench_node1 jbench_node2 jbench_node4 jbench_node4" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
+	SCALARIS_JAPI_NODE="jbench_node1 jbench_node2 jbench_node3 jbench_node4" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS) ) ; \
 	FAILED=$$? ; \
 	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix jbench_node stop ; \
 	if [ $$FAILED -ne 0 ]; then \

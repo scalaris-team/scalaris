@@ -16,7 +16,7 @@
 RINGSIZE=4
 NODEPREFIX=ebench_node
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
-SCALARIS_YAWS_PORT=${SCALARIS_YAWS_PORT-"8000"}
+SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
 usage(){
     echo "usage: setup-ring-for-benchmarks [options] <cmd>"
     echo " options:"
@@ -40,11 +40,11 @@ start_ring(){
         then
             STARTTYPE="first -m"
             TESTPORT=$SCALARIS_UNITTEST_PORT
-            YAWSPORT=$SCALARIS_YAWS_PORT
+            YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT
         else
             STARTTYPE="joining"
             let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx-1
-            let YAWSPORT=$SCALARIS_YAWS_PORT+$idx-1
+            let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
         fi
 
         ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
