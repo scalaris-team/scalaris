@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -247,12 +247,13 @@ collect(Length, L, Print) ->
     receive
         ?SCALARIS_RECV({done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts}, %% ->
          begin
-             ?IIF(Print, io:format("BS: ~p @ ~p~n",[WallClockTime, X]), ok),
+             Done = erlang:length(L),
+             ?IIF(Print, io:format("BS [~p/~p]: ~p @ ~p~n",[Done+1, Done+Length, WallClockTime, X]), ok),
              collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L], Print)
           end);
         ?SCALARIS_RECV({fd_notify, crash, Pid, _Reason}, %% ->
            begin
-               ?IIF(Print, io:format("ignoring ~p, because it crashed", [Pid]), ok),
+               ?IIF(Print, io:format("ignoring ~p, because it crashed~n", [Pid]), ok),
                collect(Length - 1, L, Print)
            end);
         ?SCALARIS_RECV({fd_notify, _Event, _Pid, _Reason}, %% ->
