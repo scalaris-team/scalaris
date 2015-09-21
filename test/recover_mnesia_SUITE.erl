@@ -50,11 +50,11 @@ groups() ->
 
     {make_ring_group_repeater, [sequence], [test_make_ring, write, 
                                             {group, recover_data_group_repeater}]},
-    {recover_data_group_repeater, [sequence, {repeat, num_executions()}], [read]},
+    {recover_data_group_repeater, [sequence, {repeat, repeater_num_executions()}], [read]},
     {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
-    {remove_node_repeater, [sequence, {repeat, num_executions()}], [remove_node]},
+    {remove_node_repeater, [sequence, {repeat, repeater_num_executions()}], [remove_node]},
 
-    {repeater, [{repeat, 1}], [{group, make_ring_group_repeater},
+    {repeater, [{repeat, 20}], [{group, make_ring_group_repeater},
                                 {group, remove_node_group_repeater}]}
 
   ].
@@ -143,9 +143,9 @@ read(Config) ->
                                                 {leases, true},
                                                 {db_backend, db_mnesia},
                                                 {start_type, recover}]}]),
-  util:wait_for(fun admin:check_leases/0),
+  lease_checker2:wait_for_clean_leases(500, 4),
   % ring restored -> checking KV data integrity
-  _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
+  _ = check_data_integrity(),
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -166,10 +166,10 @@ remove_node(_Config) ->
   timer:sleep(11000),
   _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
   ct:pal("wait for check_leases"),
-  util:wait_for(fun admin:check_leases/0),
+  lease_checker2:wait_for_clean_leases(500, 3),
   % check data integrity
   ct:pal("check data integrity"),
-  _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)],
+  _ = check_data_integrity(),
   % add node to reform ring_size() node ring
   ct:pal("add node"),
   _ = admin:add_nodes(1),
@@ -178,5 +178,16 @@ remove_node(_Config) ->
   ct:pal("check_ring_size_fully_joined"),
   unittest_helper:check_ring_size_fully_joined(ring_size()),
   ct:pal("wait for check_leases"),
-  util:wait_for(fun admin:check_leases/0),
+  lease_checker2:wait_for_clean_leases(500, 4),
   true.
+
+check_data_integrity() ->
+    F = fun(X) ->
+                case kv_on_cseq:read(integer_to_list(X)) of
+                    {ok, X} -> {ok, X};
+                    Res -> log:log("failed to read ~p: ~p", [X, Res]),
+                           {ok, X} = Res % crash
+                end
+        end,
+    %% _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)].
+    _ = [F(X) || X <- lists:seq(1, 100)].

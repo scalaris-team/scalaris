@@ -46,7 +46,7 @@ groups() ->
                                          %%  %test_quadruple_join_triple_leave,
                                          %%  %test_quadruple_join_quadruple_leave
                                          ]},
-     {repeater, [{repeat, 1}], [{group, join_tests}]}
+     {repeater, [{repeat, 20}], [{group, join_tests}]}
     ].
 
 all() ->
@@ -182,7 +182,7 @@ joiner_helper(Current, Target) ->
     joiner_helper(Current+1, Target).
 
 synchronous_join(TargetSize) ->
-    AllDHTNodes = pid_groups:find_all(dht_node),
+    %% AllDHTNodes = pid_groups:find_all(dht_node),
     %% _ = add_bp_on_successful_split(),
     %% _ = add_bp_on_successful_handover(),
     _ = api_vm:add_nodes(1),
@@ -195,7 +195,8 @@ synchronous_join(TargetSize) ->
     log:log("wait for ring size ~w", [TargetSize]),
     lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for ring to stabilize in sync. join"),
-    util:wait_for(fun admin:check_leases/0, 10000).
+    lease_checker2:wait_for_clean_leases(200, TargetSize).
+    %% util:wait_for(fun admin:check_leases/0, 10000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
