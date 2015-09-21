@@ -716,7 +716,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                 [erlang:byte_size(Hashes),
                                  erlang:byte_size(
                                    erlang:term_to_binary(Hashes, [compressed]))]),
-                  ?DBG_ASSERT(Hashes =/= <<>>),
+                  % note: Hashes may be <<>> if only direct resolves exist
+                  % (leaf-leaf mismatches with empty leaves on the other node)
                   send(DestReconPid, {resolve_req, Hashes}),
                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
                                           misc = [{one_leaf_p1e, P1EOneLeaf}]};
@@ -821,10 +822,10 @@ on({resolve_req, Hashes} = _Msg,
                            misc = [{one_leaf_p1e, P1EOneLeaf}]})
   when is_bitstring(Hashes) ->
     ?TRACE1(_Msg, State),
+    ?DBG_ASSERT(?implies(not IsInitiator, Hashes =/= <<>>)),
     {BinIdxList, NStats} =
         merkle_resolve_leaves_receive(MerkleSyncRcv, Hashes, DestRRPid, Stats,
                                       OwnerL, Params, P1EOneLeaf, IsInitiator),
-    ?DBG_ASSERT(Hashes =/= <<>>),
     comm:send(DestRCPid, {resolve_req, idx, BinIdxList}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {MerkleSyncSend, []},
@@ -1828,10 +1829,11 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf,
                                BucketSizeBits, Hashes), LeafNAcc + 1, ToSend};
                        ({MyKItems, _MyItemCount}, {Hashes, LeafNAcc, ToSend}) ->
                             % empty leaf hash on the other node
-                            {<<Hashes/bitstring, 0:BucketSizeBits>>, LeafNAcc + 1, MyKItems ++ ToSend}
+                            {Hashes, LeafNAcc + 1, MyKItems ++ ToSend}
                     end, {<<>>, 0, []}, Sync),
 
-    % resolve the leaf-leaf comparison's items as key_upd:
+    % resolve the leaf-leaf comparisons's items with empty leaves on the initiator as key_upd:
+    ?DBG_ASSERT(?implies(ToSend =/= [], not IsInitiator)),
     Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats1),
     {Hashes, NStats}.
@@ -1848,11 +1850,20 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf,
 merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                               P1EOneLeaf, IsInitiator) ->
     BucketSizeBits = merkle_max_bucket_size_bits(Params),
-    {<<>>, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc} =
+    % mismatches to resolve:
+    % * at initiator    : inner(I)-leaf(NI) or leaf-leaf
+    % * at non-initiator: inner(NI)-leaf(I)
+    {<<>>, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, NIResolves} =
         lists:foldl(
-          fun({MyMaxItemsCount, MyKVItems, LeafCount},
-              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc}) ->
-                  % inner-leaf mismatch to resolve
+          fun({_MaxItemsCount, [], 1},
+              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, _NIResolves}) when IsInitiator ->
+                  % empty leaf on this node
+                  % -> this is directly resolved at the non-initiator but we
+                  %    need to increase the resolve_started counter by 1 (no
+                  %    matter how many empty leaves)!
+                  {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, 1};
+             ({MyMaxItemsCount, MyKVItems, LeafCount},
+              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, NIResolves}) ->
                   {NHashes, OBucketTree, _OrigDBChunkLen, SigSize, VSize} =
                       merkle_resolve_retrieve_leaf_hashes(
                         HashesAcc, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
@@ -1867,11 +1878,11 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                                                 Params#merkle_params.bucket_size + 1),
                   {NHashes, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   LeafNAcc + LeafCount}
-          end, {Hashes, [], [], false, 0}, Sync),
+                   LeafNAcc + LeafCount, NIResolves}
+          end, {Hashes, [], [], false, 0, 0}, Sync),
 
     % send resolve message:
-    % resolve the leaf-leaf comparison's items as key_upd:
+    % resolve items we should send as key_upd:
     Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
     % let the other node's rr_recon process identify the remaining keys;
     % it will use key_upd_send (if non-empty) and we must thus increase
@@ -1884,7 +1895,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
            MerkleResReqs = 0
     end,
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
-                                 {resolve_started, MerkleResReqs}],
+                                 {resolve_started, MerkleResReqs + NIResolves}],
                                 Stats1),
     ?TRACE("resolve_req Merkle Session=~p ; resolve started=~B",
            [rr_recon_stats:get(session_id, Stats),
@@ -1909,10 +1920,8 @@ merkle_resolve_leaves_ckidx([{_OtherMaxItemsCount, MyKVItems, _LeafCount} | TL],
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
                                 ToSend1, IsInitiator);
 merkle_resolve_leaves_ckidx([{_MyKVItems, _MyItemCount} | TL],
-                             BinKeyList0,
+                             BinKeyList,
                              DestRRPid, Stats, OwnerL, Params, ToSend, IsInitiator) ->
-    Positions = Params#merkle_params.bucket_size + 1,
-    <<0:Positions, BinKeyList/bitstring>> = BinKeyList0,
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
                                 ToSend, IsInitiator);
 merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params, ToSend, IsInitiator) ->
