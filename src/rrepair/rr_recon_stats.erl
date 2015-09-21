@@ -39,7 +39,6 @@
          tree_nodesCompared = 0       :: non_neg_integer(),
          tree_compareSkipped= 0       :: non_neg_integer(),
          tree_leavesSynced  = 0       :: non_neg_integer(),
-         error_count        = 0       :: non_neg_integer(),
          build_time         = 0       :: non_neg_integer(),      %in us
          recon_time         = 0       :: non_neg_integer(),      %in us
          resolve_started    = 0       :: non_neg_integer(),      %number of resolve requests send
@@ -53,7 +52,6 @@
                {tree_nodesCompared, non_neg_integer()} |
                {tree_compareSkipped, non_neg_integer()} |
                {tree_leavesSynced, non_neg_integer()} |
-               {error_count, non_neg_integer()} |
                {build_time, non_neg_integer()} |
                {recon_time, non_neg_integer()} |
                {resolve_started, non_neg_integer()} |
@@ -95,9 +93,6 @@ inc([{K, V} | L], Stats) ->
              tree_compareSkipped ->
                  X = V + Stats#rr_recon_stats.tree_compareSkipped,
                  Stats#rr_recon_stats{tree_compareSkipped = X};
-             error_count ->
-                 X = V + Stats#rr_recon_stats.error_count,
-                 Stats#rr_recon_stats{error_count = X};
              build_time ->
                  X = V + Stats#rr_recon_stats.build_time,
                  Stats#rr_recon_stats{build_time = X};
@@ -124,7 +119,6 @@ set([{K, V} | L], Stats) ->
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
-             error_count         -> Stats#rr_recon_stats{error_count = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
              resolve_started     -> Stats#rr_recon_stats{resolve_started = V};
@@ -138,7 +132,6 @@ set([{K, V} | L], Stats) ->
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
          (tree_leavesSynced, stats())  -> non_neg_integer();
-         (error_count, stats())        -> non_neg_integer();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
          (resolve_started, stats())    -> non_neg_integer();
@@ -149,7 +142,6 @@ get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
 get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
 get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
-get(error_count        , #rr_recon_stats{error_count         = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
 get(resolve_started    , #rr_recon_stats{resolve_started     = X}) -> X;
@@ -161,7 +153,6 @@ merge(A, #rr_recon_stats{ tree_size = TS,
                           tree_nodesCompared = TNC,
                           tree_leavesSynced = TLS,
                           tree_compareSkipped = TCS,
-                          error_count = EC,
                           build_time = BT,
                           recon_time = RC,
                           resolve_started = RS,
@@ -170,7 +161,6 @@ merge(A, #rr_recon_stats{ tree_size = TS,
          {tree_nodesCompared, TNC},
          {tree_leavesSynced, TLS},
          {tree_compareSkipped, TCS},
-         {error_count, EC},
          {build_time, BT},
          {recon_time, RC},
          {resolve_started, RS},
