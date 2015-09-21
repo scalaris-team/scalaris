@@ -510,7 +510,6 @@ tester_type_check_rrepair(_Config) ->
              {send_request_resolve, 7}, %% tries to send messages
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
-             {send_stats, 2}, %% tries to send messages
 
              {start_update_key_entries, 3}, %% tries to send messages
              {map_kvv_list, 2}, %% needs a unique tuple list, e.g. via feeder

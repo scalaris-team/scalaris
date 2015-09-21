@@ -55,7 +55,6 @@
 -export_type([stats/0]).
 
 -type option()   :: {feedback_request, comm:mypid()} |
-                    {send_stats, comm:mypid()} | %send stats to pid after completion
                     {session_id, rrepair:session_id()} |
                     {from_my_node, 0 | 1}.
 -type options()  :: [option()].
@@ -91,7 +90,6 @@
          fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
          other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), client_version()),
-         send_stats     = undefined                               :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                        :: stats(),
          from_my_node   = 1                                       :: 0 | 1
          }).
@@ -123,12 +121,10 @@
 on({start, Operation, Options}, State) ->
     FBDest = proplists:get_value(feedback_request, Options, undefined),
     FromMyNode = proplists:get_value(from_my_node, Options, 1),
-    StatsDest = proplists:get_value(send_stats, Options, undefined),
     SID = proplists:get_value(session_id, Options, null),
     NewState = State#rr_resolve_state{ operation = Operation,
                                        stats = #resolve_stats{session_id = SID},
                                        fb_dest_pid = FBDest,
-                                       send_stats = StatsDest,
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
            [util:extint2atom(element(1, Operation)), FBDest, SID]),
@@ -457,7 +453,7 @@ any_replica_in_tree([Key | Rest], Tree) ->
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
-shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
+shutdown(_Reason, #rr_resolve_state{ownerPid = Owner,
                                     stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
                                     operation = _Op, fb_dest_pid = FBDest,
                                     fb_send_kvv = FbKVV,
@@ -489,7 +485,6 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                          [], true)
         end,
     Stats1 = Stats#resolve_stats{resolve_started = ResStarted0 + ResStarted},
-    send_stats(SendStats, Stats1),
     % note: do not propagate the SessionId unless we report to the node
     %       the request came from (indicated by FromMyNode =:= 1),
     %       otherwise the resolve_progress_report on the other node will
@@ -604,12 +599,6 @@ entry_to_kvv(Entry) ->
     {db_entry:get_key(Entry),
      db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
-
--spec send_stats(comm:mypid() | undefined, stats()) -> ok.
-send_stats(undefined, _) ->
-    ok;
-send_stats(DestPid, Stats) ->
-    send(DestPid, {resolve_stats, Stats}).
 
 -spec print_resolve_stats(stats()) -> [any()].
 print_resolve_stats(Stats) ->
