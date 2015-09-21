@@ -41,7 +41,7 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--export([init/1, on/2, start/0]).
+-export([init/1, on/2, start/1]).
 -export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
@@ -55,7 +55,6 @@
 -export_type([stats/0]).
 
 -type option()   :: {feedback_request, comm:mypid()} |
-                    {session_id, rrepair:session_id()} |
                     {from_my_node, 0 | 1}.
 -type options()  :: [option()].
 -type kvv_list() :: [{?RT:key(), db_dht:value(), client_version()}].
@@ -63,7 +62,7 @@
 
 -record(resolve_stats,
         {
-         session_id       = null   :: rrepair:session_id() | null,
+         session_id       = ?required(resolve_stats, session_id) :: rrepair:session_id() | null,
          diff_size        = 0      :: non_neg_integer(),
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
@@ -90,7 +89,7 @@
          fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
          other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), client_version()),
-         stats          = #resolve_stats{}                        :: stats(),
+         stats          = ?required(rr_resolve_state, stats)      :: stats(),
          from_my_node   = 1                                       :: 0 | 1
          }).
 -type state() :: #rr_resolve_state{}.
@@ -121,9 +120,7 @@
 on({start, Operation, Options}, State) ->
     FBDest = proplists:get_value(feedback_request, Options, undefined),
     FromMyNode = proplists:get_value(from_my_node, Options, 1),
-    SID = proplists:get_value(session_id, Options, null),
     NewState = State#rr_resolve_state{ operation = Operation,
-                                       stats = #resolve_stats{session_id = SID},
                                        fb_dest_pid = FBDest,
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
@@ -615,9 +612,10 @@ init(State) ->
     _ = gen_component:monitor(State#rr_resolve_state.ownerPid),
     State.
 
--spec start() -> {ok, MyPid::pid()}.
-start() ->
-    State = #rr_resolve_state{ownerPid = self()},
+-spec start(SessionId::rrepair:session_id() | null) -> {ok, MyPid::pid()}.
+start(SessionId) ->
+    State = #rr_resolve_state{ownerPid = self(),
+                              stats = #resolve_stats{session_id = SessionId}},
     PidName = lists:flatten(io_lib:format("~s.~s", [?MODULE, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
                              [{pid_groups_join_as, pid_groups:my_groupname(),

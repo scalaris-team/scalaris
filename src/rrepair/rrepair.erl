@@ -133,7 +133,7 @@ on({request_sync, Method, DestKey, Principal}, State) ->
 
 % initial resolve request
 on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = OpenResolve}) ->
-    {ok, Pid} = rr_resolve:start(),
+    {ok, Pid} = rr_resolve:start(null),
     comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
@@ -231,15 +231,15 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
 % initial resolve request
 on({request_resolve, SessionID, Operation, Options},
    State = #rrepair_state{open_resolve = OpenResolve}) ->
-    {ok, Pid} = rr_resolve:start(),
-    comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
+    {ok, Pid} = rr_resolve:start(SessionID),
+    comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 % feedback response from a previous resolve request (without session ID)
 on({continue_resolve, Operation, Options}, State) ->
     % do not increase the open_resolve member - we did this during the
     % resolve_progress_report of the original request
-    {ok, Pid} = rr_resolve:start(),
+    {ok, Pid} = rr_resolve:start(null),
     comm:send_local(Pid, {start, Operation, Options}),
     State;
 
@@ -247,8 +247,8 @@ on({continue_resolve, Operation, Options}, State) ->
 on({continue_resolve, SessionID, Operation, Options}, State) ->
     % do not increase the open_resolve member - we did this during the
     % resolve_progress_report of the original request
-    {ok, Pid} = rr_resolve:start(),
-    comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
+    {ok, Pid} = rr_resolve:start(SessionID),
+    comm:send_local(Pid, {start, Operation, Options}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
