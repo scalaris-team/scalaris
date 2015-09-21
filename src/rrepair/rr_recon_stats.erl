@@ -20,10 +20,13 @@
 -author('malange@informatik.hu-berlin.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+-include("record_helpers.hrl").
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported functions and types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([new/0, new/1, inc/2, set/2, get/2, merge/2, print/1]).
+-export([new/1, new/2, inc/2, set/2, get/2, merge/2, print/1]).
 
 -export_type([stats/0, status/0]).
 
@@ -34,7 +37,7 @@
 -type status() :: wait | abort | finish.
 -record(rr_recon_stats,
         {
-         session_id         = null    :: rrepair:session_id() | null,
+         session_id         = ?required(rr_recon_stats, session_id) :: rrepair:session_id(),
          tree_size          = {0,0,0} :: merkle_tree:mt_size(),
          tree_nodesCompared = 0       :: non_neg_integer(),
          tree_compareSkipped= 0       :: non_neg_integer(),
@@ -58,20 +61,20 @@
                {await_rs_fb, non_neg_integer()}].
 
 -type field_list2()  ::
-          [{session_id, rrepair:session_id() | null} |
-               {status, status()}] | field_list1().
+          [{status, status()}] | field_list1().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec new() -> stats().
-new() ->
-    #rr_recon_stats{}.
+-spec new(rrepair:session_id()) -> stats().
+new(SID) ->
+    ?DBG_ASSERT(SID =/= null),
+    #rr_recon_stats{session_id = SID}.
 
--spec new(field_list2()) -> stats().
-new(KVList) ->
-    set(KVList, #rr_recon_stats{}).
+-spec new(rrepair:session_id(), field_list2()) -> stats().
+new(SID, KVList) ->
+    set(KVList, #rr_recon_stats{session_id = SID}).
 
 % @doc increases the record field with name key by value
 -spec inc(field_list1(), Old::stats()) -> New::stats().
@@ -114,7 +117,6 @@ set([], Stats) ->
     Stats;
 set([{K, V} | L], Stats) ->
     NS = case K of
-             session_id          -> Stats#rr_recon_stats{session_id = V};
              tree_size           -> Stats#rr_recon_stats{tree_size = V};
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
@@ -127,7 +129,7 @@ set([{K, V} | L], Stats) ->
          end,
     set(L, NS).
 
--spec get(session_id, stats())         -> rrepair:session_id() | null;
+-spec get(session_id, stats())         -> rrepair:session_id();
          (tree_size, stats())          -> merkle_tree:mt_size();
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();

@@ -106,8 +106,8 @@
     {rr_trigger} |
     {rr_gc_trigger} |
     {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
-	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
-    {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
+	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id(), ReqMsg::rr_recon:request()} |
+    {request_resolve | continue_resolve, session_id(), rr_resolve:operation(), rr_resolve:options()} |
     {continue_resolve, rr_resolve:operation(), rr_resolve:options()} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -199,8 +199,7 @@ on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}
             {S, TSessions} = extract_session(SessionId, OS),
             ?TRACE_RECON("~nRECON OK3 - ~p", [S]),
             % this session is aborted, so it is complete!
-            Stats = rr_recon_stats:new([{session_id, SessionId},
-                                        {status, finish}]),
+            Stats = rr_recon_stats:new(SessionId, [{status, finish}]),
             SUpd = update_session_recon(S, Stats),
             true = check_session_complete(SUpd),
             State#rrepair_state{open_recon = OR - 1,
@@ -269,9 +268,7 @@ on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
             % use empty stats with status abort for now since non-initiator
             % stats are not integrated in the successful case either
             SID = rr_recon_stats:get(session_id, Stats),
-            StatsToSend =
-                rr_recon_stats:set([{status, abort}],
-                                   rr_recon_stats:new([{session_id, SID}])),
+            StatsToSend = rr_recon_stats:new(SID, [{status, abort}]),
             comm:send(DestRR, {recon_progress_report, Sender, true,
                                comm:this(), undefined, StatsToSend});
         _ -> ok

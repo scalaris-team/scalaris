@@ -163,7 +163,7 @@
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          kv_list            = []                                     :: db_chunk_kv(),
          k_list             = []                                     :: [?RT:key()],
-         stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
+         stats              = ?required(rr_recon_state, stats)       :: rr_recon_stats:stats(),
          to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReqIdx::[non_neg_integer()]}
          }).
 -type state() :: #rr_recon_state{}.
@@ -912,8 +912,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                                    dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
-                     comm:make_global(OwnerL), SID,
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, trivial, MySyncStruct}}),
     State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
                          k_list = [element(1, KV) || KV <- KVList]};
@@ -923,8 +922,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                                    dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
-                     comm:make_global(OwnerL), SID,
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, shash, MySyncStruct}}),
     case MySyncStruct#shash_recon_struct.db_chunk of
         <<>> -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
@@ -936,8 +934,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
-                     comm:make_global(OwnerL), SID,
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
     case MySyncStruct#bloom_recon_struct.item_count of
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
@@ -1009,8 +1006,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                           ni_item_count = ItemCount},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
-                             comm:make_global(OwnerL), SID,
+            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                              {start_recon, merkle_tree, SyncParams}}),
             
             % finally create the real merkle tree containing data
@@ -1055,8 +1051,7 @@ begin_sync(MySyncStruct, OtherSyncStruct,
                                                          kv_list = []});
         false ->
             SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
-                             comm:make_global(OwnerL), SID,
+            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                              {start_recon, art, MySyncStruct}}),
             shutdown(sync_finished, State#rr_recon_state{kv_list = []})
     end.
@@ -2497,12 +2492,12 @@ init(State) ->
     _ = gen_component:monitor(State#rr_recon_state.ownerPid),
     State.
 
--spec start(SessionId::rrepair:session_id() | null, SenderRRPid::comm:mypid())
+-spec start(SessionId::rrepair:session_id(), SenderRRPid::comm:mypid())
         -> {ok, pid()}.
 start(SessionId, SenderRRPid) ->
     State = #rr_recon_state{ ownerPid = self(),
                              dest_rr_pid = SenderRRPid,
-                             stats = rr_recon_stats:new([{session_id, SessionId}]) },
+                             stats = rr_recon_stats:new(SessionId) },
     PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, SessionId, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
                              [{pid_groups_join_as, pid_groups:my_groupname(),
