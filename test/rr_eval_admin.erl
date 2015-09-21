@@ -691,6 +691,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
                                     trace_mpath:start(TraceName, [{map_fun, fun bw_map_fun/3},
                                                                   {filter_fun, fun bw_filter_fun/1}]),
                                     RunRound(NodeList),
+                                    io:format("S "), % code for a successful sync run
                                     trace_mpath:stop(),
                                     Trace = trace_mpath:get_trace(TraceName, cleanup),
                                     
@@ -849,6 +850,7 @@ make_ring(Type, Size) ->
         end,
     unittest_helper:check_ring_size_fully_joined(Size),
     unittest_helper:wait_for_stable_ring(),
+    io:format("R"), % code for a successfully started ring
     ok.
 
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
@@ -863,6 +865,7 @@ fill_ring(Type, DBSize, Params) ->
     erlang:put(?DBSizeKey, element(1, DbStatus)),
     ?DBG_ASSERT2(DbStatus =:= (DbStatus2 = get_db_status2(get_node_list())),
                  {different_db_status, DbStatus, DbStatus2}),
+    io:format("F"), % code for a successfully filled ring
     % more details for debugging:
 %%     Data = lists:keysort(2, unittest_helper:get_ring_data(full)),
 %%     _ = [begin
