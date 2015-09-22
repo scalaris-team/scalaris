@@ -301,7 +301,9 @@ on({resolve_progress_report, _Sender, Stats},
    State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
     SID = rr_resolve:get_stats_session_id(Stats),
     NSessions = case extract_session(SID, OS) of
-                    not_found -> OS;
+                    not_found when SID =:= null ->
+                        % all other session IDs should be there!
+                        OS;
                     {S, TSessions} ->
                         SUpd = update_session_resolve(S, Stats),
                         case check_session_complete(SUpd) of
