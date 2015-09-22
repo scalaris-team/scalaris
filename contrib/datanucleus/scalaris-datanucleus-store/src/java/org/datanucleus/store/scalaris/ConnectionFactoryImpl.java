@@ -179,11 +179,23 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
             return null;
         }
 
-        public synchronized void close () {
+        public synchronized void close() {
             if (conn != null) {
                 connPool.releaseConnection((de.zib.scalaris.Connection) conn);
                 conn = null;
             }
+        }
+
+        @Override
+        public boolean closeAfterTransactionEnd() {
+            // Do NOT close immediately after datanucleus transaction ends,
+            // since the corresponding scalaris transaction can be still
+            // active for a short period of time, causing the connection pool
+            // to release the connection a little bit to early - early enough
+            // so that this connection could be reused in rare cases in a
+            // different thread. This causes potentially UnknownExceptions
+            // since Connection objects are not thread safe.
+            return false;
         }
     }
 }
