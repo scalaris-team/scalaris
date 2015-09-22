@@ -209,5 +209,14 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
             // since Connection objects are not thread safe.
             return false;
         }
+
+        @Override
+        public void setCloseOnRelease(boolean closeOnRelease) {
+            // Because of the override of closeAfterTransactionEnd
+            // Datanucleus tries to set this to false. But this value
+            // needs to be true, otherwise close() won't be called and
+            // the connection pool will never release any connections.
+            this.closeOnRelease = true;
+        }
     }
 }
