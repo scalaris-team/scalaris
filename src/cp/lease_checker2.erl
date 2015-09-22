@@ -275,34 +275,39 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
     end,
     ok.
 
--spec describe_node_diff(Node::comm:mypid(), OldNodeInfo::node_info(),
+-spec describe_node_diff(Node::comm:mypid(), OldNodeInfo::node_info() | empty,
                          NewNodeInfo::node_info() | empty) -> ok.
 describe_node_diff(Node, OldNodeInfo, NewNodeInfo) ->
-    OldLeaseList = OldNodeInfo#node_info_t.lease_list,
-    NewLeaseList = NewNodeInfo#node_info_t.lease_list,
-    LeasesDiffer = not compare_lease_lists(OldLeaseList, NewLeaseList),
-    OldRange = OldNodeInfo#node_info_t.my_range,
-    NewRange = NewNodeInfo#node_info_t.my_range,
-    RangesDiffer = OldRange =/= NewRange,
+    case {OldNodeInfo, NewNodeInfo} of
+        {empty, empty}       -> ok;
+        {empty, NewNodeInfo} -> io:format("nyi1~n");
+        {OldNodeInfo, empty} -> io:format("nyi2~n");
+        {OldNodeInfo, NewNodeInfo} ->
+            OldLeaseList = OldNodeInfo#node_info_t.lease_list,
+            NewLeaseList = NewNodeInfo#node_info_t.lease_list,
+            LeasesDiffer = not compare_lease_lists(OldLeaseList, NewLeaseList),
+            OldRange = OldNodeInfo#node_info_t.my_range,
+            NewRange = NewNodeInfo#node_info_t.my_range,
+            RangesDiffer = OldRange =/= NewRange,
 
-    case LeasesDiffer orelse RangesDiffer of
-        true ->
-            io:format("the node ~p has changed~n", [Node]),
-            _ = case LeasesDiffer of
-                    true ->
-                        describe_lease_diff(lease_list:get_active_lease(OldLeaseList),
-                                            lease_list:get_active_lease(NewLeaseList), active),
-                        describe_lease_list_diff(OldLeaseList, NewLeaseList);
-                    false ->
-                        ok
-                end,
-            _ = case RangesDiffer of
-                    true -> io_lib:format("  the range changed from ~p -> ~p~n", [OldRange, NewRange]);
-                    false -> ok
-                end,
-            ok;
-        false ->
-            ok
+            case LeasesDiffer orelse RangesDiffer of
+                true ->
+                    io:format("the node ~p has changed~n", [Node]),
+                    _ = case LeasesDiffer of
+                            true ->
+                                describe_lease_list_diff(OldLeaseList, NewLeaseList);
+                            false ->
+                                ok
+                        end,
+                    _ = case RangesDiffer of
+                            true -> io_lib:format("  the range changed from ~p -> ~p~n",
+                                                  [OldRange, NewRange]);
+                            false -> ok
+                        end,
+                    ok;
+                false ->
+                    ok
+            end
     end.
 
 -spec describe_lease_list_diff(lease_list:lease_list(), lease_list:lease_list()) -> ok.
@@ -318,8 +323,8 @@ describe_lease_list_diff(OldLeaseList, NewLeaseList) ->
 describe_lease_diff(OldLease, NewLease, Type) ->
     case {OldLease, NewLease} of
         {empty, empty} -> ok;
-        {empty, NewLease} -> io:format("nyi~n");
-        {OldLease, empty} -> io:format("nyi~n");
+        {empty, NewLease} -> io:format("nyi3~n");
+        {OldLease, empty} -> io:format("nyi4~n");
         {_, _} ->
             case compare_leases(OldLease, NewLease) of
                 true -> ok;
