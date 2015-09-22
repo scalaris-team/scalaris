@@ -44,8 +44,7 @@
          tree_leavesSynced  = 0       :: non_neg_integer(),
          build_time         = 0       :: non_neg_integer(),      %in us
          recon_time         = 0       :: non_neg_integer(),      %in us
-         resolve_started    = 0       :: non_neg_integer(),      %number of resolve requests send
-         await_rs_fb        = 0       :: non_neg_integer(),      %awaiting feedback response from a RS process not initiated by rr_resolve
+         rs_expected        = 0       :: non_neg_integer(),      %number of resolve expected requests
          status             = wait    :: status()
          }).
 -type stats() :: #rr_recon_stats{}.
@@ -57,8 +56,7 @@
                {tree_leavesSynced, non_neg_integer()} |
                {build_time, non_neg_integer()} |
                {recon_time, non_neg_integer()} |
-               {resolve_started, non_neg_integer()} |
-               {await_rs_fb, non_neg_integer()}].
+               {rs_expected, non_neg_integer()}].
 
 -type field_list2()  ::
           [{status, status()}] | field_list1().
@@ -102,12 +100,9 @@ inc([{K, V} | L], Stats) ->
              recon_time ->
                  X = V + Stats#rr_recon_stats.recon_time,
                  Stats#rr_recon_stats{recon_time = X};
-             resolve_started ->
-                 X = V + Stats#rr_recon_stats.resolve_started,
-                 Stats#rr_recon_stats{resolve_started = X};
-             await_rs_fb ->
-                 X = V + Stats#rr_recon_stats.await_rs_fb,
-                 Stats#rr_recon_stats{await_rs_fb = X}
+             rs_expected ->
+                 X = V + Stats#rr_recon_stats.rs_expected,
+                 Stats#rr_recon_stats{rs_expected = X}
          end,
     inc(L, NS).
 
@@ -123,8 +118,7 @@ set([{K, V} | L], Stats) ->
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
-             resolve_started     -> Stats#rr_recon_stats{resolve_started = V};
-             await_rs_fb         -> Stats#rr_recon_stats{await_rs_fb = V};
+             rs_expected         -> Stats#rr_recon_stats{rs_expected = V};
              status              -> Stats#rr_recon_stats{status = V}
          end,
     set(L, NS).
@@ -136,8 +130,7 @@ set([{K, V} | L], Stats) ->
          (tree_leavesSynced, stats())  -> non_neg_integer();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
-         (resolve_started, stats())    -> non_neg_integer();
-         (await_rs_fb, stats())        -> non_neg_integer();
+         (rs_expected, stats())        -> non_neg_integer();
          (status, stats())             -> status().
 get(session_id         , #rr_recon_stats{session_id          = X}) -> X;
 get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
@@ -146,8 +139,7 @@ get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
-get(resolve_started    , #rr_recon_stats{resolve_started     = X}) -> X;
-get(await_rs_fb        , #rr_recon_stats{await_rs_fb         = X}) -> X;
+get(rs_expected        , #rr_recon_stats{rs_expected         = X}) -> X;
 get(status             , #rr_recon_stats{status              = X}) -> X.
 
 -spec merge(stats(), stats()) -> stats().
@@ -157,16 +149,14 @@ merge(A, #rr_recon_stats{ tree_size = TS,
                           tree_compareSkipped = TCS,
                           build_time = BT,
                           recon_time = RC,
-                          resolve_started = RS,
-                          await_rs_fb = RsFb }) ->
+                          rs_expected = RS }) ->
     inc([{tree_size, TS},
          {tree_nodesCompared, TNC},
          {tree_leavesSynced, TLS},
          {tree_compareSkipped, TCS},
          {build_time, BT},
          {recon_time, RC},
-         {resolve_started, RS},
-         {await_rs_fb, RsFb}], A).
+         {rs_expected, RS}], A).
 
 -spec print(stats()) -> [any()].
 print(Stats) ->

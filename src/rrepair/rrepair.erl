@@ -75,7 +75,7 @@
           rc_method         = ?required(session, rc_method)     :: rr_recon:method(),
           rc_stats          = none                              :: rr_recon_stats:stats() | none,
           rs_stats          = none                              :: rr_resolve:stats() | none,
-          rs_called         = 0                                 :: non_neg_integer(),
+          rs_expected       = 0                                 :: non_neg_integer(),
           rs_finish         = 0                                 :: non_neg_integer(),
           ttl               = ?required(session, ttl)           :: pos_integer()    %time to live in milliseconds
         }).
@@ -225,20 +225,13 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
     %       counted by request_sync)
     State;
 
-% initial resolve request
-on({request_resolve, SessionID, Operation, Options},
-   State = #rrepair_state{open_resolve = OpenResolve}) ->
+% (first or continued) resolve request
+on({Tag, SessionID, Operation, Options},
+   State = #rrepair_state{open_resolve = OpenResolve})
+  when Tag =:= request_resolve orelse Tag =:= continue_resolve ->
     {ok, Pid} = rr_resolve:start(SessionID),
-    comm:send_local(Pid, {start, Operation, Options}),
+    comm:send_local(Pid, {start, Operation, Options, Tag}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
-
-% feedback response from a previous resolve request
-on({continue_resolve, SessionID, Operation, Options}, State) ->
-    % do not increase the open_resolve member - we did this during the
-    % resolve_progress_report of the original request
-    {ok, Pid} = rr_resolve:start(SessionID),
-    comm:send_local(Pid, {start, Operation, Options}),
-    State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % report messages
@@ -264,19 +257,17 @@ on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
     end,
     State#rrepair_state{ open_recon = OR - 1 };
 on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
-   State = #rrepair_state{open_recon = ORC, open_resolve = ORS,
+   State = #rrepair_state{open_recon = ORC, open_resolve = _ORS,
                           open_sessions = OS}) ->
     {S, TSessions} = extract_session(rr_recon_stats:get(session_id, Stats), OS),
-    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nSession=~.2p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p,~n~p",
-                 [_Sender, rr_recon_stats:print(Stats), S, ORC - 1, ORS, OS, rr_recon_stats:print(Stats)]),
     SUpd = update_session_recon(S, Stats),
+    ?TRACE_RECON("~nRECON-I OK - Sender=~p~nStats=~p~nSession=~.2p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p,~n~p",
+                 [_Sender, rr_recon_stats:print(Stats), SUpd, ORC - 1, _ORS, OS, rr_recon_stats:print(Stats)]),
     NewOS = case check_session_complete(SUpd) of
                 true -> TSessions;
                 _    -> [SUpd | TSessions]
             end,
-    NewRS = rr_recon_stats:get(await_rs_fb, Stats),
-    State#rrepair_state{open_resolve = ORS + NewRS,
-                        open_recon = ORC - 1, open_sessions = NewOS};
+    State#rrepair_state{open_recon = ORC - 1, open_sessions = NewOS};
 
 on({resolve_progress_report, _Sender, Stats},
    State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
@@ -292,11 +283,10 @@ on({resolve_progress_report, _Sender, Stats},
                             _    -> [SUpd | TSessions]
                         end
                 end,
-    NewRS = rr_resolve:get_stats_resolve_started(Stats),
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
-                    State#rrepair_state.open_recon, OR - 1 + NewRS, OS, NSessions]),
-    State#rrepair_state{open_resolve = OR - 1 + NewRS,
+                    State#rrepair_state.open_recon, OR - 1, OS, NSessions]),
+    State#rrepair_state{open_resolve = OR - 1,
                         open_sessions = NSessions};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -387,33 +377,25 @@ extract_session(Id, Sessions) ->
     end.
 
 -spec update_session_recon(session(), rr_recon_stats:stats()) -> session().
-update_session_recon(Session = #session{rs_called = RSCalled}, New) ->
+update_session_recon(Session = #session{rs_expected = 0}, New) ->
     ?ASSERT(rr_recon_stats:get(status, New) =/= wait),
-    NewRS = rr_recon_stats:get(resolve_started, New),
-    Session#session{ rc_stats  = New,
-                     rs_called = RSCalled + NewRS }.
+    NewRS = rr_recon_stats:get(rs_expected, New),
+    Session#session{rc_stats  = New, rs_expected = NewRS}.
 
-%% @doc Increases the rs_finish field and merges the new stats. If the resolve
-%%      is expecting a feedback reply, rs_called is also increased.
+%% @doc Increases the rs_finish field and merges the new stats.
 -spec update_session_resolve(session(), rr_resolve:stats()) -> session().
-update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount,
-                                 rs_called = RSCalled } = S, Stats) ->
-    NewRS = rr_resolve:get_stats_resolve_started(Stats),
-    S#session{ rs_stats = Stats, rs_finish = RSCount + 1,
-               rs_called = RSCalled + NewRS };
-update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount,
-                                 rs_called = RSCalled } = S, New) ->
-    NewRS = rr_resolve:get_stats_resolve_started(New),
+update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount } = S, Stats) ->
+    S#session{rs_stats = Stats, rs_finish = RSCount + 1};
+update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount} = S, New) ->
     Merge = rr_resolve:merge_stats(Old, New),
-    S#session{ rs_stats = Merge, rs_finish = RSCount + 1,
-               rs_called = RSCalled + NewRS }.
+    S#session{rs_stats = Merge, rs_finish = RSCount + 1}.
 
 %% @doc Checks if the session is complete (rs_called =:= rs_finish, stats
 %%      available) and in this case informs the principal and returns 'true'.
 %%      Otherwise 'false'.
 -spec check_session_complete(session()) -> boolean().
 check_session_complete(#session{rc_stats = RCStats, principal = PrincipalPid,
-                                rs_called = C, rs_finish = C} = S)
+                                rs_expected = C, rs_finish = C} = S)
   when RCStats =/= none ->
     case rr_recon_stats:get(status, RCStats) of
         X when X =:= finish orelse X =:= abort ->

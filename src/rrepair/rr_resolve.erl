@@ -42,7 +42,7 @@
 -include("client_types.hrl").
 
 -export([init/1, on/2, start/1]).
--export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
+-export([get_stats_session_id/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
 % for tester:
@@ -67,8 +67,7 @@
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
-         regen_fail_count = 0      :: non_neg_integer(),
-         resolve_started  = 0      :: non_neg_integer()
+         regen_fail_count = 0      :: non_neg_integer()
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -96,7 +95,7 @@
 
 -type message() ::
     % API
-    {start, operation(), options()} |
+    {start, operation(), options(), StartTag::atom()} |
     % internal
     {get_entries_response, db_dht:db_as_list()} |
     {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
@@ -119,14 +118,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
 
-on({start, Operation, Options}, State) ->
+on({start, Operation, Options, _StartCont}, State) ->
     FBDest = proplists:get_value(feedback_request, Options, undefined),
     FromMyNode = proplists:get_value(from_my_node, Options, 1),
     NewState = State#rr_resolve_state{ operation = Operation,
                                        fb_dest_pid = FBDest,
                                        from_my_node = FromMyNode },
-    ?TRACE_START_END("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p (MyNode: ~p)",
-           [util:extint2atom(element(1, Operation)), FBDest,
+    ?TRACE_START_END("RESOLVE ~s - Operation=~p~n FeedbackTo=~p~n SessionId:~p (MyNode: ~p)",
+           [_StartCont, util:extint2atom(element(1, Operation)), FBDest,
             NewState#rr_resolve_state.stats#resolve_stats.session_id,
             FromMyNode]),
     send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), my_range}),
@@ -201,20 +200,13 @@ on({get_entries_response, EntryList}, State =
 
     % note: EntryList may not be unique!
     KvvList = make_unique_kvv([entry_to_kvv(E) || E <- EntryList]),
-    % note: if ReqKeys contains any entries, we will get 2 replies per resolve!
-    FBCount = if ReqKeys =/= [] -> 2;
-                 true -> 1
-              end,
     ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
                  {non_unique_req_list, ReqKeys}),
     ?TRACE_START_END("sending key_upd with ~B items and ~B requests",
                      [length(KvvList), length(ReqKeys)]),
-    ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
-                                      FromMyNode, FBDest, [], false) * FBCount,
-
-    NewState =
-        State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
-                               fb_dest_pid = undefined},
+    send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
+                         FromMyNode, FBDest, []),
+    NewState = State#rr_resolve_state{fb_dest_pid = undefined},
     shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -293,12 +285,9 @@ on({get_entries_response, EntryList}, State =
 
     % note: EntryList may not be unique!
     KvvList = make_unique_kvv([entry_to_kvv(E) || E <- EntryList]),
-    ResStarted = send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
-                                      FromMyNode, FBDest, [], false),
-
-    NewState =
-        State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
-                               fb_dest_pid = undefined},
+    send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
+                         FromMyNode, FBDest, []),
+    NewState = State#rr_resolve_state{fb_dest_pid = undefined},
     shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -457,7 +446,7 @@ any_replica_in_tree([Key | Rest], Tree) ->
 
 -spec shutdown(exit_reason(), state()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner,
-                                    stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
+                                    stats = Stats,
                                     operation = _Op, fb_dest_pid = FBDest,
                                     fb_send_kvv = FbKVV,
                                     fb_had_kvv_req = SendReqKeyReply,
@@ -469,38 +458,35 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner,
             FromMyNode, ?IIF(FBDest =/= undefined,
                              {length(FbKVV), "items to", FBDest, "via key_upd:", FbKVV},
                              none)]),
-    ResStarted =
         case FBDest of
             undefined ->
-                0;
+                ok;
             _ when not SendReqKeyReply ->
                 FbKVV1 = make_unique_kvv(FbKVV),
                 send_request_resolve(FBDest, {?key_upd, FbKVV1, []},
                                      Stats#resolve_stats.session_id,
-                                     FromMyNode, undefined, [], true);
+                                     FromMyNode, undefined, []);
             _ ->
                 % feedback item lists may not be unique -> make them!
                 FbKVV1 = make_unique_kvv(FbKVV),
                 FbReqKVV1 = make_unique_kvv(FbReqKVV),
                 send_request_resolve(FBDest, {?key_upd, FbKVV1, []},
                                      Stats#resolve_stats.session_id,
-                                     FromMyNode, undefined, [], true) +
-                    send_request_resolve(FBDest, {?key_upd, FbReqKVV1, []},
-                                         Stats#resolve_stats.session_id,
-                                         FromMyNode, comm:make_global(Owner),
-                                         [], true)
+                                     FromMyNode, undefined, []),
+                send_request_resolve(FBDest, {?key_upd, FbReqKVV1, []},
+                                     Stats#resolve_stats.session_id,
+                                     FromMyNode, comm:make_global(Owner), [])
         end,
-    Stats1 = Stats#resolve_stats{resolve_started = ResStarted0 + ResStarted},
     % note: do not propagate the SessionId unless we report to the node
     %       the request came from (indicated by FromMyNode =:= 1),
     %       otherwise the resolve_progress_report on the other node will
     %       be counted for the session's rs_finish and it will not match
-    %       its rs_called any more!
+    %       its rs_expected anymore!
     if FromMyNode =:= 1 ->
-           send_local(Owner, {resolve_progress_report, self(), Stats1});
+           send_local(Owner, {resolve_progress_report, self(), Stats});
        true ->
            send_local(Owner, {resolve_progress_report, self(),
-                              Stats1#resolve_stats{session_id = null}})
+                              Stats#resolve_stats{session_id = null}})
     end,
     kill.
 
@@ -531,21 +517,16 @@ make_other_kv_tree(KVV) ->
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,
                            FromMyNode::0 | 1, FBDest::comm:mypid() | undefined,
-                           Options::options(), IsFeedback::boolean())
-        -> ResolveStarted::0 | 1.
-send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
-    case FBDest of
-        undefined -> Options1 = Options,
-                     ResStarted = 0;
-        _         -> Options1 = [{feedback_request, FBDest} | Options],
-                     ResStarted = 1
-    end,
+                           Options::options())
+        -> ok.
+send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options) ->
+    Options1 = case FBDest of
+                   undefined -> Options;
+                   _         -> [{feedback_request, FBDest} | Options]
+               end,
     Options2 = [{from_my_node, FromMyNode bxor 1} | Options1],
-    Tag = if IsFeedback -> continue_resolve;
-             true       -> request_resolve
-          end,
-    send(Dest, {Tag, SID, Op, Options2}),
-    ResStarted.
+    send(Dest, {continue_resolve, SID, Op, Options2}),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % resolve stats operations
@@ -553,9 +534,6 @@ send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
 
 -spec get_stats_session_id(stats()) -> rrepair:session_id() | null.
 get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
-
--spec get_stats_resolve_started(stats()) -> non_neg_integer().
-get_stats_resolve_started(Stats) -> Stats#resolve_stats.resolve_started.
 
 -spec merge_stats_feeder(stats(), stats()) -> {stats(), stats()}.
 merge_stats_feeder(A, B) ->
@@ -569,22 +547,19 @@ merge_stats(#resolve_stats{ session_id = SID,
                             regen_count = ARC,
                             regen_fail_count = AFC,
                             upd_fail_count = AUFC,
-                            update_count = AUC,
-                            resolve_started = ARS },
+                            update_count = AUC },
             #resolve_stats{ session_id = SID,
                             diff_size = BDiff,
                             regen_count = BRC,
                             regen_fail_count = BFC,
                             upd_fail_count = BUFC,
-                            update_count = BUC,
-                            resolve_started = BRS }) ->
+                            update_count = BUC }) ->
     #resolve_stats{ session_id = SID,
                     diff_size = ADiff + BDiff,
                     regen_count = ARC + BRC,
                     regen_fail_count = AFC + BFC,
                     upd_fail_count = AUFC + BUFC,
-                    update_count = AUC + BUC,
-                    resolve_started = ARS + BRS }.
+                    update_count = AUC + BUC }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER

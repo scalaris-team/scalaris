@@ -507,7 +507,7 @@ tester_type_check_rrepair(_Config) ->
            ],
            [
              {shutdown, 2}, %% tries to send messages
-             {send_request_resolve, 7}, %% tries to send messages
+             {send_request_resolve, 6}, %% tries to send messages
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
 

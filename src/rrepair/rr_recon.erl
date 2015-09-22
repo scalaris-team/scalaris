@@ -365,14 +365,13 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   [SID, length(ToSend1)]),
            NewStats =
                if ToSend1 =/= [] ->
+                      % send request_resolve to non-initiator
                       send(DestRR_Pid, {request_resolve, SID,
                                         {?key_upd, ToSend1, []},
                                         [{from_my_node, 0},
                                          {feedback_request, comm:make_global(OwnerL)}]}),
                       % we will get one reply from a subsequent feedback response (?key_upd)
-                      FBCount = 1,
-                      rr_recon_stats:inc([{resolve_started, FBCount},
-                                          {await_rs_fb, FBCount}], Stats);
+                      rr_recon_stats:inc([{rs_expected, 1}], Stats);
                   true ->
                       Stats
                end,
@@ -385,7 +384,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
            % the number of resolve processes here!
            NewStats2 =
                if ReqIdx =/= [] ->
-                      rr_recon_stats:inc([{resolve_started, 1}], NewStats);
+                      rr_recon_stats:inc([{rs_expected, 1}], NewStats);
                   true -> NewStats
                end,
 
@@ -457,7 +456,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
                   % the non-initiator will use key_upd_send and we must thus increase
                   % the number of resolve processes here!
-                  NewStats = rr_recon_stats:inc([{resolve_started, 1},
+                  NewStats = rr_recon_stats:inc([{rs_expected, 1},
                                                  {build_time, BuildTime}], Stats),
                   NewState#rr_recon_state{stats = NewStats, stage = resolve,
                                           params = Params1,
@@ -525,7 +524,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                        {resolve_req, DBChunk, SigSize, VSize, comm:this()}),
                   % the non-initiator will use key_upd_send and we must thus increase
                   % the number of resolve processes here!
-                  NewStats = rr_recon_stats:inc([{resolve_started, 1},
+                  NewStats = rr_recon_stats:inc([{rs_expected, 1},
                                                  {build_time, BuildTime}], Stats),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
                                        kv_list = [],
@@ -1495,7 +1494,7 @@ shash_bloom_perform_resolve(
     % the initiator will use key_upd_send and we must thus increase
     % the number of resolve processes here!
     if ReqIdx =/= [] ->
-           rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
+           rr_recon_stats:inc([{rs_expected, 1}], NewStats1);
        true -> NewStats1
     end.
 
@@ -1839,7 +1838,9 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf,
     % resolve the leaf-leaf comparisons's items with empty leaves on the initiator as key_upd:
     ?DBG_ASSERT(?implies(ToSend =/= [], not IsInitiator)),
     Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount}], Stats1),
+    % the other node will send its items from this CKV list - increase rs_expected, too
+    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
+                                 {rs_expected, 1}], Stats1),
     {Hashes, NStats}.
 
 %% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/4
@@ -1863,7 +1864,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
               {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, _NIResolves}) when IsInitiator ->
                   % empty leaf on this node
                   % -> this is directly resolved at the non-initiator but we
-                  %    need to increase the resolve_started counter by 1 (all
+                  %    need to increase the rs_expected counter by 1 (all
                   %    leaves will be resolved in a single operation)!
                   {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, 1};
              ({MyMaxItemsCount, MyKVItems, LeafCount},
@@ -1887,7 +1888,9 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
 
     % send resolve message:
     % resolve items we should send as key_upd:
-    Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
+    % NOTE: the other node does not know whether our ToSend is empty and thus
+    %       always expects a following resolve process!
+    Stats1 = send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, false),
     % let the other node's rr_recon process identify the remaining keys;
     % it will use key_upd_send (if non-empty) and we must thus increase
     % the number of resolve processes here!
@@ -1899,11 +1902,11 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
            MerkleResReqs = 0
     end,
     NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
-                                 {resolve_started, MerkleResReqs + NIResolves}],
+                                 {rs_expected, MerkleResReqs + NIResolves}],
                                 Stats1),
-    ?TRACE("resolve_req Merkle Session=~p ; resolve started=~B",
+    ?TRACE("resolve_req Merkle Session=~p ; resolve expexted=~B",
            [rr_recon_stats:get(session_id, Stats),
-            rr_recon_stats:get(resolve_started, NStats)]),
+            rr_recon_stats:get(rs_expected, NStats)]),
     {ToResolve1, NStats}.
 
 %% @doc Decodes all requested keys from merkle_resolve_leaves_receive/8 (as a
@@ -1926,10 +1929,12 @@ merkle_resolve_leaves_ckidx([{_OtherMaxItemsCount, MyKVItems, _LeafCount} | TL],
 merkle_resolve_leaves_ckidx([{_MyKVItems, _MyItemCount} | TL],
                              BinKeyList,
                              DestRRPid, Stats, OwnerL, Params, ToSend, IsInitiator) ->
+    % empty leaf hash on the other node - already resolved!
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
                                 ToSend, IsInitiator);
-merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params, ToSend, IsInitiator) ->
-    send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true).
+merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params,
+                            [_|_] = ToSend, IsInitiator) ->
+    send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator, false).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% art recon
@@ -1940,17 +1945,17 @@ merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params, ToSend,
 %%      Returns the number of resolve requests (requests with feedback count 2).
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
-        -> {ResolveCalled::0..1, FBCount::0..1}.
+        -> ResolveExp::0..2.
 resolve_leaves([_|_] = Nodes, Dest, SID, OwnerL) ->
     resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0);
 resolve_leaves([], _Dest, _SID, _OwnerL) ->
-    {0, 0}.
+    0.
 
 %% @doc Helper for resolve_leaves/4.
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
-        -> {ResolveCalled::0..1, FBCount::0..1}.
+        -> ResolveExp::0..2.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     LeafInterval = merkle_tree:get_interval(Node),
@@ -1966,14 +1971,14 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
                    send_local(OwnerL, {request_resolve, SID,
                                        {interval_upd_send, Interval, Dest},
                                        [{from_my_node, 1} | Options]}),
-                   {1, 0};
+                   2;
                true ->
                    % we know that we don't have data in this range, so we must
                    % regenerate it from the other node
                    % -> send him this request directly!
                    send(Dest, {request_resolve, SID, {?interval_upd, Interval, []},
                                [{from_my_node, 0} | Options]}),
-                   {1, 1}
+                   1
             end
     end.
 
@@ -1989,13 +1994,11 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                 {ASyncLeafs, NComp, NSkip, NLSync} =
                     art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
                                         [], 0, 0, 0),
-                {ResolveCalled, FBCount} =
-                    resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
+                ResolveExp = resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
                 rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                     {tree_compareSkipped, NSkip},
                                     {tree_leavesSynced, NLSync},
-                                    {resolve_started, ResolveCalled},
-                                    {await_rs_fb, FBCount}], Stats);
+                                    {rs_expected, ResolveExp}], Stats);
             false -> Stats
         end,
     rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
@@ -2054,7 +2057,7 @@ send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator,
                         [{from_my_node, ?IIF(IsInitiator, 1, 0)},
                          {feedback_request, comm:make_global(OwnerL)}]}),
     % key_upd_send + one reply from a subsequent feedback response (?key_upd)
-    rr_recon_stats:inc([{resolve_started, 2}], Stats).
+    rr_recon_stats:inc([{rs_expected, 2}], Stats).
 
 %% @doc Gets the number of bits needed to encode the given number.
 -spec bits_for_number(Number::pos_integer()) -> pos_integer();
