@@ -94,44 +94,39 @@ public class JDOQLQuery extends AbstractJDOQLQuery {
         AbstractClassMetaData cmd = ec.getMetaDataManager()
                 .getMetaDataForClass(candidateClass,
                         ec.getClassLoaderResolver());
-        ManagedConnection mconn = getStoreManager().getConnection(ec);
 
-        try {
-            // get all stored instances of class candidateClass
-            Collection candidates;
-            if (candidateCollection == null) {
+        // get all stored instances of class candidateClass
+        Collection candidates;
+        if (candidateCollection == null) {
 
-                Expression filterExpr = compilation.getExprFilter();
-                String[] memberNameValuePair = getUniqueMemberNameValuePairIfExist(cmd, filterExpr, parameters);
-                if (memberNameValuePair == null) {
-                    // it is not possible to pre-select which objects are needed, therefore
-                    // all objects must be fetched first
-                    candidates = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
-                            .getObjectsOfCandidateType(ec, mconn, candidateClass, cmd);
-                } else {
-                    // the member is marked by 'unique' annotation, which
-                    // means that there can only be at most one object fitting the criteria
-                    candidates = new ArrayList(1);
-                    Object uniqueObject = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
-                            .getObjectByUniqueMember(ec, mconn, candidateClass, memberNameValuePair[0], memberNameValuePair[1]);
-                    if (uniqueObject != null) {
-                        candidates.add(uniqueObject);
-                    }
-                }
+            Expression filterExpr = compilation.getExprFilter();
+            String[] memberNameValuePair = getUniqueMemberNameValuePairIfExist(cmd, filterExpr, parameters);
+            if (memberNameValuePair == null) {
+                // it is not possible to pre-select which objects are needed, therefore
+                // all objects must be fetched first
+                candidates = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
+                        .getObjectsOfCandidateType(ec, candidateClass, cmd);
             } else {
-                candidates = new ArrayList<Object>(candidateCollection);
+                // the member is marked by 'unique' annotation, which
+                // means that there can only be at most one object fitting the criteria
+                candidates = new ArrayList(1);
+                Object uniqueObject = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
+                        .getObjectByUniqueMember(ec, candidateClass, memberNameValuePair[0], memberNameValuePair[1]);
+                if (uniqueObject != null) {
+                    candidates.add(uniqueObject);
+                }
             }
-
-            // execute query
-            JavaQueryEvaluator resultMapper = new ScalarisJDOQLEvaluator(this,
-                    candidateClass, candidates, compilation, parameters,
-                    ec.getClassLoaderResolver(), ec);
-            Collection result = resultMapper.execute(true, true, true, true, true);
-
-            return result;
-        } finally {
-            mconn.release();
+        } else {
+            candidates = new ArrayList<Object>(candidateCollection);
         }
+
+        // execute query
+        JavaQueryEvaluator resultMapper = new ScalarisJDOQLEvaluator(this,
+                candidateClass, candidates, compilation, parameters,
+                ec.getClassLoaderResolver(), ec);
+        Collection result = resultMapper.execute(true, true, true, true, true);
+
+        return result;
     }
 
     /**

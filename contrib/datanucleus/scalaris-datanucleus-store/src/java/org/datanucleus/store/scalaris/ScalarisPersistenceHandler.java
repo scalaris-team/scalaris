@@ -411,11 +411,11 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      * @param candidateClass
      */
     public List<Object> getObjectsOfCandidateType(ExecutionContext ec,
-            ManagedConnection mconn, Class<?> candidateClass,
-            AbstractClassMetaData cmd) {
+            Class<?> candidateClass,AbstractClassMetaData cmd) {
         List<Object> results = new ArrayList<Object>();
         String idIndexKey = ScalarisSchemaHandler.getIDIndexKeyName(candidateClass);
 
+        ManagedConnection mconn = ec.getStoreManager().getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
         Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
@@ -444,6 +444,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             throw new NucleusException(e.getMessage(), e);
         } catch (UnknownException e) {
             throw new NucleusException(e.getMessage(), e);
+        } finally {
+            if (mconn != null) {
+                mconn.release();
+            }
         }
 
         return results;
@@ -461,11 +465,12 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
      * @param memberValue Value of the unique member
      * @return The persisted object, or null if there is no such object.
      */
-    public Object getObjectByUniqueMember(ExecutionContext ec, ManagedConnection mconn,
+    public Object getObjectByUniqueMember(ExecutionContext ec,
                 Class<?> objectClass, String memberName, String memberValue) {
         AbstractClassMetaData cmd = ec.getMetaDataManager()
                 .getMetaDataForClass(objectClass,
                         ec.getClassLoaderResolver());
+        ManagedConnection mconn = ec.getStoreManager().getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mconn
                 .getConnection();
         Transaction scalarisTransaction = ((ScalarisStoreManager) storeMgr)
@@ -492,6 +497,10 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
             // there does not exist an object with the unique member value
         } catch (UnknownException e) {
             throw new NucleusException(e.getMessage(), e);
+        } finally {
+            if (mconn != null) {
+                mconn.release();
+            }
         }
         return null;
     }

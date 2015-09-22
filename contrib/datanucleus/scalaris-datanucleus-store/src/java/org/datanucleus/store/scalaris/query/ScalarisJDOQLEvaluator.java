@@ -105,11 +105,10 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
         if (!subquery.getCandidateClass().equals(candidateClass)) {
             // if the sub-query queries over a different candidate class, all objects of this
             // class must be fetched beforehand
-            ManagedConnection mconn = ec.getStoreManager().getConnection(ec);
             AbstractClassMetaData cmd = ec.getMetaDataManager()
                     .getMetaDataForClass(subquery.getCandidateClass(),ec.getClassLoaderResolver());
             candidates = ((ScalarisPersistenceHandler) ec.getStoreManager().getPersistenceHandler())
-                    .getObjectsOfCandidateType(ec, mconn, subquery.getCandidateClass(), cmd);
+                    .getObjectsOfCandidateType(ec, subquery.getCandidateClass(), cmd);
         }
         return super.evaluateSubquery(subquery, compilation, candidates, outerCandidate);
     }

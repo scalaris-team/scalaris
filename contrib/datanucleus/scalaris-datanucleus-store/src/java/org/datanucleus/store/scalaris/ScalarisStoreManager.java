@@ -37,12 +37,14 @@ import de.zib.scalaris.Transaction;
 public class ScalarisStoreManager extends AbstractStoreManager {
 
     private Map<org.datanucleus.Transaction, de.zib.scalaris.Transaction> transactionMap;
-
+    private Map<org.datanucleus.Transaction, ManagedConnection> connectionMap;
+    
     public ScalarisStoreManager(ClassLoaderResolver clr,
             PersistenceNucleusContext ctx, Map<String, Object> props) {
         super("scalaris", clr, ctx, props);
 
         transactionMap = new HashMap<org.datanucleus.Transaction, de.zib.scalaris.Transaction>();
+        connectionMap = new HashMap<org.datanucleus.Transaction, ManagedConnection>();
 
         // Handler for persistence process
         persistenceHandler = new ScalarisPersistenceHandler(this);
@@ -66,6 +68,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
             throw new NucleusDataStoreException("Cannot start the same transaction multiple times");
         } else {
             transactionMap.put(ec.getTransaction(), scalarisTransaction);
+            connectionMap.put(ec.getTransaction(), mConn);
         }
     }
 
@@ -80,6 +83,11 @@ public class ScalarisStoreManager extends AbstractStoreManager {
             throw new NucleusDataStoreException(e.getMessage(), e);
         } finally {
             transactionMap.remove(ec.getTransaction());
+            ManagedConnection mconn = connectionMap.get(ec.getTransaction());
+            if (mconn != null) {
+                mconn.release();
+                connectionMap.remove(ec.getTransaction());
+            }
         }
     }
 
@@ -89,7 +97,12 @@ public class ScalarisStoreManager extends AbstractStoreManager {
         if (scalarisTransaction != null) {
             transactionMap.remove(ec.getTransaction());
             scalarisTransaction.abort();
-            scalarisTransaction.closeConnection();
+
+            ManagedConnection mconn = connectionMap.get(ec.getTransaction());
+            if (mconn != null) {
+                mconn.release();
+                connectionMap.remove(ec.getTransaction());
+            }
         }
     }
 

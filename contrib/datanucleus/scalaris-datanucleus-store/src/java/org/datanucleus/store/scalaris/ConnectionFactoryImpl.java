@@ -42,7 +42,7 @@ import de.zib.scalaris.ConnectionPool;
 @SuppressWarnings("rawtypes")
 public class ConnectionFactoryImpl extends AbstractConnectionFactory {
     
-    private static final int MAX_NUMBER_CONNECTIONS = 0;
+    private static final int MAX_NUMBER_CONNECTIONS = 50;
     
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
@@ -72,8 +72,8 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
      */
     public final static String PROPERTY_SCALARIS_CLIENT_APPENDUUID = "scalaris.client.appendUUID";
 
-    private static ConnectionPool connPool = null;
-    
+    private static volatile ConnectionPool connPool = null;
+
     /**
      * Constructor.
      * 
@@ -85,10 +85,10 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
     public ConnectionFactoryImpl(final StoreManager storeMgr,
             final String resourceType) {
         super(storeMgr, resourceType);
-        
+
         initConnectionPool();
     }
-    
+
     private void initConnectionPool() {
         synchronized(ConnectionFactoryImpl.class) {
             if (connPool == null) {
@@ -100,7 +100,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
                 copyProperty(PROPERTY_SCALARIS_CLIENT_APPENDUUID, properties,
                         "scalaris.client.appendUUID", true);
                 ConnectionFactory connectionFactory = new ConnectionFactory(properties);
-            
+
                 connPool = new ConnectionPool(connectionFactory, MAX_NUMBER_CONNECTIONS);
             }
         }
@@ -164,7 +164,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
             // TODO: handle options?
         }
 
-        public Object getConnection() {
+        public synchronized Object getConnection() {
             try {
                 if (conn == null) {
                     conn = connPool.getConnection();
@@ -179,9 +179,9 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
             return null;
         }
 
-        public void close() {
+        public synchronized void close () {
             if (conn != null) {
-                 connPool.releaseConnection((de.zib.scalaris.Connection) conn);
+                connPool.releaseConnection((de.zib.scalaris.Connection) conn);
                 conn = null;
             }
         }
