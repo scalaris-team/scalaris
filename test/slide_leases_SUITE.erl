@@ -46,7 +46,7 @@ groups() ->
                                          %%  %test_quadruple_join_triple_leave,
                                          %%  %test_quadruple_join_quadruple_leave
                                          ]},
-     {repeater, [{repeat, 20}], [{group, join_tests}]}
+     {repeater, [{repeat, 1}], [{group, join_tests}]}
     ].
 
 all() ->
