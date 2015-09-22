@@ -646,14 +646,14 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
     RunRound = fun(Nodes) ->
                        % the nodelist may not be sorted by quadrants!
                        % -> sort the nodes by their RT keys first:
-                       [{_AKey, _A}, {BKey, _B}, {_CKey, _C}, {_DKey, D}] =
+                       [{_AKey, _A}, {BKey, B}, {_CKey, _C}, {_DKey, D}] =
                            lists:keysort(1, [{pid_to_rtkey(N), N} || N <- Nodes]),
                        %B->D
 %%                        comm:send(B, {request_sync, DKey}, [{group_member, rrepair}]),
-%%                        wait_sync_end([B])
+%%                        wait_sync_end([B, D])
                        %D->B
                        comm:send(D, {request_sync, BKey}, [{group_member, rrepair}]),
-                       wait_sync_end([D])
+                       wait_sync_end([D, B])
                end,
     
     EPFile = proplists:get_value(ep_file, Options, null),
