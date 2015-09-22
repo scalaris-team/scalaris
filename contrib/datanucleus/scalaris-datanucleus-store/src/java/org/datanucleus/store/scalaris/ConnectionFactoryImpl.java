@@ -35,9 +35,7 @@ import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
 
 /**
- * Implementation of a ConnectionFactory for Scalaris. The connections are only
- * created and they are not managed. All operations besides getConnection are
- * no-op.
+ * Implementation of a ConnectionFactory for Scalaris.
  */
 @SuppressWarnings("rawtypes")
 public class ConnectionFactoryImpl extends AbstractConnectionFactory {
