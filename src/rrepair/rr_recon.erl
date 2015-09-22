@@ -369,7 +369,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                         {?key_upd, ToSend1, []},
                                         [{from_my_node, 0},
                                          {feedback_request, comm:make_global(OwnerL)}]}),
-                      % we will get one reply from a subsequent feedback response
+                      % we will get one reply from a subsequent feedback response (?key_upd)
                       FBCount = 1,
                       rr_recon_stats:inc([{resolve_started, FBCount},
                                           {await_rs_fb, FBCount}], Stats);
@@ -455,7 +455,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
                   send(DestReconPid,
                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
-                  % we will get one reply from a subsequent ?key_upd resolve
+                  % the non-initiator will use key_upd_send and we must thus increase
+                  % the number of resolve processes here!
                   NewStats = rr_recon_stats:inc([{resolve_started, 1},
                                                  {build_time, BuildTime}], Stats),
                   NewState#rr_recon_state{stats = NewStats, stage = resolve,
@@ -522,7 +523,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   
                   send(DestReconPid,
                        {resolve_req, DBChunk, SigSize, VSize, comm:this()}),
-                  % we will get one reply from a subsequent ?key_upd resolve
+                  % the non-initiator will use key_upd_send and we must thus increase
+                  % the number of resolve processes here!
                   NewStats = rr_recon_stats:inc([{resolve_started, 1},
                                                  {build_time, BuildTime}], Stats),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
@@ -1490,6 +1492,8 @@ shash_bloom_perform_resolve(
     ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
            [_RMethod, SID, erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
+    % the initiator will use key_upd_send and we must thus increase
+    % the number of resolve processes here!
     if ReqIdx =/= [] ->
            rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
        true -> NewStats1
@@ -1859,8 +1863,8 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
               {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, _NIResolves}) when IsInitiator ->
                   % empty leaf on this node
                   % -> this is directly resolved at the non-initiator but we
-                  %    need to increase the resolve_started counter by 1 (no
-                  %    matter how many empty leaves)!
+                  %    need to increase the resolve_started counter by 1 (all
+                  %    leaves will be resolved in a single operation)!
                   {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, 1};
              ({MyMaxItemsCount, MyKVItems, LeafCount},
               {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, NIResolves}) ->
@@ -2049,8 +2053,8 @@ send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator,
                         {key_upd_send, DestRRPid, ToSend, _ToReq = []},
                         [{from_my_node, ?IIF(IsInitiator, 1, 0)},
                          {feedback_request, comm:make_global(OwnerL)}]}),
-    % we will get one reply from a subsequent ?key_upd resolve
-    rr_recon_stats:inc([{resolve_started, 1}], Stats).
+    % key_upd_send + one reply from a subsequent feedback response (?key_upd)
+    rr_recon_stats:inc([{resolve_started, 2}], Stats).
 
 %% @doc Gets the number of bits needed to encode the given number.
 -spec bits_for_number(Number::pos_integer()) -> pos_integer();
