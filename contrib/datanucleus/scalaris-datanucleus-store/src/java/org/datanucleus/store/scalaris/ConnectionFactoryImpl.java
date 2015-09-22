@@ -41,9 +41,18 @@ import de.zib.scalaris.ConnectionPool;
  */
 @SuppressWarnings("rawtypes")
 public class ConnectionFactoryImpl extends AbstractConnectionFactory {
-    
+
+    /**
+     * Maximum number of open connections at the same time.
+     */
     private static final int MAX_NUMBER_CONNECTIONS = 50;
-    
+
+    /**
+     * Period of time (in ms) which will be waited for a connection
+     * to get released if {@link #MAX_NUMBER_CONNECTIONS} is reached.
+     */
+    private static final int GET_CONNECTION_TIMOUT = 200;
+
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
      * Property value Cookie used for connecting to Scalaris node. <property
@@ -167,7 +176,10 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
         public synchronized Object getConnection() {
             try {
                 if (conn == null) {
-                    conn = connPool.getConnection();
+                    conn = connPool.getConnection(GET_CONNECTION_TIMOUT);
+                    if (conn == null) {
+                        throw new ConnectionException("Maximum number of connections reached");
+                    }
                 }
             } catch (ConnectionException e) {
                 throw new NucleusDataStoreException("Could not create a connection", e);
