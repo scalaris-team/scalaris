@@ -596,8 +596,8 @@ all_dht_nodes() ->
 gb_trees_filter(F, Tree) ->
     gb_trees_filter(F, gb_trees:empty(), gb_trees:iterator(Tree)).
 
--spec gb_trees_filter(F::fun((K, V) -> boolean()), Acc::gb_tree:tree(K, V),
-                      Iter::gb_trees:iter(K,V)) -> gb_tree:tree(K, V).
+-spec gb_trees_filter(F::fun((K, V) -> boolean()), Acc::gb_trees:tree(K, V),
+                      Iter::gb_trees:iter(K,V)) -> gb_trees:tree(K, V).
 gb_trees_filter(F, Acc, Iter) ->
     case gb_trees:next(Iter) of
         none -> Acc;
