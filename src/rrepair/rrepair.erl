@@ -107,8 +107,7 @@
     {rr_gc_trigger} |
     {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id(), ReqMsg::rr_recon:request()} |
-    {request_resolve | continue_resolve, session_id(), rr_resolve:operation(), rr_resolve:options()} |
-    {continue_resolve, rr_resolve:operation(), rr_resolve:options()} |
+    {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     % report
@@ -132,10 +131,8 @@ on({request_sync, Method, DestKey, Principal}, State) ->
     request_sync(State, Method, DestKey, Principal);
 
 % initial resolve request
-on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = OpenResolve}) ->
-    {ok, Pid} = rr_resolve:start(null),
-    comm:send_local(Pid, {start, Operation, Options}),
-    State#rrepair_state{ open_resolve = OpenResolve + 1 };
+on({request_resolve, Operation, Options}, State) ->
+    gen_component:post_op({request_resolve, null, Operation, Options}, State);
 
 % request replica repair status
 on({get_state, Sender, Key}, State =
@@ -235,15 +232,7 @@ on({request_resolve, SessionID, Operation, Options},
     comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
-% feedback response from a previous resolve request (without session ID)
-on({continue_resolve, Operation, Options}, State) ->
-    % do not increase the open_resolve member - we did this during the
-    % resolve_progress_report of the original request
-    {ok, Pid} = rr_resolve:start(null),
-    comm:send_local(Pid, {start, Operation, Options}),
-    State;
-
-% feedback response from a previous resolve request (with session ID)
+% feedback response from a previous resolve request
 on({continue_resolve, SessionID, Operation, Options}, State) ->
     % do not increase the open_resolve member - we did this during the
     % resolve_progress_report of the original request

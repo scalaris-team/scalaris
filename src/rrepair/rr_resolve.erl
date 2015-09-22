@@ -544,10 +544,7 @@ send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
     Tag = if IsFeedback -> continue_resolve;
              true       -> request_resolve
           end,
-    case SID of
-        null -> send(Dest, {Tag, Op, Options2});
-        SID -> send(Dest, {Tag, SID, Op, Options2})
-    end,
+    send(Dest, {Tag, SID, Op, Options2}),
     ResStarted.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
