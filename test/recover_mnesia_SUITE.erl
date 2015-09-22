@@ -182,12 +182,26 @@ remove_node(_Config) ->
   true.
 
 check_data_integrity() ->
-    F = fun(X) ->
-                case kv_on_cseq:read(integer_to_list(X)) of
-                    {ok, X} -> {ok, X};
-                    Res -> log:log("failed to read ~p: ~p", [X, Res]),
-                           {ok, X} = Res % crash
-                end
-        end,
+    %% F = fun(X) ->
+    %%             case kv_on_cseq:read(integer_to_list(X)) of
+    %%                 {ok, X} -> {ok, X};
+    %%                 Res -> log:log("failed to read ~p: ~p", [X, Res]),
+    %%                        {ok, X} = Res % crash
+    %%             end
+    %%     end,
     %% _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)].
-    _ = [F(X) || X <- lists:seq(1, 100)].
+    %% _ = [F(X) || X <- lists:seq(1, 100)].
+    Pred = fun (Id) ->
+                   case kv_on_cseq:read(integer_to_list(Id)) of
+                       {ok, Id} -> true;
+                       _        -> false
+                   end
+           end,
+    Elements = lists:filter(Pred, lists:seq(1, 100)),
+    case length(Elements) of
+        100 ->
+            true;
+        X ->
+            ct:pal("found ~p of 100 elements", [X]),
+            100 = X
+    end.
