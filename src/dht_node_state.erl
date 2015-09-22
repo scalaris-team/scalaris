@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@
 
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
 
--type db_selector() :: prbr_kv_db | {tx_id, pos_integer()} | {lease_db, pos_integer()}.
+-type db_selector() :: kv_db | {tx_id, pos_integer()} | {lease_db, pos_integer()}.
 
 -type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
               | succ_pid | predlist | pred | pred_id | pred_pid | node
@@ -89,7 +89,7 @@
                 slide_succ              = null :: slide_op:slide_op() | null,
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
-                prbr_kv_db = ?required(state, prbr_kv_db) :: prbr:state(),
+                kv_db = ?required(state, kv_db) :: prbr:state(),
                 txid_dbs = ?required(state, txid_dbs) :: tuple(),
                 lease_dbs = ?required(state, lease_dbs) :: tuple(),
                 lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
@@ -111,7 +111,7 @@ new(RT, RMState, DB) ->
            join_time = os:timestamp(),
            db = DB,
            tx_tp_db = tx_tp:init(),
-           prbr_kv_db = prbr:init(prbr_kv_db),
+           kv_db = prbr:init(kv_db),
            txid_dbs = erlang:make_tuple(config:read(replication_factor), ok, TxidDBs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, LeaseDBs),
            lease_list = lease_list:empty(),
@@ -120,13 +120,13 @@ new(RT, RMState, DB) ->
            mr_master_state = orddict:new()
           }.
 
--spec new_on_recover(?RT:external_rt(), RMState::rm_loop:state(), 
+-spec new_on_recover(?RT:external_rt(), RMState::rm_loop:state(),
                      PRBR_KV_DB::prbr:state(),
                      TXID_DBs::list(prbr:state()),
                      Lease_DBs::list(prbr:state()),
                      LeaseList::lease_list:lease_list()) -> state().
-new_on_recover(RT, RMState, 
-               PRBR_KV_DB,
+new_on_recover(RT, RMState,
+               KV_DB,
                TXID_DBs,
                Lease_DBs,
                LeaseList) ->
@@ -137,7 +137,7 @@ new_on_recover(RT, RMState,
            join_time = os:timestamp(),
            db = db_dht:new(db_dht),
            tx_tp_db = tx_tp:init(),
-           prbr_kv_db = PRBR_KV_DB,
+           kv_db = KV_DB,
            txid_dbs  = erlang:make_tuple(config:read(replication_factor), ok, IndexedTXIDs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, IndexedLeases),
            lease_list = LeaseList,
@@ -149,7 +149,7 @@ new_on_recover(RT, RMState,
 %% @doc Clean up tables before rejoining with a new state.
 -spec delete_for_rejoin(state()) -> ok.
 delete_for_rejoin(
-  #state{db = DB, prbr_kv_db=PRBRState,
+  #state{db = DB, kv_db=PRBRState,
          txid_dbs=TXID_DBs, lease_dbs=Lease_DBs}) ->
     % note: rm_state is transferred (ref. move_state in rm_loop)
     % TODO: transfer snapshot state / data?!
@@ -222,14 +222,14 @@ delete_for_rejoin(
          (state(), snapshot_state) -> snapshot_state:snapshot_state() | null;
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
-         (state(), prbr_kv_db) -> prbr:state();
+         (state(), kv_db) -> prbr:state();
          (state(), {tx_id, pos_integer()}) -> prbr:state();
          (state(), {lease_db, pos_integer()}) -> prbr:state();
          (state(), lease_list) -> lease_list:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, prbr_kv_db=PRBRState,
+           db_range=DBRange, kv_db=PRBRState,
            lease_list=LeaseList, txid_dbs = TXID_DBs, lease_dbs = LeaseDBs,
            snapshot_state=SnapState} = State, Key) ->
     case Key of
@@ -277,17 +277,17 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
                             + prbr:get_load(PRBRState);
         load2        -> lb_stats:get_load_metric();
         load3        -> lb_stats:get_request_metric();
-        prbr_kv_db   -> PRBRState;
+        kv_db        -> PRBRState;
         {tx_id, I}   -> element(I, TXID_DBs);
         {lease_db, I}-> element(I, LeaseDBs);
         lease_list   -> LeaseList
     end.
 
 -spec set_prbr_state(state(), db_selector(), prbr:state()) -> state().
-set_prbr_state(State = #state{txid_dbs=TXID_DBs, lease_dbs = LeaseDBs}, 
+set_prbr_state(State = #state{txid_dbs=TXID_DBs, lease_dbs = LeaseDBs},
                WhichDB, Value) ->
     case WhichDB of
-        prbr_kv_db -> State#state{prbr_kv_db = Value};
+        kv_db -> State#state{kv_db = Value};
         {tx_id, I} -> State#state{txid_dbs = setelement(I, TXID_DBs, Value)};
         {lease_db, I} -> State#state{lease_dbs = setelement(I, LeaseDBs, Value)}
     end.
@@ -446,7 +446,7 @@ details(State) ->
 
 -spec get_prbr_selectors() -> list(db_selector()).
 get_prbr_selectors() ->
-    [prbr_kv_db | lists:flatmap(fun(I) -> [{tx_id, I}, {lease_db, I}] end,
+    [kv_db | lists:flatmap(fun(I) -> [{tx_id, I}, {lease_db, I}] end,
                                 lists:seq(1, config:read(replication_factor)))].
 
 %% @doc Gets all entries to transfer (slide) in the given range and starts delta

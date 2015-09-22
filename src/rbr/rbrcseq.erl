@@ -27,7 +27,7 @@
 %%-define(TRACE(X,Y),
 %%        Name = pid_groups:my_pidname(),
 %%        case Name of
-%%            kv_rbrcseq -> log:pal("~p ~p " X, [self(), Name | Y]);
+%%            kv_db -> log:pal("~p ~p " X, [self(), Name | Y]);
 %%            _ -> ok
 %%        end).
 -define(TRACE(X,Y), ok).
@@ -1000,7 +1000,7 @@ set_period(State, Val) -> setelement(3, State, Val).
 -spec get_data_type(dht_node_state:db_selector())
                    -> kv_on_cseq | l_on_cseq | tx_id_on_cseq
                           | util. %% default max function
-get_data_type(prbr_kv_db) ->
+get_data_type(kv_db) ->
     kv_on_cseq;
 get_data_type(_) ->
     %% in practice this decision only happens for the kv data type.

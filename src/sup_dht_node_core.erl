@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -64,11 +64,11 @@ childs([DHTNodeGroup, Options]) ->
     %% rbrcseq process working on the kv DB
 
     KV_RBRcseq = sup:worker_desc(
-                   kv_rbrcseq, rbrcseq,
+                   kv_db, rbrcseq,
                    start_link,
                    [DHTNodeGroup,
-                    _PidGroupsNameKV = kv_rbrcseq,
-                    _DBSelectorKV = prbr_kv_db]),
+                    _PidGroupsNameKV = kv_db,
+                    _DBSelectorKV = kv_db]),
     %% rbrcseq process working on the lease_db1 DB
     Lease_RBRcseqs = [sup:worker_desc(
                    {lease_db, Id}, rbrcseq,
