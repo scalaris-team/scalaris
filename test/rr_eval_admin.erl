@@ -649,11 +649,13 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
                        [{_AKey, _A}, {BKey, B}, {_CKey, _C}, {_DKey, D}] =
                            lists:keysort(1, [{pid_to_rtkey(N), N} || N <- Nodes]),
                        %B->D
-%%                        comm:send(B, {request_sync, DKey}, [{group_member, rrepair}]),
+%%                        comm:send(B, {request_sync, ReconP#rc_config.recon_method,
+%%                                      DKey, comm:this()}, [{group_member, rrepair}]),
 %%                        wait_sync_end([B, D])
                        %D->B
-                       comm:send(D, {request_sync, BKey}, [{group_member, rrepair}]),
-                       wait_sync_end([D, B])
+                       comm:send(D, {request_sync, ReconP#rc_config.recon_method,
+                                     BKey, comm:this()}, [{group_member, rrepair}]),
+                       wait_sync_end([D, B], true)
                end,
     
     EPFile = proplists:get_value(ep_file, Options, null),
@@ -899,12 +901,18 @@ reset() ->
 start_round(Nodes) ->
     lists:foreach(fun(N) ->
                           comm:send(N, {rr_trigger}, [{group_member, rrepair}]),
-                          wait_sync_end(Nodes)
+                          wait_sync_end(Nodes, false)
                   end, Nodes),
     ok.
 
--spec wait_sync_end(Nodes::[comm:mypid()]) -> ok.
-wait_sync_end(Nodes) ->
+-spec wait_sync_end(Nodes::[comm:mypid()], PrincipalUsed::boolean()) -> ok.
+wait_sync_end(Nodes, true) ->
+    receive
+        % TODO: use and verify stats for plausibility
+        ?SCALARIS_RECV({request_sync_complete, _Stats}, ok)
+    end,
+    wait_sync_end(Nodes, false);
+wait_sync_end(Nodes, false) ->
     Req = {get_state, comm:this(), [open_sessions, open_recon, open_resolve]},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, Nodes) end, 200),
     % check whether there are still some running rrepair processes!
