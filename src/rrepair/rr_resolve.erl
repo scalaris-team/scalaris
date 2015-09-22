@@ -563,19 +563,22 @@ merge_stats(#resolve_stats{ session_id = SID,
                             regen_count = ARC,
                             regen_fail_count = AFC,
                             upd_fail_count = AUFC,
-                            update_count = AUC },
+                            update_count = AUC,
+                            resolve_started = ARS },
             #resolve_stats{ session_id = SID,
                             diff_size = BDiff,
                             regen_count = BRC,
                             regen_fail_count = BFC,
                             upd_fail_count = BUFC,
-                            update_count = BUC }) ->
+                            update_count = BUC,
+                            resolve_started = BRS }) ->
     #resolve_stats{ session_id = SID,
                     diff_size = ADiff + BDiff,
                     regen_count = ARC + BRC,
                     regen_fail_count = AFC + BFC,
                     upd_fail_count = AUFC + BUFC,
-                    update_count = AUC + BUC }.
+                    update_count = AUC + BUC,
+                    resolve_started = ARS + BRS }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
