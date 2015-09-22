@@ -907,7 +907,17 @@ start_round(Nodes) ->
 wait_sync_end(Nodes) ->
     Req = {get_state, comm:this(), [open_sessions, open_recon, open_resolve]},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, Nodes) end, 200),
-    timer:sleep(100).
+    % check whether there are still some running rrepair processes!
+    {ok, Pat} = re:compile("^(rr_resolve|rr_recon)\.[0-9]+$"),
+    _ = [begin
+             Group = pid_groups:group_of(comm:make_local(N)),
+             RRProcs = [Name || Pid <- pid_groups:members(Group),
+                                Name <- [element(2, pid_groups:group_and_name_of(Pid))],
+                                is_list(Name),
+                                re:run(Name, Pat) =/= nomatch],
+             ?ASSERT2(RRProcs =:= [], {running_rr_procs, RRProcs})
+         end || N <- Nodes],
+    ok.
 
 -spec wait_for_sync_round_end2(Req::comm:message(), Nodes::[comm:mypid()]) -> boolean().
 wait_for_sync_round_end2(_Req, []) -> true;
