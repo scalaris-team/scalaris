@@ -36,6 +36,7 @@ join(Options) ->
     Neighbors = nodelist:new_neighborhood(Me), % needed for ?RT:empty_ext/1
     EmptyRT = ?RT:empty_ext(Neighbors), % only for rt_chord
     RMState = rm_loop:init(Me, Me, Me, null),
+    rm_loop:send_trigger(), % speed up RM
     KV_DB = get_db(Options, kv_db),
     TXID_DBs = [get_db(Options, erlang:list_to_atom("tx_id-" ++ erlang:integer_to_list(I))) || I <- lists:seq(1, config:read(replication_factor))],
     State = dht_node_state:new_on_recover(EmptyRT, RMState,
