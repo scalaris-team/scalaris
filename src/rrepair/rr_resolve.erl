@@ -110,6 +110,8 @@
 
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), log:pal("~w [~p:~p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+-define(TRACE_START_END(X,Y), ok).
+%-define(TRACE_START_END(X,Y), log:pal("~w [~p:~p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("to ~p:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -123,8 +125,10 @@ on({start, Operation, Options}, State) ->
     NewState = State#rr_resolve_state{ operation = Operation,
                                        fb_dest_pid = FBDest,
                                        from_my_node = FromMyNode },
-    ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
-           [util:extint2atom(element(1, Operation)), FBDest, SID]),
+    ?TRACE_START_END("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p (MyNode: ~p)",
+           [util:extint2atom(element(1, Operation)), FBDest,
+            NewState#rr_resolve_state.stats#resolve_stats.session_id,
+            FromMyNode]),
     send_local(pid_groups:get_my(dht_node), {get_state, comm:this(), my_range}),
     NewState;
 
@@ -203,6 +207,8 @@ on({get_entries_response, EntryList}, State =
               end,
     ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
                  {non_unique_req_list, ReqKeys}),
+    ?TRACE_START_END("sending key_upd with ~B items and ~B requests",
+                     [length(KvvList), length(ReqKeys)]),
     ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
                                       FromMyNode, FBDest, [], false) * FBCount,
 
@@ -457,9 +463,12 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner,
                                     fb_had_kvv_req = SendReqKeyReply,
                                     fb_send_kvv_req = FbReqKVV,
                                     from_my_node = FromMyNode} = _State) ->
-    ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
+    ?TRACE_START_END("SHUTDOWN ~p - Operation=~p~n SessionId:~p (MyNode: ~p)~n"
+                     " feedback: ~.2p",
            [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
-            length(FbKVV), FBDest, FbKVV]),
+            FromMyNode, ?IIF(FBDest =/= undefined,
+                             {length(FbKVV), "items to", FBDest, "via key_upd:", FbKVV},
+                             none)]),
     ResStarted =
         case FBDest of
             undefined ->
