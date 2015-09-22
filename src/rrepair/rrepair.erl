@@ -277,22 +277,14 @@ on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
 on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
    State = #rrepair_state{open_recon = ORC, open_resolve = ORS,
                           open_sessions = OS}) ->
-    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p",
-                 [_Sender, rr_recon_stats:print(Stats), ORC - 1, ORS, OS]),
-    NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
-                    {S, TSessions} ->
-                        ?TRACE_RECON("~nRECON OK2 - Sender=~p,~n~.2p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p,~n~p",
-                                     [_Sender, S, ORC - 1, ORS, OS, rr_recon_stats:print(Stats)]),
-                        SUpd = update_session_recon(S, Stats),
-                        case check_session_complete(SUpd) of
-                            true -> TSessions;
-                            _    -> [SUpd | TSessions]
-                        end;
-                    not_found ->
-                        %caused by error or forked rc instances by bloom filter rc
-                        %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
-                        OS
-                end,
+    {S, TSessions} = extract_session(rr_recon_stats:get(session_id, Stats), OS),
+    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nSession=~.2p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p,~n~p",
+                 [_Sender, rr_recon_stats:print(Stats), S, ORC - 1, ORS, OS, rr_recon_stats:print(Stats)]),
+    SUpd = update_session_recon(S, Stats),
+    NewOS = case check_session_complete(SUpd) of
+                true -> TSessions;
+                _    -> [SUpd | TSessions]
+            end,
     NewRS = rr_recon_stats:get(await_rs_fb, Stats),
     State#rrepair_state{open_resolve = ORS + NewRS,
                         open_recon = ORC - 1, open_sessions = NewOS};
