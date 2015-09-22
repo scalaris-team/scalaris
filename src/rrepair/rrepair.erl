@@ -407,12 +407,10 @@ extract_session(Id, Sessions) ->
 
 -spec update_session_recon(session(), rr_recon_stats:stats()) -> session().
 update_session_recon(Session = #session{rs_called = RSCalled}, New) ->
-    case rr_recon_stats:get(status, New) of
-        wait -> Session;
-        _ -> NewRS = rr_recon_stats:get(resolve_started, New),
-             Session#session{ rc_stats  = New,
-                              rs_called = RSCalled + NewRS }
-    end.
+    ?ASSERT(rr_recon_stats:get(status, New) =/= wait),
+    NewRS = rr_recon_stats:get(resolve_started, New),
+    Session#session{ rc_stats  = New,
+                     rs_called = RSCalled + NewRS }.
 
 %% @doc Increases the rs_finish field and merges the new stats. If the resolve
 %%      is expecting a feedback reply, rs_called is also increased.
