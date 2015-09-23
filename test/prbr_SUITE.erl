@@ -230,7 +230,7 @@ rbr_consistency(_Config) ->
               %% intercept and drop a message at r1
               _ = lists:foldl(read_quorum_without(Key), {Old, New}, Nodes),
               ok
-          end || {R,N} <- lists:zip(Replicas, lists:seq(1,4))],
+          end || {R,N} <- lists:zip(Replicas, lists:seq(1, config:read(replication_factor)))],
 
     ok.
 
