@@ -41,6 +41,8 @@
 
 -export([wait_for_clean_leases/1, wait_for_clean_leases/2]).
 
+-export([get_kv_db/0]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % public api
@@ -56,6 +58,13 @@ wait_for_clean_leases(WaitTimeInMs, TargetSize) ->
 wait_for_clean_leases(WaitTimeInMs) ->
     ?ASSERT(not gen_component:is_gen_component(self())),
     wait_for_clean_leases(WaitTimeInMs, admin:number_of_nodes(), true, create_new_state()).
+
+-spec get_kv_db() -> ok.
+get_kv_db() ->
+    KVDBs = [ get_dht_node_state(Pid, kv_db) || Pid <- all_dht_nodes()],
+    Data = [prbr:tab2list(DB) || {true, DB} <- KVDBs, DB =/= empty],
+    io:format("kv-pairs: ~p~n", [length(lists:flatten(Data))]),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

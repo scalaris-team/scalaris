@@ -191,6 +191,7 @@ check_data_integrity() ->
     %%     end,
     %% _ = [{ok, X} = kv_on_cseq:read(integer_to_list(X)) || X <- lists:seq(1, 100)].
     %% _ = [F(X) || X <- lists:seq(1, 100)].
+    lease_checker2:get_kv_db(),
     Pred = fun (Id) ->
                    case kv_on_cseq:read(integer_to_list(Id)) of
                        {ok, Id} -> true;
