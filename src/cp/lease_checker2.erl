@@ -280,7 +280,10 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
 describe_node_diff(Node, OldNodeInfo, NewNodeInfo) ->
     case {OldNodeInfo, NewNodeInfo} of
         {empty, empty}       -> ok;
-        {empty, NewNodeInfo} -> io:format("nyi1~n");
+        {empty, NewNodeInfo} ->
+            io:format("the node ~p has changed~n", [Node]),
+            io:format("node info changed from empty to~n"),
+            describe_node(Node, NewNodeInfo);
         {OldNodeInfo, empty} -> io:format("nyi2~n");
         {OldNodeInfo, NewNodeInfo} ->
             OldLeaseList = OldNodeInfo#node_info_t.lease_list,
@@ -300,8 +303,8 @@ describe_node_diff(Node, OldNodeInfo, NewNodeInfo) ->
                                 ok
                         end,
                     _ = case RangesDiffer of
-                            true -> io_lib:format("  the range changed from ~p -> ~p~n",
-                                                  [OldRange, NewRange]);
+                            true -> io:format("  the range changed~n  ~p~n  ~p~n",
+                                              [OldRange, NewRange]);
                             false -> ok
                         end,
                     ok;
