@@ -784,7 +784,7 @@ on_unknown_event(UnknownMessage, UState, GCState) ->
                "** Handler:~n ~.0p~n"
                "** Pid:~n ~p ~.0p~n"
                "** State:~n ~.0p~n",
-    DbgVal = [UnknownMessage,
+    DbgVal = [setelement(1, UnknownMessage, util:extint2atom(element(1, UnknownMessage))),
               gc_mod(GCState),
               gc_hand(GCState),
               self(), catch pid_groups:group_and_name_of(self()),
@@ -802,7 +802,7 @@ on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
                "** Stacktrace:~n ~.0p~n",
     Mod = gc_mod(GCState),
     DbgVal = [Level, Reason,
-              Msg,
+              setelement(1, Msg, util:extint2atom(element(1, Msg))),
               Mod,
               gc_hand(GCState),
               self(), catch pid_groups:group_and_name_of(self()),
