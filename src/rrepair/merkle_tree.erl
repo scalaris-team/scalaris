@@ -123,7 +123,7 @@ get_root({merkle_tree, _, Root}) -> Root.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Checks whether the merkle tree has any children or elements.
+%% @doc Checks whether the merkle tree or tree node has any children or elements.
 -spec is_empty(merkle_tree() | mt_node()) -> boolean().
 is_empty({merkle_tree, _, Root}) -> is_empty(Root);
 is_empty({_H, _ICnt = 0, _Bkt = [], _I}) -> true;
