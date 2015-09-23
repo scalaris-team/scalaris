@@ -37,9 +37,10 @@ suite() -> [ {timetrap, {seconds, 30}} ].
 -define(EPSILON, 1.0e-8 * ?RT:n()).
 
 init_per_suite(Config) ->
-    Config.
+    unittest_helper:start_minimal_procs(Config, [], true).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    unittest_helper:stop_minimal_procs(Config),
     ok.
 
 

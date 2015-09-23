@@ -39,9 +39,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config.
+    unittest_helper:start_minimal_procs(Config, [], true).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    unittest_helper:stop_minimal_procs(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
