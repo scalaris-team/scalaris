@@ -19,12 +19,14 @@ Contributors:
  **********************************************************************/
 package org.datanucleus.store.scalaris;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.datanucleus.ClassLoaderResolver;
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
+import org.datanucleus.TransactionEventListener;
 import org.datanucleus.exceptions.NucleusDataStoreException;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
@@ -37,14 +39,13 @@ import de.zib.scalaris.Transaction;
 public class ScalarisStoreManager extends AbstractStoreManager {
 
     private Map<org.datanucleus.Transaction, de.zib.scalaris.Transaction> transactionMap;
-    private Map<org.datanucleus.Transaction, ManagedConnection> connectionMap;
-    
+
     public ScalarisStoreManager(ClassLoaderResolver clr,
             PersistenceNucleusContext ctx, Map<String, Object> props) {
         super("scalaris", clr, ctx, props);
 
-        transactionMap = new HashMap<org.datanucleus.Transaction, de.zib.scalaris.Transaction>();
-        connectionMap = new HashMap<org.datanucleus.Transaction, ManagedConnection>();
+        transactionMap = Collections.synchronizedMap(
+                new HashMap<org.datanucleus.Transaction, de.zib.scalaris.Transaction>());
 
         // Handler for persistence process
         persistenceHandler = new ScalarisPersistenceHandler(this);
@@ -58,52 +59,60 @@ public class ScalarisStoreManager extends AbstractStoreManager {
     }
 
     @Override
-    public synchronized void transactionStarted(ExecutionContext ec) {
-        ManagedConnection mConn = getConnection(ec);
+    public void transactionStarted(ExecutionContext ec) {
+        final org.datanucleus.Transaction dnTransaction = ec.getTransaction();
+        final ManagedConnection mConn = getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
                 .getConnection();
-        Transaction scalarisTransaction = new Transaction(conn);
+        final Transaction scalarisTransaction = new Transaction(conn);
 
-        if (transactionMap.containsKey(ec.getTransaction())) {
+        if (transactionMap.containsKey(dnTransaction)) {
             throw new NucleusDataStoreException("Cannot start the same transaction multiple times");
-        } else {
-            transactionMap.put(ec.getTransaction(), scalarisTransaction);
-            connectionMap.put(ec.getTransaction(), mConn);
         }
-    }
+        transactionMap.put(dnTransaction, scalarisTransaction);
 
-    @Override
-    public void transactionCommitted(ExecutionContext ec) {
-        Transaction scalarisTransaction = transactionMap.get(ec.getTransaction());
-        try {
-            scalarisTransaction.commit();
-        } catch (ConnectionException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } catch (AbortException e) {
-            throw new NucleusDataStoreException(e.getMessage(), e);
-        } finally {
-            transactionMap.remove(ec.getTransaction());
-            ManagedConnection mconn = connectionMap.get(ec.getTransaction());
-            if (mconn != null) {
-                mconn.release();
-                connectionMap.remove(ec.getTransaction());
+        dnTransaction.addTransactionEventListener(new TransactionEventListener() {
+            /**
+             * Signal if managed connection was released in pre-commit, preventing
+             * multiple releases which can lead to undefined behavior.
+             */
+            private boolean releasedInPreCommit = false;
+
+            public void transactionPreCommit() {
+                try {
+                    scalarisTransaction.commit();
+                } catch (ConnectionException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } catch (AbortException e) {
+                    throw new NucleusDataStoreException(e.getMessage(), e);
+                } finally {
+                    transactionMap.remove(dnTransaction);
+                    if (mConn != null) {
+                        releasedInPreCommit = true;
+                        mConn.release();
+                    }
+                }
             }
-        }
-    }
 
-    @Override
-    public void transactionRolledBack(ExecutionContext ec) {
-        Transaction scalarisTransaction = transactionMap.get(ec.getTransaction());
-        if (scalarisTransaction != null) {
-            transactionMap.remove(ec.getTransaction());
-            scalarisTransaction.abort();
-
-            ManagedConnection mconn = connectionMap.get(ec.getTransaction());
-            if (mconn != null) {
-                mconn.release();
-                connectionMap.remove(ec.getTransaction());
+            public void transactionPreRollBack() {
+                scalarisTransaction.abort();
+                transactionMap.remove(dnTransaction);
+                if (mConn != null && !releasedInPreCommit) {
+                    mConn.release();
+                }
             }
-        }
+
+            // Not implemented because not needed
+            public void transactionStarted() {}
+            public void transactionEnded() {}
+            public void transactionPreFlush() {}
+            public void transactionFlushed() {}
+            public void transactionCommitted() {}
+            public void transactionRolledBack() {}
+            public void transactionSetSavepoint(String name) {}
+            public void transactionReleaseSavepoint(String name) {}
+            public void transactionRollbackToSavepoint(String name) {}
+        });
     }
 
     /**
