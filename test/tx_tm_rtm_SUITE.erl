@@ -51,14 +51,16 @@ init_per_testcase(TestCase, Config) ->
               4,
               [{config,
                 [{monitor_perf_interval, 0},  % deactivate monitor_perf,
-                 {log_path, PrivDir}]}]),
+                 {log_path, PrivDir},
+                 {replication_factor, 4}]}]),
             unittest_helper:wait_for_stable_ring(),
             unittest_helper:wait_for_stable_ring_deep();
         false ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_symmetric_ring([{config,
                 [{monitor_perf_interval, 0},  % deactivate monitor_perf
-                 {log_path, PrivDir}]}]),
+                 {log_path, PrivDir},
+                 {replication_factor, 4}]}]),
             ok
     end,
     [{stop_ring, true} | Config].
