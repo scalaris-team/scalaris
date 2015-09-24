@@ -80,7 +80,7 @@ test_crash_recovery(_Config) ->
                 ok
         end,
 
-    generic_crash_recovery_test(F, 4).
+    generic_crash_recovery_test(F, config:read(replication_factor)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -94,7 +94,7 @@ test_crash_recovery_one_new_node(_Config) ->
                 erase_lease_dbs(hd(DHTNodes))
         end,
 
-    generic_crash_recovery_test(F, 4).
+    generic_crash_recovery_test(F, config:read(replication_factor)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -108,7 +108,7 @@ test_crash_recovery_one_outdated_node(_Config) ->
                 change_lease_replicas(hd(DHTNodes))
         end,
 
-    generic_crash_recovery_test(F, 4).
+    generic_crash_recovery_test(F, config:read(replication_factor)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -119,12 +119,12 @@ test_crash_recovery_two_outdated_nodes(_Config) ->
     % delete the manipulate dbs on *two* nodes
     F = fun(DHTNodes) ->
                 % manipulate rounds on the first node
-                [N1, N2, _N3, _N4] = DHTNodes,
+                [N1, N2 | _Tail] = DHTNodes,
                 change_lease_replicas(N1),
                 change_lease_replicas(N2)
         end,
 
-    generic_crash_recovery_test(F, 4).
+    generic_crash_recovery_test(F, config:read(replication_factor)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -137,7 +137,7 @@ test_crash_recovery_bad_owner_pids(_Config) ->
                 change_owner_pids(DHTNodes)
         end,
 
-    generic_crash_recovery_test(F, 4).
+    generic_crash_recovery_test(F, config:read(replication_factor)).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
