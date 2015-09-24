@@ -64,6 +64,8 @@ get_kv_db() ->
     KVDBs = [ get_dht_node_state(Pid, kv_db) || Pid <- all_dht_nodes()],
     Data = [prbr:tab2list(DB) || {true, DB} <- KVDBs, DB =/= empty],
     io:format("kv-pairs: ~p~n", [length(lists:flatten(Data))]),
+    Empties = [ DB || DB <- KVDBs, DB =:= empty],
+    io:format("empties: ~p~n", [length(Empties)]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
