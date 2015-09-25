@@ -72,6 +72,7 @@ init_per_group(recover_data_group = Group, Config) ->
 init_per_group(remove_node = Group, Config) ->
     unittest_helper:init_per_group(Group, Config);
 init_per_group(Group, Config) ->
+    ct:pal("stop ring and clean repository from previous test case (it may have run into a timeout)"),
     %% stop ring and clean repository from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
     _ = application:stop(mnesia),
@@ -95,6 +96,7 @@ end_per_group(recover_data_group = Group, Config) ->
 end_per_group(remove_node = Group, Config) ->
       unittest_helper:end_per_group(Group, Config);
 end_per_group(Group, Config) ->
+    ct:pal("stop ring, stop mnesia and clean repository"),
     % stop ring, stop mnesia and clean repository
     PWD = os:cmd(pwd),
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
@@ -121,7 +123,7 @@ test_make_ring(Config) ->
                                                {leases, true},
                                                {db_backend, db_mnesia},
                                                {start_type, recover}]}]),
-  util:wait_for(fun admin:check_leases/0),
+  lease_checker2:wait_for_clean_leases(500, 4),
   true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -129,13 +131,17 @@ test_make_ring(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 write(_Config) ->
   % write data to KV
-  [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)].
+  lease_checker2:get_kv_db(),
+  _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+  lease_checker2:get_kv_db(),
+  ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test read/1 ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 read(Config) ->
   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+  lease_checker2:get_kv_db(),
   unittest_helper:stop_ring(),
   % wait for leases to expire
   timer:sleep(11000),
@@ -153,7 +159,7 @@ read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(_Config) ->
   ct:pal("wait for check_leases"),
-  util:wait_for(fun admin:check_leases/0),
+  lease_checker2:wait_for_clean_leases(500, 4),
   % delete random node from ring
   RandomNode = comm:make_local(lease_checker:get_random_save_node()),
   PidGroup = pid_groups:group_of(RandomNode),
