@@ -69,7 +69,11 @@ end_per_suite(_Config) ->
 
 init_per_group(recover_data_group = Group, Config) ->
     unittest_helper:init_per_group(Group, Config);
+init_per_group(recover_data_group_repeater = Group, Config) ->
+    unittest_helper:init_per_group(Group, Config);
 init_per_group(remove_node = Group, Config) ->
+    unittest_helper:init_per_group(Group, Config);
+init_per_group(remove_node_repeater = Group, Config) ->
     unittest_helper:init_per_group(Group, Config);
 init_per_group(Group, Config) ->
     ct:pal("stop ring and clean repository from previous test case (it may have run into a timeout)"),
@@ -93,7 +97,11 @@ init_per_group(Group, Config) ->
 
 end_per_group(recover_data_group = Group, Config) ->
       unittest_helper:end_per_group(Group, Config);
+end_per_group(recover_data_group_repeater = Group, Config) ->
+      unittest_helper:end_per_group(Group, Config);
 end_per_group(remove_node = Group, Config) ->
+      unittest_helper:end_per_group(Group, Config);
+end_per_group(remove_node_repeater = Group, Config) ->
       unittest_helper:end_per_group(Group, Config);
 end_per_group(Group, Config) ->
     ct:pal("stop ring, stop mnesia and clean repository"),
