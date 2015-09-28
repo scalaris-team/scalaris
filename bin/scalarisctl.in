@@ -716,7 +716,12 @@ scalarisstart(){
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        $SCREEN -S "scalaris_$NODE_NAME" -d -m bash -x -f +B -c "$START_CMD; sleep 365d"
+        if [ -n "$SLURM_JOBID" ]; then
+          session_name="scalaris_$NODE_NAME"
+          $SCREEN -S "scalaris_${NODE_NAME}_SLURM_JOBID_${SLURM_JOBID}" -d -m bash -x -f +B -c "$START_CMD; sleep 365d"
+        else
+          $SCREEN -S "scalaris_$NODE_NAME" -d -m bash -x -f +B -c "$START_CMD; sleep 365d"
+        fi
     else
         bash -x -f +B -c "$START_CMD"
     fi
