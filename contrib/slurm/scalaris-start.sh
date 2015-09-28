@@ -109,9 +109,17 @@ function wait_for_servers_to_start {
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', admin, wait_for_stable_ring, [$NR_OF_NODES]), io:format('waited for the ring: ~p~n', [A]), halt(0)."
 }
 
+function start_watchdog() {
+    # start watchdog
+    for slurm_host in `scontrol show hostnames`; do
+        srun -N1-1 --nodelist="$slurm_host" bash -c "nohup watchdog.sh&"
+    done
+}
+
 module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
 kill_old_nodes
 start_servers
 wait_for_servers_to_start
+start_watchdog

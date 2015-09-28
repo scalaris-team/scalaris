@@ -8,16 +8,17 @@ export BINDIR=$SCALARIS_DIR/bin
 export BEAMDIR=$SCALARIS_DIR/ebin
 
 export SHUFFLE_NODE_IDS=1
+export WATCHDOG_INTERVAL=10
 
 function cleanup() {
     echo "Nodelist of the cancelled job: $SLURM_NODELIST"
     echo -e "Use:
-    srun -p CSR -A csr --nodelist='$SLURM_NODELIST' cleanup.sh"
+    srun -p CUMU -A csr --nodelist='$SLURM_NODELIST' cleanup.sh"
     echo "to clean up the nodes manually"
 
     # comment in for automatic cleanup
     # for NODE in $NODELIST; do
-        # sbatch --job-name cleanup -p CSR -A csr --nodelist="$NODE" -o cleanup-%j.out cleanup.sh
+        # sbatch --job-name cleanup -p CUMU -A csr --nodelist="$NODE" -o cleanup-%j.out cleanup.sh
     # done
     exit 1
 }
