@@ -174,19 +174,19 @@ check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, CheckAtoms) ->
 
     case erlang:system_info(version) of
         %% R18.1 and the current dev (8.0) have a memory leak"
-        "7.1" -> %% R18.1
-            %% tolerate 850k processes_used memory overhead for running maintenance processes like RT rebuild etc.
-            ?equals_pattern_w_note(NewMemInfo#mem_info.processes_used, X when X =< PrevMemInfo#mem_info.processes_used + 850000,
-                                   lists:flatten(io_lib:format("PrevProcUSize: ~B, NewProcUSize: ~B, Diff: ~B",
-                                                 [PrevMemInfo#mem_info.processes_used, NewMemInfo#mem_info.processes_used,
-                                                  NewMemInfo#mem_info.processes_used - PrevMemInfo#mem_info.processes_used]))),
-
-            %% tolerate 270k ets memory overhead for DB data etc.
-            ?equals_pattern_w_note(NewMemInfo#mem_info.ets, X when X =< PrevMemInfo#mem_info.ets + 270000 + (EntryEtsSize * NewItems),
-                                   lists:flatten(io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
-                                                 [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
-                                                  NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets])));
-
+        %%"7.1" -> %% R18.1
+        %%    %% tolerate 850k processes_used memory overhead for running maintenance processes like RT rebuild etc.
+        %%    ?equals_pattern_w_note(NewMemInfo#mem_info.processes_used, X when X =< PrevMemInfo#mem_info.processes_used + 850000,
+        %%                           lists:flatten(io_lib:format("PrevProcUSize: ~B, NewProcUSize: ~B, Diff: ~B",
+        %%                                         [PrevMemInfo#mem_info.processes_used, NewMemInfo#mem_info.processes_used,
+        %%                                          NewMemInfo#mem_info.processes_used - PrevMemInfo#mem_info.processes_used]))),
+        %%
+        %%    %% tolerate 270k ets memory overhead for DB data etc.
+        %%    ?equals_pattern_w_note(NewMemInfo#mem_info.ets, X when X =< PrevMemInfo#mem_info.ets + 270000 + (EntryEtsSize * NewItems),
+        %%                           lists:flatten(io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
+        %%                                         [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
+        %%                                          NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets])));
+        %%
         %%"8.0" -> %% current dev
         %%    %% tolerate 700k processes_used memory overhead for running maintenance processes like RT rebuild etc.
         %%    ?equals_pattern_w_note(NewMemInfo#mem_info.processes_used, X when X =< PrevMemInfo#mem_info.processes_used + 700000,
@@ -199,7 +199,6 @@ check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, CheckAtoms) ->
         %%                           lists:flatten(io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
         %%                                         [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
         %%                                          NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets])));
-
         _ ->
             %% tolerate 250k processes_used memory overhead for running maintenance processes like RT rebuild etc.
             ?equals_pattern_w_note(NewMemInfo#mem_info.processes_used, X when X =< PrevMemInfo#mem_info.processes_used + 250000,
