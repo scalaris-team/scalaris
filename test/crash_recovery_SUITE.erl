@@ -118,7 +118,7 @@ test_crash_recovery_one_outdated_node(_Config) ->
 test_crash_recovery_two_outdated_nodes(_Config) ->
     % delete the manipulate dbs on *two* nodes
     F = fun(DHTNodes) ->
-                % manipulate rounds on the first node
+                % manipulate rounds on two nodes
                 [N1, N2 | _Tail] = DHTNodes,
                 change_lease_replicas(N1),
                 change_lease_replicas(N2)
@@ -165,7 +165,12 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
     
     % wait for leases to reappear
     ct:pal("cr: wait for leases to reappear"),
-    lease_helper:wait_for_number_of_valid_active_leases(ExpectedLeases).
+    case config:read(replication_factor) of
+        ExpectedLeases ->
+            lease_checker2:wait_for_clean_leases(400, ExpectedLeases);
+        _ ->
+            lease_helper:wait_for_number_of_valid_active_leases(ExpectedLeases)
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
