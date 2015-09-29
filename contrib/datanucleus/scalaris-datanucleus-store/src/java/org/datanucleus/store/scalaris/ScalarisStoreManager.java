@@ -70,13 +70,12 @@ public class ScalarisStoreManager extends AbstractStoreManager {
             throw new NucleusDataStoreException("Cannot start the same transaction multiple times");
         }
         transactionMap.put(dnTransaction, scalarisTransaction);
-
         dnTransaction.addTransactionEventListener(new TransactionEventListener() {
             /**
              * Signal if managed connection was released in pre-commit, preventing
              * multiple releases which can lead to undefined behavior.
              */
-            private boolean releasedInPreCommit = false;
+            private boolean connectionIsReleased = false;
 
             public void transactionPreCommit() {
                 try {
@@ -87,8 +86,8 @@ public class ScalarisStoreManager extends AbstractStoreManager {
                     throw new NucleusDataStoreException(e.getMessage(), e);
                 } finally {
                     transactionMap.remove(dnTransaction);
-                    if (mConn != null) {
-                        releasedInPreCommit = true;
+                    if (mConn != null && !connectionIsReleased) {
+                        connectionIsReleased = true;
                         mConn.release();
                     }
                 }
@@ -97,7 +96,8 @@ public class ScalarisStoreManager extends AbstractStoreManager {
             public void transactionPreRollBack() {
                 scalarisTransaction.abort();
                 transactionMap.remove(dnTransaction);
-                if (mConn != null && !releasedInPreCommit) {
+                if (mConn != null && !connectionIsReleased) {
+                    connectionIsReleased = true;
                     mConn.release();
                 }
             }
