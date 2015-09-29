@@ -49,7 +49,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
      * Period of time (in ms) which will be waited for a connection
      * to get released if {@link #MAX_NUMBER_CONNECTIONS} is reached.
      */
-    private static final int GET_CONNECTION_TIMOUT = 200;
+    private static final int GET_CONNECTION_TIMEOUT = 200;
 
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
@@ -174,7 +174,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
         public synchronized Object getConnection() {
             try {
                 if (conn == null) {
-                    conn = connPool.getConnection(GET_CONNECTION_TIMOUT);
+                    conn = connPool.getConnection(GET_CONNECTION_TIMEOUT);
                     if (conn == null) {
                         throw new ConnectionException("Maximum number of connections reached");
                     }
