@@ -55,12 +55,6 @@ public class ScalarisUtils {
     private static final String FKA_DELETE_OBJ = "_DEL_OBJECT";
 
     /**
-     * Object which will be used for synchronization when performing
-     * write operations.
-     */
-    public static final Object WRITE_LOCK = new Object();
-
-    /**
      * Value which will be used to signal a deleted key.
      */
     public static final String DELETED_RECORD_VALUE = new JSONObject().toString();
@@ -275,21 +269,19 @@ public class ScalarisUtils {
     static void performScalarisObjectInsert(ObjectProvider<?> op, JSONObject json, Transaction scalarisTransaction)
             throws ConnectionException {
 
-        synchronized(WRITE_LOCK) {
-            try {
-                String objectId = ScalarisUtils.getPersistableIdentity(op);
+        try {
+            String objectId = ScalarisUtils.getPersistableIdentity(op);
 
-                insertObjectToIDIndex(op, scalarisTransaction);
-                updateUniqueMemberKey(op, json, null, scalarisTransaction);
-                insertToForeignKeyAction(op, json, scalarisTransaction);
+            insertObjectToIDIndex(op, scalarisTransaction);
+            updateUniqueMemberKey(op, json, null, scalarisTransaction);
+            insertToForeignKeyAction(op, json, scalarisTransaction);
 
-                String className = op.getClassMetaData().getFullClassName();
-                String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
-                
-                scalarisTransaction.write(storageKey, json.toString());
-            } catch (NotAListException e) {
-                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
-            }
+            String className = op.getClassMetaData().getFullClassName();
+            String storageKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+
+            scalarisTransaction.write(storageKey, json.toString());
+        } catch (NotAListException e) {
+            throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
         }
     }
 
@@ -306,37 +298,35 @@ public class ScalarisUtils {
     static void performScalarisObjectUpdate(ObjectProvider<?> op, int[] updatedFieldNumbers, Transaction scalarisTransaction)
             throws ConnectionException, NotFoundException {
 
-        synchronized(WRITE_LOCK) {
-            String objectId = ScalarisUtils.getPersistableIdentity(op);
-           
-            // get old value
-            String className = op.getClassMetaData().getFullClassName();
-            String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+        String objectId = ScalarisUtils.getPersistableIdentity(op);
 
-            JSONObject stored = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
+        // get old value
+        String className = op.getClassMetaData().getFullClassName();
+        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-            JSONObject changedVals = new JSONObject();
-            op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
-                    changedVals, true));
+        JSONObject stored = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
 
-            // update stored object values
-            JSONObject changedValsOld = new JSONObject();
-            Iterator<?> keyIter = changedVals.keys();
-            while (keyIter.hasNext()) {
-                String key = (String) keyIter.next();
-                if (stored.has(key)) {
-                    changedValsOld.put(key, stored.get(key));
-                }
-                stored.put(key, changedVals.get(key));
+        JSONObject changedVals = new JSONObject();
+        op.provideFields(updatedFieldNumbers, new StoreFieldManager(op,
+                changedVals, true));
+
+        // update stored object values
+        JSONObject changedValsOld = new JSONObject();
+        Iterator<?> keyIter = changedVals.keys();
+        while (keyIter.hasNext()) {
+            String key = (String) keyIter.next();
+            if (stored.has(key)) {
+                changedValsOld.put(key, stored.get(key));
             }
-            try {
-                updateUniqueMemberKey(op, changedVals, changedValsOld, scalarisTransaction);
-                updateForeignKeyAction(op, changedVals, changedValsOld, scalarisTransaction);
+            stored.put(key, changedVals.get(key));
+        }
+        try {
+            updateUniqueMemberKey(op, changedVals, changedValsOld, scalarisTransaction);
+            updateForeignKeyAction(op, changedVals, changedValsOld, scalarisTransaction);
 
-                scalarisTransaction.write(objectKey, stored.toString());
-            } catch (NotAListException e) {
-                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
-            }
+            scalarisTransaction.write(objectKey, stored.toString());
+        } catch (NotAListException e) {
+            throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
         }
     }
 
@@ -351,22 +341,20 @@ public class ScalarisUtils {
     static void performScalarisObjectDelete(ObjectProvider<?> op, Transaction scalarisTransaction)
             throws ConnectionException, NotFoundException {
 
-        synchronized(WRITE_LOCK) {
-            String objectId = ScalarisUtils.getPersistableIdentity(op);
-            String className = op.getClassMetaData().getFullClassName();
-            String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
+        String objectId = ScalarisUtils.getPersistableIdentity(op);
+        String className = op.getClassMetaData().getFullClassName();
+        String objectKey = ScalarisSchemaHandler.getObjectStorageKey(className, objectId);
 
-            JSONObject oldJson = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
+        JSONObject oldJson = new JSONObject(scalarisTransaction.read(objectKey).stringValue());
 
-            try {
-                removeObjectFromIDIndex(op, scalarisTransaction);
-                removeObjectFromUniqueMemberKey(op, oldJson, scalarisTransaction);
-                performForeignKeyActionDelete(op, scalarisTransaction);
+        try {
+            removeObjectFromIDIndex(op, scalarisTransaction);
+            removeObjectFromUniqueMemberKey(op, oldJson, scalarisTransaction);
+            performForeignKeyActionDelete(op, scalarisTransaction);
 
-                scalarisTransaction.write(objectKey,  DELETED_RECORD_VALUE);
-            } catch (NotAListException e) {
-                throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
-            }
+            scalarisTransaction.write(objectKey,  DELETED_RECORD_VALUE);
+        } catch (NotAListException e) {
+            throw new NucleusDataStoreException("Keys used internally have values of unexpected structure", e);
         }
     }
 
@@ -416,7 +404,7 @@ public class ScalarisUtils {
      */
     private static void removeObjectFromIDIndex(ObjectProvider<?> op, Transaction t)
             throws ConnectionException, NotAListException {
-        
+
         AbstractClassMetaData cmd = op.getClassMetaData();
         String key = ScalarisSchemaHandler.getIDIndexKeyName(cmd.getFullClassName());
         String objectStringIdentity = getPersistableIdentity(op);
