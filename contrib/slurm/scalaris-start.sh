@@ -68,7 +68,7 @@ function start_servers() {
         YAWSPORT=8000
         for TASKSPERNODE in `seq 1 $VMS_PER_NODE`; do
             JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+            srun --nodelist=$NODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start &
             let PORT+=1
             let YAWSPORT+=1
             let VM_IDX+=1
@@ -80,11 +80,14 @@ function start_servers() {
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
         JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+        srun --nodelist=$HEADNODE -N1 --ntasks-per-node=1 $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start &
         let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1
     done
+
+    # wait for all sruns to return
+    wait
 }
 
 function wait_for_servers_to_start {
@@ -112,7 +115,7 @@ function wait_for_servers_to_start {
 function start_watchdog() {
     # start watchdog
     for slurm_host in `scontrol show hostnames`; do
-        srun -N1-1 --nodelist="$slurm_host" bash -c "nohup watchdog.sh&"
+        srun -N1-1 --nodelist="$slurm_host" bash -c "nohup ./watchdog.sh&"
     done
 }
 
@@ -120,6 +123,9 @@ module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
 kill_old_nodes
+d1=$(date '+%s')
 start_servers
 wait_for_servers_to_start
+d2=$(date '+%s')
+echo "starting $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM))($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM) nodes took $((d2-d1)) seconds"
 start_watchdog
