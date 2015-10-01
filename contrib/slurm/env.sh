@@ -2,6 +2,7 @@ export ERLANG_VERSION=${ERLANG_VERSION:-R17B05}
 export SCALARIS_DIR=${SCALARIS_DIR:-$HOME/scalaris}
 export VMS_PER_NODE=${VMS_PER_NODE:-1}
 export DHT_NODES_PER_VM=${DHT_NODES_PER_VM:-1}
+export ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS:-""}
 
 export ETCDIR=$SCALARIS_DIR/bin
 export BINDIR=$SCALARIS_DIR/bin
@@ -24,5 +25,4 @@ function cleanup() {
 }
 
 trap cleanup SIGTERM
-
 
