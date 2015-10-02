@@ -114,9 +114,7 @@ function wait_for_servers_to_start {
 
 function start_watchdog() {
     # start watchdog
-    for slurm_host in `scontrol show hostnames`; do
-        srun -N1-1 --nodelist="$slurm_host" bash -c "nohup ./watchdog.sh&"
-    done
+    srun -N$SLURM_NNODES screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./watchdog.sh
 }
 
 module load erlang/$ERLANG_VERSION
