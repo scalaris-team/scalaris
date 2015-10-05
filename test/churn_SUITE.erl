@@ -68,7 +68,8 @@ init_per_testcase(TestCase, Config) ->
         _ ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_symmetric_ring(
-              [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
+              [{config, [{log_path, PrivDir}, {rrepair_after_crash, false},
+                         {replication_factor, 4}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
             [{stop_ring, true} | Config]
 %%             {skip, "temporarily"}
