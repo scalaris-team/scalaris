@@ -64,7 +64,7 @@ function start_servers() {
 
     ## @todo use auto-binding
     # start vms at all the tail nodes
-    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE
+    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE &
 
     # start remaining VMs on head node
     PORT=14196
