@@ -117,7 +117,8 @@ init_per_testcase(_TestCase, Config) ->
                                                    {dht_node, mockup_dht_node},
                                                    {monitor_perf_interval, 0},
                                                    {join_lb_psv, lb_psv_simple},
-                                                   {lb_psv_samples, 1}]
+                                                   {lb_psv_samples, 1},
+                                                   {replication_factor, 4}]
                                           ++ MoveConf ++ additional_ring_config()}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
