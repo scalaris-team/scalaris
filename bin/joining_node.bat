@@ -39,8 +39,6 @@ set NODE_NAME=node%ID%
 set /a CSPORT=14195+%ID%
 set /a YAWSPORT=8000+%ID%
 set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %YAWSPORT%
-:: for best performance, especially on Erlang > R14B04:
-set ERL_SCHED_FLAGS=+sbt db +swt low
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: scalaris configuration parameters
