@@ -34,7 +34,6 @@
 -export([fill_ring_feeder/3]).
 -export([feeder_fix_rangen/2]).
 
--define(ReplicationFactor, 4).
 -define(VersionMin, 1).
 -define(VersionMax, 1048576). % 1024*1024
 -define(VersionDiffMax, 512).
@@ -312,7 +311,7 @@ fill_random_feeder(Sizes0, Params0) ->
 -spec fill_random(DBSize::pos_integer(), [db_parameter()]) -> db_status().
 fill_random(DBSize, Params) ->
     Distr = proplists:get_value(distribution, Params, uniform),
-    I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
+    I = hd(intervals:split(intervals:all(), config:read(replication_factor))),
     {_LBr, LKey, RKey, _RBr} = intervals:get_bounds(I),
     I2 = intervals:new('(', LKey, RKey, ')'),
     Keys = get_db(I2, DBSize, Distr),
@@ -444,7 +443,7 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
                           end,
                           {GoodDB, 0}, FKeys),
     Insert = length(DB),
-    DBSize = KeyCount * ?ReplicationFactor,
+    DBSize = KeyCount * config:read(replication_factor),
     {DB, {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
@@ -463,7 +462,7 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
                     end,
                     {[], FCount, 0}, FCells),
     Insert = length(DB),
-    DBSize = KeyCount * ?ReplicationFactor,
+    DBSize = KeyCount * config:read(replication_factor),
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
@@ -484,7 +483,7 @@ p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
           end,
           {[], 0, 1, FCount}, Keys),
     Insert = length(DB),
-    DBSize = KeyCount * ?ReplicationFactor,
+    DBSize = KeyCount * config:read(replication_factor),
     {DB, {DBSize, Insert, DBSize - Insert, O}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
