@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source $(pwd)/env.sh
-
 function cleanup_node(){
     screen -ls | grep Detached | grep scalaris_ | grep "SLURM_JOBID_${SLURM_JOB_ID}" | cut -d. -f1 | awk '{print $1}' | xargs -r kill
 

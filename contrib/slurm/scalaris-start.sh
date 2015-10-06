@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source $(pwd)/env.sh
-
 function fix_known_hosts() {
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
     if [ -e $ETCDIR/scalaris.local.cfg ]
