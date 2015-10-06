@@ -112,9 +112,9 @@ module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
 kill_old_nodes
+start_watchdog
 d1=$(date '+%s')
 start_servers
 wait_for_servers_to_start
 d2=$(date '+%s')
 echo "starting $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM))($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM) nodes took $((d2-d1)) seconds"
-start_watchdog
