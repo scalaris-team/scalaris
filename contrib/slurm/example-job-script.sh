@@ -5,8 +5,9 @@
 
 #SBATCH -J bench-script
 #SBATCH -N 2
-#SBATCH -p CSR
+#SBATCH -p CUMU
 #SBATCH -A csr
+#SBATCH -t 00:03:00
 #SBATCH --exclusive
 
 source $(pwd)/env.sh
