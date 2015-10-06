@@ -26,7 +26,6 @@ $(pwd)/scalaris-start.sh
 #############################################
 
 echo "Nodelist: $SLURM_NODELIST"
-env | grep CPU
 
 collectl -s cdmn -o T -f ~/basho_result/collectl_firstnode.log -i5 -F0 &
 

@@ -3,6 +3,8 @@
 # Script to clean up the remaining processes from Scalaris on a slurm node after
 # a job was canceled
 
+source $(pwd)/env.sh
+
 HOSTNAME="$(hostname)"
 
 function test_success() {
@@ -16,7 +18,7 @@ function test_success() {
 # find all the screen sessions running a scalaris node and kill them
 SCALARIS_SESSIONS=$(screen -ls | grep Detached | grep scalaris_ | awk '{print $1}')
 if [[ -z $SCALARIS_SESSIONS ]]; then
-    echo "[$HOSTNAME] no Scalaris sessions running"
+    echo "[$HOSTNAME] no Scalaris sessions of $(whoami) running"
 else
     echo "[$HOSTNAME] Running Scalaris sessions:"
     for SESSION in $SCALARIS_SESSIONS; do
@@ -36,5 +38,9 @@ else
     kill $EPMD
     test_success
 fi
+
+test_foreign_beams
+
+
 
 

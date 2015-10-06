@@ -24,5 +24,19 @@ function cleanup() {
     exit 1
 }
 
+function test_foreign_beams() {
+    BEAM=$(pgrep beam)
+    if [[ -n $BEAM ]]; then
+        USER=$(ps -e -o user,comm | grep beam | awk '{print $1}' | sort | uniq | xargs echo)
+        echo "There are Erlang VMs from $USER still running, please contact $USER for cleanup:"
+        echo "$(ps -e -o user,pid,start_time,comm | awk 'NR == 1 {print} /beam/ {print}')"
+        return 1
+    fi
+    return 0
+}
+
+export -f cleanup
+export -f test_foreign_beams
+
 trap cleanup SIGTERM
 

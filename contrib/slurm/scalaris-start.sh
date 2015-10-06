@@ -39,6 +39,10 @@ function fix_known_hosts() {
 
 function kill_old_nodes() {
     srun -N$SLURM_JOB_NUM_NODES bash -c "screen -ls | grep Detached | grep scalaris_ | cut -d. -f1 | awk '{print $1}' | xargs -r kill"
+    test_foreign_beams
+    if [[ $? -ne 0 ]]; then
+        scancel $SLURM_JOBID
+    fi
 }
 
 function start_servers() {
