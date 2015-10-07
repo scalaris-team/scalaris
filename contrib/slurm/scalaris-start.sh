@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source $(pwd)/env.sh
-
 function fix_known_hosts() {
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
     if [ -e $ETCDIR/scalaris.local.cfg ]
@@ -39,6 +37,10 @@ function fix_known_hosts() {
 
 function kill_old_nodes() {
     srun -N$SLURM_JOB_NUM_NODES bash -c "screen -ls | grep Detached | grep scalaris_ | cut -d. -f1 | awk '{print $1}' | xargs -r kill"
+    test_foreign_beams
+    if [[ $? -ne 0 ]]; then
+        scancel $SLURM_JOBID
+    fi
 }
 
 function start_servers() {
@@ -64,7 +66,7 @@ function start_servers() {
 
     ## @todo use auto-binding
     # start vms at all the tail nodes
-    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE
+    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE &
 
     # start remaining VMs on head node
     PORT=14196
@@ -112,9 +114,9 @@ module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
 kill_old_nodes
+start_watchdog
 d1=$(date '+%s')
 start_servers
 wait_for_servers_to_start
 d2=$(date '+%s')
 echo "starting $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM))($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM) nodes took $((d2-d1)) seconds"
-start_watchdog

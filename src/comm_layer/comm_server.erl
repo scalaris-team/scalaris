@@ -256,7 +256,7 @@ get_local_address_port() ->
                 [] ->
                     {undefined, 0}
             catch
-                error:_ -> undefined
+                error:_ -> {undefined, 0}
             end;
         Value -> Value
     end.
