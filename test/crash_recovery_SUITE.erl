@@ -31,8 +31,9 @@ groups() ->
                                         test_crash_recovery,
                                         test_crash_recovery_one_new_node,
                                         test_crash_recovery_one_outdated_node,
-                                        test_crash_recovery_bad_owner_pids,
-                                        test_crash_recovery_two_outdated_nodes
+                                        test_crash_recovery_bad_owner_pids%,
+                                        %% requires node rejoin after lost active lease
+                                        %% test_crash_recovery_two_outdated_nodes
                                        ]},
      {repeater, [{repeat, 30}], [{group, crash_recovery_tests}]}
     ].
