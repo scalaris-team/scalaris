@@ -295,7 +295,10 @@ describe_node_diff(Node, OldNodeInfo, NewNodeInfo) ->
             io:format("the node ~p has changed~n", [Node]),
             io:format("node info changed from empty to~n"),
             describe_node(Node, NewNodeInfo);
-        {OldNodeInfo, empty} -> io:format("nyi2~n");
+        {OldNodeInfo, empty} ->
+            io:format("the node ~p has changed~n", [Node]),
+            io:format("node info changed to empty from~n"),
+            describe_node(Node, OldNodeInfo);
         {OldNodeInfo, NewNodeInfo} ->
             OldLeaseList = OldNodeInfo#node_info_t.lease_list,
             NewLeaseList = NewNodeInfo#node_info_t.lease_list,
