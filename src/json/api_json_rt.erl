@@ -39,6 +39,4 @@ handler(AnyOp, AnyParams) ->
 %% interface for rt calls
 -spec get_replication_factor() -> {struct, [{Key::atom(), Value::term()}]}.
 get_replication_factor() ->
-    Res = {struct, [{status, "ok"}, {value, api_rt:get_replication_factor()}]},
-    io:format("returned: ~p~n", [Res]),
-    Res.
+    {struct, [{status, "ok"}, {value, api_rt:get_replication_factor()}]}.
