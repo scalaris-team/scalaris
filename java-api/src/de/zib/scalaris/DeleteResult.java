@@ -66,7 +66,10 @@ public class DeleteResult {
      *
      * @since 3.19
      */
-    public boolean hasDeletedAll() {
-        return (ok + undef) == 4;
+    public boolean hasDeletedAll() throws ConnectionException {
+        final RoutingTable rt = new RoutingTable();
+        final int r = rt.get_replication_factor();
+
+        return (ok + undef) == r;
     }
 }
