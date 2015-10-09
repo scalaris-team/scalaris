@@ -28,6 +28,10 @@ rescue LoadError => e
   require "scalaris"
 end
 
+def get_replication_factor()
+  (Scalaris::RoutingTable.new).get_replication_factor
+end
+
 def write(sc, key_value_list)
   key, value = key_value_list
   sc.write(key, value)
@@ -62,6 +66,12 @@ options = {}
 
 optparse = OptionParser.new do |opts|
   options[:help] = true
+
+  options[:replication_factor] = nil
+  opts.on('-f', '--get-replication-factor', 'get the replication factor' ) do |f|
+    options[:factor] = f
+    options[:help] = false
+  end
 
   options[:read] = nil
   opts.on('-r', '--read KEY', 'read key KEY' ) do |key|
@@ -123,4 +133,5 @@ pp write(sc, options[:write]) unless options[:write] == nil
 pp test_and_set(sc, options[:test_and_set]) unless options[:test_and_set] == nil
 pp add_on_nr(sc, options[:add_on_nr]) unless options[:add_on_nr] == nil
 pp add_del_on_list(sc, options[:add_del_on_list]) unless options[:add_del_on_list] == nil
+pp get_replication_factor() unless options[:factor] == nil
 puts optparse if options[:help]

@@ -911,6 +911,25 @@ module Scalaris
     include InternalScalarisNopClose
   end
 
+  # API for using routing tables
+  class RoutingTable
+    # Create a new object using the given connection.
+    def initialize(conn = JSONConnection.new())
+      @conn = conn
+    end
+
+    def get_replication_factor()
+      result_raw = @conn.call(:get_replication_factor, [])
+      if result_raw.is_a?(Hash) and result_raw.has_key?('status') and result_raw.has_key?('value')
+        return result_raw['value']
+      else
+        raise UnknownError.new(result)
+      end
+    end
+
+    include InternalScalarisNopClose
+  end
+
   # Converts a string to a list of integers.
   # If the expected value of a read operation is a list, the returned value
   # could be (mistakenly) a string if it is a list of integers.
