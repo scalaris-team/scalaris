@@ -49,6 +49,8 @@ handler(get_node_performance, [])        -> api_json_monitor:get_node_performanc
 handler(get_service_info, [])            -> api_json_monitor:get_service_info();
 handler(get_service_performance, [])     -> api_json_monitor:get_service_performance();
 
+handler(get_replication_factor, [])      -> api_json_rt:get_replication_factor();
+
 
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~s:~p(~p)~n", [?MODULE, AnyOp, AnyParams]),
