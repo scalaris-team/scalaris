@@ -133,6 +133,8 @@ public class ReplicatedDHTTest {
             TimeoutException, UnknownException {
         final String key = "_Delete_NotExistingKey";
         final ReplicatedDHT rdht = new ReplicatedDHT();
+        final RoutingTable rt = new RoutingTable();
+        final int r = rt.get_replication_factor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -142,7 +144,7 @@ public class ReplicatedDHTTest {
                 assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
-                assertEquals(4, result.undef);
+                assertEquals(r, result.undef);
 
                 // make sure the key does not exist afterwards:
                 checkKeyDoesNotExist(testTime + key + i);
@@ -170,6 +172,8 @@ public class ReplicatedDHTTest {
         final Connection c = ConnectionFactory.getInstance().createConnection("test");
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
         final TransactionSingleOp sc = new TransactionSingleOp(c);
+        final RoutingTable rt = new RoutingTable(c);
+        final int r = rt.get_replication_factor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -182,7 +186,7 @@ public class ReplicatedDHTTest {
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
                 assertEquals(true, result.hasDeletedAll());
-                assertEquals(4, result.ok);
+                assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
 
@@ -196,7 +200,7 @@ public class ReplicatedDHTTest {
                 assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
-                assertEquals(4, result.undef);
+                assertEquals(r, result.undef);
 
                 // make sure the key does not exist afterwards:
                 checkKeyDoesNotExist(testTime + key + i);
@@ -224,6 +228,8 @@ public class ReplicatedDHTTest {
         final Connection c = ConnectionFactory.getInstance().createConnection("test");
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
         final TransactionSingleOp sc = new TransactionSingleOp(c);
+        final RoutingTable rt = new RoutingTable(c);
+        final int r = rt.get_replication_factor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -236,7 +242,7 @@ public class ReplicatedDHTTest {
                 final DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
                 assertEquals(true, result.hasDeletedAll());
-                assertEquals(4, result.ok);
+                assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
 
@@ -254,7 +260,7 @@ public class ReplicatedDHTTest {
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
                 assertEquals(true, result.hasDeletedAll());
-                assertEquals(4, result.ok);
+                assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
 
@@ -268,7 +274,7 @@ public class ReplicatedDHTTest {
                 assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
-                assertEquals(4, result.undef);
+                assertEquals(r, result.undef);
 
                 // make sure the key does not exist afterwards:
                 checkKeyDoesNotExist(testTime + key + i);
