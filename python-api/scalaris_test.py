@@ -646,12 +646,14 @@ class TestReplicatedDHT(unittest.TestCase):
     def testDelete_notExistingKey(self):
         key = "_Delete_NotExistingKey"
         rdht = ReplicatedDHT()
+        rt = scalaris.RoutingTable()
+        r = rt.get_replication_factor()
         
         for i in xrange(len(_TEST_DATA)):
             ok = rdht.delete(str(self._testTime) + key + str(i))
             self.assertEqual(ok, 0)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, r))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
         
         rdht.close_connection()
@@ -663,6 +665,8 @@ class TestReplicatedDHT(unittest.TestCase):
         c = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
         rdht = ReplicatedDHT(conn = c)
         sc = scalaris.TransactionSingleOp(conn = c)
+        rt = scalaris.RoutingTable(conn = c)
+        r = rt.get_replication_factor()
         
         for i in xrange(len(_TEST_DATA)):
             sc.write(str(self._testTime) + key + str(i), _TEST_DATA[i])
@@ -670,16 +674,16 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_TEST_DATA)):
             ok = rdht.delete(str(self._testTime) + key + str(i))
-            self.assertEqual(ok, 4)
+            self.assertEqual(ok, r)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (r, 0, 0))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
             ok = rdht.delete(str(self._testTime) + key + str(i))
             self.assertEqual(ok, 0)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, r))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
         
         c.close()
@@ -691,6 +695,8 @@ class TestReplicatedDHT(unittest.TestCase):
         c = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
         rdht = ReplicatedDHT(conn = c)
         sc = scalaris.TransactionSingleOp(conn = c)
+        rt = scalaris.RoutingTable(conn = c)
+        r = rt.get_replication_factor()
         
         for i in xrange(len(_TEST_DATA)):
             sc.write(str(self._testTime) + key + str(i), _TEST_DATA[i])
@@ -698,9 +704,9 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_TEST_DATA)):
             ok = rdht.delete(str(self._testTime) + key + str(i))
-            self.assertEqual(ok, 4)
+            self.assertEqual(ok, r)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (r, 0, 0))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
         
         for i in xrange(len(_TEST_DATA)):
@@ -709,16 +715,16 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_TEST_DATA)):
             ok = rdht.delete(str(self._testTime) + key + str(i))
-            self.assertEqual(ok, 4)
+            self.assertEqual(ok, r)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (r, 0, 0))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
             ok = rdht.delete(str(self._testTime) + key + str(i))
             self.assertEqual(ok, 0)
             results = rdht.get_last_delete_result()
-            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, r))
             self._checkKeyDoesNotExist(str(self._testTime) + key + str(i))
         
         c.close()
