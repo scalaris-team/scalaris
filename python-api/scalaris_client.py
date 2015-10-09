@@ -12,7 +12,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-from scalaris import TransactionSingleOp, ReplicatedDHT
+from scalaris import TransactionSingleOp, ReplicatedDHT, RoutingTable
 from scalaris import ConnectionError, TimeoutError, NotFoundError, AbortError, KeyChangedError, UnknownError
 import scalaris_bench
 import sys
@@ -98,6 +98,8 @@ if __name__ == "__main__":
             sys.exit(1)
     elif (len(sys.argv) >= 2 and sys.argv[1] in ["--minibench", "-b"]):
         scalaris_bench.run_from_cmd(sys.argv[:1] + sys.argv[2:])
+    elif (len(sys.argv) >= 2 and sys.argv[1] in ["--get-replication-factor", "-f"]):
+        print RoutingTable().get_replication_factor()
     else:
         print 'usage: ' + sys.argv[0] + ' [Options]'
         print ' -r,--read <key>'
@@ -119,5 +121,7 @@ if __name__ == "__main__":
         print '                            run selected mini benchmark(s)'
         print '                            [1|...|9|all] (default: all benchmarks, 500'
         print '                            operations each, 10 threads per Scalaris node)'
+        print ' -f, --get-replication-factor'
+        print '                            print the replication factor'
         if len(sys.argv) == 1 or (len(sys.argv) >= 2 and not sys.argv[1] in ["--help", "-h"]):
             sys.exit(1)

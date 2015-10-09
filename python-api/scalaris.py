@@ -1287,6 +1287,26 @@ class ReplicatedDHT(object):
         """
         self._conn.close()
 
+class RoutingTable(object):
+    """
+    API for using routing tables
+    """
+
+    def __init__(self, conn = None):
+        """
+        Create a new object using the given connection.
+        """
+        if conn is None:
+            conn = JSONConnection()
+        self._conn = conn
+
+    def get_replication_factor(self):
+      result = self._conn.callp('/api/rt.yaws', 'get_replication_factor', [])
+      if isinstance(result, dict) and 'status' in result and len(result) == 2 and result['status'] == 'ok' and 'value' in result:
+          return result['value']
+      else:
+        raise UnknownError(result)
+
 class ScalarisVM(object):
     """
     Provides methods to interact with a specific Scalaris (Erlang) VM.
