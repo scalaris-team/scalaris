@@ -727,6 +727,8 @@ class TestReplicatedDHT < Test::Unit::TestCase
   def testDelete_notExistingKey()
     key = "_Delete_NotExistingKey"
     rdht = Scalaris::ReplicatedDHT.new()
+    rt = Scalaris::RoutingTable.new
+    r = rt.get_replication_factor
 
     (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
@@ -734,7 +736,7 @@ class TestReplicatedDHT < Test::Unit::TestCase
       results = rdht.get_last_delete_result()
       assert_equal(0, results.ok)
       assert_equal(0, results.locks_set)
-      assert_equal(4, results.undefined)
+      assert_equal(r, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
     end
     
@@ -748,7 +750,9 @@ class TestReplicatedDHT < Test::Unit::TestCase
     c = Scalaris::JSONConnection.new(url = Scalaris::DEFAULT_URL)
     rdht = Scalaris::ReplicatedDHT.new(conn = c)
     sc = Scalaris::TransactionSingleOp.new(conn = c)
-
+    rt = Scalaris::RoutingTable.new
+    r = rt.get_replication_factor
+    
     (0..($_TEST_DATA.length - 1)).each do |i|
       sc.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
@@ -756,9 +760,9 @@ class TestReplicatedDHT < Test::Unit::TestCase
     # now try to delete the data:
     (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
-      assert_equal(4, ok)
+      assert_equal(r, ok)
       results = rdht.get_last_delete_result()
-      assert_equal(4, results.ok)
+      assert_equal(r, results.ok)
       assert_equal(0, results.locks_set)
       assert_equal(0, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
@@ -769,7 +773,7 @@ class TestReplicatedDHT < Test::Unit::TestCase
       results = rdht.get_last_delete_result()
       assert_equal(0, results.ok)
       assert_equal(0, results.locks_set)
-      assert_equal(4, results.undefined)
+      assert_equal(r, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
     end
     
@@ -783,6 +787,8 @@ class TestReplicatedDHT < Test::Unit::TestCase
     c = Scalaris::JSONConnection.new(url = Scalaris::DEFAULT_URL)
     rdht = Scalaris::ReplicatedDHT.new(conn = c)
     sc = Scalaris::TransactionSingleOp.new(conn = c)
+    rt = Scalaris::RoutingTable.new
+    r = rt.get_replication_factor
 
     (0..($_TEST_DATA.length - 1)).each do |i|
       sc.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
@@ -791,9 +797,9 @@ class TestReplicatedDHT < Test::Unit::TestCase
     # now try to delete the data:
     (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
-      assert_equal(4, ok)
+      assert_equal(r, ok)
       results = rdht.get_last_delete_result()
-      assert_equal(4, results.ok)
+      assert_equal(r, results.ok)
       assert_equal(0, results.locks_set)
       assert_equal(0, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
@@ -806,9 +812,9 @@ class TestReplicatedDHT < Test::Unit::TestCase
     # now try to delete the data:
     (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
-      assert_equal(4, ok)
+      assert_equal(r, ok)
       results = rdht.get_last_delete_result()
-      assert_equal(4, results.ok)
+      assert_equal(r, results.ok)
       assert_equal(0, results.locks_set)
       assert_equal(0, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
@@ -819,7 +825,7 @@ class TestReplicatedDHT < Test::Unit::TestCase
       results = rdht.get_last_delete_result()
       assert_equal(0, results.ok)
       assert_equal(0, results.locks_set)
-      assert_equal(4, results.undefined)
+      assert_equal(r, results.undefined)
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
     end
     
