@@ -95,7 +95,7 @@ end_per_group_special(_, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_symmetric_keys_test(_) ->
-    ToTest = lists:sort(get_symmetric_keys(4)),
+    ToTest = lists:sort(get_symmetric_keys(config:read(replication_factor))),
     ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
     ?equals_w_note(ToTest, ToBe,
                    io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
