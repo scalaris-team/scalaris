@@ -256,7 +256,11 @@ get_replica_keys(Key) ->
              Key bxor 16#D0000000000000000000000000000000,
              Key bxor 16#E0000000000000000000000000000000,
              Key bxor 16#F0000000000000000000000000000000
-            ]
+            ];
+        R ->
+            Step = n() div R,
+            MappedToFirstSector = Key rem Step,
+            [MappedToFirstSector + I * Step || I <- lists:seq(0, R-1)]
     end.
 
 -spec get_key_segment(key()) -> pos_integer().
@@ -265,7 +269,10 @@ get_key_segment(Key) ->
         2  -> (Key bsr 127) + 1;
         4  -> (Key bsr 126) + 1;
         8  -> (Key bsr 125) + 1;
-        16 -> (Key bsr 124) + 1
+        16 -> (Key bsr 124) + 1;
+        R ->
+            Step = n() div R,
+            Key div Step
     end.
 
 %% @doc Dumps the RT state for output in the web interface.
