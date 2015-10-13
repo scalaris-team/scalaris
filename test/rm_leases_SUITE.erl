@@ -44,7 +44,10 @@ groups() ->
                                ]},
      {rm_loop_tests,  [sequence], [
                                   propose_new_neighbor
-                                 ]}
+                                 ]},
+
+     {repeater, [{repeat, 30}], [{group, kill_tests}   , {group, add_tests},
+                                 {group, rm_loop_tests}, {group, partition_tests}]}
     ].
 
 all() ->
