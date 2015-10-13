@@ -272,7 +272,7 @@ get_key_segment(Key) ->
         16 -> (Key bsr 124) + 1;
         R ->
             Step = n() div R,
-            Key div Step
+            Key div Step + 1
     end.
 
 %% @doc Dumps the RT state for output in the web interface.
