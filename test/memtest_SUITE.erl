@@ -62,7 +62,9 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     % start ring:
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0}]}]),
+    %% add_remove_nodes_50 and add_kill_nodes_50 throw error:system_limit for larger r
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0},
+                                            {replication_factor, 4}]}]),
     config:write(no_print_ring_data, true),
     % load necessary code for the atom check to work (we do not create additional atoms):
     InitKey = "memtest_SUITE",
