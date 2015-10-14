@@ -120,17 +120,17 @@
 
 -type split_step1_failed_reason() :: lease_already_exists.
 
--type content_check_t() :: fun ((Current::lease_t() | prbr_bottom, 
-                                 WriteFilter::prbr:write_filter(), 
+-type content_check_t() :: fun ((Current::lease_t() | prbr_bottom,
+                                 WriteFilter::prbr:write_filter(),
                                  Next::lease_t()) ->
-          {Result::boolean(), {Reason::generic_failed_reason(), Current::lease_t() | prbr_bottom, 
+          {Result::boolean(), {Reason::generic_failed_reason(), Current::lease_t() | prbr_bottom,
                                Next::lease_t()} | null}).
 
 -spec delta() -> pos_integer().
 delta() -> 10.
 
 -spec unittest_get_delta() -> pos_integer().
-unittest_get_delta() -> 
+unittest_get_delta() ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     delta().
 
@@ -242,7 +242,7 @@ unittest_clear_lease_list(Pid) ->
             ok
           )
     end.
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % gen_component
@@ -269,7 +269,7 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
    State) ->
     %log:pal("on renew ~w (~w, ~w)~n", [Old, Mode, self()]),
     Self = comm:this(),
-    {New, Renew} = 
+    {New, Renew} =
         case Mode of
             passive -> % passive lease are only renewed
                 {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
@@ -310,7 +310,7 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Re
     end;
 
 on({l_on_cseq, renew_reply,
-    {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
+    {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}},
     _New, Mode, Renew}, State) ->
     % @todo retry
     ?TRACE_ERROR("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, _New, Mode]),
@@ -479,7 +479,7 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
 % lease takeover
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, takeover, Old = #lease{epoch=OldEpoch}, 
+on({l_on_cseq, takeover, Old = #lease{epoch=OldEpoch},
     ReplyTo}, State) ->
     New = Old#lease{epoch   = OldEpoch + 1,
                     version = 0,
@@ -498,7 +498,7 @@ on({l_on_cseq, takeover_reply, ReplyTo,
     lease_list:update_lease_in_dht_node_state(Value, State, passive, takeover);
 
 on({l_on_cseq, takeover_reply, ReplyTo,
-    {qwrite_deny, _ReqId, _Round, Value, 
+    {qwrite_deny, _ReqId, _Round, Value,
      {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
     ?TRACE("takeover failed ~p ~p~n", [Value, Reason]),
     comm:send_local(ReplyTo, {takeover, failed, Value, Reason}),
@@ -525,7 +525,7 @@ on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
     State;
 
 on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed,
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step1 failed~n~w~n~w~n~w~n~w:~w~n", [Reason, L1, L2, _ReqId, Round]),
@@ -659,7 +659,7 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=_OldEpoch}, ReplyTo,
                                               merge_reply_step2);
 
 on({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed,
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
@@ -736,7 +736,7 @@ on({l_on_cseq, merge_reply_step4, {_L1Id, L1}, ReplyTo,
                                               merge_reply_step3);
 
 on({l_on_cseq, merge_reply_step4, {L1Id, L1}, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, {content_check_failed, 
+    {qwrite_deny, _ReqId, Round, L2, {content_check_failed,
                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
@@ -819,7 +819,7 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=_Id,epoch=OldEpoch}, R1, R2,
     end;
 
 on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
+    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed,
                                        {Reason, _Current, _Next}}}}, State) ->
     ?TRACE_ERROR("split second step failed: ~p~n", [Reason]),
     case Reason of
@@ -878,7 +878,7 @@ on({l_on_cseq, split_reply_step2,
     lease_list:update_lease_in_dht_node_state(L2, State, active, split_reply_step2);
 
 on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, 
+    {qwrite_deny, _ReqId, _Round, L1, {content_check_failed,
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
     ?TRACE_ERROR("split third step failed: ~p~n", [Reason]),
@@ -945,7 +945,7 @@ on({l_on_cseq, split_reply_step4, L1, _R1, _R2, _Keep, ReplyTo, _PostAux,
     lease_list:update_lease_in_dht_node_state(L2, State, active, split_reply_step4);
 
 on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
+    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed,
                                        {Reason, _Current, _Next}}}}, State) ->
     % @todo
     ?TRACE_ERROR("split fourth step failed: ~p~n", [Reason]),
@@ -1009,7 +1009,74 @@ on({l_on_cseq, renew_leases}, State) ->
     _ = [lease_renew(self(), L, passive) ||
             L <- PassiveLeaseList],
     msg_delay:send_trigger(delta() div 2, {l_on_cseq, renew_leases}),
-    State.
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% post recover operations
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({l_on_cseq, post_recover_takeover, Result}, State) ->
+    case Result of
+        {takeover, success, Value} ->
+            %% merge the new lease with the active lease
+            log:log("recover: the takeover of ~p was a success", [Value]),
+            LeaseList = dht_node_state:get(State, lease_list),
+            ActiveLease = lease_list:get_active_lease(LeaseList),
+            case intervals:is_adjacent(l_on_cseq:get_range(Value),
+                                       l_on_cseq:get_range(ActiveLease))
+                andalso intervals:is_left_of(l_on_cseq:get_range(Value),
+                                             l_on_cseq:get_range(ActiveLease)) of
+                true ->
+                    Me = comm:reply_as(self(), 3, {l_on_cseq, post_recover_merge, '_'}),
+                    lease_merge(Value, ActiveLease, Me),
+                    State;
+                false ->
+                    %% give up ?!?
+                    State
+            end;
+        {takeover, failed, Value, Reason} ->
+            %% remove from passive list just in case
+            log:log("recover: the takeover of ~p failed: ~p", [Value, Reason]),
+            ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
+            case Reason of
+                lease_does_not_exist ->
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value),
+                                                                State, passive);
+                unexpected_owner     ->
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value),
+                                                                State, passive);
+                unexpected_range     ->
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value),
+                                                                State, passive);
+                unexpected_aux       ->
+                    lease_list:remove_lease_from_dht_node_state(Value, get_id(Value),
+                                                                State, passive);
+                unexpected_timeout ->
+                    %% retry
+                    gen_component:post_op({l_on_cseq, takeover, Value, ReplyTo}, State);
+                timeout_is_not_newer_than_current_lease ->
+                    %% retry
+                    gen_component:post_op({l_on_cseq, takeover, Value, ReplyTo}, State);
+                unexpected_epoch ->
+                    %% retry
+                    gen_component:post_op({l_on_cseq, takeover, Value, ReplyTo}, State);
+                unexpected_version ->
+                    %% retry
+                    gen_component:post_op({l_on_cseq, takeover, Value, ReplyTo}, State)
+            end
+    end;
+
+on({l_on_cseq, post_recover_merge, Result}, State) ->
+    case Result of
+        {merge, success, L2, L1} ->
+            log:log("recover: the merge of ~p and ~p was a success", [L2, L1]),
+            State;
+        _ ->
+            log:log("recover: the merge failed: ", [Result]),
+            State
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -1018,7 +1085,7 @@ on({l_on_cseq, renew_leases}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% % @doc generic content check. used for almost all qwrite operations
-%% -spec generic_content_check_(lease_t(), lease_t(), atom()) -> 
+%% -spec generic_content_check_(lease_t(), lease_t(), atom()) ->
 %%                                    content_check_t(). %% content check
 %% generic_content_check_(#lease{id=OldId,owner=_OldOwner,aux = OldAux,range=OldRange,
 %%                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
@@ -1049,7 +1116,7 @@ on({l_on_cseq, renew_leases}, State) ->
 %%     end.
 
 % @doc generic content check. used for almost all qwrite operations
--spec generic_content_check(lease_t(), lease_t(), atom()) -> 
+-spec generic_content_check(lease_t(), lease_t(), atom()) ->
                                    content_check_t(). %% content check
 generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
@@ -1057,17 +1124,17 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                              epoch=NewEpoch,version=NewVersion,timeout=NewTimeout} = New, Writer) ->
     fun(Current, _WriteFilter, Next) ->
             case Current of
-                % check for prbr_bottom 
+                % check for prbr_bottom
 %                {prbr_bottom, _WriteFilter, _Next} ->
                 prbr_bottom ->
                     {false, {lease_does_not_exist, prbr_bottom, Next}};
                 % check for re-write
                 New -> % Current =:= New
-                    log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", 
+                    log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n",
                             [Current, Next, Old, New, Writer]),
                     {true, null};
                 % special case for renew after crash-recovery
-                #lease{epoch = E0, owner = O0, version = V0} 
+                #lease{epoch = E0, owner = O0, version = V0}
                   when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =:= OldOwner
                        andalso NewOwner =/= OldOwner andalso Writer =:= renew_recover ->
                        % after a crash the logical owner should not
@@ -1085,42 +1152,42 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                     EpochUpdate = (NewEpoch =:= OldEpoch + 1) andalso (NewVersion =:= 0),
                     VersionUpdate = (NewEpoch =:= OldEpoch) andalso (NewVersion =:= OldVersion + 1),
                     % check for correct epoch/version handling
-                    ?WARN(OldEpoch =:= NewEpoch, 
+                    ?WARN(OldEpoch =:= NewEpoch,
                           OldVersion + 1 =:= NewVersion,
                          "the version has to increase by one"),
-                    ?WARN(OldEpoch + 1 =:= NewEpoch, 
+                    ?WARN(OldEpoch + 1 =:= NewEpoch,
                           0 =:= NewVersion,
-                         "the version has to be zero after an epoch update: " 
+                         "the version has to be zero after an epoch update: "
                              ++ atom_to_list(Writer)),
                     % check that the id does not change
-                    ?WARN(OldId =/= NewId, 
-                          false, 
-                          "the id may never change: " 
+                    ?WARN(OldId =/= NewId,
+                          false,
+                          "the id may never change: "
                               ++ atom_to_list(Writer)),
                     % check for correct behavior for the remaining fields
-                    ?WARN(OldOwner =/= NewOwner, 
-                          EpochUpdate, 
-                          "the owner changed without an epoch update: " 
+                    ?WARN(OldOwner =/= NewOwner,
+                          EpochUpdate,
+                          "the owner changed without an epoch update: "
                               ++ atom_to_list(Writer)),
-                    ?WARN(OldRange =/= NewRange, 
+                    ?WARN(OldRange =/= NewRange,
                          EpochUpdate,
-                         "the range changed without an epoch update: " 
+                         "the range changed without an epoch update: "
                              ++ atom_to_list(Writer)),
-                    ?WARN(OldAux =/= NewAux, 
+                    ?WARN(OldAux =/= NewAux,
                          EpochUpdate,
-                         "the aux changed without an epoch update: " 
+                         "the aux changed without an epoch update: "
                              ++ atom_to_list(Writer)),
-                    ?WARN(OldTimeout =/= NewTimeout, 
+                    ?WARN(OldTimeout =/= NewTimeout,
                          VersionUpdate orelse EpochUpdate,
-                         "the timeout changed without a version update: " 
+                         "the timeout changed without a version update: "
                              ++ atom_to_list(Writer)),
-                    ?WARN(OldTimeout =/= NewTimeout, 
+                    ?WARN(OldTimeout =/= NewTimeout,
                          OldTimeout < NewTimeout,
-                         "the new timeout is not newer than the old: " 
+                         "the new timeout is not newer than the old: "
                              ++ atom_to_list(Writer)),
                     {true, null};
                 % epoch and/or version did not match: give useful error message
-                #lease{id = Id0, epoch = E0, owner = O0, range = R0, aux = Aux0, 
+                #lease{id = Id0, epoch = E0, owner = O0, range = R0, aux = Aux0,
                        version = V0, timeout = T0} ->
                     if
                         Id0 =/= OldId ->
@@ -1142,7 +1209,6 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                     end
             end
     end.
-                            
 
 -spec cc_delete_lease(lease_t(), atom()) ->
                              content_check_t(). %% content check
@@ -1187,7 +1253,7 @@ cc_delete_lease(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
 
 % @doc only for unittests
 -spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
-    fun ((Current::lease_t(), WriteFilter::prbr:write_filter(), Next::lease_t()) -> 
+    fun ((Current::lease_t(), WriteFilter::prbr:write_filter(), Next::lease_t()) ->
                 {Result::boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
@@ -1202,8 +1268,8 @@ is_valid_update(CurrentEpoch, CurrentVersion) ->
     end.
 
 %@doc only content check which allows to create a new lease
--spec is_valid_split_step1() -> 
-        fun ((Current::lease_t(), WriteFilter::prbr:write_filter(), Next::lease_t()) -> 
+-spec is_valid_split_step1() ->
+        fun ((Current::lease_t(), WriteFilter::prbr:write_filter(), Next::lease_t()) ->
                      {Result::boolean(), split_step1_failed_reason() | null}). %% content check
 is_valid_split_step1() ->
     fun (Current, _WriteFilter, _Next) ->
