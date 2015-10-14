@@ -1,0 +1,161 @@
+%% @copyright 2015 Zuse Institute Berlin
+
+%%   Licensed under the Apache License, Version 2.0 (the "License");
+%%   you may not use this file except in compliance with the License.
+%%   You may obtain a copy of the License at
+%%
+%%       http://www.apache.org/licenses/LICENSE-2.0
+%%
+%%   Unless required by applicable law or agreed to in writing, software
+%%   distributed under the License is distributed on an "AS IS" BASIS,
+%%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%   See the License for the specific language governing permissions and
+%%   limitations under the License.
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for recovery.
+%% @end
+-module(recover_SUITE).
+
+-include("scalaris.hrl").
+-include("unittest.hrl").
+
+-author('schuett@zib.de').
+-vsn('$Id$').
+
+-compile(export_all).
+
+-define(CLOSE, close).
+
+num_executions() ->
+    5.
+
+repeater_num_executions() ->
+    10.
+
+ring_size() ->
+    4.
+
+groups() ->
+    [{slide_tests, [sequence], [
+                                %% leaves one node with no lease
+                                %% half_join_and_recover_after_step2,
+                                half_join_and_recover_after_step3,
+                                half_join_and_recover_after_step4
+                               ]},
+     {repeater, [{repeat, 30}], [{group, slide_tests}]}
+    ].
+
+all() -> [
+          {group, slide_tests}
+         ].
+
+suite() -> [ {timetrap, {seconds, 60}} ].
+
+group(_) ->
+    suite().
+
+init_per_suite(Config) -> Config.
+
+end_per_suite(_Config) -> ok.
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
+
+init_per_testcase(_TestCase, Config) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(ring_size(), [{config, [{log_path, PrivDir},
+                                                      {leases, true},
+                                                      {db_backend, db_mnesia}]}]),
+    %%[{stop_ring, true} | Config].
+    Config.
+
+end_per_testcase(_TestCase, Config) ->
+    unittest_helper:stop_ring(),
+    _ = application:stop(mnesia),
+    %% %% need config to get db path
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+    PWD = os:cmd(pwd),
+    WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
+        "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
+    _ = file:delete(WorkingDir ++ "schema.DAT"),
+    unittest_helper:stop_minimal_procs(Config2),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% test interrupted split before recover
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+half_join_and_recover_after_step2(Config) ->
+    half_join_and_recover(Config, split_reply_step2).
+
+half_join_and_recover_after_step3(Config) ->
+    half_join_and_recover(Config, split_reply_step3).
+
+half_join_and_recover_after_step4(Config) ->
+    half_join_and_recover(Config, split_reply_step4).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% generic test for interrupted split before recover
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+half_join_and_recover(Config, MsgTag) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    %% write data
+    _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+    %% hook into split-protocol
+    [gen_component:bp_set_cond(Pid, block(self(), MsgTag),
+                               block)
+     || Pid <- pid_groups:find_all(dht_node)],
+    %% add node
+    _ = api_vm:add_nodes(1),
+    %% wait for break point
+    receive
+        {dropped, MsgTag} -> ok
+    end,
+    %% stop ring
+    unittest_helper:stop_ring(),
+    %% wait for leases to expire
+    timer:sleep(11000),
+    %% %% recover
+    unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
+                                                  {leases, true},
+                                                  {db_backend, db_mnesia},
+                                                  {start_type, recover}]}]),
+    lease_checker2:wait_for_clean_leases(500, 4),
+    %% ring restored -> checking KV data integrity
+    _ = check_data_integrity(),
+    true.
+
+block(Owner, MsgTag) ->
+    %% blocking qwrite_done and qwrite_deny
+    fun (Message, _State) ->
+            case {element(1, Message), element(2, Message)} of
+                {l_on_cseq, MsgTag} ->
+                    comm:send_local(Owner, {dropped, MsgTag}),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% helper functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+check_data_integrity() ->
+    %% lease_checker2:get_kv_db(),
+    Pred = fun (Id) ->
+                   case kv_on_cseq:read(integer_to_list(Id)) of
+                       {ok, Id} -> true;
+                       _        -> false
+                   end
+           end,
+    Elements = lists:filter(Pred, lists:seq(1, 100)),
+    case length(Elements) of
+        100 ->
+            true;
+        X ->
+            ct:pal("found ~p of 100 elements", [X]),
+            100 = X
+    end.
