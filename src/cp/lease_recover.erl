@@ -32,6 +32,36 @@ recover(LeaseDBs) ->
                         L =/= prbr_bottom, %% ??
                         Id =:= l_on_cseq:get_id(L) %% is this the first replica?,
                   ],
+    case length(LocalLeases) of
+        0 ->
+            log:log("recovered with zero leases~n"),
+            %% async. call!
+            service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
+            util:sleep_for_ever(),
+            lease_list:empty();
+        1 ->
+            wait_for_leases_to_timeout(LocalLeases),
+            Lease = hd(LocalLeases),
+            %% one potentially active lease: set active lease
+            lease_list:make_lease_list(Lease, [], []);
+        2 ->
+            %% could be an ongoing split: finish operation
+            wait_for_leases_to_timeout(LocalLeases),
+            log:log("leases: ~p~n", [LocalLeases]),
+            {Active, Passive} = get_active_passive(LocalLeases),
+            Me = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
+            l_on_cseq:lease_takeover(Passive, Me),
+            lease_list:make_lease_list(Active, [Passive], []);
+        _ ->
+            %% could be an ongoing split or an ongoing merge: finish operation
+            wait_for_leases_to_timeout(LocalLeases),
+            log:log("leases: ~p~n", [LocalLeases]),
+            ts = nyi, % ts: not yet implemented
+            lease_list:empty()
+    end.
+
+-spec wait_for_leases_to_timeout([l_on_cseq:lease_t()]) -> ok.
+wait_for_leases_to_timeout(LocalLeases) ->
     MaxTimeout = lists:max([l_on_cseq:get_timeout(L) || L <- LocalLeases]),
     WaitTime = timer:now_diff(MaxTimeout, os:timestamp()) * 1000,
     if
@@ -41,13 +71,23 @@ recover(LeaseDBs) ->
             ok
     end,
     ?DBG_ASSERT(lists:all(fun l_on_cseq:has_timed_out/1, LocalLeases)),
-    %% log:log("candidates ~p~n", [LocalLeases]),
-    case LocalLeases of
-        [] -> lease_list:empty();
-        [Lease] -> % one potentially active lease: set active lease
-            lease_list:make_lease_list(Lease, [], []);
-        [_, _] -> % could be an ongoing split or an ongoing merge: finish operation
-            log:log("leases: ~p~n", [LocalLeases]),
-            ts = nyi, % ts: not yet implemented
-            lease_list:empty()
+    ok.
+
+% @doc take the left one
+-spec get_active_passive([l_on_cseq:lease_t()]) ->
+                                {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
+get_active_passive(LocalLeases) ->
+    [First, Second] = LocalLeases,
+    case intervals:is_all(intervals:union(l_on_cseq:get_range(First),
+                                          l_on_cseq:get_range(Second))) of
+        true ->
+            {Second, First};
+        false ->
+            case intervals:is_left_of(l_on_cseq:get_range(First),
+                                      l_on_cseq:get_range(Second)) of
+                true ->
+                    {Second, First};
+                false ->
+                    {First, Second}
+            end
     end.
