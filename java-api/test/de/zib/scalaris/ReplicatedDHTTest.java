@@ -132,8 +132,9 @@ public class ReplicatedDHTTest {
     public void testDelete_notExistingKey() throws ConnectionException,
             TimeoutException, UnknownException {
         final String key = "_Delete_NotExistingKey";
-        final ReplicatedDHT rdht = new ReplicatedDHT();
-        final RoutingTable rt = new RoutingTable();
+        final Connection c = ConnectionFactory.getInstance().createConnection("test");
+        final ReplicatedDHT rdht = new ReplicatedDHT(c);
+        final RoutingTable rt = new RoutingTable(c);
         final int r = rt.get_replication_factor();
 
         try {
@@ -141,7 +142,7 @@ public class ReplicatedDHTTest {
                 final DeleteResult result0 = rdht.delete(testTime + key + i);
                 final DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(r, result.undef);
@@ -150,7 +151,7 @@ public class ReplicatedDHTTest {
                 checkKeyDoesNotExist(testTime + key + i);
             }
         } finally {
-            rdht.closeConnection();
+            c.close();
         }
     }
 
@@ -185,7 +186,7 @@ public class ReplicatedDHTTest {
                 DeleteResult result0 = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -197,7 +198,7 @@ public class ReplicatedDHTTest {
                 result0 = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(r, result.undef);
@@ -241,7 +242,7 @@ public class ReplicatedDHTTest {
                 final DeleteResult result0 = rdht.delete(testTime + key + i);
                 final DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -259,7 +260,7 @@ public class ReplicatedDHTTest {
                 DeleteResult result0 = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(r, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -271,7 +272,7 @@ public class ReplicatedDHTTest {
                 result0 = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
                 assertEquals(result0, result);
-                assertEquals(true, result.hasDeletedAll());
+                assertEquals(true, result.hasDeletedAll(c));
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(r, result.undef);
