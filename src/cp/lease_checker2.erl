@@ -210,7 +210,7 @@ describe_lease(Lease, _Type) ->
     Owner    = l_on_cseq:get_owner(Lease),
     Aux      = l_on_cseq:get_aux(Lease),
 
-    io:format("range:~p~n rel_range:~p~n owner:~p~n aux:~p~n", [Interval, RelRange, Owner, Aux]),
+    io:format("    range:~p~n   rel_range:~p~n   owner:~p~n   aux:~p~n", [Interval, RelRange, Owner, Aux]),
     ok.
 
 %% @todo change to /1 with | empty
@@ -230,7 +230,7 @@ describe_node(_Pid, NodeInfo) ->
                              end,
             RelRange = get_relative_range(ActiveInterval),
             LocalCorrect = MyRange =:= ActiveInterval,
-            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
+            io:format("rm =:= leases -> ~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
                       [LocalCorrect, ActiveInterval, MyRange, RelRange]),
             ok
     end.
@@ -317,7 +317,7 @@ describe_node_diff(Node, OldNodeInfo, NewNodeInfo) ->
                                 ok
                         end,
                     _ = case RangesDiffer of
-                            true -> io:format("  the range changed~n  ~p~n  ~p~n",
+                            true -> io:format("    the nodes' range changed~n      ~p~n      ~p~n",
                                               [OldRange, NewRange]);
                             false -> ok
                         end,
@@ -469,7 +469,7 @@ check_local_leases(_Pid, NodeInfo, Verbose) ->
                 false ->
                     case Verbose of
                         true ->
-                            io:format("rm =:= leases:~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
+                            io:format("rm =:= leases -> ~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
                                       [LocalCorrect, ActiveInterval, MyRange, RelRange]);
                         false ->
                             ok
