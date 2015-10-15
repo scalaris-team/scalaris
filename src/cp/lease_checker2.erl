@@ -268,9 +268,8 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
              io:format("lost ~p nodes: ~p~n", [N, Old]),
              describe_nodes(gb_trees_filter(fun (Pid, _Node) ->
                                                     ordsets:is_element(Pid, LostPids) end,
-                                            OldNodeInfos))
-             %% describe_nodes([ Node || {Pid, Node} <- gb_trees:to_list(OldNodeInfos),
-             %%                          ordsets:is_element(Pid, LostPids)])
+                                            OldNodeInfos)),
+             io:format("end lost~n", [])
     end,
     %% found
     _ = case ordsets:size(FoundPids) of
@@ -279,9 +278,8 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
              io:format("found ~p new nodes: ~p~n", [N2, New]),
              describe_nodes(gb_trees_filter(fun (Pid, _Node) ->
                                                     ordsets:is_element(Pid, FoundPids) end,
-                                            NewNodeInfos))
-             %% describe_nodes([ Node || {Pid, Node} <- gb_trees:to_list(NewNodeInfos),
-             %%                          ordsets:is_element(Pid, FoundPids)])
+                                            NewNodeInfos)),
+             io:format("end found~n", [])
     end,
     _ = case ordsets:size(Unchanged) of
         0 -> ok;
@@ -352,32 +350,32 @@ describe_lease_diff(OldLease, NewLease, Type) ->
             case compare_leases(OldLease, NewLease) of
                 true -> ok;
                 false ->
-                    io:format("  an ~p lease changed~n", [Type]),
+                    io:format("  an ~p lease has changed~n", [Type]),
                     case l_on_cseq:get_id(OldLease) =:= l_on_cseq:get_id(NewLease) of
                         true -> ok;
                         false ->
-                            io:format("    the id changed~n      ~p~n      ~p~n",
+                            io:format("    the id has changed~n      ~p~n      ~p~n",
                                       [l_on_cseq:get_id(OldLease),
                                        l_on_cseq:get_id(NewLease)])
                     end,
                     case l_on_cseq:get_owner(OldLease) =:= l_on_cseq:get_owner(NewLease) of
                         true -> ok;
                         false ->
-                            io:format("    the owner changed~n      ~p~n      ~p~n",
+                            io:format("    the owner has changed~n      ~p~n      ~p~n",
                                       [l_on_cseq:get_owner(OldLease),
                                        l_on_cseq:get_owner(NewLease)])
                     end,
                     case l_on_cseq:get_range(OldLease) =:= l_on_cseq:get_range(NewLease) of
                         true -> ok;
                         false ->
-                            io:format("    the range changed from~n    ~p~n    ->~n    ~p~n",
+                            io:format("    the range has changed from~n    ~p~n    ->~n    ~p~n",
                                       [l_on_cseq:get_range(OldLease),
                                        l_on_cseq:get_range(NewLease)])
                     end,
                     case l_on_cseq:get_aux(OldLease) =:= l_on_cseq:get_aux(NewLease) of
                         true -> ok;
                         false ->
-                            io:format("    the aux changed ~p -> ~p",
+                            io:format("    the aux has changed ~p -> ~p",
                                       [l_on_cseq:get_aux(OldLease),
                                        l_on_cseq:get_aux(NewLease)])
                     end
@@ -475,8 +473,13 @@ check_local_leases(_Pid, NodeInfo, Verbose) ->
                 false ->
                     case Verbose of
                         true ->
-                            io:format("rm =:= leases -> ~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
-                                      [LocalCorrect, ActiveInterval, MyRange, RelRange]);
+                            Aux = l_on_cseq:get_aux(ActiveLease),
+                            io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
+                            io:format("    active lease=~p~n", [ActiveInterval]),
+                            io:format("      my_range  =~p~n", [MyRange]),
+                            io:format("      rel_range =~p~n", [RelRange]),
+                            io:format("      aux       =~p~n", [Aux]),
+                            io:format("    passive     =~p~n", [PassiveLeases]);
                         false ->
                             ok
                     end,
