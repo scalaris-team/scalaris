@@ -95,12 +95,12 @@ check_leases(OldState, TargetSize, First) ->
     io:format("================= check leases ====================~n"),
     LastFailed = OldState#leases_state_t.last_failed,
     NewState = create_new_state(),
-    Changed = not
+    Changed =
         case compare_node_lists(OldState#leases_state_t.node_infos,
                                 NewState#leases_state_t.node_infos) of
-            true -> true;
+            true -> false;
             false -> describe_lease_states_diff(OldState, NewState),
-                     false
+                     true
         end,
     Res = check_state(NewState, First orelse not LastFailed orelse Changed, TargetSize),
     {Res, NewState#leases_state_t{last_failed=not Res}}.
@@ -222,6 +222,7 @@ describe_node(_Pid, NodeInfo) ->
             LeaseList = NodeInfo#node_info_t.lease_list,
             MyRange   = NodeInfo#node_info_t.my_range,
             ActiveLease = lease_list:get_active_lease(LeaseList),
+            PassiveLeases = lease_list:get_passive_leases(LeaseList),
             ActiveInterval = case ActiveLease of
                                  empty ->
                                      intervals:empty();
@@ -229,9 +230,14 @@ describe_node(_Pid, NodeInfo) ->
                                      l_on_cseq:get_range(ActiveLease)
                              end,
             RelRange = get_relative_range(ActiveInterval),
+            Aux = l_on_cseq:get_aux(ActiveLease),
             LocalCorrect = MyRange =:= ActiveInterval,
-            io:format("rm =:= leases -> ~w~n active lease=~p~n my_range    =~p~n rel_range     =~p~n",
-                      [LocalCorrect, ActiveInterval, MyRange, RelRange]),
+            io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
+            io:format("    active lease=~p~n", [ActiveInterval]),
+            io:format("      my_range  =~p~n", [MyRange]),
+            io:format("      rel_range =~p~n", [RelRange]),
+            io:format("      aux       =~p~n", [Aux]),
+            io:format("    passive     =~p~n", [PassiveLeases]),
             ok
     end.
 
