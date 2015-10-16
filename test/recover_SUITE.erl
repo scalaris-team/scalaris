@@ -27,15 +27,6 @@
 
 -define(CLOSE, close).
 
-num_executions() ->
-    5.
-
-repeater_num_executions() ->
-    10.
-
-ring_size() ->
-    4.
-
 groups() ->
     [{slide_tests, [sequence], [
                                 %% leaves one node with no lease
@@ -43,11 +34,19 @@ groups() ->
                                 half_join_and_recover_after_step3,
                                 half_join_and_recover_after_step4
                                ]},
+     {leave_tests, [sequence], [
+                                %% leaves one node with no lease
+                                %% half_leave_and_recover_after_step1,
+                                %% half_leave_and_recover_after_step2,
+                                half_leave_and_recover_after_step3,
+                                half_leave_and_recover_after_step4
+                               ]},
      {repeater, [{repeat, 30}], [{group, slide_tests}]}
     ].
 
 all() -> [
-          {group, slide_tests}
+          {group, slide_tests},
+          {group, leave_tests}
          ].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
@@ -65,16 +64,15 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(ring_size(), [{config, [{log_path, PrivDir},
-                                                      {leases, true},
-                                                      {db_backend, db_mnesia}]}]),
-    %%[{stop_ring, true} | Config].
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir},
+                                                   {leases, true},
+                                                   {db_backend, db_mnesia}]}]),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     _ = application:stop(mnesia),
-    %% %% need config to get db path
+    %% need config to get db path
     Config2 = unittest_helper:start_minimal_procs(Config, [], false),
     PWD = os:cmd(pwd),
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
@@ -95,6 +93,22 @@ half_join_and_recover_after_step3(Config) ->
 
 half_join_and_recover_after_step4(Config) ->
     half_join_and_recover(Config, split_reply_step4).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% test interrupted merge before recover
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+half_leave_and_recover_after_step1(Config) ->
+    half_leave_and_recover(Config, merge_reply_step1).
+
+half_leave_and_recover_after_step2(Config) ->
+    half_leave_and_recover(Config, merge_reply_step2).
+
+half_leave_and_recover_after_step3(Config) ->
+    half_leave_and_recover(Config, merge_reply_step3).
+
+half_leave_and_recover_after_step4(Config) ->
+    half_leave_and_recover(Config, merge_reply_step4).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% generic test for interrupted split before recover
@@ -124,6 +138,45 @@ half_join_and_recover(Config, MsgTag) ->
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
     lease_checker2:wait_for_clean_leases(500, 4),
+    %% ring restored -> checking KV data integrity
+    _ = check_data_integrity(),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% generic test for interrupted merge before recover
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+half_leave_and_recover(Config, MsgTag) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    %% write data
+    _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+    %% hook into merge-protocol
+    [gen_component:bp_set_cond(Pid, block(self(), MsgTag),
+                               block)
+     || Pid <- pid_groups:find_all(dht_node)],
+    %% kill node
+    RandomNode = comm:make_local(lease_checker:get_random_save_node()),
+    PidGroup = pid_groups:group_of(RandomNode),
+    PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
+                             element(2, db_util:parse_table_name(Table)) =:= PidGroup],
+    ct:pal("kill node"),
+    {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
+    %% wait for break point
+    receive
+        {dropped, MsgTag} -> ok
+    end,
+    %% stop ring
+    unittest_helper:stop_ring(),
+    %% wait for leases to expire
+    timer:sleep(11000),
+    %% remove database files
+    _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
+    %% recover
+    unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
+                                                  {leases, true},
+                                                  {db_backend, db_mnesia},
+                                                  {start_type, recover}]}]),
+    lease_checker2:wait_for_clean_leases(500, 3),
     %% ring restored -> checking KV data integrity
     _ = check_data_integrity(),
     true.

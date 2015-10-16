@@ -269,7 +269,6 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
              describe_nodes(gb_trees_filter(fun (Pid, _Node) ->
                                                     ordsets:is_element(Pid, LostPids) end,
                                             OldNodeInfos)),
-             io:format("end lost~n", [])
     end,
     %% found
     _ = case ordsets:size(FoundPids) of
@@ -375,7 +374,7 @@ describe_lease_diff(OldLease, NewLease, Type) ->
                     case l_on_cseq:get_aux(OldLease) =:= l_on_cseq:get_aux(NewLease) of
                         true -> ok;
                         false ->
-                            io:format("    the aux has changed ~p -> ~p",
+                            io:format("    the aux has changed~n    ~p~n    ->~n    ~p~n",
                                       [l_on_cseq:get_aux(OldLease),
                                        l_on_cseq:get_aux(NewLease)])
                     end
@@ -473,13 +472,18 @@ check_local_leases(_Pid, NodeInfo, Verbose) ->
                 false ->
                     case Verbose of
                         true ->
-                            Aux = l_on_cseq:get_aux(ActiveLease),
-                            io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
-                            io:format("    active lease=~p~n", [ActiveInterval]),
-                            io:format("      my_range  =~p~n", [MyRange]),
-                            io:format("      rel_range =~p~n", [RelRange]),
-                            io:format("      aux       =~p~n", [Aux]),
-                            io:format("    passive     =~p~n", [PassiveLeases]);
+                            case ActiveLease of
+                                empty ->
+                                    io:format("the active lease is empty~n");
+                                _ ->
+                                    Aux = l_on_cseq:get_aux(ActiveLease),
+                                    io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
+                                    io:format("    active lease=~p~n", [ActiveInterval]),
+                                    io:format("      my_range  =~p~n", [MyRange]),
+                                    io:format("      rel_range =~p~n", [RelRange]),
+                                    io:format("      aux       =~p~n", [Aux]),
+                                    io:format("    passive     =~p~n", [PassiveLeases])
+                            end;
                         false ->
                             ok
                     end,
