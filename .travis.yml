@@ -1,17 +1,26 @@
-language: erlang
+language: java
+
+jdk: openjdk6
 
 otp_release:
    - 17.4
 
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "JFxfkbgDHgbRnw9xpCjp0YudLpRCOzrK4CJKDrbko78eDQ/7+YMDwz09dFf59qxWkfKaLWDzlaSuv0vptmuI/JeRkdQcIDVoQ1YEE34CQjaKoKyQRUWoBOK/uBj4jGko/FpDH8p+AK9AJUkB75QnMp72Rglvusx7OxFsyt/WUt0="
+
+
 addons:
-  apt:
-    packages:
-    - python3
+  coverity_scan:
+    project:
+      name: scalaris-team/scalaris
+      description: Scalaris, a distributed, transactional key-value store
+    notification_email: scalaris-owners@googlegroups.com
+    build_command_prepend: ./configure
+    build_command: make java
+    branch_pattern: coverity_scan
 
 script:
-  - ./configure
-  - touch TAGS.root
-  - make
-  - make python
-  - make python3
-  - make java
+  - true
