@@ -268,8 +268,8 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
              io:format("lost ~p nodes: ~p~n", [N, Old]),
              describe_nodes(gb_trees_filter(fun (Pid, _Node) ->
                                                     ordsets:is_element(Pid, LostPids) end,
-                                            OldNodeInfos)),
-    end,
+                                            OldNodeInfos))
+        end,
     %% found
     _ = case ordsets:size(FoundPids) of
         0 -> ok;
