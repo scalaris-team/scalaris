@@ -217,10 +217,7 @@ rbr_consistency(_Config) ->
 
     _ = [ begin
               New = N+100,
-              Old = case N of
-                        1 -> 1;
-                        _ -> N+99
-                    end,
+              {ok, Old} = kv_on_cseq:read(Key),
 
               modify_rbr_at_key(R, N+100),
               %% ct:pal("After modification:"),
@@ -379,7 +376,7 @@ read_quorum_without(Key) ->
               drop_prbr_read),
 
             {ok, Val} = kv_on_cseq:read(Key),
-            %% ct:pal("Old: ~p, Val: ~p New: ~p", [Old, Val, New]),
+            io:format("Old: ~p, Val: ~p New: ~p", [Old, Val, New]),
             receive
                 {drop_prbr_read, done} ->
                     gen_component:bp_del(ExcludedDHTNode, drop_prbr_read),
@@ -393,7 +390,12 @@ read_quorum_without(Key) ->
                     {Old, New}; %% valid for next read
                 New ->
                     {New, New}; %% old is no longer acceptable
-                _ -> ?equals(Val, New)
+                X ->
+                    %% maybe an update was not propagated at all in the previous round
+                    case X > Old andalso X < New of
+                        true -> {X, New};
+                        _ -> ?equals(Val, New)
+                    end
             end
     end.
 
