@@ -113,8 +113,9 @@ check_state(State, Verbose, TargetSize) ->
 
 -spec check_leases_locally(leases_state(), boolean()) -> boolean().
 check_leases_locally(#leases_state_t{node_infos=Nodes}, Verbose) ->
-    lists:all(fun (B) -> B end, [ check_local_leases(Pid, Node, Verbose) ||
-                                    {Pid, Node} <- gb_trees:to_list(Nodes) ]).
+    lists:foldl(fun ({Pid, Node}, Acc) ->
+                        Acc andalso check_local_leases(Pid, Node, Verbose)
+                end, true, gb_trees:to_list(Nodes)).
 
 -spec check_leases_globally(leases_state(), boolean(), pos_integer()) -> boolean().
 check_leases_globally(State, Verbose, TargetSize) ->
@@ -126,6 +127,7 @@ check_leases_globally(State, Verbose, TargetSize) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc returns true iff the lists are equal
 -spec compare_node_lists(node_list(), node_list()) -> boolean().
 compare_node_lists(Old, New) ->
     OldPids = ordsets:from_list(gb_trees:keys(Old)),
