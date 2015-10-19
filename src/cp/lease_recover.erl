@@ -34,10 +34,8 @@ recover(LeaseDBs) ->
                   ],
     case length(LocalLeases) of
         0 ->
-            log:log("recovered with zero leases~n"),
-            %% async. call!
-            service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-            util:sleep_for_ever(),
+            log:log("recovered with zero leases (~p)~n", [comm:this()]),
+            restart_node(),
             lease_list:empty();
         1 ->
             wait_for_leases_to_timeout(LocalLeases),
@@ -91,3 +89,11 @@ get_active_passive(LocalLeases) ->
                     {First, Second}
             end
     end.
+
+-spec restart_node() -> no_return().
+restart_node() ->
+    log:log("we are restarting ~p~n", [comm:this()]),
+    _ = admin:add_node([]),
+    %% async. call!
+    service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
+    util:sleep_for_ever().
