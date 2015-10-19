@@ -1074,7 +1074,7 @@ on({l_on_cseq, post_recover_merge, Result}, State) ->
             log:log("recover: the merge of ~p and ~p was a success", [L2, L1]),
             State;
         _ ->
-            log:log("recover: the merge failed: ", [Result]),
+            log:log("recover: the merge failed: ~p", [Result]),
             State
     end.
 
