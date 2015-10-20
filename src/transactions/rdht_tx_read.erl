@@ -508,15 +508,23 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                                                    Op =:= ?read ->
                                  %% maybe a value not visible in every majority
 
-                                 %% if we return not_found a read after a write
-                                 %% could return not_found, which is wrong
+                                 %% (a) if we return not_found a read after a
+                                 %% write could return not_found, which is wrong
                                  %% (majority has value, but not yet the
-                                 %% complete remaining minority).  Returning the
-                                 %% partly written value (persistent in a
-                                 %% minority of the replicas) is also
-                                 %% problematic, a subsequent read may return
-                                 %% not_found when it accesses other replicas.
-                                 %% The solution is done in the new rbrcseq.
+                                 %% complete remaining minority).
+
+                                 %% (b) Returning the partly written value
+                                 %% (persistent in a minority of the replicas)
+                                 %% is also problematic, a subsequent read may
+                                 %% return not_found when it accesses other
+                                 %% replicas.
+
+                                 %% We have no correct solution here.
+                                 %% The solution is done in the new
+                                 %% rbrcseq.
+
+                                 %% We return the value as
+                                 %% api_tx_SUITE:random_write_read needs it.
 
                                                         %% ?not_found;
                                                         ?value;
