@@ -506,8 +506,20 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                                                         %% a value visible in every majority r=4: at least in 2 visible
                                                         ?value;
                                                    Op =:= ?read ->
-                                                        %% maybe a value not visible in every majority
-                                                        ?not_found;
+                                 %% maybe a value not visible in every majority
+
+                                 %% if we return not_found a read after a write
+                                 %% could return not_found, which is wrong
+                                 %% (majority has value, but not yet the
+                                 %% complete remaining minority).  Returning the
+                                 %% partly written value (persistent in a
+                                 %% minority of the replicas) is also
+                                 %% problematic, a subsequent read may return
+                                 %% not_found when it accesses other replicas.
+                                 %% The solution is done in the new rbrcseq.
+
+                                                        %% ?not_found;
+                                                        ?value;
                                                    true ->
                                                         ?partial_value
                                                end,
