@@ -48,7 +48,7 @@ groups() ->
      {remove_node_group, [sequence], [write, {group, remove_node}]},
      {remove_node, [sequence, {repeat, num_executions()}], [remove_node]},
 
-     {make_ring_group_repeater, [sequence], [test_make_ring, write, 
+     {make_ring_group_repeater, [sequence], [test_make_ring, write,
                                              {group, recover_data_group_repeater}]},
      {recover_data_group_repeater, [sequence, {repeat, repeater_num_executions()}], [read]},
      {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
@@ -102,6 +102,8 @@ end_per_group(recover_data_group_repeater = Group, Config) ->
 end_per_group(remove_node = Group, Config) ->
     unittest_helper:end_per_group(Group, Config);
 end_per_group(remove_node_repeater = Group, Config) ->
+    unittest_helper:end_per_group(Group, Config);
+end_per_group(repeater = Group, Config) ->
     unittest_helper:end_per_group(Group, Config);
 end_per_group(Group, Config) ->
     ct:pal("stop ring, stop mnesia and clean repository"),
