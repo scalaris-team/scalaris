@@ -170,7 +170,8 @@ tester_type_check_l_on_cseq(_Config) ->
             {update_active_lease, 2}, %% assert fails for random input
             {remove_next_round, 2}, %% cannot create dht_node_state (reference for bulkowner)
             {remove_passive_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
-            {remove_active_lease_from_dht_node_state, 3} %% cannot create dht_node_state (reference for bulkowner)
+            {remove_active_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
+            {restart_node, 0} %% kills the current process
            ]},
           {leases,
            [
