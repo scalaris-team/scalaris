@@ -92,8 +92,8 @@ get_active_passive(LocalLeases) ->
 
 -spec restart_node() -> no_return().
 restart_node() ->
-    log:log("we are restarting ~p~n", [comm:this()]),
-    _ = admin:add_node([]),
+    NewNode = admin:add_node([]),
+    log:log("we are restarting ~p -> ~p~n", [comm:this(), NewNode]),
     %% async. call!
     service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
     util:sleep_for_ever().
