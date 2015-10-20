@@ -31,7 +31,7 @@ groups() ->
     [{slide_tests, [sequence], [
                                 %% leaves one node with no lease
                                 %% half_join_and_recover_after_step2,
-                                half_join_and_recover_after_step3,
+                                %% half_join_and_recover_after_step3,
                                 half_join_and_recover_after_step4
                                ]},
      {leave_tests, [sequence], [
