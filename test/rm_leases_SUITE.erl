@@ -132,14 +132,14 @@ tester_type_check_rm_leases(_Config) ->
 test_single_kill(_Config) ->
 %    log:log("join nodes", []),
     log:log("kill nodes", []),
-    synchronous_kill(4, 3),
+    synchronous_kill(config:read(replication_factor), config:read(replication_factor)-1),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
 test_double_kill(_Config) ->
 %    log:log("join nodes", []),
     log:log("kill nodes", []),
-    synchronous_kill(4, 2),
+    synchronous_kill(config:read(replication_factor), config:read(replication_factor)-2),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
@@ -153,21 +153,21 @@ test_double_kill(_Config) ->
 test_single_add(_Config) ->
 %    log:log("join nodes", []),
     log:log("add nodes", []),
-    synchronous_add(4, 5),
+    synchronous_add(config:read(replication_factor), config:read(replication_factor)+1),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
 test_double_add(_Config) ->
 %    log:log("join nodes", []),
     log:log("add nodes", []),
-    synchronous_add(4, 6),
+    synchronous_add(config:read(replication_factor), config:read(replication_factor)+2),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
 test_triple_add(_Config) ->
 %    log:log("join nodes", []),
     log:log("add nodes", []),
-    synchronous_add(4, 7),
+    synchronous_add(config:read(replication_factor), config:read(replication_factor)+3),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
@@ -177,7 +177,7 @@ test_triple_add(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 propose_new_neighbor(_Config) ->
-    lease_helper:wait_for_ring_size(4),
+    lease_helper:wait_for_ring_size(config:read(replication_factor)),
     lease_helper:wait_for_correct_ring(),
     MainNode = pid_groups:group_with(dht_node),
     % main node
@@ -190,15 +190,15 @@ propose_new_neighbor(_Config) ->
     Msg = {read_after_rm_change, PredRange, Result},
     TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
     ct:pal("+wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
-    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change], %get_node_for_new_neighbor], 
-                            fun () -> 
-                                    comm:send_local(RMLeasesPid, Msg) 
+    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change], %get_node_for_new_neighbor],
+                            fun () ->
+                                    comm:send_local(RMLeasesPid, Msg)
                             end),
     ct:pal("-wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
 
 
-    AllRMMsgs = [read_after_rm_change, takeover_after_rm_change, 
-                 merge_after_rm_change, merge_after_leave, 
+    AllRMMsgs = [read_after_rm_change, takeover_after_rm_change,
+                 merge_after_rm_change, merge_after_leave,
                  get_node_for_new_neighbor, get_takeovers],
     ct:pal("+test_quiescence"),
     test_quiescence(RMLeasesPid, AllRMMsgs, 100),
@@ -218,18 +218,18 @@ test_network_partition(_Config) ->
     % node.
 
     DHTNodes = pid_groups:find_all(dht_node),
-    IdsAndNodes = lists:sort( 
-        [ 
+    IdsAndNodes = lists:sort(
+        [
           begin
-              comm:send_local(Node, {get_state, comm:this(), [node_id]}), 
-              receive 
+              comm:send_local(Node, {get_state, comm:this(), [node_id]}),
+              receive
                   {get_state_response, [{node_id, Id}]} ->
                       {Id, Node}
               end
           end
           || Node <- DHTNodes]),
-    OddNodes = iterate_even_odd(IdsAndNodes, 
-                                fun(Val, Even) -> 
+    OddNodes = iterate_even_odd(IdsAndNodes,
+                                fun(Val, Even) ->
                                         case Even of
                                             true ->
                                                 ok;
@@ -252,9 +252,9 @@ test_network_partition(_Config) ->
     %comm:send_local(RMLeasesPid, Msg),
 
     % what do we expect to happen? takeover and merge should succeed
-    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change], 
-                            fun () -> 
-                                    comm:send_local(RMLeasesPid, Msg) 
+    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change],
+                            fun () ->
+                                    comm:send_local(RMLeasesPid, Msg)
                             end),
     ok.
 
@@ -270,7 +270,7 @@ iterate_even_odd1([Val|Rest], F, Even, Acc) ->
         _ ->
             iterate_even_odd1(Rest, F, not Even, Acc)
     end.
-            
+
 get_pred_info(Pid) ->
     comm:send_local(Pid, {get_state, comm:this(), neighbors}),
     Neighbors = receive
@@ -286,8 +286,6 @@ get_pred_info(Pid) ->
     LeaseId = l_on_cseq:id(PredRange),
     {ok, Lease} = l_on_cseq:read(LeaseId),
     {PredPid, PredRange, Lease}.
-
-    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
