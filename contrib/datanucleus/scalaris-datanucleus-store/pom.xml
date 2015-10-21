@@ -1,10 +1,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <groupId>de.zib.scalaris</groupId>
-    <version>4.0.99-SNAPSHOT</version>
-    <artifactId>scalaris-datanucleus-store</artifactId>
+    <version>4.1.99-SNAPSHOT</version>
+    <artifactId>datanucleus-store</artifactId>
     <name>datanucleus.store.scalaris</name>
+
     <description>&quot;Scalaris&quot; data store plugin for Datanucleus deriving from  Datanucleus-json plugin.
 	
 	The research leading to these results has received funding from the European Union’s Seventh Framework Programme (FP7/2007-2013) under grant agreement n° 258862.
