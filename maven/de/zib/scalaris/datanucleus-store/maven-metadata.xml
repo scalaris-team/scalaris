@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>de.zib.scalaris</groupId>
+  <artifactId>datanucleus-store</artifactId>
+  <versioning>
+    <versions>
+      <version>4.1.99-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20151021125331</lastUpdated>
+  </versioning>
+</metadata>

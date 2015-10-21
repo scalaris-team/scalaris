@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>de.zib.scalaris</groupId>
+  <artifactId>datanucleus-store</artifactId>
+  <version>4.1.99-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <timestamp>20151021.125331</timestamp>
+      <buildNumber>1</buildNumber>
+    </snapshot>
+    <lastUpdated>20151021125331</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>4.1.99-20151021.125331-1</value>
+        <updated>20151021125331</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>4.1.99-20151021.125331-1</value>
+        <updated>20151021125331</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>
