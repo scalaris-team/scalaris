@@ -112,7 +112,7 @@ increment_iter(Key, Iterations, Aborts) ->
             increment_iter(Key, Iterations, Aborts + 1)
     end.
 
--spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> {histogram:histogram(), non_neg_integer()}.
+-spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> {non_neg_integer(), histogram:histogram()}.
 increment_with_histo_iter(H, _Key, 0, Aborts) ->
     {Aborts, H};
 increment_with_histo_iter(H, Key, Iterations, Aborts) ->
