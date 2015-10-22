@@ -109,7 +109,7 @@ increment_iter(Key, Iterations, Aborts) ->
             increment_iter(Key, Iterations, Aborts + 1);
         X ->
             log:log(warn, "bench_fun:increment_iter unexpected return: ~p", [X]),
-            increment_iter(Key, Iterations, Aborts +1)
+            increment_iter(Key, Iterations, Aborts + 1)
     end.
 
 -spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> {histogram:histogram(), non_neg_integer()}.
@@ -131,7 +131,7 @@ increment_with_histo_iter(H, Key, Iterations, Aborts) ->
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         X ->
             log:log(warn, "bench_fun:increment_with_histo_iter unexpected return: ~p", [X]),
-            increment_iter(Key, Iterations, Aborts +1)
+            increment_with_histo_iter(H, Key, Iterations, Aborts + 1)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
