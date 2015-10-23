@@ -1,4 +1,4 @@
-%% @copyright 2007-2014 Zuse Institute Berlin
+%% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ on({send, DestPid, Message, Options}, State) ->
                                     local_listen_port(State),
                                     channel(State)),
             case Socket of
-                fail ->
+                notconnected ->
                     comm_server:report_send_error(Options,
                                                   {dest_ip(State), dest_port(State), DestPid},
                                                   Message, tcp_connect_failed),
@@ -444,76 +444,83 @@ send(Pid, Message, Options, State) ->
         -> state().
 send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
     Socket = socket(State),
-    ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
-    case gen_tcp:send(Socket, BinaryMessage) of
-        ok ->
-            ?TRACE("~.0p Sent message ~.0p~n",
-                   [pid_groups:my_pidname(), Message]),
-            SendMsgCount = s_msg_count_session(State),
-            State2 = save_n_msgs(Message, fun set_last_msg_sent/2, State),
-            %% only close in case of no_keep_alive if the
-            %% connection was solely initiated for this send
-            case SendMsgCount =< 1 andalso
-                     lists:member({no_keep_alive}, Options) of
-                true -> close_connection(Socket, State2);
-                _    -> State2
-            end;
-        {error, closed} ->
-            case Errors < 1 of
-                true ->
-                    State2 = close_connection(Socket, State),
-                    State3 = set_socket(State2, reconnect(State2)),
-                    send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
-                _    ->
-                    Address = dest_ip(State),
-                    Port = dest_port(State),
-                    report_bundle_error(Options, {Address, Port, Pid}, Message,
-                                        socket_closed),
-                    log:log(warn,"[ CC ~p (~p) ] sending closed connection", [self(), pid_groups:my_pidname()]),
-                    close_connection(Socket, State)
-            end;
-        {error, timeout} ->
-            if  % retry 5 times
-                Timeouts < 5 ->
-                    log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retrying.",
-                            [self(), pid_groups:my_pidname(), timeout]),
-                    send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts + 1, Errors);
-                true ->
-                    log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retried 5 times, now closing the connection.",
-                            [self(), pid_groups:my_pidname(), timeout]),
-                    Address = dest_ip(State),
-                    Port = dest_port(State),
-                    report_bundle_error(Options, {Address, Port, Pid}, Message,
-                                        socket_timeout),
-                    close_connection(Socket, State)
-            end;
-        {error, Reason} ->
-            case Errors < 1 of
-                true ->
-                    State2 = close_connection(Socket, State),
-                    State3 = set_socket(State2, reconnect(State2)),
-                    send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
-                _    ->
-                    Address = dest_ip(State),
-                    Port = dest_port(State),
-                    report_bundle_error(Options, {Address, Port, Pid}, Message,
-                                        Reason),
-                    log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). closing connection",
-                            [self(), pid_groups:my_pidname(), Reason]),
-                    close_connection(Socket, State)
+    case Socket of
+        notconnected ->
+            log:log(error, "[ CC ~p (~p) ] couldn't send message (tcp connect failed)",
+                    [self(), pid_groups:my_pidname()]),
+            set_socket(reset_msg_counters(State), notconnected);
+        Socket ->
+            ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
+            case gen_tcp:send(Socket, BinaryMessage) of
+                ok ->
+                    ?TRACE("~.0p Sent message ~.0p~n",
+                           [pid_groups:my_pidname(), Message]),
+                    SendMsgCount = s_msg_count_session(State),
+                    State2 = save_n_msgs(Message, fun set_last_msg_sent/2, State),
+                    %% only close in case of no_keep_alive if the
+                    %% connection was solely initiated for this send
+                    case SendMsgCount =< 1 andalso
+                        lists:member({no_keep_alive}, Options) of
+                        true -> close_connection(Socket, State2);
+                        _    -> State2
+                    end;
+                {error, closed} ->
+                    case Errors < 1 of
+                        true ->
+                            State2 = close_connection(Socket, State),
+                            State3 = set_socket(State2, reconnect(State2)),
+                            send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
+                        _    ->
+                            Address = dest_ip(State),
+                            Port = dest_port(State),
+                            report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                                socket_closed),
+                            log:log(warn,"[ CC ~p (~p) ] sending closed connection", [self(), pid_groups:my_pidname()]),
+                            close_connection(Socket, State)
+                    end;
+                {error, timeout} ->
+                    if  % retry 5 times
+                        Timeouts < 5 ->
+                            log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retrying.",
+                                    [self(), pid_groups:my_pidname(), timeout]),
+                            send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts + 1, Errors);
+                        true ->
+                            log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retried 5 times, now closing the connection.",
+                                    [self(), pid_groups:my_pidname(), timeout]),
+                            Address = dest_ip(State),
+                            Port = dest_port(State),
+                            report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                                socket_timeout),
+                            close_connection(Socket, State)
+                    end;
+                {error, Reason} ->
+                    case Errors < 1 of
+                        true ->
+                            State2 = close_connection(Socket, State),
+                            State3 = set_socket(State2, reconnect(State2)),
+                            send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
+                        _    ->
+                            Address = dest_ip(State),
+                            Port = dest_port(State),
+                            report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                                Reason),
+                            log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). closing connection",
+                                    [self(), pid_groups:my_pidname(), Reason]),
+                            close_connection(Socket, State)
+                    end
             end
     end.
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
                      comm_server:tcp_port(), Channel::comm:channel() | unknown)
-        -> inet:socket() | fail.
+        -> inet:socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel) ->
     new_connection(Address, Port, MyPort, Channel, 0).
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
                      comm_server:tcp_port(), Channel::comm:channel() | unknown,
                      non_neg_integer())
-        -> inet:socket() | fail.
+        -> inet:socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel, Retries) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
                          ++ comm_server:tcp_options(Channel),
@@ -543,13 +550,13 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
             log:log(info,"[ CC ~p (~p) ] couldn't connect (~.0p)",
                     [self(), pid_groups:my_pidname(), Reason]),
             case Retries >= 3 of
-                true -> fail;
+                true -> notconnected;
                 _    -> timer:sleep(config:read(tcp_connect_timeout) * (Retries + 1)),
                         new_connection(Address, Port, MyPort, Channel, Retries + 1)
             end
     end.
 
--spec reconnect(state()) -> inet:socket() | fail.
+-spec reconnect(state()) -> inet:socket() | notconnected.
 reconnect(State) ->
     Address = dest_ip(State),
     Port = dest_port(State),
