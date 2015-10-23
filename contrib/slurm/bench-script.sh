@@ -5,7 +5,7 @@
 
 #SBATCH -J bench-script
 #SBATCH -N 2
-#SBATCH -p CSR
+#SBATCH -p CUMU
 #SBATCH -A csr
 #SBATCH --time=00:10:00
 #SBATCH --exclusive
@@ -13,6 +13,7 @@
 source /usr/share/modules/init/bash
 source $(pwd)/env.sh
 
+check_compile
 $(pwd)/scalaris-start.sh
 
 #############################################

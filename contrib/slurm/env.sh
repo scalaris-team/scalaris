@@ -35,8 +35,24 @@ function test_foreign_beams() {
     return 0
 }
 
+check_compile(){
+    local curdir=$(pwd)
+    cd $SCALARIS_DIR
+    local res=$(erl -pa contrib/yaws -pa ebin -noinput +B -eval 'R=make:all([noexec]), halt(0).')
+    cd $curdir
+    if [[ -n $res ]]; then
+        echo "Scalaris binaries do not match source version:"
+        echo $res
+        exit 1
+    fi
+}
+
+
 export -f cleanup
 export -f test_foreign_beams
+export -f check_compile
 
 trap cleanup SIGTERM
+
+
 

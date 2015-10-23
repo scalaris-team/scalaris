@@ -4,6 +4,8 @@ ERLANG_VERSIONS="R17B05 R14B04"
 
 mkdir -p $OUTPUTDIR
 
+check_compile
+
 for NNODES in "2" #  1 2 3 4 5 6 7 8 12 16 24 32
 do
     for VMS_PER_NODE in "2" #  1 2 4 8

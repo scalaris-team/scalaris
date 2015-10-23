@@ -13,7 +13,7 @@
 source $(pwd)/env.sh
 
 #$BINDIR/scalarisctl checkinstallation
-
+check_compile
 $(pwd)/scalaris-start.sh
 
 #############################################
