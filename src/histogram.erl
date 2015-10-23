@@ -216,6 +216,6 @@ tester_is_valid_histogram(#histogram{size = 0, data = [], data_size = 0}) ->
     true;
 tester_is_valid_histogram(#histogram{size = Size, data = Data, data_size = DataSize})
   when Size > 0->
-    Size >= DataSize andalso length(Data) =:= DataSize;
+    Size >= DataSize andalso is_list(Data) andalso length(Data) =:= DataSize;
 tester_is_valid_histogram(_) ->
     false.
