@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ check_leases(OldState, TargetSize, First) ->
         {Old, Old} ->
             io:format("================= check leases (~p of ~p) ====================~n",
                       [Old, TargetSize]);
-        {Old, New} ->
+        {Old, New} ->
           io:format("================= check leases ((~p -> ~p) of ~p) ====================~n",
                    [Old, New, TargetSize])
      end,
