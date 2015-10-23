@@ -387,10 +387,12 @@ asymmetric_ring(Config) ->
     RRConf = get_rep_upd_config(Method),
 
     %build and fill ring
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
     Key1 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,4}),
     Key2 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,2}),
     Key3 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {3,4}),
     Key4 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7,8}),
+    unittest_helper:stop_minimal_procs(Config2),
     NodeKeys = [Key1, Key2, Key3, Key4],
     _ = build_ring(NodeKeys, Config, RRConf),
 
@@ -574,7 +576,9 @@ get_symmetric_keys(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
 build_symmetric_ring(NodeCount, Config, RRConfig) ->
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
+    unittest_helper:stop_minimal_procs(Config2),
     build_ring(NodeKeys, Config, RRConfig).
 
 build_ring(NodeKeys, Config, RRConfig) ->
