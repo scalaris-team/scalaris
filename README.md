@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/scalaris-team/scalaris.svg?branch=master)](https://travis-ci.org/scalaris-team/scalaris)
+[![Project Stats](https://www.openhub.net/p/scalaris/widgets/project_thin_badge.gif)](https://www.openhub.net/p/scalaris)
 
 Scalaris is a scalable, transactional, distributed and fault-tolerant
 key-value-store with strong data consistency for online databases and
