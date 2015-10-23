@@ -281,7 +281,7 @@ on({send_error, FailedTarget,
     {?send_to_registered_proc, monitor_perf,
      {bulkowner, reply, Id, Target, BMsg, Parents}}, Reason} = _Msg, State) ->
     %% redirect to other send_error
-    on({send_error, FailedTarget, {bulkowner, reply, Id, Target, BMsg, Parents}, Reason}, State);
+    gen_component:post_op({send_error, FailedTarget, {bulkowner, reply, Id, Target, BMsg, Parents}, Reason}, State);
 
 on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg,
    {AllNodes, Leader, BenchPid, IgnBenchT} = _State)
