@@ -66,14 +66,14 @@ function start_servers() {
 
     ## @todo use auto-binding
     # start vms at all the tail nodes
-    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE &
+    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE 
 
     # start remaining VMs on head node
     PORT=14196
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
         JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start &
+        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start 
         let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1
