@@ -105,7 +105,7 @@ init_system_stats() ->
       ?MODULE, 'mem_binary', rrd:create(15 * 1000000, 1, gauge)),
     monitor:monitor_set_value(
       ?MODULE, 'mem_ets', rrd:create(15 * 1000000, 1, gauge)),
-    
+
     monitor:monitor_set_value(
       ?MODULE, 'rcv_count', rrd:create(15 * 1000000, 1, gauge)),
     monitor:monitor_set_value(
@@ -122,7 +122,7 @@ collect_system_stats() ->
     [{total, MemTotal}, {processes, MemProcs}, {system, MemSys},
      {atom, MemAtom}, {binary, MemBin}, {ets, MemEts}] =
         erlang:memory([total, processes, system, atom, binary, ets]),
-    
+
     monitor:monitor_set_value(?MODULE, 'mem_total',
                            fun(Old) -> rrd:add_now(MemTotal, Old) end),
     monitor:monitor_set_value(?MODULE, 'mem_processes',
@@ -135,7 +135,7 @@ collect_system_stats() ->
                            fun(Old) -> rrd:add_now(MemBin, Old) end),
     monitor:monitor_set_value(?MODULE, 'mem_ets',
                            fun(Old) -> rrd:add_now(MemEts, Old) end),
-    
+
     {RcvCnt, RcvBytes, SendCnt, SendBytes} = comm_stats:get_stats(),
     monitor:monitor_set_value(?MODULE, 'rcv_count',
                            fun(Old) -> rrd:add_now(RcvCnt, Old) end),
@@ -263,7 +263,7 @@ on({bulkowner, gather, Id, Target, Msgs, Parents} = _Msg, State) ->
                                {PerfRR2, PerfLH2, rrd:timing_with_hist_merge_fun(0, PerfTX2, PerfTX3)}
                        end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
              end, {undefined, undefined, undefined}, Msgs),
-    
+
     Msg = {?send_to_registered_proc, monitor_perf,
            {gather_stats_response, [{?MODULE, 'read_read', PerfRR},
                                     {dht_node, 'lookup_hops', PerfLH},
@@ -276,6 +276,12 @@ on({send_error, FailedTarget, {bulkowner, reply, Id, Target, BMsg, Parents}, _Re
     % if sending the reply from bulkowner gather fails
     bulkowner:send_reply_failed(Id, Target, BMsg, Parents, self(), FailedTarget),
     State;
+
+on({send_error, FailedTarget,
+    {?send_to_registered_proc, monitor_perf,
+     {bulkowner, reply, Id, Target, BMsg, Parents}}, Reason} = _Msg, State) ->
+    %% redirect to other send_error
+    on({send_error, FailedTarget, {bulkowner, reply, Id, Target, BMsg, Parents}, Reason}, State);
 
 on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg,
    {AllNodes, Leader, BenchPid, IgnBenchT} = _State)
