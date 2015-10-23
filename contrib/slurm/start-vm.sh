@@ -16,6 +16,7 @@ start_vm(){
     PORT=$((BASE_PORT+LOCAL_OFFSET))
     YAWSPORT=$((BASE_YAWSPORT+LOCAL_OFFSET))
     $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $NODES_PER_VM --screen -d -t joining start
+    sleep 5
 }
 
 until [ -z "$1" ]; do
