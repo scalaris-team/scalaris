@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -92,9 +92,23 @@ wait_for_clean_leases(WaitTimeInMs, TargetSize, First, State) ->
 -spec check_leases(OldState::leases_state(), TargetSize::pos_integer(), First::boolean()) ->
                           {boolean(), leases_state()}.
 check_leases(OldState, TargetSize, First) ->
-    io:format("================= check leases ====================~n"),
     LastFailed = OldState#leases_state_t.last_failed,
     NewState = create_new_state(),
+    case {gb_trees:size(OldState#leases_state_t.node_infos),
+          gb_trees:size(NewState#leases_state_t.node_infos)} of
+        {Old, Old} ->
+            io:format("================= check leases (~p of ~p) ====================~n",
+                      [Old, TargetSize]);
+        {Old, New} ->
+          io:format("================= check leases ((~p -> ~p) of ~p) ====================~n",
+                   [Old, New, TargetSize])
+     end,
+    case First of
+        true -> io:format("begin existing nodes~n"),
+                describe_nodes(OldState#leases_state_t.node_infos),
+                io:format("end existing nodes~n");
+        false -> ok
+    end,
     Changed =
         case compare_node_lists(OldState#leases_state_t.node_infos,
                                 NewState#leases_state_t.node_infos) of
@@ -113,8 +127,9 @@ check_state(State, Verbose, TargetSize) ->
 
 -spec check_leases_locally(leases_state(), boolean()) -> boolean().
 check_leases_locally(#leases_state_t{node_infos=Nodes}, Verbose) ->
-    lists:all(fun (B) -> B end, [ check_local_leases(Pid, Node, Verbose) ||
-                                    {Pid, Node} <- gb_trees:to_list(Nodes) ]).
+    lists:foldl(fun ({Pid, Node}, Acc) ->
+                        Acc and check_local_leases(Pid, Node, Verbose)
+                end, true, gb_trees:to_list(Nodes)).
 
 -spec check_leases_globally(leases_state(), boolean(), pos_integer()) -> boolean().
 check_leases_globally(State, Verbose, TargetSize) ->
@@ -126,6 +141,7 @@ check_leases_globally(State, Verbose, TargetSize) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc returns true iff the lists are equal
 -spec compare_node_lists(node_list(), node_list()) -> boolean().
 compare_node_lists(Old, New) ->
     OldPids = ordsets:from_list(gb_trees:keys(Old)),
@@ -215,7 +231,7 @@ describe_lease(Lease, _Type) ->
 
 %% @todo change to /1 with | empty
 -spec describe_node(Node::comm:mypid(), node_info() | empty) -> ok.
-describe_node(_Pid, NodeInfo) ->
+describe_node(Pid, NodeInfo) ->
     case NodeInfo of
         empty -> ok;
         _ ->
@@ -230,14 +246,18 @@ describe_node(_Pid, NodeInfo) ->
                                      l_on_cseq:get_range(ActiveLease)
                              end,
             RelRange = get_relative_range(ActiveInterval),
-            Aux = l_on_cseq:get_aux(ActiveLease),
+            Aux = case ActiveLease of
+                      empty -> no_lease;
+                      _ -> l_on_cseq:get_aux(ActiveLease)
+                  end,
             LocalCorrect = MyRange =:= ActiveInterval,
-            io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
-            io:format("    active lease=~p~n", [ActiveInterval]),
-            io:format("      my_range  =~p~n", [MyRange]),
-            io:format("      rel_range =~p~n", [RelRange]),
-            io:format("      aux       =~p~n", [Aux]),
-            io:format("    passive     =~p~n", [PassiveLeases]),
+            io:format("  ~p~n", [Pid]),
+            io:format("    rm =:= leases -> ~w~n", [LocalCorrect]),
+            io:format("      active lease=~p~n", [ActiveInterval]),
+            io:format("        my_range  =~p~n", [MyRange]),
+            io:format("        rel_range =~p~n", [RelRange]),
+            io:format("        aux       =~p~n", [Aux]),
+            io:format("      passive     =~p~n", [PassiveLeases]),
             ok
     end.
 
@@ -268,8 +288,8 @@ describe_nodes_diff(OldNodeInfos, NewNodeInfos) ->
              io:format("lost ~p nodes: ~p~n", [N, Old]),
              describe_nodes(gb_trees_filter(fun (Pid, _Node) ->
                                                     ordsets:is_element(Pid, LostPids) end,
-                                            OldNodeInfos)),
-    end,
+                                            OldNodeInfos))
+        end,
     %% found
     _ = case ordsets:size(FoundPids) of
         0 -> ok;
@@ -452,7 +472,7 @@ create_node_info(DHTNode) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec check_local_leases(comm:mypid(), node_info(), boolean()) -> boolean().
-check_local_leases(_Pid, NodeInfo, Verbose) ->
+check_local_leases(Pid, NodeInfo, Verbose) ->
     case NodeInfo of
         empty ->
             false;
@@ -477,12 +497,13 @@ check_local_leases(_Pid, NodeInfo, Verbose) ->
                                     io:format("the active lease is empty~n");
                                 _ ->
                                     Aux = l_on_cseq:get_aux(ActiveLease),
-                                    io:format("  rm =:= leases -> ~w~n", [LocalCorrect]),
-                                    io:format("    active lease=~p~n", [ActiveInterval]),
-                                    io:format("      my_range  =~p~n", [MyRange]),
-                                    io:format("      rel_range =~p~n", [RelRange]),
-                                    io:format("      aux       =~p~n", [Aux]),
-                                    io:format("    passive     =~p~n", [PassiveLeases])
+                                    io:format("  ~p~n", [Pid]),
+                                    io:format("    rm =:= leases -> ~w~n", [LocalCorrect]),
+                                    io:format("      active lease=~p~n", [ActiveInterval]),
+                                    io:format("        my_range  =~p~n", [MyRange]),
+                                    io:format("        rel_range =~p~n", [RelRange]),
+                                    io:format("        aux       =~p~n", [Aux]),
+                                    io:format("      passive     =~p~n", [PassiveLeases])
                             end;
                         false ->
                             ok

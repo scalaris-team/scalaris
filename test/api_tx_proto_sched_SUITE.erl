@@ -102,7 +102,7 @@ proto_sched_fun(stop) ->
 %%      with proto_sched does not increase too much.
 -spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
 adapt_tx_runs(N) ->
-    erlang:max(N div 10, 1).
+    erlang:max(N div (10 * config:read(replication_factor)), 1).
 
 concurrent_2(_Config) ->
     %% let two increments run concurrently

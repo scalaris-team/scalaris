@@ -210,9 +210,7 @@ remove_active_lease_from_dht_node_state(Lease, Id, State) ->
     Active = LeaseList#lease_list_t.active,
     case l_on_cseq:get_id(Active) of
         Id ->
-            % async. call!
-            service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-            util:sleep_for_ever(),
+            restart_node(),
             dht_node_state:set_lease_list(remove_next_round(Id, State),
                                           LeaseList#lease_list_t{active=empty});
         _ ->
@@ -239,10 +237,7 @@ remove_lease_from_dht_node_state(Lease, Id, State, Mode) ->
             remove_passive_lease_from_dht_node_state(Lease, Id, State);
         active ->
             log:log("you are trying to remove an active lease"),
-            % disable_mnesia_dbs(State) ?
-            % async. call!
-            service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-            util:sleep_for_ever(),
+            restart_node(),
             remove_active_lease_from_dht_node_state(Lease, Id, State);
         any ->
             remove_passive_lease_from_dht_node_state(Lease, Id,
@@ -271,12 +266,10 @@ update_passive_lease(Lease, LeaseList = #lease_list_t{passive=Passive}) ->
 
 -spec update_active_lease(Lease::l_on_cseq:lease_t(), LeaseList::lease_list()) -> lease_list().
 update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
-    case Lease of 
+    case Lease of
         empty ->
             log:log("you are trying to remove an active lease in update"),
-            % async. call!
-            service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-            util:sleep_for_ever(),
+            restart_node(),
             ok;
         _ ->
             ok
@@ -297,3 +290,10 @@ update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
             LeaseList#lease_list_t{active=Lease}
     end.
 
+-spec restart_node() -> no_return().
+restart_node() ->
+    NewNode = admin:add_node([]),
+    log:log("we are restarting ~p -> ~p~n", [comm:this(), NewNode]),
+    %% async. call!
+    service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
+    util:sleep_for_ever().

@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ inc(Key) ->
         Fail -> Fail
     end.
 
--spec increment_iter(string(), integer(), non_neg_integer()) -> any().
+-spec increment_iter(string(), integer(), non_neg_integer()) -> non_neg_integer().
 increment_iter(_Key, 0, Aborts) ->
     Aborts;
 increment_iter(Key, Iterations, Aborts) ->
@@ -107,10 +107,12 @@ increment_iter(Key, Iterations, Aborts) ->
         {fail, not_found} ->
             timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_iter(Key, Iterations, Aborts + 1);
-        X -> log:log(warn, "~p", [X])
+        X ->
+            log:log(warn, "bench_fun:increment_iter unexpected return: ~p", [X]),
+            increment_iter(Key, Iterations, Aborts + 1)
     end.
 
--spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> any().
+-spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> {non_neg_integer(), histogram:histogram()}.
 increment_with_histo_iter(H, _Key, 0, Aborts) ->
     {Aborts, H};
 increment_with_histo_iter(H, Key, Iterations, Aborts) ->
@@ -127,7 +129,9 @@ increment_with_histo_iter(H, Key, Iterations, Aborts) ->
         {fail, not_found} ->
             timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
-        X -> log:log(warn, "~p", [X])
+        X ->
+            log:log(warn, "bench_fun:increment_with_histo_iter unexpected return: ~p", [X]),
+            increment_with_histo_iter(H, Key, Iterations, Aborts + 1)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

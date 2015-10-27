@@ -148,11 +148,14 @@ read_write_2old(_Config) ->
     Key = "read_write_2old_a",
     GSelf = comm:make_global(self()),
     ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
-    wait_for_dht_entries(config:read(replication_factor)),
-    [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    _ = [comm:send_local(DhtNode, {delete_keys, GSelf, [HK1, HK2]}) || DhtNode <- pid_groups:find_all(dht_node)],
-    receive {delete_keys_reply} -> ok end,
-    receive {delete_keys_reply} -> ok end,
+    R = config:read(replication_factor),
+    wait_for_dht_entries(R),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    MDeny = quorum:majority_for_deny(R),
+    DeleteKeys = lists:sublist(RKeys, MDeny),
+    DHTNodes = pid_groups:find_all(dht_node),
+    _ = [comm:send_local(DhtNode, {delete_keys, GSelf, DeleteKeys}) || DhtNode <- DHTNodes ],
+    _ = [ receive {delete_keys_reply} -> ok end || _ <- DHTNodes ],
 
     ?equals(api_tx:write(Key, 2), {ok}),
     ok.
@@ -162,20 +165,23 @@ read_write_2old_locked(_Config) ->
     Key = "read_write_2old_a",
     GSelf = comm:make_global(self()),
     ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
-    wait_for_dht_entries(config:read(replication_factor)),
-    [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    R = config:read(replication_factor),
+    wait_for_dht_entries(R),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    MDeny = quorum:majority_for_deny(R),
+    ModKeys = lists:sublist(RKeys, MDeny),
 
-    % get HK1, HK2 entries
-    api_dht_raw:unreliable_lookup(HK1, {get_key_entry, GSelf, HK1}),
-    api_dht_raw:unreliable_lookup(HK2, {get_key_entry, GSelf, HK2}),
-    receive {get_key_entry_reply, Entry1} ->
-                ?assert_w_note(not db_entry:is_empty(Entry1), io_lib:format("~p", [Entry1]))
-    end,
-    receive {get_key_entry_reply, Entry2} ->
-                ?assert_w_note(not db_entry:is_empty(Entry2), io_lib:format("~p", [Entry2]))
-    end,
-    ?equals(db_entry:get_version(Entry1), db_entry:get_version(Entry2)),
-    OldVersion = db_entry:get_version(Entry1),
+    % get ModKeys entries
+    ModEntries = [ begin
+                    api_dht_raw:unreliable_lookup(X, {get_key_entry, GSelf, X}),
+                    receive {get_key_entry_reply, Entry} ->
+                            ?assert_w_note(not db_entry:is_empty(Entry), io_lib:format("~p", [Entry])),
+                            Entry
+                    end
+                end || X <- ModKeys ],
+    OldVersion = db_entry:get_version(erlang:hd(ModEntries)),
+    %% all entries have same version
+    ?assert(lists:all(fun(E) -> db_entry:get_version(E) =:= OldVersion end, ModEntries)),
 
     % write new value
     ?equals_w_note(api_tx:write(Key, 2), {ok}, "write_2_a"),
@@ -188,13 +194,12 @@ read_write_2old_locked(_Config) ->
                             end, Values)
       end),
 
-    % set two outdated, locked entries:
-    Entry1L = db_entry:set_writelock(Entry1, OldVersion - 1),
-    Entry2L = db_entry:set_writelock(Entry2, OldVersion - 1),
-    api_dht_raw:unreliable_lookup(db_entry:get_key(Entry1L), {set_key_entry, GSelf, Entry1L}),
-    api_dht_raw:unreliable_lookup(db_entry:get_key(Entry2L), {set_key_entry, GSelf, Entry2L}),
-    receive {set_key_entry_reply, Entry1L} -> ok end,
-    receive {set_key_entry_reply, Entry2L} -> ok end,
+    % set majority for Deny outdated, locked entries:
+    [ begin
+          EntryL = db_entry:set_writelock(X, OldVersion - 1),
+          api_dht_raw:unreliable_lookup(db_entry:get_key(EntryL), {set_key_entry, GSelf, EntryL}),
+          receive {set_key_entry_reply, EntryL} -> ok end
+      end || X <- ModEntries ],
 
     % now try to write
     ?equals_w_note(api_tx:write(Key, 3), {ok}, "write_3_a"),
@@ -204,36 +209,45 @@ read_write_2old_locked(_Config) ->
 read_write_notfound(_Config) ->
     Key = "read_write_notfound_test",
     _ = [read_write_notfound_test(Key ++ lists:flatten(io_lib:format("_~p_~p", [X, M])), X, M)
-           || X <- [none | lists:seq(1,4)],
+           || X <- [none | lists:seq(1,config:read(replication_factor))],
               M <- [single, req_list]],
     ok.
 
--spec read_write_notfound_test(Key::client_key(), HashedKeyToExclude::1..4 | none, Mode::single | req_list) -> ok.
-read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
-    [HK1, HK2, _HK3, _HK4] = HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+-spec read_write_notfound_test(Key::client_key(), NthKeyToExclude::1..4 | none, Mode::single | req_list) -> ok.
+read_write_notfound_test(Key, NthKeyToExclude, Mode) ->
+    R = config:read(replication_factor),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    MDeny = quorum:minority(R),
+    DelKeys = lists:sublist(RKeys, MDeny),
+
     Note = io_lib:format("Key: ~p, Hashed: ~p, Excl.: ~p, Mode: ~p",
-                         [Key, HashedKeys, HashedKeyToExclude, Mode]),
+                         [Key, RKeys, NthKeyToExclude, Mode]),
     % init
     ?equals_w_note(api_tx:write(Key, 1), {ok}, Note ++ " (write_0_a)"),
-    wait_for_dht_entries(HashedKeys),
+    wait_for_dht_entries(RKeys),
     _ = [begin
-             comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), [HK1, HK2]}),
+             comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), DelKeys}),
              receive {delete_keys_reply} -> ok end
          end || DhtNode <- pid_groups:find_all(dht_node)],
 
     % test
-    case HashedKeyToExclude of
+    case NthKeyToExclude of
         none -> ok;
-        _    -> drop_read_op_on_key(HashedKeyToExclude)
+        _    ->
+            HashedKeyToExclude = lists:nth(NthKeyToExclude, RKeys),
+            drop_read_op_on_key(HashedKeyToExclude)
     end,
     case Mode of
         single ->
-            ct:pal("read"),
+            ct:pal("read ~p", [Key]),
             {T1, R1} = api_tx:read(api_tx:new_tlog(), Key),
+            ct:pal("read result ~p", [{T1, R1}]),
             ct:pal("write ~p", [T1]),
             {T2, R2} = api_tx:write(T1, Key, 2),
+            ct:pal("write result ~p", [{T2, R2}]),
             ct:pal("commit ~p", [T2]),
             R3 = api_tx:commit(T2),
+            ct:pal("commit result ~p", [R3]),
             ok;
         req_list ->
             ct:pal("req_list"),
@@ -251,7 +265,12 @@ read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
     end,
 
     % cleanup
-    stop_drop_read_op_on_key(HashedKeyToExclude),
+    case NthKeyToExclude of
+        none -> ok;
+        _    ->
+            HKeyToExclude = lists:nth(NthKeyToExclude, RKeys),
+            stop_drop_read_op_on_key(HKeyToExclude)
+    end,
     ok.
 
 drop_read_op_on_key(HashedKey) ->

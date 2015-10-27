@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([majority_for_accept/1, majority_for_deny/1]).
+-export([majority_for_accept/1,
+         majority_for_deny/1,
+         minority/1]).
 
 %% @doc Gives the majority required for a quorum to accept.
 -spec majority_for_accept(integer()) -> integer().
@@ -29,3 +31,7 @@ majority_for_accept(SetSize) -> SetSize div 2 + 1.
 %% @doc Gives the majority required for a quorum to deny.
 -spec majority_for_deny(integer()) -> integer().
 majority_for_deny(SetSize) -> SetSize div 2 + SetSize rem 2.
+
+%% @doc Gives the minority.
+-spec minority(integer()) -> integer().
+minority(SetSize) -> SetSize - majority_for_accept(SetSize).

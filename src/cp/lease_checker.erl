@@ -127,6 +127,7 @@ lease_checker(TargetSize) ->
 get_random_save_node() ->
     SaveNodes = [Node || Node <- all_dht_nodes(),
                          {true, LL} <- [get_dht_node_state(Node, lease_list)],
+                         lease_list:get_active_lease(LL) =/= empty andalso
                          get_relative_range(
                            l_on_cseq:get_range(
                              lease_list:get_active_lease(LL))) =< 0.25],
