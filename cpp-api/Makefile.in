@@ -1,0 +1,53 @@
+NAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+  SHELL = /usr/local/bin/bash
+endif
+SHELL = /usr/local/bin/bash
+
+AR=ar
+ARFLAGS=rv
+RANLIB=echo
+CXX=@CXX@
+CXXFLAGS=@CXXFLAGS@ @BOOST_CPPFLAGS@ -Iinclude
+LDFLAGS=@LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_REGEX_LIB@ @BOOST_ASIO_LIB@ @BOOST_UNIT_TEST_FRAMEWORK_LIB@ @BOOST_TEST_EXEC_MONITOR_LIB@
+
+ifeq ($(VERBOSE),1)
+  VC=
+  NVC=@@TRUE@ ||
+else
+  VC=@
+  NVC=@
+endif
+
+SRC_CPP=$(wildcard src/*.cpp)
+TEST_SRC_CPP=$(wildcard test/*.cpp)
+
+OBJS=$(SRC_CPP:.cpp=.o)
+OBJS_TEST=$(TEST_SRC_CPP:.cpp=.o)
+
+all: libscalaris.a tests
+
+cpp-test : tests
+	$(VC)./tests --report_level=detailed
+
+tests: $(OBJS_TEST) $(OBJS)
+	$(NVC)echo -e "\e[0;33mCreating tests\033[39m"
+	$(VC)$(CXX) $(LDFLAGS) -o $@ $(OBJS_TEST) libscalaris.a
+
+libscalaris.a: $(OBJS)
+	$(NVC)echo -e "\e[0;33mCreating archive" $@ "\033[39m"
+	$(VC)$(AR) $(ARFLAGS) $@ $(OBJS)
+
+.cpp.o: Makefile
+	$(NVC)echo -e "\e[0;32mCompiling" $< "\033[39m"
+	$(VC)$(CXX) -MD $(CXXFLAGS)  -c $< -o $@
+
+clean:
+	@-rm -rf $(shell find . -type f -name '*.o')
+	@-rm -rf $(shell find . -type f -name '*.d')
+	@-rm ./tests
+
+-include $(OBJS:.o=.d)
+-include $(OBJS_TEST:.o=.d)
+
+.PHONY: clean test libscalaris
