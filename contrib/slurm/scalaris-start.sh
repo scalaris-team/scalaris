@@ -66,21 +66,18 @@ function start_servers() {
 
     ## @todo use auto-binding
     # start vms at all the tail nodes
-    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE 
+    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE
 
     # start remaining VMs on head node
     PORT=14196
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
         JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start 
+        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
         let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1
     done
-
-    # wait for all sruns to return
-    wait
 }
 
 function wait_for_servers_to_start {
@@ -110,11 +107,25 @@ function start_watchdog() {
     srun -N$SLURM_NNODES screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./watchdog.sh
 }
 
+function start_collectl(){
+    # start collectl on all allocated nodes
+
+    if [[ ! -d $COLLECTL_DIR ]]; then
+        # create directory if necessary
+        mkdir -p $COLLECTL_DIR
+    fi
+
+    # collectl will be started in a screen session which will be cleaned up by the watchdog
+    srun -N$SLURM_NNODES screen -S "scalaris_collectl_SLURM_JOBID_${SLURM_JOBID}" -d -m \
+        bash -c "collectl -f $COLLECTL_DIR -i5 -F0; sleep 365d"
+}
+
 module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
 kill_old_nodes
 start_watchdog
+[[ $COLLECTL = true ]] && start_collectl
 d1=$(date '+%s')
 start_servers
 wait_for_servers_to_start

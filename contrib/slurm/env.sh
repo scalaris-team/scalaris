@@ -3,10 +3,12 @@ export SCALARIS_DIR=${SCALARIS_DIR:-$HOME/scalaris}
 export VMS_PER_NODE=${VMS_PER_NODE:-1}
 export DHT_NODES_PER_VM=${DHT_NODES_PER_VM:-1}
 export ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS:-""}
+export COLLECTL=${COLLECTL:-"false"}
 
 export ETCDIR=$SCALARIS_DIR/bin
 export BINDIR=$SCALARIS_DIR/bin
 export BEAMDIR=$SCALARIS_DIR/ebin
+export COLLECTL_DIR=${COLLECTL_DIR:-"$(pwd)/collectl/"}
 
 export SHUFFLE_NODE_IDS=1
 export WATCHDOG_INTERVAL=10
@@ -65,6 +67,4 @@ export -f print_env
 export -f check_compile
 
 trap cleanup SIGTERM
-
-
 
