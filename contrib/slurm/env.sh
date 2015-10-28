@@ -35,6 +35,18 @@ function test_foreign_beams() {
     return 0
 }
 
+function print_env() {
+    echo "Nodes: $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM))($SLURM_JOB_NUM_NODES*$VMS_PER_NODE*$DHT_NODES_PER_VM)"
+    echo "erl schedular flags: $ERL_SCHED_FLAGS"
+    erl_binary=$(grep "^ERL=" $SCALARIS_DIR/bin/scalarisctl | awk -F= '{print $2}')
+    erl_version_file=$($erl_binary -eval 'io:format("~s", [filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])]), halt()'  -noshell)
+    erl_version=$(cat $erl_version_file)
+    echo "Erlang binary: $erl_binary"
+    echo "Erlang version: $erl_version"
+    echo "Current HEAD"
+    printenv > $WD/slurm/slurm-${SLURM_JOB_ID}.env
+}
+
 check_compile(){
     local curdir=$(pwd)
     cd $SCALARIS_DIR
@@ -47,9 +59,9 @@ check_compile(){
     fi
 }
 
-
 export -f cleanup
 export -f test_foreign_beams
+export -f print_env
 export -f check_compile
 
 trap cleanup SIGTERM

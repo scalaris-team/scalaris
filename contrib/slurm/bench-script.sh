@@ -14,6 +14,7 @@ source /usr/share/modules/init/bash
 source $(pwd)/env.sh
 
 check_compile
+environment
 $(pwd)/scalaris-start.sh
 
 #############################################
