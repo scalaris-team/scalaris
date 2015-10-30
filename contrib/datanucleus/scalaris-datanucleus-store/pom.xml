@@ -44,8 +44,8 @@
             </snapshots>
         </repository>
         <repository>
-            <id>scalaris</id>
-            <url>https://scalaris.googlecode.com/svn/maven/</url>
+            <id>scalaris-repo</id>
+            <url>https://scalaris.zib.de/maven/</url>
         </repository>
     </repositories>
     <distributionManagement>
