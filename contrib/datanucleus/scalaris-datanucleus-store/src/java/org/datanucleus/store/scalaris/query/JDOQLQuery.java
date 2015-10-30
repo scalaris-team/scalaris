@@ -34,7 +34,6 @@ import org.datanucleus.query.expression.Expression.Operator;
 import org.datanucleus.query.expression.ParameterExpression;
 import org.datanucleus.query.expression.PrimaryExpression;
 import org.datanucleus.store.StoreManager;
-import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.AbstractJDOQLQuery;
 import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
 
