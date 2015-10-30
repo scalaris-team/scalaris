@@ -1,5 +1,8 @@
 package de.zib.scalaris.datanucleus.store.test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import javax.jdo.JDOHelper;
 import javax.jdo.PersistenceManager;
 import javax.jdo.PersistenceManagerFactory;
@@ -17,8 +20,14 @@ public class StoreUtils {
      * @return a new PersistenceManager
      */
     public static PersistenceManager getNewPersistenceManager() {
+        Map<String, String> propOverrides = new HashMap<>();
+        String scalarisNodeOverride = System.getProperty("scalaris.node");
+        if (scalarisNodeOverride != null) {
+            propOverrides.put("scalaris.node", scalarisNodeOverride);
+        }
+
         PersistenceManagerFactory pmf = JDOHelper
-                .getPersistenceManagerFactory(PERSISTENCE_UNIT_NAME);
+                .getPersistenceManagerFactory(propOverrides, PERSISTENCE_UNIT_NAME);
         return pmf.getPersistenceManager();
     }
 
