@@ -9,4 +9,6 @@ kramdown:
   toc_levels: "2,3"
 
 # just the title, no year...
-permalink: /blog/:title
+# we need the /index.html for our relative links to work properly
+# (see _includes/base.html)
+permalink: /blog/:title/index.html
