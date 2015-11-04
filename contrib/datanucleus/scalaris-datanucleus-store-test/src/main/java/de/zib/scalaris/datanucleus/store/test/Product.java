@@ -21,7 +21,6 @@ import javax.jdo.annotations.IdGeneratorStrategy;
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
-import javax.jdo.annotations.IdentityType;
 
 /**
  * Definition of a Product Represents a product, and contains the key aspects of

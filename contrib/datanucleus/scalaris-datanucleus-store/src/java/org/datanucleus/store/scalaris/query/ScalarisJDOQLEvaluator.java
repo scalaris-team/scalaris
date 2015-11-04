@@ -18,7 +18,6 @@ import org.datanucleus.query.expression.Expression;
 import org.datanucleus.query.inmemory.InMemoryExpressionEvaluator;
 import org.datanucleus.query.inmemory.InMemoryFailure;
 import org.datanucleus.query.inmemory.VariableNotSetException;
-import org.datanucleus.store.connection.ManagedConnection;
 import org.datanucleus.store.query.Query;
 import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
 import org.datanucleus.util.Localiser;

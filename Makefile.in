@@ -25,7 +25,7 @@ VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.12
 COMMONS_CLI_VERSION=1.2
 
-.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
+.PHONY: all compile test test-vts java java-test java-bench java-* datanucleus datanucleus-test python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
 
 APP_NAME = @PACKAGE_TARNAME@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
@@ -115,7 +115,7 @@ DIALYZER_FLAGS ?=
 
 SCALARIS_CT_PREFIX ?= ct
 SCALARIS_CT_NAME = $(SCALARIS_CT_PREFIX)@`hostname -s`
-# for java-test and java-bench:
+# for java-test, java-bench and datanucleus-test:
 SCALARIS_UNITTEST_PORT ?= 14194
 SCALARIS_UNITTEST_YAWS_PORT ?= 8000
 SCALARIS_JTEST_NAME ?= jtest_boot
@@ -137,7 +137,7 @@ contrib/log4erl/src/log4erl_parser.erl: contrib/log4erl/src/log4erl_parser.yrl
 contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 	cd contrib/log4erl/src && $(ERL) -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 
-test-all: all_TESTS java-test python-test ruby-test interop-test
+test-all: all_TESTS java-test python-test ruby-test interop-test datanucleus-test
 
 test: default_TESTS
 
@@ -243,6 +243,32 @@ java-bench: compile java
 
 java-%:
 	ant -buildfile java-api/build.xml $*
+
+datanucleus:
+	mvn -DskipGit -f java-api/pom.xml clean install
+	mvn -f contrib/datanucleus/scalaris-datanucleus-store/pom.xml clean install
+	mvn -f contrib/datanucleus/scalaris-datanucleus-store-test/pom.xml test -DskipTests
+
+datanucleus-test: compile datanucleus
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d \
+	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
+	-p $(SCALARIS_UNITTEST_PORT) \
+	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
+	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
+	mvn -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -f contrib/datanucleus/scalaris-datanucleus-store-test/pom.xml test ) ; \
+	FAILED=$$? ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 python: python-compile
 

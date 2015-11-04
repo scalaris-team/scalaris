@@ -125,12 +125,14 @@ lease_checker(TargetSize) ->
 %@doc returns a random node, which covers 0.25 or less of the key-space
 -spec get_random_save_node() -> comm:mypid().
 get_random_save_node() ->
+    R = config:read(replication_factor),
+    SaveFraction = quorum:minority(R) / R,
     SaveNodes = [Node || Node <- all_dht_nodes(),
                          {true, LL} <- [get_dht_node_state(Node, lease_list)],
                          lease_list:get_active_lease(LL) =/= empty andalso
                          get_relative_range(
                            l_on_cseq:get_range(
-                             lease_list:get_active_lease(LL))) =< 0.25],
+                             lease_list:get_active_lease(LL))) =< SaveFraction],
     util:randomelem(SaveNodes).
 
 -spec is_disjoint([intervals:interval()]) -> boolean().
@@ -163,7 +165,7 @@ get_dht_node_state(Pid, What) ->
     This = comm:reply_as(comm:this(), 2, {get_dht_node_state_response, '_', Cookie}),
     comm:send(Pid, {get_state, This, What}),
     trace_mpath:thread_yield(),
-    Result = 
+    Result =
         receive
             ?SCALARIS_RECV({get_dht_node_state_response, {get_state_response, Data}, Cookie},% ->
                 {true, Data})
