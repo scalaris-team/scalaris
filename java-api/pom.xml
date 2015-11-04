@@ -26,7 +26,7 @@
     <repositories>
         <repository>
             <id>scalaris-repo</id>
-            <url>https://scalaris.zib.de/maven/</url>
+            <url>https://scalaris-team.github.io/scalaris/maven</url>
         </repository>
     </repositories>
 
