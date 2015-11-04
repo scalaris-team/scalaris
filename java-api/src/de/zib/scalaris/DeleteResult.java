@@ -68,7 +68,7 @@ public class DeleteResult {
      */
     public boolean hasDeletedAll(final Connection conn) throws ConnectionException {
         final RoutingTable rt = new RoutingTable(conn);
-        final int r = rt.get_replication_factor();
+        final int r = rt.getReplicationFactor();
 
         return (ok + undef) == r;
     }

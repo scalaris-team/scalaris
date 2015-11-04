@@ -15,20 +15,16 @@
  */
 package de.zib.scalaris;
 
-import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangInt;
-import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangRangeException;
-import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
+ * Scalaris interface to basic routing table information.
  *
- * @author Nico Kruber, kruber@zib.de
- * @version 3.19
- * @since 2.6
+ * @author Thorsten Schuett, schuett@zib.de
+ * @version 3.20
+ * @since 3.20
  */
 public class RoutingTable {
     /**
@@ -57,11 +53,20 @@ public class RoutingTable {
         connection = conn;
     }
 
-    // /////////////////////////////
-    // methods
-    // /////////////////////////////
-
-    public int get_replication_factor() throws ConnectionException, UnknownException {
+    /**
+     * Returns the replication factor used by the current routing table
+     * implementation.
+     *
+     * @return the current replication factor
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public int getReplicationFactor() throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_rt", "get_replication_factor",
                 new OtpErlangObject[] { });
         try {
