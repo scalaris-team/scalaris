@@ -298,7 +298,7 @@ It is not so much an error but a message created by the Erlang runtime that this
 
 #### Maven repository
 
-Alternatively to installing the Java-API from the sources or using the [packages](#prebuild-packages), we also provide a Maven repository at [http://scalaris.zib.de/maven](http://scalaris.zib.de/maven). To use this repository, add it to your `pom.xml`:
+Alternatively to installing the Java-API from the sources or using the [packages](#prebuild-packages), we also provide a Maven repository at [https://scalaris-team.github.io/scalaris/maven](https://scalaris-team.github.io/scalaris/maven). To use this repository, add it to your `pom.xml`:
 
 {% highlight xml %}
 <dependencies>
@@ -312,7 +312,7 @@ Alternatively to installing the Java-API from the sources or using the [packages
 <repositories>
   <repository>
     <id>scalaris-repo</id>
-    <url>http://scalaris.zib.de/maven</url>
+    <url>https://scalaris-team.github.io/scalaris/maven</url>
   </repository>
 </repositories>
 {% endhighlight %}
