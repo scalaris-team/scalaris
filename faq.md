@@ -189,8 +189,8 @@ No. Well, maybe.
   0. adapt the path to your Erlang installation in `firstnode.bat`, and `joining_node.bat`
   0. run `firstnode.bat` in the cmd window
 
-On certain older Erlang versions, you will need to adapt the \code{Emakefile}.
-Please refer to the \code{build.bat} and \code{configure.ac} for the available
+On certain older Erlang versions, you will need to adapt the `Emakefile`.
+Please refer to the `build.bat` and `configure.ac`} for the available
 configuration parameters and their meaning.
 
 Note: we do not support Scalaris on Windows at the moment.
