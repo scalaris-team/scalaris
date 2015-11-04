@@ -247,6 +247,7 @@ java-%:
 datanucleus:
 	mvn -DskipGit -f java-api/pom.xml clean install
 	mvn -f contrib/datanucleus/scalaris-datanucleus-store/pom.xml clean install
+	mvn -f contrib/datanucleus/scalaris-datanucleus-store-test/pom.xml test -DskipTests
 
 datanucleus-test: compile datanucleus
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
