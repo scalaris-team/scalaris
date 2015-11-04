@@ -30,7 +30,6 @@
 -include("client_types.hrl").
 -include("record_helpers.hrl").
 
--define(REP_FACTOR, 4).
 -define(DBSizeKey, rrepair_SUITE_dbsize).    %Process Dictionary Key for generated db size
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -263,13 +262,12 @@ dest(Config) ->
 
 dest_empty_node(Config) ->
     %parameter
-    NodeCount = 4,
     DataCount = 1000,
     P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
-    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
-                                                 {rr_recon_p1e, P1E}]),
+    _ = build_symmetric_ring(as_replication_factor, Config,
+                             [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
                                                    {fprob, 100},
                                                    {distribution, uniform},
@@ -567,7 +565,7 @@ get_db_status() ->
                   Acc
           end, 0, RingData),
     {DBKeys, DBKeysNum, Outdated} = create_full_db(RingData, [], 0, 0),
-    DBSize = ?REP_FACTOR * DBKeysNum,
+    DBSize = config:read(replication_factor) * DBKeysNum,
     remove_full_db(DBKeys),
     {DBSize, Stored, DBSize - Stored, Outdated}.
 
@@ -575,8 +573,12 @@ get_db_status() ->
 get_symmetric_keys(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
-build_symmetric_ring(NodeCount, Config, RRConfig) ->
+build_symmetric_ring(NodeCount0, Config, RRConfig) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+    NodeCount = case NodeCount0 of
+                    as_replication_factor -> config:read(replication_factor);
+                    _ -> NodeCount0
+                end,
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     unittest_helper:stop_minimal_procs(Config2),
     build_ring(NodeKeys, Config, RRConfig).
