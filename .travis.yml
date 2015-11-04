@@ -19,7 +19,7 @@ addons:
       description: Scalaris, a distributed, transactional key-value store
     notification_email: scalaris-owners@googlegroups.com
     build_command_prepend: ./configure
-    build_command: make java
+    build_command: make java datanucleus
     branch_pattern: coverity_scan
 
 script:
