@@ -1,6 +1,6 @@
 language: java
 
-jdk: openjdk6
+jdk: openjdk7
 
 otp_release:
    - 17.4
