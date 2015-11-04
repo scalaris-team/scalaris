@@ -191,7 +191,6 @@ public class ScalarisVMTest {
         final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final List<ErlangValue> nodes = conn.getNodes();
-            assertTrue(nodes.size() >= 0);
             assertEquals(conn.getNumberOfNodes(), nodes.size());
         } finally {
             conn.closeConnection();

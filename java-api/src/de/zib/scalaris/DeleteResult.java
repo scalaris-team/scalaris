@@ -62,7 +62,15 @@ public class DeleteResult {
      * well). If not, the delete needs to be executed again (see
      * {@link ReplicatedDHT#delete(com.ericsson.otp.erlang.OtpErlangString, int)}.
      *
+     * @param conn
+     *            a connection to Scalaris to find out the current replication
+     *            degree
      * @return whether all replicas were deleted or not
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
      *
      * @since 3.19
      */
