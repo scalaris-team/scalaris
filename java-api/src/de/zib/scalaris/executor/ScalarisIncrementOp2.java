@@ -87,6 +87,7 @@ public class ScalarisIncrementOp2<T extends Number> implements ScalarisOp {
      */
     protected int checkIncrement(final int firstOp, final ResultList results)
             throws OtpErlangException, UnknownException {
+        assert results != null;
         results.processAddOnNrAt(firstOp);
         return 1;
     }

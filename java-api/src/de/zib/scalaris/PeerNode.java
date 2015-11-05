@@ -108,7 +108,7 @@ public class PeerNode {
      *
      * @return the number of failed connections (dates and times)
      */
-    public int getFailureCount() {
+    synchronized public int getFailureCount() {
         return failureCount;
     }
 
@@ -144,7 +144,7 @@ public class PeerNode {
 
     /**
      * Returns a string representation of this node.
-     * 
+     *
      * @return the name of the node
      */
     @Override

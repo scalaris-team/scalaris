@@ -82,6 +82,7 @@ public class PropertyLoaderTest {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
 
         final URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
+        assertNotNull(url);
         final Properties properties = new Properties();
         assertTrue(PropertyLoader.loadProperties(properties, url.getPath()));
         assertEquals("ahz2ieSh", properties.get("cs.node"));

@@ -77,7 +77,7 @@ public interface MonitorServiceMBean {
      * Gets the current, i.e. latest, average latency of the whole Scalaris ring
      * from the VM the monitor is connected to.
      *
-     * @return latest average latency
+     * @return latest average latency (or <tt>null</tt> if there is none)
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -86,13 +86,14 @@ public interface MonitorServiceMBean {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public abstract double getCurLatencyAvg() throws ConnectionException, UnknownException;
+    public abstract Double getCurLatencyAvg() throws ConnectionException, UnknownException;
 
     /**
      * Gets the current, i.e. latest, standard deviation of the latency of the
      * whole Scalaris ring from the VM the monitor is connected to.
      *
-     * @return latest latency (standard) deviation
+     * @return latest latency (standard) deviation (or <tt>null</tt> if there is
+     *         none)
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -101,6 +102,6 @@ public interface MonitorServiceMBean {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public abstract double getCurLatencyStddev() throws ConnectionException, UnknownException;
+    public abstract Double getCurLatencyStddev() throws ConnectionException, UnknownException;
 
 }

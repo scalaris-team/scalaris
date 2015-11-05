@@ -284,6 +284,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
     @SuppressWarnings("unchecked")
     public synchronized <E extends Exception> PeerNode selectNode(final int retry,
             final PeerNode failedNode, final E e) throws E {
+        assert maxRetries >= 0;
         if (retry <= maxRetries) {
             if ((goodNodes.size() + badNodes.size()) < 1) {
                 throw new UnsupportedOperationException(
@@ -322,9 +323,12 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
     /**
      * Gets the maximal number of automatic connection retries.
      *
-     * @param maxRetries the maxRetries to set
+     * @param maxRetries the maxRetries to set (>= 0)
      */
     public void setMaxRetries(final int maxRetries) {
+        if (maxRetries < 0) {
+            throw new IllegalArgumentException("maxRetries must be >= 0");
+        }
         this.maxRetries = maxRetries;
     }
 

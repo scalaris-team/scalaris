@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -253,8 +254,8 @@ public class InterOpTest {
             if (expected_map.size() != actual.size()) {
                 return false;
             }
-            for (final String key : expected_map.keySet()) {
-                if (!compare(actual.get(key), expected_map.get(key))) {
+            for (final Entry<String, Object> value : expected_map.entrySet()) {
+                if (!compare(actual.get(value.getKey()), value.getValue())) {
                     return false;
                 }
             }
@@ -335,49 +336,59 @@ public class InterOpTest {
     }
 
     private static String valueToStr(final Object value) {
-        String value_str;
+        final StringBuilder sb = new StringBuilder();
+        valueToStr(value, sb);
+        return sb.toString();
+    }
+
+    private static void valueToStr(final Object value, final StringBuilder sb) {
         if (value instanceof String) {
-//            value_str = "\"" + ((String) value).replace("\n", "\\n") + "\"";
-            value_str = "\"" + value + "\"";
-        } else if (value instanceof byte[]) {
-            final byte[] bytes = ((byte[]) value);
-            value_str = "<<";
-            for (final byte b : bytes) {
-                value_str += b;
-            }
-            value_str += ">>";
-        } else if (value instanceof Map<?, ?>) {
-            @SuppressWarnings("unchecked")
-            final
-            Map<String, Object> map = ((Map<String, Object>) value);
-            value_str = "{";
-            for (final Map.Entry<String, Object> entry : map.entrySet()) {
-                value_str += valueToStr(entry.getKey()) + "=" + valueToStr(entry.getValue()) + ",";
-            }
-            // remove last ","
-            if (map.size() > 0) {
-                value_str = value_str.substring(0, value_str.length() - 1);
-            }
-            value_str += "}";
-        } else if (value instanceof List<?>) {
-            @SuppressWarnings("unchecked")
-            final
-            List<Object> list = (List<Object>) value;
-            value_str = "[";
-            for (final Object object : list) {
-                value_str += valueToStr(object) + ",";
-            }
-            // remove last ","
-            if (list.size() > 0) {
-                value_str = value_str.substring(0, value_str.length() - 1);
-            }
-            value_str += "]";
-        } else if (value instanceof ErlangValue) {
-            value_str = ((ErlangValue) value).value().toString();
-        } else {
-            value_str = value.toString();
-        }
-        return value_str;
+          sb.append('"');
+//          sb.append(((String) value).replace("\n", "\\n"));
+          sb.append(value);
+          sb.append('"');
+      } else if (value instanceof byte[]) {
+          final byte[] bytes = ((byte[]) value);
+          sb.append("<<");
+          for (final byte b : bytes) {
+              sb.append(b);
+          }
+          sb.append(">>");
+      } else if (value instanceof Map<?, ?>) {
+          @SuppressWarnings("unchecked")
+          final
+          Map<String, Object> map = ((Map<String, Object>) value);
+          sb.append('{');
+          for (final Map.Entry<String, Object> entry : map.entrySet()) {
+              valueToStr(entry.getKey(), sb);
+              sb.append('=');
+              valueToStr(entry.getValue(), sb);
+              sb.append(',');
+          }
+          // remove last ","
+          if (map.size() > 0) {
+              sb.deleteCharAt(sb.length() - 1);
+          }
+          sb.append('}');
+      } else if (value instanceof List<?>) {
+          @SuppressWarnings("unchecked")
+          final
+          List<Object> list = (List<Object>) value;
+          sb.append('[');
+          for (final Object object : list) {
+              valueToStr(object, sb);
+              sb.append(',');
+          }
+          // remove last ","
+          if (list.size() > 0) {
+              sb.deleteCharAt(sb.length() - 1);
+          }
+          sb.append(']');
+      } else if (value instanceof ErlangValue) {
+          sb.append(((ErlangValue) value).value().toString());
+      } else {
+          sb.append(value.toString());
+      }
     }
 
     private static int read_write_boolean(final String basekey, final TransactionSingleOp sc, final Mode mode) {

@@ -56,13 +56,13 @@ public class MonitorService implements MonitorServiceMBean {
     /* (non-Javadoc)
      * @see jmx.MonitorServiceMBean#getCurLatencyAvg()
      */
-    public double getCurLatencyAvg() throws ConnectionException, UnknownException {
+    public Double getCurLatencyAvg() throws ConnectionException, UnknownException {
         return Monitor.getCurrentPerfValue(monitor.getServicePerformance().latencyAvg);
     }
     /* (non-Javadoc)
      * @see jmx.MonitorServiceMBean#getCurLatencyStddev()
      */
-    public double getCurLatencyStddev() throws ConnectionException, UnknownException {
+    public Double getCurLatencyStddev() throws ConnectionException, UnknownException {
         return Monitor.getCurrentPerfValue(monitor.getServicePerformance().latencyStddev);
     }
 

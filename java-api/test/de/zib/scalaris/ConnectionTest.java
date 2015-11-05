@@ -305,7 +305,7 @@ public class ConnectionTest {
      *             if the value is too large to be represented as an int
      * @throws InterruptedException if the sleep is interrupted
      */
-    @Test
+    @Test(expected=ConnectionException.class)
     public final void testDoRPCStringStringOtpErlangList_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
@@ -327,10 +327,11 @@ public class ConnectionTest {
             c.close();
             // this should have failed!
             fail();
-        } catch (final Exception e) {
+        } catch (final ConnectionException e) {
+            assertEquals(0, remote.getFailureCount());
+            assertNull(remote.getLastFailedConnect());
+            throw e;
         }
-        assertEquals(0, remote.getFailureCount());
-        assertNull(remote.getLastFailedConnect());
     }
 
     /**
@@ -395,7 +396,7 @@ public class ConnectionTest {
      *             if the value is too large to be represented as an int
      * @throws InterruptedException if the sleep is interrupted
      */
-    @Test
+    @Test(expected=ConnectionException.class)
     public final void testDoRPCStringStringOtpErlangObjectArray_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
@@ -417,10 +418,11 @@ public class ConnectionTest {
             c.close();
             // this should have failed!
             fail();
-        } catch (final Exception e) {
+        } catch (final ConnectionException e) {
+            assertEquals(0, remote.getFailureCount());
+            assertNull(remote.getLastFailedConnect());
+            throw e;
         }
-        assertEquals(0, remote.getFailureCount());
-        assertNull(remote.getLastFailedConnect());
     }
 
 }

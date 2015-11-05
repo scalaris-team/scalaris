@@ -176,8 +176,11 @@ public class Connection {
                 try {
                     connection.sendRPC(mod, fun, args);
                     final OtpErlangObject result = connection.receiveRPC();
-                    success = true;
-                    return result;
+                    // result may be null but this should not happen and is an error anyway!
+                    if (result != null) {
+                        success = true;
+                        return result;
+                    }
                 } catch (final OtpErlangExit e) {
                     connectionPolicy.nodeFailed(remote);
                     // first re-try (connection was the first contact)
