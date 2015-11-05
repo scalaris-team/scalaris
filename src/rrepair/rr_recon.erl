@@ -2455,8 +2455,9 @@ replicated_intervals(I) ->
                     % -> we can zip the sorted keys to get the replicated intervals
                     lists:zipwith(
                       fun(LKeyX, RKeyX) ->
-                              ?DBG_ASSERT(?RT:get_range(LKeyX, ?IIF(RKeyX =:= ?MINUS_INFINITY, ?PLUS_INFINITY, RKeyX)) =:=
-                                          ?RT:get_range(LKey, RKey0)),
+                              % this debug statement only holds for replication factors that are a power of 2:
+%%                               ?DBG_ASSERT(?RT:get_range(LKeyX, ?IIF(RKeyX =:= ?MINUS_INFINITY, ?PLUS_INFINITY, RKeyX)) =:=
+%%                                           ?RT:get_range(LKey, RKey0)),
                               intervals:new(LBr, LKeyX, RKeyX, RBr)
                       end, LKeys, RKeys)
             end;
