@@ -63,13 +63,13 @@ public class MonitorNode implements MonitorNodeMBean {
     /* (non-Javadoc)
      * @see jmx.MonitorNodeMBean#getCurLatencyAvg()
      */
-    public double getCurLatencyAvg() throws ConnectionException, UnknownException {
+    public Double getCurLatencyAvg() throws ConnectionException, UnknownException {
         return Monitor.getCurrentPerfValue(monitor.getNodePerformance().latencyAvg);
     }
     /* (non-Javadoc)
      * @see jmx.MonitorNodeMBean#getCurLatencyStddev()
      */
-    public double getCurLatencyStddev() throws ConnectionException, UnknownException {
+    public Double getCurLatencyStddev() throws ConnectionException, UnknownException {
         return Monitor.getCurrentPerfValue(monitor.getNodePerformance().latencyStddev);
     }
 

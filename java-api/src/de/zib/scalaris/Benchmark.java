@@ -19,9 +19,9 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -546,9 +546,10 @@ public class Benchmark {
             }
             reqs.addCommit();
             results = tx.req_list(reqs);
+            // check results:
             for (int i = 0; i < keys.length; ++i) {
                 if (value instanceof OtpErlangObject) {
-                    results.processReadAt(i).value();
+                    results.processReadAt(i); // no need to extract the value itself
                 } else {
                     results.processReadAt(i).stringValue();
                 }
@@ -1006,7 +1007,8 @@ public class Benchmark {
 
     /**
      * Creates an object T from <tt>size</tt> random bytes. Uses either a
-     * constructor that expects a <tt>byte[]</tt> or a {@link String} parameter.
+     * constructor that expects a <tt>byte[]</tt> or a {@link String} parameter
+     * (in which case the UTF-8 encoding is used for the bytes).
      *
      * @param <T>
      *            the type of the object to create
@@ -1049,10 +1051,60 @@ public class Benchmark {
             throws IllegalArgumentException, SecurityException,
             InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {
+        return getRandom(size, c, new Random());
+    }
+
+    /**
+     * Creates an object T from <tt>size</tt> random bytes. Uses either a
+     * constructor that expects a <tt>byte[]</tt> or a {@link String} parameter
+     * (in which case the UTF-8 encoding is used for the bytes).
+     *
+     * @param <T>
+     *            the type of the object to create
+     * @param size
+     *            the number of (random) bytes to create
+     * @param c
+     *            the class of the object to create (needed due to type erasure)
+     * @param r
+     *            the random number generator to use
+     *
+     * @return the created object
+     *
+     * @throws IllegalAccessException
+     *             - if this Constructor object enforces Java language access
+     *             control and the underlying constructor is inaccessible.
+     * @throws IllegalArgumentException
+     *             - if the number of actual and formal parameters differ; if an
+     *             unwrapping conversion for primitive arguments fails; or if,
+     *             after possible unwrapping, a parameter value cannot be
+     *             converted to the corresponding formal parameter type by a
+     *             method invocation conversion; if this constructor pertains to
+     *             an enum type.
+     * @throws InstantiationException
+     *             - if the class that declares the underlying constructor
+     *             represents an abstract class.
+     * @throws InvocationTargetException
+     *             - if the underlying constructor throws an exception.
+     * @throws ExceptionInInitializerError
+     *             - if the initialization provoked by this method fails.
+     * @throws NoSuchMethodException
+     *             - if a matching method is not found.
+     * @throws SecurityException
+     *             - If a security manager, s, is present and any of the
+     *             following conditions is met: invocation of
+     *             s.checkMemberAccess(this, Member.PUBLIC) denies access to the
+     *             constructor the caller's class loader is not the same as or
+     *             an ancestor of the class loader for the current class and
+     *             invocation of s.checkPackageAccess() denies access to the
+     *             package of this class
+     */
+    public static <T> T getRandom(final int size, final Class<T> c, final Random r)
+            throws IllegalArgumentException, SecurityException,
+            InstantiationException, IllegalAccessException,
+            InvocationTargetException, NoSuchMethodException {
         if (c == null) {
             return null;
         }
-        final Random r = new Random();
         if (Integer.class.isAssignableFrom(c)) {
             final int par = r.nextInt();
             return c.getConstructor(int.class).newInstance(par);
@@ -1060,24 +1112,24 @@ public class Benchmark {
 
         final byte[] data = new byte[size];
         r.nextBytes(data);
-        if (String.class.isAssignableFrom(c)) {
-            final Charset charset = Charset.forName("UTF-8");
-            final CharsetDecoder decoder = charset.newDecoder();
-            decoder.onMalformedInput(CodingErrorAction.REPLACE);
-            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
-            String par;
-            try {
-                par = decoder.decode(ByteBuffer.wrap(data)).toString();
-                return c.getConstructor(String.class).newInstance(par);
-            } catch (final CharacterCodingException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
 
         try {
-            return c.getConstructor(byte[].class).newInstance(data);
+            if (!String.class.isAssignableFrom(c)) {
+                return c.getConstructor(byte[].class).newInstance(data);
+            }
         } catch (final NoSuchMethodException e) {
-            return c.getConstructor(String.class).newInstance(new String(data));
+            // use String constructor below
+        }
+
+        final CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+        decoder.onMalformedInput(CodingErrorAction.REPLACE);
+        decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        String par;
+        try {
+            par = decoder.decode(ByteBuffer.wrap(data)).toString();
+            return c.getConstructor(String.class).newInstance(par);
+        } catch (final CharacterCodingException e) {
+            throw new IllegalArgumentException(e);
         }
     }
 

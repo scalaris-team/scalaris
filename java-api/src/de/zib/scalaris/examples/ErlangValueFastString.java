@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris.examples;
 
+import java.nio.charset.StandardCharsets;
+
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -59,7 +61,7 @@ public class ErlangValueFastString extends ErlangValue {
     public ErlangValueFastString(final String value) {
         super(new OtpErlangTuple(new OtpErlangObject[] {
                 identifier,
-                new OtpErlangBinary(value.getBytes()) }));
+                new OtpErlangBinary(value.getBytes(StandardCharsets.UTF_8)) }));
     }
 
     /**
@@ -97,7 +99,8 @@ public class ErlangValueFastString extends ErlangValue {
         final OtpErlangTuple otpTuple = (OtpErlangTuple) value();
         if (otpTuple.elementAt(0).equals(identifier)) {
             return new String(
-                    ((OtpErlangBinary) otpTuple.elementAt(0)).binaryValue());
+                    ((OtpErlangBinary) otpTuple.elementAt(0)).binaryValue(),
+                    StandardCharsets.UTF_8);
         }
 
         throw new ClassCastException("Unexpected result type: "

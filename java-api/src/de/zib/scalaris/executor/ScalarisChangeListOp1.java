@@ -97,6 +97,7 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
     protected int prepareWrite(final int firstOp, final ResultList results,
             final RequestList requests) throws OtpErlangException,
             UnknownException {
+        assert results != null;
         List<ErlangValue> pageList;
         try {
             pageList = results.processReadAt(firstOp).listValue();
@@ -137,6 +138,7 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
         int checkedOps = 0;
 
         if (listChanged) {
+            assert results != null;
             results.processWriteAt(firstOp + checkedOps);
             ++checkedOps;
             if ((countKey != null) && listCountChanged) {

@@ -62,7 +62,11 @@ public class ErlangValueTest {
         if (onlyChars) {
             return getRandomCharString(random, length);
         } else {
-            return new String(getRandomBytes(random, length));
+            try {
+                return Benchmark.getRandom(length, String.class, random);
+            } catch (final Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -1044,13 +1048,13 @@ public class ErlangValueTest {
             }
             final Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
             assertEquals(map1.size(), actual_b3.size());
-            for (final String key : map1.keySet()) {
-                assertEquals(map1.get(key).get("a"), actual_b3.get(key).getA());
-                assertEquals(map1.get(key).get("b"), actual_b3.get(key).getB());
-                assertEquals(map1.get(key).get("c"), actual_b3.get(key).getC());
-                assertEquals(map1.get(key).get("d"), actual_b3.get(key).getD());
-                assertEquals(map1.get(key).get("e"), actual_b3.get(key).getE());
-                assertEquals(map1.get(key).get("f"), actual_b3.get(key).getF());
+            for (final Entry<String, Map<String, Object>> key : map1.entrySet()) {
+                assertEquals(key.getValue().get("a"), actual_b3.get(key.getKey()).getA());
+                assertEquals(key.getValue().get("b"), actual_b3.get(key.getKey()).getB());
+                assertEquals(key.getValue().get("c"), actual_b3.get(key.getKey()).getC());
+                assertEquals(key.getValue().get("d"), actual_b3.get(key.getKey()).getD());
+                assertEquals(key.getValue().get("e"), actual_b3.get(key.getKey()).getE());
+                assertEquals(key.getValue().get("f"), actual_b3.get(key.getKey()).getF());
             }
             compareScalarisJSON(value, new ErlangValue(actual));
         }
@@ -1107,13 +1111,13 @@ public class ErlangValueTest {
             }
             final Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
             assertEquals(map1.size(), actual_b3.size());
-            for (final String key : map1.keySet()) {
-                assertEquals(map1.get(key).getA(), actual_b3.get(key).getA());
-                assertEquals(map1.get(key).getB(), actual_b3.get(key).getB());
-                assertEquals(map1.get(key).getC(), actual_b3.get(key).getC());
-                assertEquals(map1.get(key).getD(), actual_b3.get(key).getD());
-                assertEquals(map1.get(key).getE(), actual_b3.get(key).getE(), 0.0);
-                assertEquals(map1.get(key).getF(), actual_b3.get(key).getF());
+            for (final Entry<String, JSONBeanTest1> key : map1.entrySet()) {
+                assertEquals(key.getValue().getA(), actual_b3.get(key.getKey()).getA());
+                assertEquals(key.getValue().getB(), actual_b3.get(key.getKey()).getB());
+                assertEquals(key.getValue().getC(), actual_b3.get(key.getKey()).getC());
+                assertEquals(key.getValue().getD(), actual_b3.get(key.getKey()).getD());
+                assertEquals(key.getValue().getE(), actual_b3.get(key.getKey()).getE(), 0.0);
+                assertEquals(key.getValue().getF(), actual_b3.get(key.getKey()).getF());
             }
             compareScalarisJSON(value, new ErlangValue(actual));
         }

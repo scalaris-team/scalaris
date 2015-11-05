@@ -81,6 +81,7 @@ public abstract class ScalarisChangeListOp2 implements ScalarisOp {
      */
     protected int checkChange(final int firstOp, final ResultList results)
             throws OtpErlangException, UnknownException {
+        assert results != null;
         int checkedOps = 0;
         results.processAddDelOnListAt(firstOp + checkedOps);
         ++checkedOps;

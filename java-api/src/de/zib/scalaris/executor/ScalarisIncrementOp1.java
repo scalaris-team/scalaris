@@ -106,6 +106,7 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
     protected int prepareWrite(final int firstOp, final ResultList results,
             final RequestList requests) throws OtpErlangException,
             UnknownException {
+        assert results != null;
         BigInteger newValue;
         try {
             newValue = results.processReadAt(firstOp).bigIntValue().add(value);
@@ -127,6 +128,7 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
      */
     protected int checkWrite(final int firstOp, final ResultList results)
             throws OtpErlangException, UnknownException {
+        assert results != null;
         results.processWriteAt(firstOp);
         return 1;
     }

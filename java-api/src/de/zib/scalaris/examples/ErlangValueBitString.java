@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris.examples;
 
+import java.nio.charset.StandardCharsets;
+
 import com.ericsson.otp.erlang.OtpErlangBitstr;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
@@ -40,7 +42,7 @@ public class ErlangValueBitString extends ErlangValue {
      *            the value to use
      */
     public ErlangValueBitString(final String value) {
-        super(new OtpErlangBitstr(value.getBytes()));
+        super(new OtpErlangBitstr(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     /**
@@ -75,6 +77,7 @@ public class ErlangValueBitString extends ErlangValue {
      */
     @Override
     public String stringValue() {
-        return new String(((OtpErlangBitstr) value()).binaryValue());
+        return new String(((OtpErlangBitstr) value()).binaryValue(),
+                StandardCharsets.UTF_8);
     }
 }
