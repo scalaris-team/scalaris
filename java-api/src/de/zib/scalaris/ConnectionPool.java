@@ -129,9 +129,7 @@ public class ConnectionPool {
         availableConns.add(conn);
         --checkedOut;
         // need to notify all waiting threads so they do not exceed their timeouts
-        synchronized (this) {
-            notifyAll();
-        }
+        notifyAll();
     }
 
     /**

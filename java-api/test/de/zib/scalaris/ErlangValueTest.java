@@ -737,7 +737,7 @@ public class ErlangValueTest {
         assertTrue(msg, actual instanceof OtpErlangTuple);
         final OtpErlangTuple actualT = (OtpErlangTuple) actual;
         assertTrue(msg, actualT.arity() == 2);
-        assert (expectedT.elementAt(0).equals("struct"));
+        assert (expectedT.elementAt(0).equals(new OtpErlangString("struct")));
         assertEquals("Checking '" + actualT.elementAt(0) + "' in "
                 + actualOriginal, CommonErlangObjects.structAtom, actualT.elementAt(0));
 

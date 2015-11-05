@@ -77,7 +77,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(DBSizeKey, rr_eval_admin_dbsize).    %Process Dictionary Key for generated db size
--define(REP_FACTOR, 4).
 -define(TAB, 9).
 
 -define(BINOM, 0.2).       %binomial(N, p) - this is p
@@ -861,7 +860,8 @@ fill_ring(Type, DBSize, Params) ->
     DbStatus = {Entries, _Existing, Missing, Outdated} =
                    db_generator:fill_ring(Type, DBSize, Params),
     {fprob, FProb} = lists:keyfind(fprob, 1, Params),
-    ?ASSERT2(Entries =:= DBSize * ?REP_FACTOR, {incorrect_db_size, Entries, DBSize}),
+    ?ASSERT2(Entries =:= DBSize * config:read(replication_factor),
+             {incorrect_db_size, Entries, DBSize}),
     ?ASSERT2((Missing + Outdated) =:= erlang:round((FProb / 100) * DBSize),
              {incorrect_fprob, Missing + Outdated, FProb * DBSize}),
     erlang:put(?DBSizeKey, element(1, DbStatus)),

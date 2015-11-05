@@ -202,7 +202,7 @@ bench: compile
 	fi
 
 java:
-	ant -buildfile java-api/build.xml jar
+	ant -buildfile java-api/build.xml jar tools.test.compile scalaris.test.compile
 
 java-test: compile java
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \

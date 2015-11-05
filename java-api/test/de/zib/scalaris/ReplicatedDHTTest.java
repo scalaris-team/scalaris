@@ -135,7 +135,7 @@ public class ReplicatedDHTTest {
         final Connection c = ConnectionFactory.getInstance().createConnection("test");
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
         final RoutingTable rt = new RoutingTable(c);
-        final int r = rt.get_replication_factor();
+        final int r = rt.getReplicationFactor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -174,7 +174,7 @@ public class ReplicatedDHTTest {
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
         final TransactionSingleOp sc = new TransactionSingleOp(c);
         final RoutingTable rt = new RoutingTable(c);
-        final int r = rt.get_replication_factor();
+        final int r = rt.getReplicationFactor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -230,7 +230,7 @@ public class ReplicatedDHTTest {
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
         final TransactionSingleOp sc = new TransactionSingleOp(c);
         final RoutingTable rt = new RoutingTable(c);
-        final int r = rt.get_replication_factor();
+        final int r = rt.getReplicationFactor();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
