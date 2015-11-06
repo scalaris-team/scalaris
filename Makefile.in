@@ -265,6 +265,10 @@ datanucleus-test: compile datanucleus
 	  echo "####################" ; \
 	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
+	  echo "Java messages (last 150 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 150 "contrib/datanucleus/scalaris-datanucleus-store-test/target/surefire-reports/"*.txt ; \
+	  echo "####################" ; \
 	  false ; \
 	else \
 	  true ; \
