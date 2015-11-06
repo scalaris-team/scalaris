@@ -13,7 +13,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 @SuppressWarnings("rawtypes")
-public class TestScalarisQuery extends ScalarisTestBase {
+public class TestScalarisQuery {
 
     private static Product discman = new Product("Sony Discman",
             "A standard discman from Sony", 1.99);
