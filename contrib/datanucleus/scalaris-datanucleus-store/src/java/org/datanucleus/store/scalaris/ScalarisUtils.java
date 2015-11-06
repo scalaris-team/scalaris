@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
@@ -663,19 +664,19 @@ public class ScalarisUtils {
         }
 
         // update all keys where new entries are added
-        for (String key : toAddToKey.keySet()) {
-            List<ErlangValue> toAdd = toAddToKey.get(key);
+        for (Entry<String, List<ErlangValue>> entry : toAddToKey.entrySet()) {
+            List<ErlangValue> toAdd = entry.getValue();
             List<ErlangValue> toRemove = new ArrayList<ErlangValue>(0);
-            if (toRemoveFromKey.containsKey(key)) {
-                toRemove = toRemoveFromKey.get(key);
+            if (toRemoveFromKey.containsKey(entry.getKey())) {
+                toRemove = toRemoveFromKey.get(entry.getKey());
             }
-            t.addDelOnList(key, toAdd, toRemove);
+            t.addDelOnList(entry.getKey(), toAdd, toRemove);
         }
         // update the remaining keys (only deletions)
-        for (String key : toRemoveFromKey.keySet()) {
-            if (toAddToKey.containsKey(key)) {
-                List<ErlangValue> toRemove = toRemoveFromKey.get(key);
-                t.addDelOnList(key, new ArrayList<ErlangValue>(0), toRemove);
+        for (Entry<String, List<ErlangValue>> entry : toRemoveFromKey.entrySet()) {
+            if (toAddToKey.containsKey(entry.getKey())) {
+                List<ErlangValue> toRemove = entry.getValue();
+                t.addDelOnList(entry.getKey(), new ArrayList<ErlangValue>(0), toRemove);
             }
         }
     }
