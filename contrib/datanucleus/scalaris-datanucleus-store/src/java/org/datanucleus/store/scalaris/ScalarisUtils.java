@@ -613,6 +613,9 @@ public class ScalarisUtils {
                         }
                     } else {
                         String className = mmd.getType().getCanonicalName();
+                        if (className == null) {
+                             className = mmd.getType().getName();
+                        }
                         foreignObjectIdsNew.add(
                                 ScalarisSchemaHandler.getForeignKeyActionKey(
                                         className, changedFieldsNewVal.getString(fieldName)));

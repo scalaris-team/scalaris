@@ -270,12 +270,7 @@ public class StoreFieldManager extends AbstractStoreFieldManager {
                 Date dateValue = (Date) value;
                 jsonobj.put(name, dateValue.getTime());
             } else if (value instanceof Enum) {
-                boolean useNumeric = true;
-                if (useNumeric) {
-                    jsonobj.put(name, ((Enum) value).ordinal());
-                } else {
-                    jsonobj.put(name, ((Enum) value).name());
-                }
+                jsonobj.put(name, ((Enum) value).ordinal());
             } else if (value instanceof BigDecimal) {
                 jsonobj.put(name, value);
             } else if (value instanceof BigInteger) {

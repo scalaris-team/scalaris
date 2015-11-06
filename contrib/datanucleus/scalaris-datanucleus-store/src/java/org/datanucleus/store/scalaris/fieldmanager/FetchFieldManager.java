@@ -298,8 +298,7 @@ public class FetchFieldManager extends AbstractFieldManager {
             Long dateValue = result.getLong(memberName);
             return new Date(dateValue);
         } else if (Enum.class.isAssignableFrom(mmd.getType())) {
-            boolean useNumeric = true;
-            if (useNumeric) {
+            if (mmd.getType().getEnumConstants() != null) {
                 return mmd.getType().getEnumConstants()[result
                         .getInt(memberName)];
             } else {
