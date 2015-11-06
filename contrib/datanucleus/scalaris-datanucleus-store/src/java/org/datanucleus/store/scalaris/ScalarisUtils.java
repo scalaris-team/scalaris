@@ -194,30 +194,18 @@ public class ScalarisUtils {
             StringBuilder keyBuilder = new StringBuilder();
 
             int[] pkFieldNumbers = cmd.getPKMemberPositions();
-            Object firstKey = null;
             for (int i = 0; i < pkFieldNumbers.length; i++) {
                 AbstractMemberMetaData mmd = cmd
                         .getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
 
                 Object keyVal = op.provideField(mmd.getAbsoluteFieldNumber());
-                if (i == 0) {
-                    firstKey = keyVal;
-                } else {
-                    keyBuilder.append(keySeparator);    
+                if (i > 0) {
+                    keyBuilder.append(keySeparator);
                 }
                 keyBuilder.append(keyVal);
             }
-            String identity = keyBuilder.toString();
-            if (op.getExternalObjectId() == null) {
-                // DataNucleus expects as internal object id an integer value if there is only one
-                // primary key member which is an integer. Otherwise it can be an arbitrary
-                // object.
-                if (pkFieldNumbers.length == 1) {
-                    op.setPostStoreNewObjectId(firstKey.toString());
-                } else {
-                    op.setPostStoreNewObjectId(identity);
-                }
-            }
+
+            op.setPostStoreNewObjectId(keyBuilder.toString());
         }
 
         String id = IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
