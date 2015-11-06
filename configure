@@ -605,6 +605,9 @@ EMAKEFILECOMPILECOMPAT
 DIALYZER_FLAGS
 EDOCMACROS
 EMAKEFILEDEFINES
+ERLANG_ERLANGJS_FLAGS
+ERLANG_LIB_VER_erlang_js
+ERLANG_LIB_DIR_erlang_js
 ERLANG_HANOIDB_FLAGS
 ERLANG_LIB_VER_hanoidb
 ERLANG_LIB_DIR_hanoidb
@@ -614,8 +617,6 @@ ERLANG_LIB_DIR_toke
 RUN_TEST
 CT_RUN_FILE
 RUN_TEST_FILE
-ERLANG_LIB_VER_erlang_js
-ERLANG_LIB_DIR_erlang_js
 ERLANG_LIB_VER_edoc
 ERLANG_LIB_DIR_edoc
 ERLANG_LIB_VER_common_test
@@ -697,6 +698,7 @@ ac_user_opts='
 enable_option_checking
 enable_toke
 enable_hanoidb
+enable_erlang_js
 with_browser
 enable_runuser
 with_systemd
@@ -1326,6 +1328,9 @@ Optional Features:
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
   --disable-hanoidb       disable support for hanoidb
   --enable-hanoidb[=DIR]  enable support for hanoidb
+  --disable-erlang-js     disable support for erlang_js
+  --enable-erlang-js[=DIR]
+                          enable support for erlang_js
   --disable-runuser       disable support for runuser (use sudo instead)
   --enable-native         enable compilation to native code using HiPE
   --enable-debug          enable debugging mode
@@ -1912,6 +1917,26 @@ fi
 if test "${enable_hanoidb+set}" = set; then :
   enableval=$enable_hanoidb; ENABLE_HANOIDB=yes
                HANOIDBPREFIX=$enableval
+fi
+
+
+###########################################################
+#
+# check erlang_js
+#
+###########################################################
+
+ENABLE_ERLANGJS=
+ERLANGJSPREFIX=
+# Check whether --enable-erlang-js was given.
+if test "${enable_erlang_js+set}" = set; then :
+  enableval=$enable_erlang_js; ERLANG_JSPREFIX=no
+fi
+
+# Check whether --enable-erlang-js was given.
+if test "${enable_erlang_js+set}" = set; then :
+  enableval=$enable_erlang_js; ENABLE_ERLANGJS=yes
+               ERLANGJSPREFIX=$enableval
 fi
 
 
@@ -3609,85 +3634,6 @@ $as_echo "$as_me: erlang-edoc not found - you won't be able to create the docume
 fi
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erlang_js' library subdirectory" >&5
-$as_echo_n "checking for Erlang/OTP 'erlang_js' library subdirectory... " >&6; }
-if ${ac_cv_erlang_lib_dir_erlang_js+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_ext=erl
-ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
-ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
-     if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
-
-start() ->
-	    ReturnValue = case code:lib_dir("erlang_js") of
-	    {error, bad_name} ->
-		file:write_file("conftest.out", "not found\n"),
-		1;
-	    LibDir ->
-		file:write_file("conftest.out", LibDir),
-		0
-	    end,
-	    halt(ReturnValue)
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  ac_cv_erlang_lib_dir_erlang_js=`cat conftest.out`
-	 rm -f conftest.out
-else
-  if test ! -f conftest.out; then
-	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "test Erlang program execution failed
-See \`config.log' for more details" "$LINENO" 5; }
-	 else
-	     ac_cv_erlang_lib_dir_erlang_js="not found"
-	     rm -f conftest.out
-	 fi
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-     ac_ext=erl
-ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
-ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_erlang_js" >&5
-$as_echo "$ac_cv_erlang_lib_dir_erlang_js" >&6; }
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erlang_js' library version" >&5
-$as_echo_n "checking for Erlang/OTP 'erlang_js' library version... " >&6; }
-if ${ac_cv_erlang_lib_ver_erlang_js+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test "$ac_cv_erlang_lib_dir_erlang_js" = "not found"; then :
-  ac_cv_erlang_lib_ver_erlang_js="not found"
-else
-  ac_cv_erlang_lib_ver_erlang_js=`$as_echo "$ac_cv_erlang_lib_dir_erlang_js" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
-fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_erlang_js" >&5
-$as_echo "$ac_cv_erlang_lib_ver_erlang_js" >&6; }
-ERLANG_LIB_DIR_erlang_js=$ac_cv_erlang_lib_dir_erlang_js
-
-ERLANG_LIB_VER_erlang_js=$ac_cv_erlang_lib_ver_erlang_js
-
-if test "$ac_cv_erlang_lib_dir_erlang_js" = "not found"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs" >&5
-$as_echo "$as_me: erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs" >&6;}
-fi
-
-
 as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_common_test/priv/bin/run_test" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test" >&5
 $as_echo_n "checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test... " >&6; }
@@ -4113,6 +4059,139 @@ else
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "$ERLANG_HANOIDB_MESSAGE
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+fi
+
+fi
+
+
+# erlang_js
+ERLANG_ERLANGJS_FLAGS=
+if test "x$ERLANGJSPREFIX" != xno; then :
+
+            ERLANG_ERLANGJS_MESSAGE=
+            if test "x$ERLANGJSPREFIX" != x; then :
+  export ERL_LIBS="$ERLANGJSPREFIX"
+fi
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erlang_js' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'erlang_js' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_erlang_js+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("erlang_js") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_erlang_js=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_erlang_js="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_erlang_js" >&5
+$as_echo "$ac_cv_erlang_lib_dir_erlang_js" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erlang_js' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'erlang_js' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_erlang_js+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_erlang_js" = "not found"; then :
+  ac_cv_erlang_lib_ver_erlang_js="not found"
+else
+  ac_cv_erlang_lib_ver_erlang_js=`$as_echo "$ac_cv_erlang_lib_dir_erlang_js" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_erlang_js" >&5
+$as_echo "$ac_cv_erlang_lib_ver_erlang_js" >&6; }
+ERLANG_LIB_DIR_erlang_js=$ac_cv_erlang_lib_dir_erlang_js
+
+ERLANG_LIB_VER_erlang_js=$ac_cv_erlang_lib_ver_erlang_js
+
+if test "$ac_cv_erlang_lib_dir_erlang_js" = "not found"; then :
+  ERLANG_ERLANGJS_MESSAGE="erlang_js erlang library not found"
+else
+  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
+                 EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
+                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
+
+else
+  ERLANG_TOKE_MESSAGE="erlang_js library erlang_js_drv.so not found"
+fi
+
+
+fi
+
+            if test "x$ERLANGJSPREFIX" != x; then :
+  export ERL_LIBS=""
+fi
+            if test "x$ERLANG_ERLANGJS_MESSAGE" != x; then :
+  if test "x$ENABLE_ERLANGJS" != xyes; then :
+  ERLANG_ERLANGJS_MESSAGE="$ERLANG_ERLANGJS_MESSAGE, disabling erlang_js support..."
+                 { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_ERLANGJS_MESSAGE" >&5
+$as_echo "$as_me: $ERLANG_ERLANGJS_MESSAGE" >&6;}
+else
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "$ERLANG_ERLANGJS_MESSAGE
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 fi

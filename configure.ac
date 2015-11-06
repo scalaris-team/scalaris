@@ -60,6 +60,24 @@ AC_ARG_ENABLE([hanoidb],
 
 ###########################################################
 #
+# check erlang_js
+#
+###########################################################
+
+ENABLE_ERLANGJS=
+ERLANGJSPREFIX=
+AC_ARG_ENABLE([erlang-js],
+              AS_HELP_STRING([--disable-erlang-js],
+                 [disable support for erlang_js]),
+              [ERLANG_JSPREFIX=no])
+AC_ARG_ENABLE([erlang-js],
+              AS_HELP_STRING([--enable-erlang-js@<:@=DIR@:>@],
+                 [enable support for erlang_js]),
+              [ENABLE_ERLANGJS=yes
+               ERLANGJSPREFIX=$enableval])
+
+###########################################################
+#
 # check browser for 'make test-vts'
 #
 ###########################################################
@@ -233,8 +251,6 @@ AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found -
 
 AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be able to create the documentation or run 'make install']))
 
-AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs]))
-
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [RUN_TEST_FILE=$ERLANG_LIB_DIR_common_test/priv/bin/run_test],
               [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
@@ -304,6 +320,31 @@ AS_IF([test "x$HANOIDBPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_HANOIDB_MESSAGE))])
             ])
 AC_SUBST([ERLANG_HANOIDB_FLAGS])
+
+# erlang_js
+ERLANG_ERLANGJS_FLAGS=
+AS_IF([test "x$ERLANGJSPREFIX" != xno],
+            [
+            ERLANG_ERLANGJS_MESSAGE=
+            AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS="$ERLANGJSPREFIX"])
+            AC_ERLANG_CHECK_LIB(erlang_js,
+              [AC_CHECK_FILE($ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so,
+                [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
+                 EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
+                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
+                ],
+                [ERLANG_TOKE_MESSAGE="erlang_js library erlang_js_drv.so not found"])
+              ],
+              [ERLANG_ERLANGJS_MESSAGE="erlang_js erlang library not found"])
+            AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_ERLANGJS_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_ERLANGJS" != xyes],
+                [ERLANG_ERLANGJS_MESSAGE="$ERLANG_ERLANGJS_MESSAGE, disabling erlang_js support..."
+                 AC_MSG_NOTICE($ERLANG_ERLANGJS_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_ERLANGJS_MESSAGE))])
+            ])
+AC_SUBST([ERLANG_ERLANGJS_FLAGS])
 
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
