@@ -42,6 +42,24 @@ AC_ARG_ENABLE([toke],
 
 ###########################################################
 #
+# check hanoidb
+#
+###########################################################
+
+ENABLE_HANOIDB=
+HANOIDBPREFIX=
+AC_ARG_ENABLE([hanoidb],
+              AS_HELP_STRING([--disable-hanoidb],
+                 [disable support for hanoidb]),
+              [HANOIDBPREFIX=no])
+AC_ARG_ENABLE([hanoidb],
+              AS_HELP_STRING([--enable-hanoidb@<:@=DIR@:>@],
+                 [enable support for hanoidb]),
+              [ENABLE_HANOIDB=yes
+               HANOIDBPREFIX=$enableval])
+
+###########################################################
+#
 # check browser for 'make test-vts'
 #
 ###########################################################
@@ -215,12 +233,6 @@ AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found -
 
 AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be able to create the documentation or run 'make install']))
 
-AC_ERLANG_CHECK_LIB(hanoidb,
-                    [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
-                     EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
-                     DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"],
-                    [AC_MSG_NOTICE([erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)])])
-
 AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs]))
 
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
@@ -245,6 +257,7 @@ else
   AC_MSG_RESULT([neither run_test nor ct_run found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
 fi
 
+# toke
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
             [
@@ -268,6 +281,29 @@ AS_IF([test "x$TOKEPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_TOKE_MESSAGE))])
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
+
+# hanoidb
+ERLANG_HANOIDB_FLAGS=
+AS_IF([test "x$HANOIDBPREFIX" != xno],
+            [
+            ERLANG_HANOIDB_MESSAGE=
+            AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS="$HANOIDBPREFIX"])
+            AC_ERLANG_CHECK_LIB(hanoidb,
+              [
+                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
+                EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
+                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"
+                ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"
+              ],
+              [ERLANG_HANOIDB_MESSAGE="hanoidb erlang not found"])
+            AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_HANOIDB_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_HANOIDB" != xyes],
+                [ERLANG_TOKE_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
+                 AC_MSG_NOTICE($ERLANG_HANOIDB_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_HANOIDB_MESSAGE))])
+            ])
+AC_SUBST([ERLANG_HANOIDB_FLAGS])
 
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
