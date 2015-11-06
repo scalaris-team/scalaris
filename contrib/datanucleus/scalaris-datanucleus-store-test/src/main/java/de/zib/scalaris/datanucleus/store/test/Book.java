@@ -85,4 +85,13 @@ public class Book extends Product {
         }
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int authorHash = author != null? author.hashCode() : 0;
+        int isbnHash = isbn != null ? isbn.hashCode() : 0;
+        int publisherHash = publisher != null? publisher.hashCode() : 0;
+
+        return super.hashCode() + authorHash + isbnHash + publisherHash;
+    }
 }

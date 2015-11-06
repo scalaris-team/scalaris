@@ -45,4 +45,9 @@ public class Author {
         }
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        return name != null? name.hashCode() : 0;
+    }
 }

@@ -10,7 +10,7 @@ import org.junit.Test;
 
 import static de.zib.scalaris.datanucleus.store.test.StoreUtils.*;
 
-public class TestScalarisStorage extends ScalarisTestBase {
+public class TestScalarisStorage {
 
     @After
     public void after() {

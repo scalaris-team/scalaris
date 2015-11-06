@@ -92,4 +92,15 @@ public class Inventory {
         }
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = name.hashCode();
+        if (products == null) return hash;
+
+        for (Product p : products) {
+            hash += p.hashCode();
+        }
+        return hash;
+    }
 }

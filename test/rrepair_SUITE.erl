@@ -50,7 +50,6 @@ groups() ->
 %%                            tester_merkle_compress_cmp_result
                                 ]},
      {basic,  [parallel], [
-                           get_symmetric_keys_test,
                            check_quadrant_intervals
                           ]},
      {repair, [sequence], [
@@ -94,15 +93,6 @@ end_per_group_special(_, Config) ->
 % Basic Functions Group
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_symmetric_keys_test(_) ->
-    ToTest = lists:sort(get_symmetric_keys(config:read(replication_factor))),
-    ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
-    ?equals_w_note(ToTest, ToBe,
-                   io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
-    ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 check_quadrant_intervals(_) ->
     Quadrants = rr_recon:quadrant_intervals(),
     ?equals(lists:foldl(fun intervals:union/2, intervals:empty(), Quadrants),
@@ -116,6 +106,8 @@ check_quadrant_intervals(_) ->
                          Q1 =/= Q2,
                          not intervals:is_empty(intervals:intersection(Q1, Q2))],
             []).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> true.
 prop_map_key_to_interval(Key, I) ->

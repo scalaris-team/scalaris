@@ -164,8 +164,8 @@ mpath(Config) ->
     FType = proplists:get_value(ftype, Config),
     TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
-    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
-                                                 {rr_recon_p1e, P1E}]),
+    _ = build_ring(NodeCount, Config, [get_rep_upd_config(Method),
+                                       {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -221,8 +221,8 @@ dest(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
-    _ = build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method),
-                                                 {rr_recon_p1e, P1E}]),
+    _ = build_ring(NodeCount, Config, [get_rep_upd_config(Method),
+                                       {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -266,8 +266,8 @@ dest_empty_node(Config) ->
     P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
-    _ = build_symmetric_ring(as_replication_factor, Config,
-                             [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
+    _ = build_ring(symmetric, Config,
+                   [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
                                                    {fprob, 100},
                                                    {distribution, uniform},
@@ -344,7 +344,7 @@ session_ttl(Config) ->
     RRConf = lists:keyreplace(rr_gc_interval, 1, RRConf1, {rr_gc_interval, erlang:round(TTL div 2)}),
 
     %build and fill ring
-    _ = build_symmetric_ring(NodeCount, Config, RRConf),
+    _ = build_ring(NodeCount, Config, RRConf),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 90},
                                                    {distribution, uniform}]),
@@ -377,33 +377,10 @@ session_ttl(Config) ->
     ok.
 
 asymmetric_ring(Config) ->
-    %parameter
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    DataCount = 1000,
-
-    RRConf = get_rep_upd_config(Method),
-
-    %build and fill ring
-    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
-    Key1 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,4}),
-    Key2 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,2}),
-    Key3 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {3,4}),
-    Key4 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7,8}),
-    unittest_helper:stop_minimal_procs(Config2),
-    NodeKeys = [Key1, Key2, Key3, Key4],
-    _ = build_ring(NodeKeys, Config, RRConf),
-
-    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
-                                                   {fprob, 90},
-                                                   {distribution, uniform}]),
-    %chose node pair
-    ?proto_sched(start),
-    startSyncRound(NodeKeys),
-    waitForSyncRoundEnd(NodeKeys, false),
-    ?proto_sched(stop),
-    print_status(1, get_db_status()),
-    ok.
+    start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}],
+               1, 0.01, get_rep_upd_config(Method), fun erlang:'=<'/2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
@@ -414,7 +391,7 @@ asymmetric_ring(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_sync(Config, Nodes::Int, DBSize::Int, DBParams,
+-spec start_sync(Config, Nodes::Int | symmetric, DBSize::Int, DBParams,
                  Rounds::Int, P1E, RRConf::Config, CompFun) -> true when
     is_subtype(Config,      [tuple()]),
     is_subtype(Int,         pos_integer()),
@@ -422,7 +399,8 @@ asymmetric_ring(Config) ->
     is_subtype(P1E,         float()),
     is_subtype(CompFun,     fun((T, T) -> boolean())).
 start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) ->
-    NodeKeys = build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
+    % NOTE: a sync round may not decrease the sync degree if there is no error on the participating nodes!
+    NodeKeys = build_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
     Nodes = [begin
                  comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
                  trace_mpath:thread_yield(),
@@ -569,33 +547,36 @@ get_db_status() ->
     remove_full_db(DBKeys),
     {DBSize, Stored, DBSize - Stored, Outdated}.
 
--spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
-get_symmetric_keys(NodeCount) ->
-    [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
-
-build_symmetric_ring(NodeCount0, Config, RRConfig) ->
-    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
-    NodeCount = case NodeCount0 of
-                    as_replication_factor -> config:read(replication_factor);
-                    _ -> NodeCount0
-                end,
-    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    unittest_helper:stop_minimal_procs(Config2),
-    build_ring(NodeKeys, Config, RRConfig).
-
-build_ring(NodeKeys, Config, RRConfig) ->
+build_ring(NodeCount0, Config, RRConfig) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    %Build ring with NodeCount symmetric nodes
-    unittest_helper:make_ring_with_ids(
-      NodeKeys,
-      [{config, lists:flatten([{log_path, PrivDir}, RRConfig])}]),
+    case NodeCount0 of
+        symmetric ->
+            % Build ring with NodeCount symmetric nodes
+            unittest_helper:make_symmetric_ring(
+              [{config, lists:flatten([{log_path, PrivDir}, RRConfig])}]),
+            NodeCount = config:read(replication_factor),
+            ok;
+        NodeCount when is_integer(NodeCount) andalso NodeCount > 0 ->
+            % Build ring with NodeCount arbitrary nodes
+            Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+            NodeKeys0 = util:for_to_ex(1, NodeCount, fun(_) -> ?RT:get_random_node_id() end),
+            unittest_helper:stop_minimal_procs(Config2),
+            unittest_helper:make_ring_with_ids(
+              NodeKeys0,
+              [{config, lists:flatten([{log_path, PrivDir}, RRConfig])}])
+    end,
     % wait for all nodes to finish their join
-    unittest_helper:check_ring_size_fully_joined(length(NodeKeys)),
+    unittest_helper:check_ring_size_fully_joined(NodeCount),
 %%     % wait a bit for the rm-processes to settle
 %%     timer:sleep(500),
-    NodeKeys.
+    _NodeKeys = [begin
+                     comm:send_local(Pid, {get_state, comm:this(), node_id}),
+                     receive
+                         ?SCALARIS_RECV({get_state_response, Key}, Key)
+                     end
+                 end || Pid <- pid_groups:find_all(dht_node)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Analysis

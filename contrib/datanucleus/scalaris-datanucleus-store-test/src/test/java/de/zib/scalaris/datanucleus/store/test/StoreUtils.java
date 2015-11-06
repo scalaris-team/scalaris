@@ -2,6 +2,7 @@ package de.zib.scalaris.datanucleus.store.test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import javax.jdo.JDOHelper;
 import javax.jdo.PersistenceManager;
@@ -12,6 +13,13 @@ import javax.jdo.Transaction;
 public class StoreUtils {
 
     public static final String PERSISTENCE_UNIT_NAME = "Scalaris_Test";
+
+    // For some reason Datanucleus complains sometimes that this property is
+    // not set and fails.
+    static {
+        Properties props = System.getProperties();
+        props.setProperty("javax.jdo.option.PersistenecUnitName", PERSISTENCE_UNIT_NAME);
+    }
 
     /**
      * Returns a new PersistenceManager of persistence unit
