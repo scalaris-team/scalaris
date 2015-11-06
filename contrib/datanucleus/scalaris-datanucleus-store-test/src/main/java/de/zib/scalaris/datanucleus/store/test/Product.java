@@ -87,4 +87,12 @@ public class Product {
         }
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int descHash = description != null? description.hashCode() : 0;
+        int nameHash = name != null? name.hashCode() : 0;
+
+        return descHash + nameHash + ((int) price);
+    }
 }
