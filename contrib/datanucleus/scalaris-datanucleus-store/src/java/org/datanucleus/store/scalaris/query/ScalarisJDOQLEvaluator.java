@@ -19,6 +19,7 @@ import org.datanucleus.query.inmemory.InMemoryExpressionEvaluator;
 import org.datanucleus.query.inmemory.InMemoryFailure;
 import org.datanucleus.query.inmemory.VariableNotSetException;
 import org.datanucleus.store.query.Query;
+import org.datanucleus.store.query.Query.SubqueryDefinition;
 import org.datanucleus.store.scalaris.ScalarisPersistenceHandler;
 import org.datanucleus.util.Localiser;
 import org.datanucleus.util.NucleusLogger;
@@ -92,7 +93,8 @@ public class ScalarisJDOQLEvaluator extends JDOQLEvaluator {
         String[] subqueryAliases = compilation.getSubqueryAliases();
         if (subqueryAliases != null) {
             for (String subqueryAlias : subqueryAliases) {
-                Query<?> tmpSubquery = query.getSubqueryForVariable(subqueryAlias).getQuery();
+                SubqueryDefinition sqd = query.getSubqueryForVariable(subqueryAlias);
+                Query<?> tmpSubquery = (sqd != null) ? sqd.getQuery() : subquery;
                 if (tmpSubquery.equals(subquery)) {
                     if (state.containsKey(subqueryAlias)) {
                         return (Collection) state.get(subqueryAlias);

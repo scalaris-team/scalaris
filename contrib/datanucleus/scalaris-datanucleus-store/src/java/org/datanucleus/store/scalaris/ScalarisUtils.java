@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.datanucleus.ExecutionContext;
 import org.datanucleus.exceptions.NucleusDataStoreException;
@@ -194,30 +195,18 @@ public class ScalarisUtils {
             StringBuilder keyBuilder = new StringBuilder();
 
             int[] pkFieldNumbers = cmd.getPKMemberPositions();
-            Object firstKey = null;
             for (int i = 0; i < pkFieldNumbers.length; i++) {
                 AbstractMemberMetaData mmd = cmd
                         .getMetaDataForManagedMemberAtAbsolutePosition(pkFieldNumbers[i]);
 
                 Object keyVal = op.provideField(mmd.getAbsoluteFieldNumber());
-                if (i == 0) {
-                    firstKey = keyVal;
-                } else {
-                    keyBuilder.append(keySeparator);    
+                if (i > 0) {
+                    keyBuilder.append(keySeparator);
                 }
                 keyBuilder.append(keyVal);
             }
-            String identity = keyBuilder.toString();
-            if (op.getExternalObjectId() == null) {
-                // DataNucleus expects as internal object id an integer value if there is only one
-                // primary key member which is an integer. Otherwise it can be an arbitrary
-                // object.
-                if (pkFieldNumbers.length == 1) {
-                    op.setPostStoreNewObjectId(firstKey.toString());
-                } else {
-                    op.setPostStoreNewObjectId(identity);
-                }
-            }
+
+            op.setPostStoreNewObjectId(keyBuilder.toString());
         }
 
         String id = IdentityUtils.getPersistableIdentityForId(op.getExternalObjectId());
@@ -625,6 +614,9 @@ public class ScalarisUtils {
                         }
                     } else {
                         String className = mmd.getType().getCanonicalName();
+                        if (className == null) {
+                             className = mmd.getType().getName();
+                        }
                         foreignObjectIdsNew.add(
                                 ScalarisSchemaHandler.getForeignKeyActionKey(
                                         className, changedFieldsNewVal.getString(fieldName)));
@@ -672,19 +664,19 @@ public class ScalarisUtils {
         }
 
         // update all keys where new entries are added
-        for (String key : toAddToKey.keySet()) {
-            List<ErlangValue> toAdd = toAddToKey.get(key);
+        for (Entry<String, List<ErlangValue>> entry : toAddToKey.entrySet()) {
+            List<ErlangValue> toAdd = entry.getValue();
             List<ErlangValue> toRemove = new ArrayList<ErlangValue>(0);
-            if (toRemoveFromKey.containsKey(key)) {
-                toRemove = toRemoveFromKey.get(key);
+            if (toRemoveFromKey.containsKey(entry.getKey())) {
+                toRemove = toRemoveFromKey.get(entry.getKey());
             }
-            t.addDelOnList(key, toAdd, toRemove);
+            t.addDelOnList(entry.getKey(), toAdd, toRemove);
         }
         // update the remaining keys (only deletions)
-        for (String key : toRemoveFromKey.keySet()) {
-            if (toAddToKey.containsKey(key)) {
-                List<ErlangValue> toRemove = toRemoveFromKey.get(key);
-                t.addDelOnList(key, new ArrayList<ErlangValue>(0), toRemove);
+        for (Entry<String, List<ErlangValue>> entry : toRemoveFromKey.entrySet()) {
+            if (toAddToKey.containsKey(entry.getKey())) {
+                List<ErlangValue> toRemove = entry.getValue();
+                t.addDelOnList(entry.getKey(), new ArrayList<ErlangValue>(0), toRemove);
             }
         }
     }

@@ -165,7 +165,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
     /**
      * Implementation of a ManagedConnection for Scalaris database.
      */
-    public class ManagedConnectionImpl extends AbstractManagedConnection {
+    public static class ManagedConnectionImpl extends AbstractManagedConnection {
 
         public ManagedConnectionImpl(final Map optionsl) {
             // TODO: handle options?

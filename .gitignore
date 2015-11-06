@@ -40,3 +40,4 @@ Session.vim
 /contrib/toke
 /contrib/erlang_js
 contrib/slurm/slurm-*.out
+/java-api/target

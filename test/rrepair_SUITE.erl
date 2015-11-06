@@ -141,8 +141,9 @@ tester_map_key_to_interval(_) ->
     prop_map_key_to_interval(Q2, intervals:union(intervals:new(Q1), intervals:new(Q3))),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
 
--spec prop_map_key_to_quadrant(?RT:key(), Quadrant::1..4) -> true.
-prop_map_key_to_quadrant(Key, Quadrant) ->
+-spec prop_map_key_to_quadrant(?RT:key(), pos_integer()) -> true.
+prop_map_key_to_quadrant(Key, Int) ->
+    Quadrant = Int rem config:read(replication_factor) + 1,
     ?equals(rr_recon:map_key_to_quadrant(Key, Quadrant),
             rr_recon:map_key_to_interval(Key, lists:nth(Quadrant, rr_recon:quadrant_intervals()))).
 
