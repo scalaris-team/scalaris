@@ -654,7 +654,6 @@ RUNUSER
 SUDO
 SCREEN
 BROWSER
-BOOST_TEST_EXEC_MONITOR_LIB
 BOOST_UNIT_TEST_FRAMEWORK_LIB
 BOOST_ASIO_LIB
 BOOST_REGEX_LIB
@@ -680,6 +679,7 @@ CPPFLAGS
 LDFLAGS
 CXXFLAGS
 CXX
+TRUE
 FALSE
 target_alias
 host_alias
@@ -728,7 +728,6 @@ with_boost_system
 with_boost_regex
 with_boost_asio
 with_boost_unit_test_framework
-with_boost_test_exec_monitor
 enable_toke
 enable_hanoidb
 enable_erlang_js
@@ -1409,11 +1408,6 @@ Optional Packages:
                           is possible to specify a certain library for the
                           linker e.g.
                           --with-boost-unit-test-framework=boost_unit_test_framework-gcc
-  --with-boost-test-exec-monitor[=special-lib]
-                          use the Test_Exec_Monitor library from boost - it is
-                          possible to specify a certain library for the linker
-                          e.g.
-                          --with-boost-test-exec-monitor=boost_test_exec_monitor-gcc
   --with-browser=BROWSER  absolute path of the browser to use for 'make
                           test-vts'
   --with-systemd[=UNITDIR]
@@ -2040,7 +2034,6 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
-# AC_CONFIG_MACRO_DIR([m4])
 
 EMAKEFILEDEFINES=
 EDOCMACROS=
@@ -2087,6 +2080,47 @@ fi
 
 
 
+# Extract the first word of "true", so it can be a program name with args.
+set dummy true; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_TRUE+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $TRUE in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_TRUE="$TRUE" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_TRUE="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+TRUE=$ac_cv_path_TRUE
+if test -n "$TRUE"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $TRUE" >&5
+$as_echo "$TRUE" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+
 
 ###########################################################
 #
@@ -2094,7 +2128,7 @@ fi
 #
 ###########################################################
 
-#             Homebrew                     Ubunut
+#              Homebrew                     Ubuntu
 for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
     if test -d $PREFIX; then
        location=`find $PREFIX -type d -name "automake-?.??"`
@@ -3177,11 +3211,6 @@ $as_echo "#define HAVE_BOOST /**/" >>confdefs.h
 fi
 
 
-#BOOST_REQUIRE([1.54])
-#BOOST_SYSTEM([])
-#BOOST_REGEX([])
-#BOOST_ASIO([])
-#BOOST_TEST([])
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -4540,185 +4569,6 @@ fi
                 as_fn_error $? "Could not find a version of the library!" "$LINENO" 5
             fi
 			if test "x$link_unit_test_framework" != "xyes"; then
-				as_fn_error $? "Could not link against $ax_lib !" "$LINENO" 5
-			fi
-		fi
-
-		CPPFLAGS="$CPPFLAGS_SAVED"
-	LDFLAGS="$LDFLAGS_SAVED"
-	fi
-
-
-
-# Check whether --with-boost-test-exec-monitor was given.
-if test "${with_boost_test_exec_monitor+set}" = set; then :
-  withval=$with_boost_test_exec_monitor;
-        if test "$withval" = "no"; then
-			want_boost="no"
-        elif test "$withval" = "yes"; then
-            want_boost="yes"
-            ax_boost_user_test_exec_monitor_lib=""
-        else
-		    want_boost="yes"
-		ax_boost_user_test_exec_monitor_lib="$withval"
-		fi
-
-else
-  want_boost="yes"
-
-fi
-
-
-	if test "x$want_boost" = "xyes"; then
-
-		CPPFLAGS_SAVED="$CPPFLAGS"
-		CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
-		export CPPFLAGS
-
-		LDFLAGS_SAVED="$LDFLAGS"
-		LDFLAGS="$LDFLAGS $BOOST_LDFLAGS"
-		export LDFLAGS
-
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the Boost::Test_Exec_Monitor library is available" >&5
-$as_echo_n "checking whether the Boost::Test_Exec_Monitor library is available... " >&6; }
-if ${ax_cv_boost_test_exec_monitor+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
-ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
-
-			 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <boost/test/test_tools.hpp>
-int
-main ()
-{
-int i=1 ; BOOST_REQUIRE(i==1); ; return 0;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ax_cv_boost_test_exec_monitor=yes
-else
-  ax_cv_boost_test_exec_monitor=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-         ac_ext=c
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_boost_test_exec_monitor" >&5
-$as_echo "$ax_cv_boost_test_exec_monitor" >&6; }
-		if test "x$ax_cv_boost_test_exec_monitor" = "xyes"; then
-
-$as_echo "#define HAVE_BOOST_TEST_EXEC_MONITOR /**/" >>confdefs.h
-
-            BOOSTLIBDIR=`echo $BOOST_LDFLAGS | sed -e 's/[^\/]*//'`
-
-            if test "x$ax_boost_user_test_exec_monitor_lib" = "x"; then
-			saved_ldflags="${LDFLAGS}"
-
-                for monitor_library in `ls $BOOSTLIBDIR/libboost_test_exec_monitor*.so* $BOOSTLIBDIR/libboost_test_exec_monitor*.dylib* $BOOSTLIBDIR/libboost_test_exec_monitor*.a* 2>/dev/null` ; do
-                    if test -r $monitor_library ; then
-                       libextension=`echo $monitor_library | sed 's,.*/,,' | sed -e 's;^lib\(boost_test_exec_monitor.*\)\.so.*$;\1;' -e 's;^lib\(boost_test_exec_monitor.*\)\.dylib.*$;\1;' -e 's;^lib\(boost_test_exec_monitor.*\)\.a.*$;\1;'`
-                       ax_lib=${libextension}
-                       link_test_exec_monitor="yes"
-                    else
-                       link_test_exec_monitor="no"
-                    fi
-
-			      if test "x$link_test_exec_monitor" = "xyes"; then
-                      BOOST_TEST_EXEC_MONITOR_LIB="-l$ax_lib"
-
-					  break
-				  fi
-                done
-                if test "x$link_test_exec_monitor" != "xyes"; then
-                for libextension in `ls $BOOSTLIBDIR/boost_test_exec_monitor*.dll* $BOOSTLIBDIR/boost_test_exec_monitor*.a* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^\(boost_test_exec_monitor.*\)\.dll.*$;\1;' -e 's;^\(boost_test_exec_monitor.*\)\.a.*$;\1;'` ; do
-                     ax_lib=${libextension}
-				    as_ac_Lib=`$as_echo "ac_cv_lib_$ax_lib''_exit" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for exit in -l$ax_lib" >&5
-$as_echo_n "checking for exit in -l$ax_lib... " >&6; }
-if eval \${$as_ac_Lib+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-l$ax_lib  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char exit ();
-int
-main ()
-{
-return exit ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  eval "$as_ac_Lib=yes"
-else
-  eval "$as_ac_Lib=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-eval ac_res=\$$as_ac_Lib
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
-  BOOST_TEST_EXEC_MONITOR_LIB="-l$ax_lib";  link_test_exec_monitor="yes"; break
-else
-  link_test_exec_monitor="no"
-fi
-
-				done
-                fi
-
-            else
-                link_test_exec_monitor="no"
-			saved_ldflags="${LDFLAGS}"
-                for ax_lib in boost_test_exec_monitor-$ax_boost_user_test_exec_monitor_lib $ax_boost_user_test_exec_monitor_lib ; do
-                   if test "x$link_test_exec_monitor" = "xyes"; then
-                      break;
-                   fi
-                   for monitor_library in `ls $BOOSTLIBDIR/lib${ax_lib}.so* $BOOSTLIBDIR/lib${ax_lib}.a* 2>/dev/null` ; do
-                   if test -r $monitor_library ; then
-                       libextension=`echo $monitor_library | sed 's,.*/,,' | sed -e 's;^lib\(boost_test_exec_monitor.*\)\.so.*$;\1;' -e 's;^lib\(boost_test_exec_monitor.*\)\.a*$;\1;'`
-                       ax_lib=${libextension}
-                       link_test_exec_monitor="yes"
-                    else
-                       link_test_exec_monitor="no"
-                    fi
-
-				if test "x$link_test_exec_monitor" = "xyes"; then
-                        BOOST_TEST_EXEC_MONITOR_LIB="-l$ax_lib"
-
-					    break
-				    fi
-                  done
-               done
-            fi
-            if test "x$ax_lib" = "x"; then
-                as_fn_error $? "Could not find a version of the library!" "$LINENO" 5
-            fi
-			if test "x$link_test_exec_monitor" != "xyes"; then
 				as_fn_error $? "Could not link against $ax_lib !" "$LINENO" 5
 			fi
 		fi
