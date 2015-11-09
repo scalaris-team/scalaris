@@ -50,8 +50,10 @@ namespace scalaris {
     }
 
     ~Connection() {
-      if(!closed)
-        socket.close();
+      if(!closed) {
+        boost::system::error_code ec;
+        socket.close(ec);
+      }
     }
     bool isOpen() const {
       return socket.is_open();
