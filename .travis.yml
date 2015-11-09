@@ -1,7 +1,7 @@
 language: erlang
 
 otp_release:
-   - 18.1
+   - 17.4
 
 addons:
   apt:
@@ -9,12 +9,12 @@ addons:
       - boost-latest
     packages:
       - automake
-      - g++-4.9
+      - clang
       - libboost1.55-all-dev
       - python3
 
 script:
-  - ./configure
+  - CXX=clang++ ./configure
   - touch TAGS.root
   - make
   - make cpp
