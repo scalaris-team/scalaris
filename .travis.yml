@@ -7,14 +7,16 @@ addons:
   apt:
     sources:
       - boost-latest
+      - llvm-toolchain-precise
+      - ubuntu-toolchain-r-test
     packages:
       - automake
-      - clang
+      - clang-3.7
       - libboost1.55-all-dev
       - python3
 
 script:
-  - CXX=clang++ ./configure
+  - CXX=clang++-3.7 ./configure
   - touch TAGS.root
   - make
   - make cpp
