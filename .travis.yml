@@ -1,17 +1,23 @@
 language: erlang
 
 otp_release:
-   - 17.4
+   - 18.1
 
 addons:
   apt:
+    sources:
+      - boost-latest
     packages:
-    - python3
+      - automake
+      - g++
+      - libboost1.55-all-dev
+      - python3
 
 script:
   - ./configure
   - touch TAGS.root
   - make
+  - make cpp
   - make python
   - make python3
   - make java
