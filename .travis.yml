@@ -9,7 +9,7 @@ addons:
       - boost-latest
     packages:
       - automake
-      - g++
+      - g++-4.9
       - libboost1.55-all-dev
       - python3
 
