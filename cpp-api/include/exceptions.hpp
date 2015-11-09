@@ -36,7 +36,7 @@ namespace scalaris {
   public:
     ConnectionError(const std::string& _msg) : msg(_msg) {}
 
-    virtual const char *what() const _NOEXCEPT override { return msg.c_str(); }
+    virtual const char *what() const noexcept override { return msg.c_str(); }
   };
 
   class CommitFailedError : public std::exception {
