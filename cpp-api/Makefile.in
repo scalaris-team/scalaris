@@ -2,7 +2,7 @@ NAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   SHELL = /usr/local/bin/bash
 endif
-SHELL = /usr/local/bin/bash
+#SHELL = /usr/local/bin/bash
 
 AR=ar
 ARFLAGS=rv
