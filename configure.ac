@@ -24,6 +24,40 @@ AC_SUBST(FALSE)
 
 ###########################################################
 #
+# fake automake scripts (config.guess, install-sh, ...)
+#
+###########################################################
+
+#              Homebrew                     Ubuntu
+for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
+    if test -d $PREFIX; then
+       location=`find $PREFIX -type d -name "automake-?.??"`
+       if test "$location"; then
+           AC_CONFIG_AUX_DIR([$location])
+           break
+       fi
+    fi
+done
+
+###########################################################
+#
+# check for C++ and boost
+#
+###########################################################
+
+AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+AX_BOOST_BASE([1.54])
+AX_BOOST_SYSTEM
+AX_BOOST_REGEX
+AX_BOOST_ASIO
+AX_BOOST_UNIT_TEST_FRAMEWORK
+AX_BOOST_TEST_EXEC_MONITOR
+
+AC_SUBST(CXX)
+AC_SUBST(CXXFLAGS)
+
+###########################################################
+#
 # check tokyo cabinet and toke
 #
 ###########################################################
@@ -575,7 +609,7 @@ sed -i -e "s|python-api|python3-api|g" \
        -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
        -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl cpp-api/Makefile java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl
