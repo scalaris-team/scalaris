@@ -44,7 +44,7 @@ namespace scalaris {
   public:
     CommitFailedError(const std::string& _msg) : msg(_msg) {}
 
-    virtual const char *what() const _NOEXCEPT override { return msg.c_str(); }
+    virtual const char *what() const noexcept override { return msg.c_str(); }
   };
 
   class ReadFailedError : public std::exception {
@@ -52,7 +52,7 @@ namespace scalaris {
   public:
     ReadFailedError(const std::string& _msg) : msg(_msg) {}
 
-    virtual const char *what() const _NOEXCEPT override { return msg.c_str(); }
+    virtual const char *what() const noexcept override { return msg.c_str(); }
   };
 
   class WriteFailedError : public std::exception {
@@ -60,7 +60,7 @@ namespace scalaris {
   public:
     WriteFailedError(const std::string& _msg) : msg(_msg) {}
 
-    virtual const char *what() const _NOEXCEPT override { return msg.c_str(); }
+    virtual const char *what() const noexcept override { return msg.c_str(); }
   };
 
 }
