@@ -25,7 +25,7 @@ VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.12
 COMMONS_CLI_VERSION=1.2
 
-.PHONY: all compile test test-vts java java-test java-bench java-* datanucleus datanucleus-test python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
+.PHONY: all compile test test-vts cpp cpp-clean cpp-test java java-test java-bench java-* datanucleus datanucleus-test python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
 
 APP_NAME = @PACKAGE_TARNAME@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
@@ -151,7 +151,7 @@ ${SUITES}: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 # define targets for single test cases of the form <test-suite>:<test-case>:
@@ -166,15 +166,15 @@ endef
 $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 
 %_SUITE-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 %_TESTS: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 test-vts: compile
-	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
+	@RUN_TEST@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
 
 test-clean:
 	-rm -rf ct_run.*@* ct.log ct-skipped.log ct_*_TESTS.log ct_*_SUITE.log ct_*_SUITE.*.log index.html all_runs.html variables-*@* ct_log_cache ct_default.css \
@@ -195,6 +195,33 @@ bench: compile
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
 	  tail -n 50 log/ebench_*@"`hostname -f`"/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
+
+cpp:
+	(cd cpp-api && make)
+
+cpp-clean:
+	(cd cpp-api && make clean)
+
+cpp-test: compile cpp
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d \
+	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
+	-p $(SCALARIS_UNITTEST_PORT) \
+	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
+	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
+	( cd cpp-api && make cpp-test ) ) ; \
+	FAILED=$$? ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -492,7 +519,7 @@ log-clean:
 	-rm -rf log/*
 
 # delete all generated files except test results and logs
-clean: erlang-clean tags-clean java-clean python-clean python3-clean
+clean: erlang-clean tags-clean cpp-clean java-clean python-clean python3-clean
 
 # delete all files related to our erlang sources
 erlang-clean:

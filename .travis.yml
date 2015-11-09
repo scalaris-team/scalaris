@@ -5,6 +5,7 @@ jdk: openjdk7
 otp_release:
    - 17.4
 
+
 env:
   global:
    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
@@ -13,13 +14,20 @@ env:
 
 
 addons:
+  apt:
+    sources:
+      - boost-latest
+    packages:
+      - clang
+      - libboost1.55-all-dev
+      - python3
   coverity_scan:
     project:
       name: scalaris-team/scalaris
       description: Scalaris, a distributed, transactional key-value store
     notification_email: scalaris-owners@googlegroups.com
-    build_command_prepend: ./configure
-    build_command: make java datanucleus
+    build_command_prepend: CXX=clang++ ./configure
+    build_command: make java datanucleus cpp
     branch_pattern: coverity_scan
 
 script:

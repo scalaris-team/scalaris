@@ -21,6 +21,41 @@ DIALYZER_FLAGS=
 
 AC_PATH_PROG(FALSE, false)
 AC_SUBST(FALSE)
+AC_PATH_PROG(TRUE, true)
+AC_SUBST(TRUE)
+
+###########################################################
+#
+# fake automake scripts (config.guess, install-sh, ...)
+#
+###########################################################
+
+#              Homebrew                     Ubuntu
+for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
+    if test -d $PREFIX; then
+       location=`find $PREFIX -type d -name "automake-?.??"`
+       if test "$location"; then
+           AC_CONFIG_AUX_DIR([$location])
+           break
+       fi
+    fi
+done
+
+###########################################################
+#
+# check for C++ and boost
+#
+###########################################################
+
+AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+AX_BOOST_BASE([1.54])
+AX_BOOST_SYSTEM
+AX_BOOST_REGEX
+AX_BOOST_ASIO
+AX_BOOST_UNIT_TEST_FRAMEWORK
+
+AC_SUBST(CXX)
+AC_SUBST(CXXFLAGS)
 
 ###########################################################
 #
@@ -39,6 +74,42 @@ AC_ARG_ENABLE([toke],
                  [enable support for tokyo cabinet through toke]),
               [ENABLE_TOKE=yes
                TOKEPREFIX=$enableval])
+
+###########################################################
+#
+# check hanoidb
+#
+###########################################################
+
+ENABLE_HANOIDB=
+HANOIDBPREFIX=
+AC_ARG_ENABLE([hanoidb],
+              AS_HELP_STRING([--disable-hanoidb],
+                 [disable support for hanoidb]),
+              [HANOIDBPREFIX=no])
+AC_ARG_ENABLE([hanoidb],
+              AS_HELP_STRING([--enable-hanoidb@<:@=DIR@:>@],
+                 [enable support for hanoidb]),
+              [ENABLE_HANOIDB=yes
+               HANOIDBPREFIX=$enableval])
+
+###########################################################
+#
+# check erlang_js
+#
+###########################################################
+
+ENABLE_ERLANGJS=
+ERLANGJSPREFIX=
+AC_ARG_ENABLE([erlang-js],
+              AS_HELP_STRING([--disable-erlang-js],
+                 [disable support for erlang_js]),
+              [ERLANG_JSPREFIX=no])
+AC_ARG_ENABLE([erlang-js],
+              AS_HELP_STRING([--enable-erlang-js@<:@=DIR@:>@],
+                 [enable support for erlang_js]),
+              [ENABLE_ERLANGJS=yes
+               ERLANGJSPREFIX=$enableval])
 
 ###########################################################
 #
@@ -215,14 +286,6 @@ AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found -
 
 AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be able to create the documentation or run 'make install']))
 
-AC_ERLANG_CHECK_LIB(hanoidb,
-                    [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
-                     EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
-                     DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"],
-                    [AC_MSG_NOTICE([erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)])])
-
-AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs]))
-
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [RUN_TEST_FILE=$ERLANG_LIB_DIR_common_test/priv/bin/run_test],
               [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
@@ -245,6 +308,7 @@ else
   AC_MSG_RESULT([neither run_test nor ct_run found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
 fi
 
+# toke
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
             [
@@ -268,6 +332,54 @@ AS_IF([test "x$TOKEPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_TOKE_MESSAGE))])
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
+
+# hanoidb
+ERLANG_HANOIDB_FLAGS=
+AS_IF([test "x$HANOIDBPREFIX" != xno],
+            [
+            ERLANG_HANOIDB_MESSAGE=
+            AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS="$HANOIDBPREFIX"])
+            AC_ERLANG_CHECK_LIB(hanoidb,
+              [
+                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
+                EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
+                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"
+                ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"
+              ],
+              [ERLANG_HANOIDB_MESSAGE="hanoidb erlang not found"])
+            AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_HANOIDB_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_HANOIDB" != xyes],
+                [ERLANG_TOKE_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
+                 AC_MSG_NOTICE($ERLANG_HANOIDB_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_HANOIDB_MESSAGE))])
+            ])
+AC_SUBST([ERLANG_HANOIDB_FLAGS])
+
+# erlang_js
+ERLANG_ERLANGJS_FLAGS=
+AS_IF([test "x$ERLANGJSPREFIX" != xno],
+            [
+            ERLANG_ERLANGJS_MESSAGE=
+            AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS="$ERLANGJSPREFIX"])
+            AC_ERLANG_CHECK_LIB(erlang_js,
+              [AC_CHECK_FILE($ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so,
+                [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
+                 EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
+                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
+                ],
+                [ERLANG_TOKE_MESSAGE="erlang_js library erlang_js_drv.so not found"])
+              ],
+              [ERLANG_ERLANGJS_MESSAGE="erlang_js erlang library not found"])
+            AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_ERLANGJS_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_ERLANGJS" != xyes],
+                [ERLANG_ERLANGJS_MESSAGE="$ERLANG_ERLANGJS_MESSAGE, disabling erlang_js support..."
+                 AC_MSG_NOTICE($ERLANG_ERLANGJS_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_ERLANGJS_MESSAGE))])
+            ])
+AC_SUBST([ERLANG_ERLANGJS_FLAGS])
 
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_start}" = "ok"],
@@ -498,7 +610,7 @@ sed -i -e "s|python-api|python3-api|g" \
        -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
        -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl cpp-api/Makefile java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl

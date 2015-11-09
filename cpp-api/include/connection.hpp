@@ -15,6 +15,7 @@
 #ifndef SCALARIS_CONNECTION_HPP
 #define SCALARIS_CONNECTION_HPP
 
+#include <array>
 #include <iostream>
 #include <string>
 #include <stdexcept>
