@@ -47,12 +47,16 @@ done
 #
 ###########################################################
 
-AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
-AX_BOOST_BASE([1.35])
+AX_CXX_COMPILE_STDCXX_11([noext],[optional])
+AS_IF([test 0 -eq "$HAVE_CXX11"],
+      [AC_MSG_WARN([no c++ compiler support for C++11 found ('make cpp' will likely fail)])])
+
+AX_BOOST_BASE([1.35], [
 AX_BOOST_SYSTEM
 AX_BOOST_REGEX
 AX_BOOST_ASIO
 AX_BOOST_UNIT_TEST_FRAMEWORK
+], [AC_MSG_WARN([no boost library found ('make cpp' will likely fail)])])
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
