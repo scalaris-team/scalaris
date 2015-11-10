@@ -12,9 +12,6 @@ Source0:        scalaris-%{version}.tar.gz
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
-BuildRequires:  automake
-BuildRequires:  boost-devel >= 1.35
-BuildRequires:  gcc-c++
 BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  ruby >= 1.8
 
@@ -25,8 +22,10 @@ BuildRequires:  ruby >= 1.8
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 BuildRequires:  pkgconfig
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
+%define with_cpp 1
 BuildRequires:  ruby(release) >= 1.8
 %else
+%define with_cpp 0
 BuildRequires:  ruby(abi) >= 1.8
 %endif
 %if 0%{?fedora_version} >= 12 || 0%{?centos_version} >= 600
@@ -83,9 +82,20 @@ BuildRequires:  python3-2to3
 %if %{?suse_version} >= 1130 && %{?suse_version} <= 1310
 BuildRequires:  ruby(abi) >= 1.8
 %endif
+%if 0%{?suse_version} >= 1310 || 0%{?sles_version} >= 12
+%define with_cpp 1
+%else
+%define with_cpp 0
+%endif
 %endif
 
 %{!?rb_sitelib: %global rb_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
+
+%if 0%{?with_cpp}
+BuildRequires:  automake
+BuildRequires:  boost-devel >= 1.35
+BuildRequires:  gcc-c++
+%endif
 
 %if 0%{?with_python}
 %if 0%{?with_python_doc_html}
@@ -123,6 +133,7 @@ BuildArch:  noarch
 %description -n scalaris-java
 Java Bindings and command line client for Scalaris
 
+%if 0%{?with_cpp}
 %package -n libscalaris-devel
 Summary:    C++-API for Scalaris
 Group:      Productivity/Databases/Clients
@@ -131,6 +142,7 @@ Requires:   boost-devel >= 1.35
 
 %description -n libscalaris-devel
 C++ Bindings for Scalaris
+%endif
 
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for Scalaris
@@ -199,6 +211,9 @@ export PATH="%{_bindir}:$PATH"
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/scalaris \
+%if 0%{?with_cpp} == 0
+    --disable-cpp \
+%endif
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
@@ -229,7 +244,9 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python3}
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
+%if 0%{?with_cpp}
 make install-cpp DESTDIR=$RPM_BUILD_ROOT
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -247,10 +264,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/scalaris-monitor
 %{_sysconfdir}/init.d/scalaris-first-monitor
 
+%if 0%{?with_cpp}
 %files -n libscalaris-devel
 %defattr(-,root,root,-)
 %{_includedir}/scalaris
 %{_libdir}/libscalaris.a
+%endif
 
 %files -n ruby-scalaris
 %defattr(-,root,root,-)
