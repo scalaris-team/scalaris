@@ -9,7 +9,7 @@ ARFLAGS=rv
 RANLIB=echo
 CXX=@CXX@
 CXXFLAGS=@CXXFLAGS@ @BOOST_CPPFLAGS@ -Iinclude
-LDFLAGS=@LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_REGEX_LIB@ @BOOST_ASIO_LIB@ @BOOST_UNIT_TEST_FRAMEWORK_LIB@
+LDFLAGS=@LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_REGEX_LIB@ @BOOST_ASIO_LIB@ @BOOST_UNIT_TEST_FRAMEWORK_LIB@ -lpthread
 
 ifeq ($(VERBOSE),1)
   VC=
@@ -32,7 +32,7 @@ cpp-test : tests
 
 tests: $(OBJS_TEST) $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating tests\033[39m"
-	$(VC)$(CXX) $(LDFLAGS) -o $@ $(OBJS_TEST) libscalaris.a
+	$(VC)$(CXX) -o $@ $(OBJS_TEST) libscalaris.a $(LDFLAGS)
 
 libscalaris.a: $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating archive" $@ "\033[39m"
@@ -45,7 +45,7 @@ libscalaris.a: $(OBJS)
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
 	@-rm -rf $(shell find . -type f -name '*.d')
-	@-rm ./tests
+	@-rm -f ./tests
 
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST:.o=.d)
