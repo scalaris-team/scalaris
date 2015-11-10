@@ -26,37 +26,39 @@ AC_SUBST(TRUE)
 
 ###########################################################
 #
-# fake automake scripts (config.guess, install-sh, ...)
-#
-###########################################################
-
-#              Homebrew                     Ubuntu
-for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
-    if test -d $PREFIX; then
-       location=`find $PREFIX -type d -name "automake-?.??"`
-       if test "$location"; then
-           AC_CONFIG_AUX_DIR([$location])
-           break
-       fi
-    fi
-done
-
-###########################################################
-#
 # check for C++ and boost
 #
 ###########################################################
 
-AX_CXX_COMPILE_STDCXX_11([noext],[optional])
-AS_IF([test 0 -eq "$HAVE_CXX11"],
-      [AC_MSG_WARN([no c++ compiler support for C++11 found ('make cpp' will likely fail)])])
+ENABLE_CPP=
+AC_ARG_ENABLE([cpp],
+              AS_HELP_STRING([--disable-cpp],
+                 [disable support for the C++ bindings]),
+              [ENABLE_CPP=$enableval],
+              [ENABLE_CPP=$enableval])
 
-AX_BOOST_BASE([1.35], [
-AX_BOOST_SYSTEM
-AX_BOOST_REGEX
-AX_BOOST_ASIO
-AX_BOOST_UNIT_TEST_FRAMEWORK
-], [AC_MSG_WARN([no boost library found ('make cpp' will likely fail)])])
+if test "x$ENABLE_CPP" != xno ; then
+  # fake automake scripts (config.guess, install-sh, ...)
+  #              Homebrew                     Ubuntu
+  for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
+    if test -d $PREFIX; then
+      location=`find $PREFIX -type d -name "automake-?.??"`
+      if test "$location"; then
+        AC_CONFIG_AUX_DIR([$location])
+        break
+      fi
+    fi
+  done
+  # C++ and boost checks
+  AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+  AX_BOOST_BASE([1.35])
+  AX_BOOST_SYSTEM
+  AX_BOOST_REGEX
+  AX_BOOST_ASIO
+  AX_BOOST_UNIT_TEST_FRAMEWORK
+else
+  AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
+fi
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
