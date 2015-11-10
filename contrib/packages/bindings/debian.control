@@ -10,26 +10,26 @@ Package: scalaris-java
 Section: java
 Architecture: all
 Depends: ${misc:Depends}, java6-runtime
-Description: Java-API and Java-Client for scalaris
- Java Bindings and command line client for scalaris.
+Description: Java-API and Java-Client for Scalaris
+ Java Bindings and command line client for Scalaris.
 
 Package: scalaris-ruby
 Section: ruby
 Architecture: all
 Depends: ${misc:Depends}, ruby, ruby-json (>= 1.4.1)
-Description: Ruby-API and Ruby-client for scalaris
- Ruby bindings and Ruby command line client for scalaris.
+Description: Ruby-API and Ruby-client for Scalaris
+ Ruby bindings and Ruby command line client for Scalaris.
 
 Package: python-scalaris
 Section: python
 Architecture: all
 Depends: ${misc:Depends}, python (>= 2.6.0)
-Description: Python-API and Python-client for scalaris
- Python bindings and Python command line client for scalaris.
+Description: Python-API and Python-client for Scalaris
+ Python bindings and Python command line client for Scalaris.
 
 Package: python3-scalaris
 Section: python
 Architecture: all
 Depends: ${misc:Depends}, python3
-Description: Python3-API and Python3-client for scalaris
- Python3 bindings and Python3 command line client for scalaris.
+Description: Python3-API and Python3-client for Scalaris
+ Python3 bindings and Python3 command line client for Scalaris.

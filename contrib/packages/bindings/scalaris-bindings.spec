@@ -111,7 +111,7 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package -n scalaris-java
-Summary:    Java-API and Java-Client for scalaris
+Summary:    Java-API and Java-Client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -121,10 +121,10 @@ BuildArch:  noarch
 %endif
 
 %description -n scalaris-java
-Java Bindings and command line client for scalaris
+Java Bindings and command line client for Scalaris
 
 %package -n ruby-scalaris
-Summary:    Ruby-API and Ruby-client for scalaris
+Summary:    Ruby-API and Ruby-client for Scalaris
 Group:      Productivity/Databases/Clients
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 Requires:   ruby(release) >= 1.8
@@ -135,11 +135,11 @@ Requires:   rubygems
 Requires:   rubygem-json >= 1.4.1
 
 %description -n ruby-scalaris
-Ruby bindings and Ruby command line client for scalaris
+Ruby bindings and Ruby command line client for Scalaris
 
 %if 0%{?with_python}
 %package -n python-scalaris
-Summary:    Python-API and Python-client for scalaris
+Summary:    Python-API and Python-client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -149,12 +149,12 @@ BuildArch:  noarch
 %endif
 
 %description -n python-scalaris
-Python bindings and Python command line client for scalaris
+Python bindings and Python command line client for Scalaris
 %endif
 
 %if 0%{?with_python3}
 %package -n python3-scalaris
-Summary:    Python3-API and Python3-client for scalaris
+Summary:    Python3-API and Python3-client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python3
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -164,7 +164,7 @@ BuildArch:  noarch
 %endif
 
 %description -n python3-scalaris
-Python3 bindings and Python3 command line client for scalaris
+Python3 bindings and Python3 command line client for Scalaris
 %endif
 
 %prep
