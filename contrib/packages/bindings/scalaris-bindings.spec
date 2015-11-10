@@ -123,6 +123,15 @@ BuildArch:  noarch
 %description -n scalaris-java
 Java Bindings and command line client for Scalaris
 
+%package -n libscalaris-devel
+Summary:    C++-API for Scalaris
+Group:      Productivity/Databases/Clients
+Provides:   libscalaris-static = %{version}-%{release}
+Requires:   boost-devel >= 1.35
+
+%description -n libscalaris-devel
+C++ Bindings for Scalaris
+
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for Scalaris
 Group:      Productivity/Databases/Clients
@@ -193,6 +202,7 @@ export PATH="%{_bindir}:$PATH"
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
+make cpp
 %if 0%{?with_python}
 make python
 %endif
@@ -219,6 +229,7 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python3}
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
+make install-cpp DESTDIR=$RPM_BUILD_ROOT
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -235,6 +246,11 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/scalaris/java-api
 %{_sysconfdir}/init.d/scalaris-monitor
 %{_sysconfdir}/init.d/scalaris-first-monitor
+
+%files -n libscalaris-devel
+%defattr(-,root,root,-)
+%{_includedir}/scalaris
+%{_libdir}/libscalaris.a
 
 %files -n ruby-scalaris
 %defattr(-,root,root,-)

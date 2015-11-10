@@ -25,7 +25,7 @@ build-stamp:
 	  --docdir=/usr/share/doc/scalaris \
 	  --with-ruby-sitelibdir=$(RUBY_SITELIB)
 	ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
-	  make java java-doc
+	  make java java-doc cpp
 	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; fi
 	if [ "$(WITH_PYTHON3)" = 1 ]; then make python3 ; fi
 
@@ -42,6 +42,7 @@ clean:
 	dh_clean
 
 BUILD_DIR_JAVA:=$(CURDIR)/debian/scalaris-java
+BUILD_DIR_CPP:=$(CURDIR)/debian/libscalaris-dev
 BUILD_DIR_RUBY:=$(CURDIR)/debian/scalaris-ruby
 BUILD_DIR_PYTHON:=$(CURDIR)/debian/python-scalaris
 BUILD_DIR_PYTHON3:=$(CURDIR)/debian/python3-scalaris
@@ -54,6 +55,7 @@ install: build
 	# Add here commands to install the package into debian/gentoo.
 	make install-java DESTDIR=$(BUILD_DIR_JAVA)
 	make install-java-doc DESTDIR=$(BUILD_DIR_JAVA)
+	make install-cpp DESTDIR=$(BUILD_DIR_CPP)
 	make install-ruby DESTDIR=$(BUILD_DIR_RUBY)
 	if [ "$(WITH_PYTHON)" = 1 ]; then make install-python DESTDIR=$(BUILD_DIR_PYTHON) ; make install-python-doc-html DESTDIR=$(BUILD_DIR_PYTHON) ; fi
 	if [ "$(WITH_PYTHON3)" = 1 ]; then make install-python3 DESTDIR=$(BUILD_DIR_PYTHON3) ; fi

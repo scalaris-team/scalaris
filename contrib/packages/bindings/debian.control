@@ -13,6 +13,13 @@ Depends: ${misc:Depends}, java6-runtime
 Description: Java-API and Java-Client for Scalaris
  Java Bindings and command line client for Scalaris.
 
+Package: libscalaris-dev
+Section: devel
+Architecture: any
+Depends: ${misc:Depends}, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35)
+Description: C++-API for Scalaris
+ C++ Bindings for Scalaris.
+
 Package: scalaris-ruby
 Section: ruby
 Architecture: all
