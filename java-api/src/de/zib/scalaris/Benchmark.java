@@ -19,9 +19,9 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -66,6 +66,13 @@ public class Benchmark {
      * Number of test runs (accumulates results over all test runs).
      */
     protected static final int testRuns = 1;
+
+    /**
+     * UTF-8 charset object.
+     *
+     * StandardCharsets.UTF_8 is only available for Java >= 7
+     */
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     /**
      * Default minimal benchmark.
@@ -1121,7 +1128,7 @@ public class Benchmark {
             // use String constructor below
         }
 
-        final CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+        final CharsetDecoder decoder = UTF_8.newDecoder();
         decoder.onMalformedInput(CodingErrorAction.REPLACE);
         decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
         String par;

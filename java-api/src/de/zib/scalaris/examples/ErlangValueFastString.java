@@ -15,8 +15,7 @@
  */
 package de.zib.scalaris.examples;
 
-import java.nio.charset.StandardCharsets;
-
+import java.nio.charset.Charset;
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -48,6 +47,13 @@ import de.zib.scalaris.ErlangValue;
  */
 public class ErlangValueFastString extends ErlangValue {
     /**
+     * UTF-8 charset object.
+     *
+     * StandardCharsets.UTF_8 is only available for Java >= 7
+     */
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
+
+    /**
      * Identifies the tuple of the stored erlang object.
      */
     private static OtpErlangAtom identifier = new OtpErlangAtom("$fs");
@@ -61,7 +67,7 @@ public class ErlangValueFastString extends ErlangValue {
     public ErlangValueFastString(final String value) {
         super(new OtpErlangTuple(new OtpErlangObject[] {
                 identifier,
-                new OtpErlangBinary(value.getBytes(StandardCharsets.UTF_8)) }));
+                new OtpErlangBinary(value.getBytes(UTF_8)) }));
     }
 
     /**
@@ -100,7 +106,7 @@ public class ErlangValueFastString extends ErlangValue {
         if (otpTuple.elementAt(0).equals(identifier)) {
             return new String(
                     ((OtpErlangBinary) otpTuple.elementAt(0)).binaryValue(),
-                    StandardCharsets.UTF_8);
+                    UTF_8);
         }
 
         throw new ClassCastException("Unexpected result type: "
