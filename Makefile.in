@@ -41,6 +41,10 @@ localstatedir = @localstatedir@
 BINDIR = $(DESTDIR)@bindir@
 # /sbin
 SBINDIR = $(DESTDIR)@sbindir@
+# /usr/include
+INCLUDEDIR = $(DESTDIR)@includedir@
+# /usr/lib[64]
+LIBDIR = $(DESTDIR)@libdir@
 # /etc/scalaris/
 ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
 # /etc/init.d/
@@ -759,6 +763,17 @@ install-erlang: compile @INSTALL_INIT@
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
 	           bin/scalarisctl
+
+install-cpp: cpp
+	install -d $(INCLUDEDIR)/scalaris
+	for dir in `find cpp-api/include -type d`; do \
+	  install -d "$(INCLUDEDIR)/scalaris$${dir#cpp-api/include}" ; \
+	  for file in `find "$$dir" -maxdepth 1 -type f`; do \
+	    install -m 644 -t "$(INCLUDEDIR)/scalaris$${dir#cpp-api/include}" "$${file}" ; \
+	  done ; \
+	done
+	install -d $(LIBDIR)
+	install -m 644 -t $(LIBDIR) cpp-api/libscalaris.a
 
 install-ruby:
 	install -d $(RUBYSITELIBDIR)
