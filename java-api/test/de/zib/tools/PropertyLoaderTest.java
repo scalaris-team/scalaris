@@ -17,7 +17,9 @@ package de.zib.tools;
 
 import static org.junit.Assert.*;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.Properties;
 
 import org.junit.After;
@@ -76,15 +78,18 @@ public class PropertyLoaderTest {
     /**
      * Test method for {@link PropertyLoader#loadProperties(Properties, String)}
      * that tries to load a properties file using an absolute file name.
+     *
+     * @throws UnsupportedEncodingException
+     *             if the path cannot be decoded using UTF-8
      */
     @Test
-    public final void testLoadProperties2() {
+    public final void testLoadProperties2() throws UnsupportedEncodingException {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
 
         final URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
         assertNotNull(url);
         final Properties properties = new Properties();
-        assertTrue(PropertyLoader.loadProperties(properties, url.getPath()));
+        assertTrue(PropertyLoader.loadProperties(properties, URLDecoder.decode(url.getFile(), "UTF-8")));
         assertEquals("ahz2ieSh", properties.get("cs.node"));
         assertEquals("wooPhu8u", properties.get("cs.cookie"));
     }

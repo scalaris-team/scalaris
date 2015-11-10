@@ -19,6 +19,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Properties;
@@ -79,7 +80,7 @@ public class PropertyLoader {
             if (classLoader != null) {
                 final URL url = classLoader.getResource(filename);
                 if (url != null) {
-                    final String path = url.getFile();
+                    final String path = URLDecoder.decode(url.getFile(), "UTF-8");
                     fis = new FileInputStream(path);
                     properties.load(fis);
                     properties.setProperty("PropertyLoader.loadedfile", path);
