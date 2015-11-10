@@ -1365,11 +1365,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-cpp           disable support for the C++ bindings
-  --disable-toke          disable support for tokyo cabinet through toke
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
-  --disable-hanoidb       disable support for hanoidb
   --enable-hanoidb[=DIR]  enable support for hanoidb
-  --disable-erlang-js     disable support for erlang_js
   --enable-erlang-js[=DIR]
                           enable support for erlang_js
   --disable-runuser       disable support for runuser (use sudo instead)
@@ -4492,11 +4489,6 @@ ENABLE_TOKE=
 TOKEPREFIX=
 # Check whether --enable-toke was given.
 if test "${enable_toke+set}" = set; then :
-  enableval=$enable_toke; TOKEPREFIX=no
-fi
-
-# Check whether --enable-toke was given.
-if test "${enable_toke+set}" = set; then :
   enableval=$enable_toke; ENABLE_TOKE=yes
                TOKEPREFIX=$enableval
 fi
@@ -4512,11 +4504,6 @@ ENABLE_HANOIDB=
 HANOIDBPREFIX=
 # Check whether --enable-hanoidb was given.
 if test "${enable_hanoidb+set}" = set; then :
-  enableval=$enable_hanoidb; HANOIDBPREFIX=no
-fi
-
-# Check whether --enable-hanoidb was given.
-if test "${enable_hanoidb+set}" = set; then :
   enableval=$enable_hanoidb; ENABLE_HANOIDB=yes
                HANOIDBPREFIX=$enableval
 fi
@@ -4530,11 +4517,6 @@ fi
 
 ENABLE_ERLANGJS=
 ERLANGJSPREFIX=
-# Check whether --enable-erlang-js was given.
-if test "${enable_erlang_js+set}" = set; then :
-  enableval=$enable_erlang_js; ERLANG_JSPREFIX=no
-fi
-
 # Check whether --enable-erlang-js was given.
 if test "${enable_erlang_js+set}" = set; then :
   enableval=$enable_erlang_js; ENABLE_ERLANGJS=yes

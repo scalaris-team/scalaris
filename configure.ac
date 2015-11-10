@@ -72,10 +72,6 @@ AC_SUBST(CXXFLAGS)
 ENABLE_TOKE=
 TOKEPREFIX=
 AC_ARG_ENABLE([toke],
-              AS_HELP_STRING([--disable-toke],
-                 [disable support for tokyo cabinet through toke]),
-              [TOKEPREFIX=no])
-AC_ARG_ENABLE([toke],
               AS_HELP_STRING([--enable-toke@<:@=DIR@:>@],
                  [enable support for tokyo cabinet through toke]),
               [ENABLE_TOKE=yes
@@ -90,10 +86,6 @@ AC_ARG_ENABLE([toke],
 ENABLE_HANOIDB=
 HANOIDBPREFIX=
 AC_ARG_ENABLE([hanoidb],
-              AS_HELP_STRING([--disable-hanoidb],
-                 [disable support for hanoidb]),
-              [HANOIDBPREFIX=no])
-AC_ARG_ENABLE([hanoidb],
               AS_HELP_STRING([--enable-hanoidb@<:@=DIR@:>@],
                  [enable support for hanoidb]),
               [ENABLE_HANOIDB=yes
@@ -107,10 +99,6 @@ AC_ARG_ENABLE([hanoidb],
 
 ENABLE_ERLANGJS=
 ERLANGJSPREFIX=
-AC_ARG_ENABLE([erlang-js],
-              AS_HELP_STRING([--disable-erlang-js],
-                 [disable support for erlang_js]),
-              [ERLANG_JSPREFIX=no])
 AC_ARG_ENABLE([erlang-js],
               AS_HELP_STRING([--enable-erlang-js@<:@=DIR@:>@],
                  [enable support for erlang_js]),
