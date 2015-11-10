@@ -54,9 +54,9 @@ SYSTEMD_CONFDIR = $(DESTDIR)@sysconfdir@/conf.d
 # /usr/lib/systemd/system
 SYSTEMD_UNITDIR = $(DESTDIR)@SYSTEMD_UNITDIR@
 # /lib/scalaris/
-SCALARISDIR = $(DESTDIR)/lib/scalaris
+SCALARISDIR = $(DESTDIR)${prefix}/lib/scalaris
 # /lib/scalaris/ebin
-BEAMDIR = $(DESTDIR)/lib/scalaris/ebin
+BEAMDIR = $(DESTDIR)${prefix}/lib/scalaris/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$(SCALARISDIR)/docroot
 # /share/doc/scalaris
