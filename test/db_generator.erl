@@ -55,7 +55,7 @@
 -type option()    :: {output, list_key_val | list_key | list_keytpl}.
 
 -type failure_type()    :: update | regen | mixed.
--type failure_quadrant():: 1..4.
+-type failure_quadrant():: rt_beh:segment().
 -type failure_dest()    :: all | [failure_quadrant(),...].
 -type db_type()         :: wiki | random.
 -type db_parameter()    :: {ftype, failure_type()} |

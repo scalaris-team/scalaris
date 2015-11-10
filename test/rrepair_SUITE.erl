@@ -74,13 +74,18 @@ groups() ->
 suite() -> [{timetrap, {seconds, 15}}].
 
 init_per_group_special(tester_tests, Config) ->
-    unittest_helper:start_minimal_procs(Config, [], true);
+    Config2 = unittest_helper:start_minimal_procs(Config, [], true),
+    tester:register_type_checker({typedef, rt_beh, segment, []}, rt_beh, tester_is_segment),
+    tester:register_value_creator({typedef, rt_beh, segment, []}, rt_beh, tester_create_segment, 1),
+    Config2;
 init_per_group_special(basic, Config) ->
     unittest_helper:start_minimal_procs(Config, [], true);
 init_per_group_special(_, Config) ->
     Config.
 
 end_per_group_special(tester_tests, Config) ->
+    tester:unregister_value_creator({typedef, rt_beh, segment, []}),
+    tester:unregister_type_checker({typedef, rt_beh, segment, []}),
     unittest_helper:stop_minimal_procs(Config),
     Config;
 end_per_group_special(basic, Config) ->
@@ -141,9 +146,8 @@ tester_map_key_to_interval(_) ->
     prop_map_key_to_interval(Q2, intervals:union(intervals:new(Q1), intervals:new(Q3))),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
 
--spec prop_map_key_to_quadrant(?RT:key(), pos_integer()) -> true.
-prop_map_key_to_quadrant(Key, Int) ->
-    Quadrant = Int rem config:read(replication_factor) + 1,
+-spec prop_map_key_to_quadrant(?RT:key(), rt_beh:segment()) -> true.
+prop_map_key_to_quadrant(Key, Quadrant) ->
     ?equals(rr_recon:map_key_to_quadrant(Key, Quadrant),
             rr_recon:map_key_to_interval(Key, lists:nth(Quadrant, rr_recon:quadrant_intervals()))).
 

@@ -25,6 +25,12 @@
 -export([behaviour_info/1]).
 -endif.
 
+-export([tester_create_segment/1,
+         tester_is_segment/1]).
+-export_type([segment/0]).
+
+-type segment() :: pos_integer(). % 1..config:read(replication_factor)
+
 %% userdevguide-begin rt_beh:behaviour
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
@@ -138,3 +144,13 @@ behaviour_info(_Other) ->
     undefined.
 -endif.
 %% userdevguide-end rt_beh:behaviour
+
+-spec tester_create_segment(pos_integer()) -> segment().
+tester_create_segment(Int) ->
+    Int rem config:read(replication_factor) + 1.
+
+-spec tester_is_segment(segment()) -> boolean().
+tester_is_segment(Segment) when Segment < 1 ->
+    false;
+tester_is_segment(Segment) ->
+    Segment =< config:read(replication_factor).

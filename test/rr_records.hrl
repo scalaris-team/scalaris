@@ -43,7 +43,7 @@
                       node_count        = ?required(rc_config, node_count) :: integer(),
                       data_count        = ?required(rc_config, data_count) :: integer(),
                       data_failure_prob = ?required(rc_config, fprob)      :: 0..100,       % probability of data failures
-                      fquadrants        = all                              :: all | [1..4],
+                      fquadrants        = all                              :: all | [rt_beh:segment()],
                       round             = 1                                :: integer()
                      }).
 -type ring_config() :: #ring_config{}.

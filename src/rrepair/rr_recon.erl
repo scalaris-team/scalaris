@@ -62,7 +62,6 @@
 -export_type([method/0, request/0,
               db_chunk_kv/0, db_chunk_kvv/0]).
 
--type quadrant()       :: 1..4. % 1..rep_factor()
 -type method()         :: trivial | shash | bloom | merkle_tree | art.% | iblt.
 -type stage()          :: req_shared_interval | build_struct | reconciliation | resolve.
 
@@ -2374,14 +2373,14 @@ key_dist(Key1, Key2) ->
     erlang:min(Dist1, Dist2).
 
 %% @doc Maps an abitrary key to its associated key in replication quadrant Q.
--spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
+-spec map_key_to_quadrant(?RT:key(), rt_beh:segment()) -> ?RT:key().
 map_key_to_quadrant(Key, Q) ->
     RKeys = ?RT:get_replica_keys(Key),
     map_rkeys_to_quadrant(RKeys, Q).
 
 %% @doc Returns a key in the given replication quadrant Q from a list of
 %%      replica keys.
--spec map_rkeys_to_quadrant([?RT:key(),...], quadrant()) -> ?RT:key().
+-spec map_rkeys_to_quadrant([?RT:key(),...], rt_beh:segment()) -> ?RT:key().
 map_rkeys_to_quadrant(RKeys, Q) ->
     SegM = case lists:member(?MINUS_INFINITY, RKeys) of
                true -> Q rem config:read(replication_factor) + 1;
