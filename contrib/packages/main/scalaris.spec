@@ -16,9 +16,6 @@ Source99:       scalaris-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
-BuildRequires:  automake
-BuildRequires:  boost-devel >= 1.35
-BuildRequires:  gcc-c++
 BuildRequires:  screen
 Requires:       screen
 
@@ -124,7 +121,8 @@ Documentation for Scalaris including its User-Dev-Guide.
 %if 0%{?with_systemd}
     --with-systemd=%{_unitdir} \
 %endif
-    --docdir=%{_docdir}/scalaris
+    --docdir=%{_docdir}/scalaris \
+    --disable-cpp
 make all
 make doc
 

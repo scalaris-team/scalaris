@@ -15,7 +15,8 @@ build-stamp:
 	./configure --prefix=/usr \
 	--sysconfdir=/etc \
 	--localstatedir=/var \
-	--docdir=/usr/share/doc/scalaris
+	--docdir=/usr/share/doc/scalaris \
+	--disable-cpp
 #    --prefix=%{_prefix} \
 #    --exec-prefix=%{_exec_prefix} \
 #    --bindir=%{_bindir} \
