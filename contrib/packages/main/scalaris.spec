@@ -16,6 +16,9 @@ Source99:       scalaris-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
+BuildRequires:  automake
+BuildRequires:  boost-devel >= 1.35
+BuildRequires:  gcc-c++
 BuildRequires:  screen
 Requires:       screen
 

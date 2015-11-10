@@ -12,6 +12,9 @@ Source0:        scalaris-%{version}.tar.gz
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
+BuildRequires:  automake
+BuildRequires:  boost-devel >= 1.35
+BuildRequires:  gcc-c++
 BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  ruby >= 1.8
 

@@ -2,7 +2,7 @@ Source: scalaris
 Section: database
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), sudo, screen, erlang-dev (>= 13.b.1), erlang-parsetools (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), pkg-config
+Build-Depends: debhelper (>= 4.1.16), sudo, screen, erlang-dev (>= 13.b.1), erlang-parsetools (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), pkg-config, automake, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35)
 Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
