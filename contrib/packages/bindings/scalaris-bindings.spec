@@ -217,7 +217,9 @@ export PATH="%{_bindir}:$PATH"
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
+%if 0%{?with_cpp}
 make cpp
+%endif
 %if 0%{?with_python}
 make python
 %endif
