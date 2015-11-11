@@ -658,15 +658,19 @@ BOOST_UNIT_TEST_FRAMEWORK_LIB
 BOOST_ASIO_LIB
 BOOST_REGEX_LIB
 BOOST_SYSTEM_LIB
-build_os
-build_vendor
-build_cpu
-build
 ac_ct_CC
 CFLAGS
 CC
 BOOST_LDFLAGS
 BOOST_CPPFLAGS
+host_os
+host_vendor
+host_cpu
+host
+build_os
+build_vendor
+build_cpu
+build
 HAVE_CXX11
 OBJEXT
 EXEEXT
@@ -1351,6 +1355,7 @@ _ACEOF
 
 System types:
   --build=BUILD     configure for building on BUILD [guessed]
+  --host=HOST       cross-compile to build programs to run on HOST [BUILD]
 _ACEOF
 fi
 
@@ -2680,7 +2685,7 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 
-    ax_cxx_compile_cxx11_required=truednl
+    ax_cxx_compile_cxx11_required=true
   ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -2701,6 +2706,13 @@ else
       static_assert(sizeof(int) <= sizeof(T), "not big enough");
     };
 
+    struct Base {
+    virtual void f() {}
+    };
+    struct Child : public Base {
+    virtual void f() override {}
+    };
+
     typedef check<check<bool>> right_angle_brackets;
 
     int a;
@@ -2711,6 +2723,28 @@ else
     check_type&& cr = static_cast<check_type&&>(c);
 
     auto d = a;
+    auto l = [](){};
+
+    // http://stackoverflow.com/questions/13728184/template-aliases-and-sfinae
+    // Clang 3.1 fails with headers of libstd++ 4.8.3 when using std::function because of this
+    namespace test_template_alias_sfinae {
+        struct foo {};
+
+        template<typename T>
+        using member = typename T::member_type;
+
+        template<typename T>
+        void func(...) {}
+
+        template<typename T>
+        void func(member<T>*) {}
+
+        void test();
+
+        void test() {
+            func<foo>(0);
+        }
+    }
 
 _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
@@ -2747,6 +2781,13 @@ else
       static_assert(sizeof(int) <= sizeof(T), "not big enough");
     };
 
+    struct Base {
+    virtual void f() {}
+    };
+    struct Child : public Base {
+    virtual void f() override {}
+    };
+
     typedef check<check<bool>> right_angle_brackets;
 
     int a;
@@ -2757,6 +2798,28 @@ else
     check_type&& cr = static_cast<check_type&&>(c);
 
     auto d = a;
+    auto l = [](){};
+
+    // http://stackoverflow.com/questions/13728184/template-aliases-and-sfinae
+    // Clang 3.1 fails with headers of libstd++ 4.8.3 when using std::function because of this
+    namespace test_template_alias_sfinae {
+        struct foo {};
+
+        template<typename T>
+        using member = typename T::member_type;
+
+        template<typename T>
+        void func(...) {}
+
+        template<typename T>
+        void func(member<T>*) {}
+
+        void test();
+
+        void test() {
+            func<foo>(0);
+        }
+    }
 
 _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
@@ -2801,6 +2864,77 @@ $as_echo "#define HAVE_CXX11 1" >>confdefs.h
 
 
   fi
+
+  # Make sure we can run config.sub.
+$SHELL "$ac_aux_dir/config.sub" sun4 >/dev/null 2>&1 ||
+  as_fn_error $? "cannot run $SHELL $ac_aux_dir/config.sub" "$LINENO" 5
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking build system type" >&5
+$as_echo_n "checking build system type... " >&6; }
+if ${ac_cv_build+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_build_alias=$build_alias
+test "x$ac_build_alias" = x &&
+  ac_build_alias=`$SHELL "$ac_aux_dir/config.guess"`
+test "x$ac_build_alias" = x &&
+  as_fn_error $? "cannot guess build type; you must specify one" "$LINENO" 5
+ac_cv_build=`$SHELL "$ac_aux_dir/config.sub" $ac_build_alias` ||
+  as_fn_error $? "$SHELL $ac_aux_dir/config.sub $ac_build_alias failed" "$LINENO" 5
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build" >&5
+$as_echo "$ac_cv_build" >&6; }
+case $ac_cv_build in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical build" "$LINENO" 5;;
+esac
+build=$ac_cv_build
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_build
+shift
+build_cpu=$1
+build_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+build_os=$*
+IFS=$ac_save_IFS
+case $build_os in *\ *) build_os=`echo "$build_os" | sed 's/ /-/g'`;; esac
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking host system type" >&5
+$as_echo_n "checking host system type... " >&6; }
+if ${ac_cv_host+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "x$host_alias" = x; then
+  ac_cv_host=$ac_cv_build
+else
+  ac_cv_host=`$SHELL "$ac_aux_dir/config.sub" $host_alias` ||
+    as_fn_error $? "$SHELL $ac_aux_dir/config.sub $host_alias failed" "$LINENO" 5
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_host" >&5
+$as_echo "$ac_cv_host" >&6; }
+case $ac_cv_host in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical host" "$LINENO" 5;;
+esac
+host=$ac_cv_host
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_host
+shift
+host_cpu=$1
+host_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+host_os=$*
+IFS=$ac_save_IFS
+case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
+
 
 
 
@@ -2856,9 +2990,23 @@ $as_echo_n "checking for boostlib >= $boost_lib_version_req... " >&6; }
 
                         libsubdirs="lib"
     ax_arch=`uname -m`
-    if test $ax_arch = x86_64 -o $ax_arch = ppc64 -o $ax_arch = s390x -o $ax_arch = sparc64; then
-        libsubdirs="lib64 lib lib64"
-    fi
+    case $ax_arch in
+      x86_64)
+        libsubdirs="lib64 libx32 lib lib64"
+        ;;
+      ppc64|s390x|sparc64|aarch64|ppc64le)
+        libsubdirs="lib64 lib lib64 ppc64le"
+        ;;
+    esac
+
+
+    libsubdirs="lib/${host_cpu}-${host_os} $libsubdirs"
+
+    case ${host_cpu} in
+      i?86)
+        libsubdirs="lib/i386-${host_os} $libsubdirs"
+        ;;
+    esac
 
                 if test "$ac_boost_path" != ""; then
         BOOST_CPPFLAGS="-I$ac_boost_path/include"
@@ -3605,44 +3753,6 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
-# Make sure we can run config.sub.
-$SHELL "$ac_aux_dir/config.sub" sun4 >/dev/null 2>&1 ||
-  as_fn_error $? "cannot run $SHELL $ac_aux_dir/config.sub" "$LINENO" 5
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking build system type" >&5
-$as_echo_n "checking build system type... " >&6; }
-if ${ac_cv_build+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_build_alias=$build_alias
-test "x$ac_build_alias" = x &&
-  ac_build_alias=`$SHELL "$ac_aux_dir/config.guess"`
-test "x$ac_build_alias" = x &&
-  as_fn_error $? "cannot guess build type; you must specify one" "$LINENO" 5
-ac_cv_build=`$SHELL "$ac_aux_dir/config.sub" $ac_build_alias` ||
-  as_fn_error $? "$SHELL $ac_aux_dir/config.sub $ac_build_alias failed" "$LINENO" 5
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build" >&5
-$as_echo "$ac_cv_build" >&6; }
-case $ac_cv_build in
-*-*-*) ;;
-*) as_fn_error $? "invalid value of canonical build" "$LINENO" 5;;
-esac
-build=$ac_cv_build
-ac_save_IFS=$IFS; IFS='-'
-set x $ac_cv_build
-shift
-build_cpu=$1
-build_vendor=$2
-shift; shift
-# Remember, the first character of IFS is used to create $*,
-# except with old shells:
-build_os=$*
-IFS=$ac_save_IFS
-case $build_os in *\ *) build_os=`echo "$build_os" | sed 's/ /-/g'`;; esac
-
 
 
 
