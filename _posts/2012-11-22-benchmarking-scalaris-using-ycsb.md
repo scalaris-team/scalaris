@@ -13,13 +13,13 @@ available on GitHub.
 
 ## Compile
 
-Check out the fork of YCSB with branch scalaris:
+Check out the scalaris repository:
 
-    git clone git://github.com/mxm/YCSB.git -b scalaris
+    git clone https://github.com/scalaris-team/scalaris.git
 
 Build with Maven:
 
-    cd YCSB
+    cd scalaris/contrib/ycsb
     mvn package
 
 ## Run
