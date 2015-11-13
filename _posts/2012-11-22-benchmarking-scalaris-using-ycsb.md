@@ -22,6 +22,28 @@ Build with Maven:
     cd scalaris/contrib/ycsb
     mvn package
 
+## Maven
+
+To use the YCSB scalaris-binding as dependency of an existing maven project,
+add the following to your pom.xml:
+
+{% highlight xml %}
+<dependencies>
+  <dependency>
+    <groupId>com.yahoo.ycsb</groupId>
+    <artifactId>scalaris-binding</artifactId>
+    <version>[0.1.4,)</version>
+  </dependency>
+</dependencies>
+
+<repositories>
+  <repository>
+    <id>scalaris</id>
+    <url>https://scalaris-team.github.io/scalaris/maven</url>
+  </repository>
+</repositories>
+{% endhighlight %}
+
 ## Run
 
     ./bin/ycsb load scalaris -P workloads/workloada
