@@ -114,7 +114,7 @@ public class ScalarisClient extends DB {
 		try {
 			// Erlang delete is not save, so we check if the key
 			// was deleted on all four replicas
-			if(rdht.delete(table + TABLE_SEPERATOR + key) != 4)
+			if(rdht.delete(table + TABLE_SEPERATOR + key).ok != 4)
 				return 1;		
 		} catch (OtpErlangException e) {
 			e.printStackTrace();
