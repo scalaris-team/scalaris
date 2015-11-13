@@ -5,33 +5,26 @@
 
 package com.yahoo.ycsb.db;
 
-import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangException;
-import com.ericsson.otp.erlang.OtpErlangInt;
-import com.ericsson.otp.erlang.OtpErlangList;
-import com.ericsson.otp.erlang.OtpErlangObject;
-import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.StringByteIterator;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.util.ArrayList;
-import java.util.HashSet;
+import de.zib.scalaris.Connection;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.ReplicatedDHT;
+import de.zib.scalaris.TransactionSingleOp;
+
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
 
-import de.zib.scalaris.*;
 
 public class ScalarisClient extends DB {
 
