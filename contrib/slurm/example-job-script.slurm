@@ -14,7 +14,7 @@ source $(pwd)/env.sh
 
 #$BINDIR/scalarisctl checkinstallation
 check_compile
-$(pwd)/scalaris-start.sh
+$(pwd)/start-scalaris.sh
 
 #############################################
 #                                           #
@@ -31,4 +31,4 @@ sleep 15
 #                                           #
 #############################################
 
-$(pwd)/scalaris-stop.sh
+$(pwd)/stop-scalaris.sh

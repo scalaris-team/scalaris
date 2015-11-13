@@ -1,10 +1,7 @@
 #!/bin/bash
 
 ERLANG_VERSIONS="R17B05 R14B04"
-
 mkdir -p $OUTPUTDIR
-
-check_compile
 
 for NNODES in "2" #  1 2 3 4 5 6 7 8 12 16 24 32
 do
@@ -20,8 +17,8 @@ do
                 export DHT_NODES_PER_VM=$DHT_NODES_PER_VM
                 for ITERATION in `seq 1 20`
                 do
-                    #sbatch --dependency=singleton --job-name scalaris-benchmark -N $NNODES bench-script.sh
-                    sbatch --dependency=singleton --job-name scalaris-benchmark -N $NNODES -o slurm-$ERLANG_VERSION-$NNODES-$VMS_PER_NODE-$DHT_NODES_PER_VM-%j.out bench-script.sh
+                    #sbatch --dependency=singleton --job-name scalaris-benchmark -N $NNODES increment-bench.slurm
+                    sbatch --dependency=singleton --job-name scalaris-benchmark -N $NNODES -o slurm-$ERLANG_VERSION-$NNODES-$VMS_PER_NODE-$DHT_NODES_PER_VM-%j.out increment-bench.slurm
                 done
             done
         done

@@ -31,25 +31,24 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # workers / dht_node = load_generators * workers_base
 # total rate = # load generators * worker base * ringsize * rate
 
-NODES_SERIES="2 4"
-VMS_PER_NODE_SERIES="1 2"
-REPETITIONS=2
-COLLECTL=true
-
-DURATION=1
+# NODES_SERIES="2 4"
+# VMS_PER_NODE_SERIES="1 2"
+# REPETITIONS=2
+# COLLECTL=true
+#
+# DURATION=1
 # MODE="{rate, 100}"
 # PREFIX="bbench-"
 
 # WORKERS_BASE=2
 # LOAD_GENERATORS=2
-# LG_HOSTS=("cumulus.zib.de" "buildbot2.zib.de")
 #
-TIMEOUT=60
+# TIMEOUT=60
 
 #=============================
 
 main(){
-    source $(pwd)/basho-bench.cfg
+    source $(pwd)/config/basho-bench.cfg
     check_wdir
     setup_logging
     setup_directories
@@ -355,10 +354,10 @@ run_bbench() {
         host=${LG_HOSTS[$((c++ % no_of_hosts))]}
 
         if [[ $(hostname -f) = $host ]]; then
-            $SCALARIS_DIR/contrib/slurm/start-bbench.sh ${args[@]} &
+            $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
             lg_pids[$i]=$!
         else
-            ssh $host $SCALARIS_DIR/contrib/slurm/start-bbench.sh ${args[@]} &
+            ssh $host $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
             lg_pids[$i]=$!
         fi
     done

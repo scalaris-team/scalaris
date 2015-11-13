@@ -7,7 +7,7 @@ see `bench.sh`.
 
 The queued tasks execute another script on the nodes
 of the cumulus cluster (cumu01-00 - cumu01-15 and cumu02-00-cumu02-15), performing
-the actual tasks. For examples see `example-job-script` and `bench-script.sh`.
+the actual tasks. For examples see `example-job-script` and `increment-bench.slurm`.
 
 The rest of the scripts are scripts for default tasks, like starting and stopping
 Scalaris.
@@ -21,8 +21,8 @@ Scalaris.
 * runs in the context of cumulus.zib.de
 * adjust number of nodes, VMs per Node, number of DHT nodes per vm,
   number of repetitions (iterations) in the script
-* calls `sbatch` with `bench-script.sh` as script
-* the output of `bench-script.sh` is returned to the calling `sbatch` command
+* calls `sbatch` with `increment-bench.slurm` as script
+* the output of `increment-bench.slurm` is returned to the calling `sbatch` command
     and saved in the directory from which `bench.sh` was called
 * the name of the outputfile is defined in `bench.sh` in the `sbatch` call with
     the '-o' parameter and has the default form of
@@ -30,18 +30,18 @@ Scalaris.
     ```slurm-<ErlangVersion>-<Nodes>-<VMs/Node>-<DHTNodes/VM>-<jobid>.out```
 
 
-## bench-script.sh
+## increment-bench.slurm
 * runs in the context of exactly one node of the cumulus cluster
-* sets up a Scalaris ring through calling `scalaris-start.sh` with the number of
+* sets up a Scalaris ring through calling `start-scalaris.sh` with the number of
     nodes, vms and dht-nodes specified in `bench.sh`
 * executes the set of comands specified in the designated area with one set
     of parameters from `bench.sh`
-* shuts down the Scalaris ring via scalaris-stop.sh
+* shuts down the Scalaris ring via stop-scalaris.sh
 
-## scalaris-start
+## start-scalaris
 * starts a Scalaris ring
 
-## scalaris-stop
+## stop-scalaris
 * stops a Scalaris ring
 
 ## env.sh
@@ -86,7 +86,7 @@ job, run e.g.
 to cleanup the nodes cumu01-[03,04]. The list of used nodes can be found in the
 logfile of the cancelled job.
 
-The `scalaris-start.sh` script also cancels still running Scalaris nodes, so if
+The `start-scalaris.sh` script also cancels still running Scalaris nodes, so if
 Scalaris is started on the same ring immediately afterwards, running the cleanup
 script is not necessary.
 
@@ -94,10 +94,10 @@ script is not necessary.
 
 Run a script on a two-node setup
 
-    $ sbatch -N2 example-job-script.sh
+    $ sbatch -N2 example-job-script.slurm
 Most of the parameters will be set through default values in `env.sh`.
 
 Individual parameters can be set on a per call basis, e.g. specify the number of
 nodes per VM (this would lead to 16 Scalaris nodes, 2 machines with 8 Erlang-VMs each)
 
-    $ VMS_PER_NODE="8" sbatch -N2 example-job-script.sh
+    $ VMS_PER_NODE="8" sbatch -N2 example-job-script.slurm

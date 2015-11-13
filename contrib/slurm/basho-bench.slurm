@@ -9,8 +9,6 @@
 #
 ################################################################################
 
-set -x
-
 #SBATCH -J scalaris
 #SBATCH -N 1
 #SBATCH -p CUMU
@@ -20,15 +18,15 @@ set -x
 
 # setup Scalaris
 source /usr/share/modules/init/bash
-source $(pwd)/env.sh
+source $(pwd)/config/env.sh
 print_env
 echo "Nodelist: $SLURM_NODELIST"
-$(pwd)/scalaris-start.sh
+$(pwd)/util/start-scalaris.sh
 
 # check that the WD (working dir) is set
 if [[ -z $WD ]]; then
     echo "WD not set, stopping servers"
-    $(pwd)/scalaris-stop.sh
+    $(pwd)/util/stop-scalaris.sh
     exit 1
 fi
 
@@ -42,5 +40,5 @@ echo "sleeping for $SLEEPTIME, need to cancel manually"
 sleep $SLEEPTIME
 
 echo "stopping servers"
-$(pwd)/scalaris-stop.sh
+$(pwd)/util/stop-scalaris.sh
 echo "stopped servers"

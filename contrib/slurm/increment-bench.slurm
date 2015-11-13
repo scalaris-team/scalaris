@@ -11,25 +11,17 @@
 #SBATCH --exclusive
 
 source /usr/share/modules/init/bash
-source $(pwd)/env.sh
+source $(pwd)/config/env.sh
 
 check_compile
-environment
-$(pwd)/scalaris-start.sh
+print_env
+$(pwd)/util/start-scalaris.sh
 
 #############################################
 #                                           #
 #     Place your commands between here      #
 #                                           #
 #############################################
-HEAD=$(git rev-parse --short HEAD)
-JOBID=$SLURM_JOB_ID
-NO_OF_NODES=$SLURM_JOB_NUM_NODES
-
-echo "HEAD; JOBID; NO_OF_NODES; VMS_PER_NODE; PID; NO_OF_CH"
-echo "Git-Head: $HEAD"
-echo "Job-Id: $JOBID"
-echo "Number of DHT Nodes: $(($NO_OF_NODES*$VMS_PER_NODE)) (Nodes: $NO_OF_NODES; VMs per Node: $VMS_PER_NODE)"
 
 METRICS="{value, {mean_troughput_overall, Mean}} = lists:keysearch(mean_troughput_overall, 1, Res), {value, {avg_latency_overall, Latency}} = lists:keysearch(avg_latency_overall, 1, Res)"
 LOGSTRING_INC="io:format('result data inc:~p:~p~n', [Mean, Latency])"
@@ -52,4 +44,4 @@ erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "{ok, Res} = 
 #############################################
 
 echo "stopping servers"
-$(pwd)/scalaris-stop.sh
+$(pwd)/util/stop-scalaris.sh

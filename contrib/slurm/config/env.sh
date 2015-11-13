@@ -45,8 +45,15 @@ function print_env() {
     erl_version=$(cat $erl_version_file)
     echo "Erlang binary: $erl_binary"
     echo "Erlang version: $erl_version"
-    echo "Current HEAD"
-    printenv > $WD/slurm/slurm-${SLURM_JOB_ID}.env
+    HEAD=$(git rev-parse --short HEAD)
+    echo "Current git-HEAD: $HEAD"
+    echo "Slurm-JOBID: $SLURM_JOB_ID"
+    echo "Number of DHT Nodes: $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE)) (Nodes: $SLURM_JOB_NUM_NODES; VMs per Node: $VMS_PER_NODE)"
+    if [[ -n $WD ]]; then
+        printenv > $WD/slurm/slurm-${SLURM_JOB_ID}.env
+    else
+        printenv > slurm-${SLURM_JOB_ID}.env
+    fi
 }
 
 check_compile(){
@@ -57,6 +64,7 @@ check_compile(){
     if [[ -n $res ]]; then
         echo "Scalaris binaries do not match source version:"
         echo $res
+        echo "exiting..."
         exit 1
     fi
 }

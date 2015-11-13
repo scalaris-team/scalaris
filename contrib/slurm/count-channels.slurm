@@ -10,12 +10,12 @@
 #SBATCH --exclusive
 
 source /usr/share/modules/init/bash
-source $(pwd)/env.sh
+source $(pwd)/config/env.sh
 
 #$BINDIR/scalarisctl checkinstallation
 
 echo $(date)
-$(pwd)/scalaris-start.sh
+$(pwd)/util/start-scalaris.sh
 
 #############################################
 #                                           #
@@ -71,5 +71,5 @@ done
 #############################################
 
 echo "stopping servers"
-$(pwd)/scalaris-stop.sh
+$(pwd)/util/stop-scalaris.sh
 echo "stopped servers"
