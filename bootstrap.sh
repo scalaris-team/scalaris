@@ -53,6 +53,6 @@ sed -e "s/pkgver=.*/pkgver=${VERSION}/g" \
 ##########
 
 echo "Creating configure script"
-aclocal -Wobsolete
+aclocal -Wobsolete -I m4
 autoconf -Wobsolete
 echo "done"
