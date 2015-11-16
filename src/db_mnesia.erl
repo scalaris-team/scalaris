@@ -31,7 +31,7 @@
 %% primitives
 -export([start/0, new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
--export([get_persisted_tables/0, get_name/1, get_load/1, 
+-export([get_persisted_tables/0, get_name/1, get_load/1,
          is_available/0, supports_feature/1]).
 %% cleanup functions
 -export([mnesia_tables_of/1, delete_mnesia_tables/1, close_and_delete/1]).
@@ -65,20 +65,33 @@ start() ->
         {error, {_, {already_exists, _}}} ->
           io:format("starting mnesia: recovering.~n");
         Msg ->
-          io:format("starting mnesia recover : ~w~n", [Msg]),
-          erlang:halt()
+              case util:is_unittest() of
+                  true  -> ct:pal("starting mnesia recover : ~w~n", [Msg]);
+                  false -> io:format("starting mnesia recover : ~w~n", [Msg])
+              end,
+              erlang:halt()
       end;
     _ ->
       case mnesia:create_schema([node()]) of
         ok -> ok;
         Msg ->
-          io:format("starting mnesia: ~w~n", [Msg]),
-          io:format("starting mnesia: maybe you tried to start a new node "
-                    "while we still found persisted data of a node with the "
-                    "same name. If you want to get rid of the old persisted "
-                    "data, delete them using ~p.~n",
-                    ["rm -rf data/" ++ atom_to_list(node())]),
-          erlang:halt()
+              case util:is_unittest() of
+                  true ->
+                      ct:pal("starting mnesia: ~w~n", [Msg]),
+                      ct:pal("starting mnesia: maybe you tried to start a new node "
+                             "while we still found persisted data of a node with the "
+                             "same name. If you want to get rid of the old persisted "
+                             "data, delete them using ~p.~n",
+                             ["rm -rf data/" ++ atom_to_list(node())]);
+                  false ->
+                      io:format("starting mnesia: ~w~n", [Msg]),
+                      io:format("starting mnesia: maybe you tried to start a new node "
+                                "while we still found persisted data of a node with the "
+                                "same name. If you want to get rid of the old persisted "
+                                "data, delete them using ~p.~n",
+                                ["rm -rf data/" ++ atom_to_list(node())])
+              end,
+              erlang:halt()
       end
   end,
   _ = application:start(mnesia),
@@ -340,16 +353,16 @@ foldr_iter(DB, Fun, Acc, {'[', End, Start, ']'}, MaxNum) ->
   {atomic, Previous} = mnesia:transaction(fun()-> mnesia:prev(DB, Start) end),
     foldr_iter(DB, Fun, Fun(Start, Acc), {'[', End, Previous, ']'}, MaxNum - 1).
 
-%% @doc Works similar to foldl/3 but uses mnesia:foldl instead of our own implementation. 
+%% @doc Works similar to foldl/3 but uses mnesia:foldl instead of our own implementation.
 %% The order in which will be iterated over is unspecified, but using this fuction
 %% might be faster than foldl/3 if it does not matter.
 -spec foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl_unordered(DB, Fun, Acc) ->
     % Entry = {db, key, value}
-    FoldlFun = fun(Entry, AccIn) -> Fun(element(3, Entry), AccIn) end, 
-    
-    {atomic, Result}  = mnesia:transaction(fun() -> 
-                                                mnesia:foldl(FoldlFun, Acc, DB) 
+    FoldlFun = fun(Entry, AccIn) -> Fun(element(3, Entry), AccIn) end,
+
+    {atomic, Result}  = mnesia:transaction(fun() ->
+                                                mnesia:foldl(FoldlFun, Acc, DB)
                                            end),
     Result.
 
