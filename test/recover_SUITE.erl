@@ -29,28 +29,21 @@
 
 groups() ->
     [{slide_tests, [sequence], [
-                                %% leaves one node with no lease
-                                %% half_join_and_recover_after_step2,
-                                %% half_join_and_recover_after_step3,
-                                %% half_join_and_recover_after_step4
+                                half_join_and_recover_after_step2,
+                                half_join_and_recover_after_step3,
+                                half_join_and_recover_after_step4
                                ]},
      {leave_tests, [sequence], [
-                                %% leaves one node with no lease
                                 %% half_leave_and_recover_after_step1,
                                 %% half_leave_and_recover_after_step2,
                                 half_leave_and_recover_after_step3,
                                 half_leave_and_recover_after_step4
                                ]},
-     {failing_tests, [sequence], [
-                                  half_join_and_recover_after_step2,
-                                  half_join_and_recover_after_step3,
-                                  half_join_and_recover_after_step4
-                                 ]},
-     {repeater, [{repeat, 30}], [{group, leave_tests}, {group, failing_tests}]}
+     {repeater, [{repeat, 10}], [{group, slide_tests}, {group, leave_tests}]}
     ].
 
 all() -> [
-          %{group, slide_tests},
+          {group, slide_tests},
           {group, leave_tests}
          ].
 
@@ -142,7 +135,13 @@ half_join_and_recover(Config, MsgTag) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, 4),
+    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)),
+    io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
+    io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
+    lease_checker2:get_kv_db(),
+    io:format("api_vm:number_of_nodes: ~p~n", [api_vm:number_of_nodes()]),
+    io:format("pid_groups:find_all(dht_node): ~p~n", [pid_groups:find_all(dht_node)]),
+    io:format("pid_groups:find_all(routing_table): ~p~n", [pid_groups:find_all(routing_table)]),
     %% ring restored -> checking KV data integrity
     _ = check_data_integrity(),
     true.
@@ -155,6 +154,8 @@ half_leave_and_recover(Config, MsgTag) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     %% write data
     _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+    %% check ring
+    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)),
     %% hook into merge-protocol
     [gen_component:bp_set_cond(Pid, block(self(), MsgTag),
                                block)
@@ -181,7 +182,13 @@ half_leave_and_recover(Config, MsgTag) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, 3),
+    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)-1),
+    io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
+    io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
+    lease_checker2:get_kv_db(),
+    io:format("api_vm:number_of_nodes: ~p~n", [api_vm:number_of_nodes()]),
+    io:format("pid_groups:find_all(dht_node): ~p~n", [pid_groups:find_all(dht_node)]),
+    io:format("pid_groups:find_all(routing_table): ~p~n", [pid_groups:find_all(routing_table)]),
     %% ring restored -> checking KV data integrity
     _ = check_data_integrity(),
     true.
