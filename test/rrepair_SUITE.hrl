@@ -126,8 +126,8 @@ get_rep_upd_config(Method) ->
      {rr_art_inner_fpr, 0.01},
      {rr_art_leaf_fpr, 0.1},
      {rr_art_correction_factor, 2},
-     {rr_merkle_branch_factor, 2},
-     {rr_merkle_bucket_size, 25}].
+     {rr_merkle_branch_factor, 4},
+     {rr_merkle_bucket_size, 3}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Replica Update tests
