@@ -1,4 +1,3 @@
-export ERLANG_VERSION=${ERLANG_VERSION:-R17B05}
 export SCALARIS_LOCAL=${SCALARIS_LOCAL:-false}
 export SCALARIS_SRC=${SCALARIS_SRC:-$HOME/scalaris}
 if [[ $SCALARIS_LOCAL = true ]]; then

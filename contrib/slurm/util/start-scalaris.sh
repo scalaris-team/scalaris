@@ -133,8 +133,6 @@ function start_collectl(){
         bash -c "collectl -f $COLLECTL_DIR -i5 -F0; sleep 365d"
 }
 
-module load erlang/$ERLANG_VERSION
-
 fix_known_hosts
 [[ $SCALARIS_LOCAL = true ]] && sync_scalaris_dir
 kill_old_nodes
