@@ -1,6 +1,11 @@
 #!/bin/bash
 
 function fix_known_hosts() {
+    # When using a local dir, the known hosts need to be written to the source dir,
+    # not the local dir. They are then synced to the local dir.
+    local old_etcdir=$ETCDIR
+    ETCDIR=$SCALARIS_SRC/bin
+
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
     if [ -e $ETCDIR/scalaris.local.cfg ]
     then
@@ -33,6 +38,9 @@ function fix_known_hosts() {
     IP=`host $HEADNODE | cut -d ' ' -f 4`
     echo -n $IP | sed s/\\./\,/g >> $ETCDIR/scalaris.local.cfg
     echo "}, 14195, mgmt_server}}." >> $ETCDIR/scalaris.local.cfg
+
+    # restore old ETCDIR
+    ETCDIR=$old_etcdir
 }
 
 function kill_old_nodes() {
@@ -41,6 +49,10 @@ function kill_old_nodes() {
     if [[ $? -ne 0 ]]; then
         scancel $SLURM_JOBID
     fi
+}
+
+function sync_scalaris_dir() {
+    srun -N $SLURM_NNODES ./util/sync_scalaris_to_local_dir.sh
 }
 
 function start_servers() {
@@ -57,6 +69,7 @@ function start_servers() {
     else
         KEYLIST=`erl -name bench_ -pa $BEAMDIR -noinput -eval "L = util:lists_split(api_dht_raw:split_ring($NR_OF_DHT_NODES), $NR_OF_VMS), io:format('~p', [L]), halt(0)."`
     fi
+    export KEYLIST # for start-vm.sh
 
     VM_IDX=1
     JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
@@ -66,7 +79,7 @@ function start_servers() {
 
     ## @todo use auto-binding
     # start vms at all the tail nodes
-    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./util/start-vm.sh --keylist "${KEYLIST}" --vm-idx $VMS_PER_NODE
+    srun -k -r1 -N$((SLURM_NNODES-1)) --cpu_bind=none --ntasks-per-node=${VMS_PER_NODE} ./util/start-vm.sh
 
     # start remaining VMs on head node
     PORT=14196
@@ -104,7 +117,7 @@ function wait_for_servers_to_start {
 
 function start_watchdog() {
     # start watchdog
-    srun -N$SLURM_NNODES screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./watchdog.sh
+    srun -N$SLURM_NNODES screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./util/watchdog.sh
 }
 
 function start_collectl(){
@@ -120,9 +133,8 @@ function start_collectl(){
         bash -c "collectl -f $COLLECTL_DIR -i5 -F0; sleep 365d"
 }
 
-module load erlang/$ERLANG_VERSION
-
 fix_known_hosts
+[[ $SCALARIS_LOCAL = true ]] && sync_scalaris_dir
 kill_old_nodes
 start_watchdog
 [[ $COLLECTL = true ]] && start_collectl

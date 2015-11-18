@@ -1485,8 +1485,8 @@ shash_bloom_perform_resolve(
     ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(DBChunkTree1)] ++ ToReqIdx1),
     ToReq2 = erlang:list_to_bitstring(
                lists:reverse(
-                 pos_to_bitstring(
-                   ReqIdx, [], 0, ?IIF(ReqIdx =:= [], 1, lists:last(ReqIdx) + 1)))),
+                 pos_to_bitstring(% note: ReqIdx positions start with 0
+                   ReqIdx, [], 0, ?IIF(ReqIdx =:= [], 0, lists:last(ReqIdx) + 1)))),
     ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
            [_RMethod, SID, erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
@@ -1894,7 +1894,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                              [Idx || {_Version, Idx} <- gb_trees:values(OBucketTree1)]
                                  ++ ToReqIdx1),
                   ToResolve1 = pos_to_bitstring(ReqIdx, ToResolve, 0,
-                                                Params#merkle_params.bucket_size + 1),
+                                                Params#merkle_params.bucket_size),
                   {NHashes, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
                    LeafNAcc + LeafCount}
@@ -1935,7 +1935,7 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
 merkle_resolve_leaves_ckidx([{_OtherMaxItemsCount, MyKVItems, _LeafCount} | TL],
                              BinKeyList0,
                              DestRRPid, Stats, OwnerL, Params, ToSend, IsInitiator) ->
-    Positions = Params#merkle_params.bucket_size + 1,
+    Positions = Params#merkle_params.bucket_size,
     <<ReqKeys:Positions/bitstring-unit:1, BinKeyList/bitstring>> = BinKeyList0,
     ToSend1 = bitstring_to_k_list_kv(ReqKeys, MyKVItems, ToSend),
     merkle_resolve_leaves_ckidx(TL, BinKeyList, DestRRPid, Stats, OwnerL, Params,
