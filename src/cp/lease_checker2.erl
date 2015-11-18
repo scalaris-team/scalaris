@@ -41,7 +41,7 @@
 
 -export([wait_for_clean_leases/1, wait_for_clean_leases/2]).
 
--export([get_kv_db/0]).
+-export([get_kv_db/0, get_kv_db/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -63,9 +63,19 @@ wait_for_clean_leases(WaitTimeInMs) ->
 get_kv_db() ->
     KVDBs = [ get_dht_node_state(Pid, kv_db) || Pid <- all_dht_nodes()],
     Data = [prbr:tab2list(DB) || {true, DB} <- KVDBs, DB =/= false],
-    io:format("kv-pairs: ~p~n", [length(lists:flatten(Data))]),
+    FlattenedData = lists:flatten(Data),
+    io:format("kv-pairs: ~p~n", [length(FlattenedData)]),
     Empties = [ DB || DB <- KVDBs, DB =:= false],
+    Bottoms = [Value || {_Key, Value} <- FlattenedData, Value =:= prbr_bottom],
     io:format("falses: ~p~n", [length(Empties)]),
+    io:format("prbr_bottoms: ~p~n", [length(Bottoms)]),
+    ok.
+
+-spec get_kv_db(term()) -> ok.
+get_kv_db(Pid) ->
+    io:format("~p~n", [Pid]),
+    {true, DB} = get_dht_node_state(comm:make_global(Pid), kv_db),
+    io:format("kv-pairs: ~p~n", [length(prbr:tab2list(DB))]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -26,33 +26,39 @@ AC_SUBST(TRUE)
 
 ###########################################################
 #
-# fake automake scripts (config.guess, install-sh, ...)
-#
-###########################################################
-
-#              Homebrew                     Ubuntu
-for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
-    if test -d $PREFIX; then
-       location=`find $PREFIX -type d -name "automake-?.??"`
-       if test "$location"; then
-           AC_CONFIG_AUX_DIR([$location])
-           break
-       fi
-    fi
-done
-
-###########################################################
-#
 # check for C++ and boost
 #
 ###########################################################
 
-AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
-AX_BOOST_BASE([1.54])
-AX_BOOST_SYSTEM
-AX_BOOST_REGEX
-AX_BOOST_ASIO
-AX_BOOST_UNIT_TEST_FRAMEWORK
+ENABLE_CPP=
+AC_ARG_ENABLE([cpp],
+              AS_HELP_STRING([--disable-cpp],
+                 [disable support for the C++ bindings]),
+              [ENABLE_CPP=$enableval],
+              [ENABLE_CPP=$enableval])
+
+if test "x$ENABLE_CPP" != xno ; then
+  # fake automake scripts (config.guess, install-sh, ...)
+  #              Homebrew                     Ubuntu
+  for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
+    if test -d $PREFIX; then
+      location=`find $PREFIX -type d -name "automake-?.??"`
+      if test "$location"; then
+        AC_CONFIG_AUX_DIR([$location])
+        break
+      fi
+    fi
+  done
+  # C++ and boost checks
+  AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+  AX_BOOST_BASE([1.35])
+  AX_BOOST_SYSTEM
+  AX_BOOST_REGEX
+  AX_BOOST_ASIO
+  AX_BOOST_UNIT_TEST_FRAMEWORK
+else
+  AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
+fi
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
@@ -65,10 +71,6 @@ AC_SUBST(CXXFLAGS)
 
 ENABLE_TOKE=
 TOKEPREFIX=
-AC_ARG_ENABLE([toke],
-              AS_HELP_STRING([--disable-toke],
-                 [disable support for tokyo cabinet through toke]),
-              [TOKEPREFIX=no])
 AC_ARG_ENABLE([toke],
               AS_HELP_STRING([--enable-toke@<:@=DIR@:>@],
                  [enable support for tokyo cabinet through toke]),
@@ -84,10 +86,6 @@ AC_ARG_ENABLE([toke],
 ENABLE_HANOIDB=
 HANOIDBPREFIX=
 AC_ARG_ENABLE([hanoidb],
-              AS_HELP_STRING([--disable-hanoidb],
-                 [disable support for hanoidb]),
-              [HANOIDBPREFIX=no])
-AC_ARG_ENABLE([hanoidb],
               AS_HELP_STRING([--enable-hanoidb@<:@=DIR@:>@],
                  [enable support for hanoidb]),
               [ENABLE_HANOIDB=yes
@@ -101,10 +99,6 @@ AC_ARG_ENABLE([hanoidb],
 
 ENABLE_ERLANGJS=
 ERLANGJSPREFIX=
-AC_ARG_ENABLE([erlang-js],
-              AS_HELP_STRING([--disable-erlang-js],
-                 [disable support for erlang_js]),
-              [ERLANG_JSPREFIX=no])
 AC_ARG_ENABLE([erlang-js],
               AS_HELP_STRING([--enable-erlang-js@<:@=DIR@:>@],
                  [enable support for erlang_js]),

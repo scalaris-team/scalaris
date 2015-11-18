@@ -403,6 +403,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
     tester:register_type_checker({typedef, intervals, non_empty_interval, []}, intervals, is_non_empty),
+    tester:register_type_checker({typedef, rt_beh, segment, []}, rt_beh, tester_is_segment),
     tester:register_value_creator({typedef, random_bias, generator, []},
                                   random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
@@ -412,6 +413,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, merkle_tree, inner_hash_fun, []}, merkle_tree, tester_create_inner_hash_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs_fun, []}, hfs_lhsp, tester_create_hfs_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs, []}, hfs_lhsp, tester_create_hfs, 1),
+    tester:register_value_creator({typedef, rt_beh, segment, []}, rt_beh, tester_create_segment, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -524,11 +526,13 @@ tester_type_check_rrepair(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     tester:unregister_value_creator({typedef, intervals, non_empty_interval, []}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun, []}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs, []}),
+    tester:unregister_value_creator({typedef, rt_beh, segment, []}),
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
     tester:unregister_type_checker({typedef, intervals, non_empty_interval, []}),
-    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun, []}),
-    tester:unregister_value_creator({typedef, hfs_lhsp, hfs, []}),
+    tester:unregister_type_checker({typedef, rt_beh, segment, []}),
     true.
 
 tester_type_check_tx(_Config) ->

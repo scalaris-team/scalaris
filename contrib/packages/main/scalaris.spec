@@ -109,7 +109,7 @@ Documentation for Scalaris including its User-Dev-Guide.
     --sysconfdir=%{_sysconfdir} \
     --datadir=%{_datadir} \
     --includedir=%{_includedir} \
-    --libdir=%{_prefix}/lib \
+    --libdir=%{_libdir} \
     --libexecdir=%{_libexecdir} \
     --localstatedir=%{_localstatedir} \
     --sharedstatedir=%{_sharedstatedir} \
@@ -121,7 +121,8 @@ Documentation for Scalaris including its User-Dev-Guide.
 %if 0%{?with_systemd}
     --with-systemd=%{_unitdir} \
 %endif
-    --docdir=%{_docdir}/scalaris
+    --docdir=%{_docdir}/scalaris \
+    --disable-cpp
 make all
 make doc
 
@@ -238,8 +239,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_docdir}/scalaris/LICENSE
 %{_docdir}/scalaris/ChangeLog
 %{_bindir}/scalarisctl
-%{_prefix}/lib/scalaris
-%exclude %{_prefix}/lib/scalaris/docroot/doc
+%{_prefix}/lib//scalaris
+%exclude %{_prefix}/lib//scalaris/docroot/doc
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service
@@ -267,6 +268,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc %{_docdir}/scalaris/erlang
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
-%{_prefix}/lib/scalaris/docroot/doc
+%{_prefix}/lib//scalaris/docroot/doc
 
 %changelog

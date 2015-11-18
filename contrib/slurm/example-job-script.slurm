@@ -1,0 +1,34 @@
+#!/bin/bash -l
+
+# -o: output log file: %j for the job ID, %N for the name of the first executing node
+# Change the path of the output logfile
+
+#SBATCH -J bench-script
+#SBATCH -N 2
+#SBATCH -p CUMU
+#SBATCH -A csr
+#SBATCH -t 00:03:00
+#SBATCH --exclusive
+
+source $(pwd)/env.sh
+
+#$BINDIR/scalarisctl checkinstallation
+check_compile
+$(pwd)/start-scalaris.sh
+
+#############################################
+#                                           #
+#     Place your commands between here      #
+#                                           #
+#############################################
+
+sleep 15
+
+
+#############################################
+#                                           #
+#     and here                              #
+#                                           #
+#############################################
+
+$(pwd)/stop-scalaris.sh

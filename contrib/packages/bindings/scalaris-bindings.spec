@@ -22,8 +22,10 @@ BuildRequires:  ruby >= 1.8
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 BuildRequires:  pkgconfig
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
+%define with_cpp 1
 BuildRequires:  ruby(release) >= 1.8
 %else
+%define with_cpp 0
 BuildRequires:  ruby(abi) >= 1.8
 %endif
 %if 0%{?fedora_version} >= 12 || 0%{?centos_version} >= 600
@@ -80,9 +82,20 @@ BuildRequires:  python3-2to3
 %if %{?suse_version} >= 1130 && %{?suse_version} <= 1310
 BuildRequires:  ruby(abi) >= 1.8
 %endif
+%if 0%{?suse_version} >= 1310 || 0%{?sles_version} >= 12
+%define with_cpp 1
+%else
+%define with_cpp 0
+%endif
 %endif
 
 %{!?rb_sitelib: %global rb_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
+
+%if 0%{?with_cpp}
+BuildRequires:  automake
+BuildRequires:  boost-devel >= 1.35
+BuildRequires:  gcc-c++
+%endif
 
 %if 0%{?with_python}
 %if 0%{?with_python_doc_html}
@@ -108,7 +121,7 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package -n scalaris-java
-Summary:    Java-API and Java-Client for scalaris
+Summary:    Java-API and Java-Client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -118,10 +131,21 @@ BuildArch:  noarch
 %endif
 
 %description -n scalaris-java
-Java Bindings and command line client for scalaris
+Java Bindings and command line client for Scalaris
+
+%if 0%{?with_cpp}
+%package -n libscalaris-devel
+Summary:    C++-API for Scalaris
+Group:      Productivity/Databases/Clients
+Provides:   libscalaris-static = %{version}-%{release}
+Requires:   boost-devel >= 1.35
+
+%description -n libscalaris-devel
+C++ Bindings for Scalaris
+%endif
 
 %package -n ruby-scalaris
-Summary:    Ruby-API and Ruby-client for scalaris
+Summary:    Ruby-API and Ruby-client for Scalaris
 Group:      Productivity/Databases/Clients
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 Requires:   ruby(release) >= 1.8
@@ -132,11 +156,11 @@ Requires:   rubygems
 Requires:   rubygem-json >= 1.4.1
 
 %description -n ruby-scalaris
-Ruby bindings and Ruby command line client for scalaris
+Ruby bindings and Ruby command line client for Scalaris
 
 %if 0%{?with_python}
 %package -n python-scalaris
-Summary:    Python-API and Python-client for scalaris
+Summary:    Python-API and Python-client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -146,12 +170,12 @@ BuildArch:  noarch
 %endif
 
 %description -n python-scalaris
-Python bindings and Python command line client for scalaris
+Python bindings and Python command line client for Scalaris
 %endif
 
 %if 0%{?with_python3}
 %package -n python3-scalaris
-Summary:    Python3-API and Python3-client for scalaris
+Summary:    Python3-API and Python3-client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python3
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -161,7 +185,7 @@ BuildArch:  noarch
 %endif
 
 %description -n python3-scalaris
-Python3 bindings and Python3 command line client for scalaris
+Python3 bindings and Python3 command line client for Scalaris
 %endif
 
 %prep
@@ -180,16 +204,22 @@ export PATH="%{_bindir}:$PATH"
     --sysconfdir=%{_sysconfdir} \
     --datadir=%{_datadir} \
     --includedir=%{_includedir} \
-    --libdir=%{_prefix}/lib \
+    --libdir=%{_libdir} \
     --libexecdir=%{_libexecdir} \
     --localstatedir=%{_localstatedir} \
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/scalaris \
+%if 0%{?with_cpp} == 0
+    --disable-cpp \
+%endif
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
+%if 0%{?with_cpp}
+make cpp
+%endif
 %if 0%{?with_python}
 make python
 %endif
@@ -216,6 +246,9 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python3}
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
+%if 0%{?with_cpp}
+make install-cpp DESTDIR=$RPM_BUILD_ROOT
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -232,6 +265,13 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/scalaris/java-api
 %{_sysconfdir}/init.d/scalaris-monitor
 %{_sysconfdir}/init.d/scalaris-first-monitor
+
+%if 0%{?with_cpp}
+%files -n libscalaris-devel
+%defattr(-,root,root,-)
+%{_includedir}/scalaris
+%{_libdir}/libscalaris.a
+%endif
 
 %files -n ruby-scalaris
 %defattr(-,root,root,-)

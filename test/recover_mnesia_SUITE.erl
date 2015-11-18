@@ -54,7 +54,7 @@ groups() ->
      {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
      {remove_node_repeater, [sequence, {repeat, repeater_num_executions()}], [remove_node]},
 
-     {repeater, [{repeat, 30}], [{group, make_ring_group_repeater},
+     {repeater, [{repeat, 10}], [{group, make_ring_group_repeater},
                                  {group, remove_node_group_repeater}]}
 
     ].
@@ -172,6 +172,10 @@ remove_node(_Config) ->
     lease_checker2:wait_for_clean_leases(500, 4),
     %% delete random node from ring
     RandomNode = comm:make_local(lease_checker:get_random_save_node()),
+    io:format("show prbr statistics for the ring~n"),
+    lease_checker2:get_kv_db(),
+    io:format("show prbr statistics for node to be killed~n"),
+    lease_checker2:get_kv_db(RandomNode),
     PidGroup = pid_groups:group_of(RandomNode),
     PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
                              element(2, db_util:parse_table_name(Table)) =:= PidGroup],
@@ -198,11 +202,12 @@ remove_node(_Config) ->
     true.
 
 check_data_integrity() ->
+    io:format("show prbr statistics for the ring~n"),
     lease_checker2:get_kv_db(),
     Pred = fun (Id) ->
                    case kv_on_cseq:read(integer_to_list(Id)) of
                        {ok, Id} -> true;
-                       _        -> false
+                       {fail, not_found} -> false
                    end
            end,
     Elements = lists:filter(Pred, lists:seq(1, 100)),

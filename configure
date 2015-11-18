@@ -722,6 +722,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_cpp
 with_boost
 with_boost_libdir
 with_boost_system
@@ -1368,11 +1369,9 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-toke          disable support for tokyo cabinet through toke
+  --disable-cpp           disable support for the C++ bindings
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
-  --disable-hanoidb       disable support for hanoidb
   --enable-hanoidb[=DIR]  enable support for hanoidb
-  --disable-erlang-js     disable support for erlang_js
   --enable-erlang-js[=DIR]
                           enable support for erlang_js
   --disable-runuser       disable support for runuser (use sudo instead)
@@ -2124,16 +2123,27 @@ fi
 
 ###########################################################
 #
-# fake automake scripts (config.guess, install-sh, ...)
+# check for C++ and boost
 #
 ###########################################################
 
-#              Homebrew                     Ubuntu
-for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
+ENABLE_CPP=
+# Check whether --enable-cpp was given.
+if test "${enable_cpp+set}" = set; then :
+  enableval=$enable_cpp; ENABLE_CPP=$enableval
+else
+  ENABLE_CPP=$enableval
+fi
+
+
+if test "x$ENABLE_CPP" != xno ; then
+  # fake automake scripts (config.guess, install-sh, ...)
+  #              Homebrew                     Ubuntu
+  for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
     if test -d $PREFIX; then
-       location=`find $PREFIX -type d -name "automake-?.??"`
-       if test "$location"; then
-           ac_aux_dir=
+      location=`find $PREFIX -type d -name "automake-?.??"`
+      if test "$location"; then
+        ac_aux_dir=
 for ac_dir in $location "$srcdir"/$location; do
   if test -f "$ac_dir/install-sh"; then
     ac_aux_dir=$ac_dir
@@ -2162,18 +2172,12 @@ ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
 ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
-           break
-       fi
+        break
+      fi
     fi
-done
-
-###########################################################
-#
-# check for C++ and boost
-#
-###########################################################
-
-ac_ext=cpp
+  done
+  # C++ and boost checks
+  ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
@@ -2861,7 +2865,7 @@ $as_echo "#define HAVE_CXX11 1" >>confdefs.h
 
   fi
 
-# Make sure we can run config.sub.
+  # Make sure we can run config.sub.
 $SHELL "$ac_aux_dir/config.sub" sun4 >/dev/null 2>&1 ||
   as_fn_error $? "cannot run $SHELL $ac_aux_dir/config.sub" "$LINENO" 5
 
@@ -2971,7 +2975,7 @@ fi
 
 
 if test "x$want_boost" = "xyes"; then
-    boost_lib_version_req=1.54
+    boost_lib_version_req=1.35
     boost_lib_version_req_shorten=`expr $boost_lib_version_req : '\([0-9]*\.[0-9]*\)'`
     boost_lib_version_req_major=`expr $boost_lib_version_req : '\([0-9]*\)'`
     boost_lib_version_req_minor=`expr $boost_lib_version_req : '[0-9]*\.\([0-9]*\)'`
@@ -3211,7 +3215,7 @@ $as_echo "#define HAVE_BOOST /**/" >>confdefs.h
 fi
 
 
-ac_ext=c
+  ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
@@ -4577,6 +4581,10 @@ fi
 	LDFLAGS="$LDFLAGS_SAVED"
 	fi
 
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: c++ bindings disabled ('make cpp' will fail)" >&5
+$as_echo "$as_me: c++ bindings disabled ('make cpp' will fail)" >&6;}
+fi
 
 
 
@@ -4589,11 +4597,6 @@ fi
 
 ENABLE_TOKE=
 TOKEPREFIX=
-# Check whether --enable-toke was given.
-if test "${enable_toke+set}" = set; then :
-  enableval=$enable_toke; TOKEPREFIX=no
-fi
-
 # Check whether --enable-toke was given.
 if test "${enable_toke+set}" = set; then :
   enableval=$enable_toke; ENABLE_TOKE=yes
@@ -4611,11 +4614,6 @@ ENABLE_HANOIDB=
 HANOIDBPREFIX=
 # Check whether --enable-hanoidb was given.
 if test "${enable_hanoidb+set}" = set; then :
-  enableval=$enable_hanoidb; HANOIDBPREFIX=no
-fi
-
-# Check whether --enable-hanoidb was given.
-if test "${enable_hanoidb+set}" = set; then :
   enableval=$enable_hanoidb; ENABLE_HANOIDB=yes
                HANOIDBPREFIX=$enableval
 fi
@@ -4629,11 +4627,6 @@ fi
 
 ENABLE_ERLANGJS=
 ERLANGJSPREFIX=
-# Check whether --enable-erlang-js was given.
-if test "${enable_erlang_js+set}" = set; then :
-  enableval=$enable_erlang_js; ERLANG_JSPREFIX=no
-fi
-
 # Check whether --enable-erlang-js was given.
 if test "${enable_erlang_js+set}" = set; then :
   enableval=$enable_erlang_js; ENABLE_ERLANGJS=yes

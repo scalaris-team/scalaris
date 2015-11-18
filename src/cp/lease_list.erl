@@ -43,8 +43,6 @@
 -export([empty/0]).
 -export([update_lease_in_dht_node_state/4]).
 -export([remove_lease_from_dht_node_state/4]).
-%-export([remove_lease_from_dht_node_state/3]).
-%-export([disable_lease_in_dht_node_state/2]).
 -export([make_lease_list/3]).
 -export([get_active_lease/1]).
 -export([get_passive_leases/1]).
@@ -210,7 +208,7 @@ remove_active_lease_from_dht_node_state(Lease, Id, State) ->
     Active = LeaseList#lease_list_t.active,
     case l_on_cseq:get_id(Active) of
         Id ->
-            restart_node(),
+            lease_recover:restart_node(),
             dht_node_state:set_lease_list(remove_next_round(Id, State),
                                           LeaseList#lease_list_t{active=empty});
         _ ->
@@ -237,21 +235,12 @@ remove_lease_from_dht_node_state(Lease, Id, State, Mode) ->
             remove_passive_lease_from_dht_node_state(Lease, Id, State);
         active ->
             log:log("you are trying to remove an active lease"),
-            restart_node(),
+            lease_recover:restart_node(),
             remove_active_lease_from_dht_node_state(Lease, Id, State);
         any ->
             remove_passive_lease_from_dht_node_state(Lease, Id,
               remove_active_lease_from_dht_node_state(Lease, Id, State))
     end.
-
-%-spec disable_lease_in_dht_node_state(l_on_cseq:lease_t(), dht_node_state:state()) ->
-%    dht_node_state:state().
-%disable_lease_in_dht_node_state(Lease, State) ->
-%    Id = l_on_cseq:get_id(Lease),
-%    LeaseList = dht_node_state:get(State, lease_list),
-%    NewActiveLeaseList = lists:keydelete(Id, 2, ActiveLeaseList),
-%    NewPassiveLeaseList = update_passive_lease(Lease, PassiveLeaseList),
-%    dht_node_state:set_lease_list(State, {NewActiveLeaseList, NewPassiveLeaseList}).
 
 -spec update_passive_lease(Lease::l_on_cseq:lease_t(), LeaseList::lease_list()) -> lease_list().
 update_passive_lease(Lease, LeaseList = #lease_list_t{passive=Passive}) ->
@@ -269,7 +258,7 @@ update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
     case Lease of
         empty ->
             log:log("you are trying to remove an active lease in update"),
-            restart_node(),
+            lease_recover:restart_node(),
             ok;
         _ ->
             ok
@@ -289,11 +278,3 @@ update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
             % @todo new lease should be newer than the old lease !!!
             LeaseList#lease_list_t{active=Lease}
     end.
-
--spec restart_node() -> no_return().
-restart_node() ->
-    NewNode = admin:add_node([]),
-    log:log("we are restarting ~p -> ~p~n", [comm:this(), NewNode]),
-    %% async. call!
-    service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
-    util:sleep_for_ever().

@@ -24,6 +24,7 @@
 -include("record_helpers.hrl").
 
 -export([recover/1]).
+-export([restart_node/0]).
 
 -spec recover(list(prbr:state())) -> lease_list:lease_list().
 recover(LeaseDBs) ->
@@ -32,6 +33,7 @@ recover(LeaseDBs) ->
                         L =/= prbr_bottom, %% ??
                         Id =:= l_on_cseq:get_id(L) %% is this the first replica?,
                   ],
+    log:log("leases:~n~p~n", [LocalLeases]),
     case length(LocalLeases) of
         0 ->
             log:log("recovered with zero leases (~p)~n", [comm:this()]),
@@ -45,7 +47,6 @@ recover(LeaseDBs) ->
         2 ->
             %% could be an ongoing split: finish operation
             wait_for_leases_to_timeout(LocalLeases),
-            log:log("leases: ~p~n", [LocalLeases]),
             {Active, Passive} = get_active_passive(LocalLeases),
             Me = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
             l_on_cseq:lease_takeover(Passive, Me),
@@ -53,7 +54,6 @@ recover(LeaseDBs) ->
         _ ->
             %% could be an ongoing split or an ongoing merge: finish operation
             wait_for_leases_to_timeout(LocalLeases),
-            log:log("leases: ~p~n", [LocalLeases]),
             ts = nyi, % ts: not yet implemented
             lease_list:empty()
     end.
@@ -92,8 +92,7 @@ get_active_passive(LocalLeases) ->
 
 -spec restart_node() -> no_return().
 restart_node() ->
-    NewNode = admin:add_node([]),
-    log:log("we are restarting ~p -> ~p~n", [comm:this(), NewNode]),
+    log:log("we are stopping ~p -> ~p~n", [comm:this()]),
     %% async. call!
     service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
     util:sleep_for_ever().
