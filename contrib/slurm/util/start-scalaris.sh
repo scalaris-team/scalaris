@@ -1,6 +1,11 @@
 #!/bin/bash
 
 function fix_known_hosts() {
+    # When using a local dir, the known hosts need to be written to the source dir,
+    # not the local dir. They are then synced to the local dir.
+    local old_etcdir=$ETCDIR
+    ETCDIR=$SCALARIS_SRC/bin
+
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE
     if [ -e $ETCDIR/scalaris.local.cfg ]
     then
@@ -33,6 +38,9 @@ function fix_known_hosts() {
     IP=`host $HEADNODE | cut -d ' ' -f 4`
     echo -n $IP | sed s/\\./\,/g >> $ETCDIR/scalaris.local.cfg
     echo "}, 14195, mgmt_server}}." >> $ETCDIR/scalaris.local.cfg
+
+    # restore old ETCDIR
+    ETCDIR=$old_etcdir
 }
 
 function kill_old_nodes() {
@@ -41,6 +49,10 @@ function kill_old_nodes() {
     if [[ $? -ne 0 ]]; then
         scancel $SLURM_JOBID
     fi
+}
+
+function sync_scalaris_dir() {
+    srun -N $SLURM_NNODES ./util/sync_scalaris_to_local_dir.sh
 }
 
 function start_servers() {
@@ -124,6 +136,7 @@ function start_collectl(){
 module load erlang/$ERLANG_VERSION
 
 fix_known_hosts
+[[ $SCALARIS_LOCAL = true ]] && sync_scalaris_dir
 kill_old_nodes
 start_watchdog
 [[ $COLLECTL = true ]] && start_collectl

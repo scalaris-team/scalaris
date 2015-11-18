@@ -1,5 +1,11 @@
 export ERLANG_VERSION=${ERLANG_VERSION:-R17B05}
-export SCALARIS_DIR=${SCALARIS_DIR:-$HOME/scalaris}
+export SCALARIS_LOCAL=${SCALARIS_LOCAL:-false}
+export SCALARIS_SRC=${SCALARIS_SRC:-$HOME/scalaris}
+if [[ $SCALARIS_LOCAL = true ]]; then
+    export SCALARIS_DIR="/local/$(whoami)/scalaris"
+else
+    export SCALARIS_DIR=${SCALARIS_DIR:-$HOME/scalaris}
+fi
 export VMS_PER_NODE=${VMS_PER_NODE:-1}
 export DHT_NODES_PER_VM=${DHT_NODES_PER_VM:-1}
 export ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS:-""}
@@ -49,6 +55,7 @@ function print_env() {
     echo "Current git-HEAD: $HEAD"
     echo "Slurm-JOBID: $SLURM_JOB_ID"
     echo "Number of DHT Nodes: $(($SLURM_JOB_NUM_NODES*$VMS_PER_NODE)) (Nodes: $SLURM_JOB_NUM_NODES; VMs per Node: $VMS_PER_NODE)"
+    echo "SCALARIS_DIR=$SCALARIS_DIR"
     if [[ -n $WD ]]; then
         printenv > $WD/slurm/slurm-${SLURM_JOB_ID}.env
     else
