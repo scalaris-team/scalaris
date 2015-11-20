@@ -8,7 +8,5 @@
 5b) remove src/*.hrl.in
 5c) reverse yaws-2e86da12b3.patch in <scalaris>/contrib/yaws:
     patch -Rp1 < ../yaws-2e86da12b3.patch
-6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
-%-define(HAVE_SENDFILE, true).
-7) delete <scalaris>/contrib/yaws/ebin/Makefile.in, <scalaris>/contrib/yaws/include/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.am
-8) that's it, go back to <scalaris>/ and run make clean && ./configure && make
+6) delete <scalaris>/contrib/yaws/ebin/Makefile.in, <scalaris>/contrib/yaws/include/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.am
+7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
