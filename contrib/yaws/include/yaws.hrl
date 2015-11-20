@@ -120,6 +120,18 @@
 -define(HONOR_CIPHER_ORDER, undefined).
 -endif.
 
+-ifdef(HAVE_SSL_CLIENT_RENEGOTIATION).
+-define(SSL_CLIENT_RENEGOTIATION, true).
+-else.
+-define(SSL_CLIENT_RENEGOTIATION, undefined).
+-endif.
+
+-ifdef(HAVE_SSL_LOG_ALERT).
+-define(SSL_LOG_ALERT, {log_alert, false}).
+-else.
+-define(SSL_LOG_ALERT, false).
+-endif.
+
 -record(ssl, {
           keyfile,
           certfile,
@@ -128,9 +140,11 @@
           depth = 1,
           password,
           cacertfile,
+          dhfile,
           ciphers,
           cachetimeout,
           secure_renegotiate = false,
+          client_renegotiation = ?SSL_CLIENT_RENEGOTIATION,
           honor_cipher_order = ?HONOR_CIPHER_ORDER,
           protocol_version
          }).

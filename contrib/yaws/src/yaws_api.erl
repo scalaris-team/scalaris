@@ -29,7 +29,7 @@
          set_content_type/1,
          htmlize/1, htmlize_char/1, f/2, fl/1]).
 -export([find_cookie_val/2, secs/0,
-         url_decode/1, url_decode_q_split/1,
+         url_decode/1, url_decode_q_split/1, url_decode_with_encoding/2,
          url_encode/1, parse_url/1, parse_url/2, format_url/1,
          format_partial_url/2]).
 -export([is_absolute_URI/1]).
@@ -40,7 +40,7 @@
          stream_chunk_end/1]).
 -export([stream_process_deliver/2, stream_process_deliver_chunk/2,
          stream_process_deliver_final_chunk/2, stream_process_end/2]).
--export([websocket_send/2]).
+-export([websocket_send/2, websocket_close/1, websocket_close/2]).
 -export([get_sslsocket/1]).
 -export([new_cookie_session/1, new_cookie_session/2, new_cookie_session/3,
          cookieval_to_opaque/1, request_url/1,
@@ -334,6 +334,7 @@ make_parse_line_reply(Key, Value, Rest) ->
 -record(mp_parse_state, {
           state,
           boundary_ctx,
+          boundary_len,
           hdr_end_ctx,
           old_data,
           data_type
@@ -351,7 +352,7 @@ parse_multipart(Data, St, Options) ->
 
 parse_multi(Data, #mp_parse_state{state=boundary}=ParseState, Acc) ->
     %% Find the beginning of the next part or the last boundary
-    case bm_find(Data, ParseState#mp_parse_state.boundary_ctx) of
+    case binary:match(Data, ParseState#mp_parse_state.boundary_ctx) of
         {Pos, Len} ->
             %% If Pos != 0, ignore data preceding the boundary
             case Data of
@@ -375,7 +376,7 @@ parse_multi(Data, #mp_parse_state{state=boundary}=ParseState, Acc) ->
             %% No boundary found, request more data. Here we keep just enough
             %% data to match on the boundary the next time
             DLen = size(Data),
-            BLen = bm_length(ParseState#mp_parse_state.boundary_ctx),
+            BLen = ParseState#mp_parse_state.boundary_len,
             SkipLen = erlang:max(DLen - BLen, 0),
             KeepLen = erlang:min(BLen, DLen),
             <<_:SkipLen/binary, OldData:KeepLen/binary>> = Data,
@@ -387,7 +388,7 @@ parse_multi(Data, #mp_parse_state{state=start_headers}=ParseState, Acc) ->
 
 parse_multi(Data, #mp_parse_state{state=body}=ParseState, Acc) ->
     %% Find the end of this part (i.e the next boundary)
-    case bm_find(Data, ParseState#mp_parse_state.boundary_ctx) of
+    case binary:match(Data, ParseState#mp_parse_state.boundary_ctx) of
         {Pos, _Len} ->
             %% Extract the body and keep the boundary
             <<Body:Pos/binary, Rest/binary>> = Data,
@@ -401,7 +402,7 @@ parse_multi(Data, #mp_parse_state{state=body}=ParseState, Acc) ->
         nomatch ->
             %% No boundary found, request more data.
             DLen = size(Data),
-            BLen = bm_length(ParseState#mp_parse_state.boundary_ctx),
+            BLen = ParseState#mp_parse_state.boundary_len,
             SkipLen = erlang:max(DLen - BLen, 0),
             KeepLen = erlang:min(BLen, DLen),
             <<PartData:SkipLen/binary, OldData:KeepLen/binary>> = Data,
@@ -421,15 +422,17 @@ parse_multi(Data, {cont, #mp_parse_state{old_data=OldData}=ParseState}, _) ->
 
 parse_multi(Data, Boundary, Options) ->
     %% Initial entry point
-    BoundaryCtx = bm_start("\r\n--"++Boundary),
-    HdrEndCtx   = bm_start("\r\n\r\n"),
-    DataType    = lists:foldl(fun(_,      list)      -> list;
-                                 (list,   _)         -> list;
-                                 (binary, undefined) -> binary;
-                                 (_,      Acc)       -> Acc
-                              end, undefined, Options),
+    FullBoundary = list_to_binary(["\r\n--", Boundary]),
+    BoundaryCtx  = binary:compile_pattern(FullBoundary),
+    HdrEndCtx    = binary:compile_pattern(<<"\r\n\r\n">>),
+    DataType     = lists:foldl(fun(_,      list)      -> list;
+				  (list,   _)         -> list;
+				  (binary, undefined) -> binary;
+				  (_,      Acc)       -> Acc
+			       end, undefined, Options),
     ParseState = #mp_parse_state{state        = boundary,
                                  boundary_ctx = BoundaryCtx,
+                                 boundary_len = size(FullBoundary),
                                  hdr_end_ctx  = HdrEndCtx,
                                  data_type    = DataType},
     parse_multi(<<"\r\n", Data/binary>>, ParseState, []).
@@ -438,7 +441,7 @@ parse_multi(Data, Boundary, Options) ->
 parse_multi(Data, #mp_parse_state{state=start_headers}=ParseState,
             Acc, [], []) ->
     %% Find the end of headers for this part
-    case bm_find(Data, ParseState#mp_parse_state.hdr_end_ctx) of
+    case binary:match(Data, ParseState#mp_parse_state.hdr_end_ctx) of
         {_Pos, _Len} ->
             %% We have all headers, we can parse it
             NParseState = ParseState#mp_parse_state{state=headers},
@@ -692,7 +695,7 @@ htmlize_l([X|Tail], Ack) when is_list(X) ->
 
 
 secs() ->
-    {MS, S, _} = now(),
+    {MS, S, _} = yaws:get_time_tuple(),
     (MS * 1000000) + S.
 
 cookie_option(secure) ->
@@ -778,10 +781,14 @@ find_cookie_val2(Name, [Cookie|Rest]) ->
         false                    -> find_cookie_val2(Name, Rest)
     end.
 
+
 %%
 url_decode(Path) ->
+    url_decode_with_encoding(Path, file:native_name_encoding()).
+
+url_decode_with_encoding(Path, Encoding) ->
     {DecPath, QS} = url_decode(Path, []),
-    DecPath1 = case file:native_name_encoding() of
+    DecPath1 = case Encoding of
                    latin1 ->
                        DecPath;
                    utf8 ->
@@ -1011,11 +1018,20 @@ stream_process_end(Sock, YawsPid) ->
     YawsPid ! endofstreamcontent.
 
 
-%% Pid must the the process in control of the websocket connection.
-websocket_send(Pid, {Type, Data}) ->
+%% Pid must be the process in control of the websocket connection.
+websocket_send(Pid, {Type, Data}) when is_pid(Pid) ->
     yaws_websockets:send(Pid, {Type, Data});
-websocket_send(Pid, #ws_frame{}=Frame) ->
+websocket_send(Pid, #ws_frame{}=Frame) when is_pid(Pid) ->
     yaws_websockets:send(Pid, Frame).
+
+websocket_close(#ws_state{}=WSState) ->
+    yaws_websockets:close(WSState, normal);
+websocket_close(Pid) when is_pid(Pid) ->
+    yaws_websockets:close(Pid, normal).
+websocket_close(#ws_state{}=WSState, Reason) ->
+    yaws_websockets:close(WSState, Reason);
+websocket_close(Pid, Reason) when is_pid(Pid) ->
+    yaws_websockets:close(Pid, Reason).
 
 
 %% returns {ok, SSL socket} if an SSL socket, undefined otherwise
@@ -2081,10 +2097,11 @@ call_cgi(Arg, Exefilename, Scriptfilename) ->
 %%
 %% {app_server_port, int()} : The TCP port number of the application server.
 %%
-%% {path_info, string()} : Override the patinfo string from Arg.
+%% {path_info, string()} : Override the pathinfo string from Arg.
 %%
-%% {extra_env, [{string(), string()}]} : Extra environment variables to be
-%% passed to the application server, as a list of name-value pairs.
+%% {extra_env, [{string()|binary(), string()|binary()}]} : Extra
+%% environment variables to be passed to the application server, as a list
+%% of name-value pairs.
 %%
 %% trace_protocol : Trace FastCGI protocol messages.
 %%
@@ -2710,39 +2727,3 @@ redirect_self(A) ->
                 scheme_str = SchemeStr,
                 port = Port,
                 port_str = PortStr}.
-
-%% Boyer-Moore searching, used for parsing multipart/form-data
-bm_start(Str) ->
-    Len = length(Str),
-    Tbl = bm_set_shifts(Str, Len),
-    {Tbl, list_to_binary(Str), lists:reverse(Str), Len}.
-
-bm_length({_,_,_,Len}) ->
-    Len.
-
-bm_find(Bin, SearchCtx) ->
-    bm_find(Bin, SearchCtx, 0).
-bm_find(Bin, {_, _, _, Len}, Pos) when size(Bin) < (Pos + Len) ->
-    nomatch;
-bm_find(Bin, {Tbl, BStr, RevStr, Len}=SearchCtx, Pos) ->
-    case Bin of
-        <<_:Pos/binary, BStr:Len/binary, _/binary>> ->
-            {Pos, Len};
-        <<_:Pos/binary, NoMatch:Len/binary, _/binary>> ->
-            RevNoMatch = lists:reverse(binary_to_list(NoMatch)),
-            Shift = bm_next_shift(RevNoMatch, RevStr, 0, Tbl),
-            bm_find(Bin, SearchCtx, Pos+Shift)
-    end.
-
-bm_set_shifts(Str, Len) ->
-    erlang:make_tuple(256, Len, bm_set_shifts(Str, 0, Len, [])).
-bm_set_shifts(_Str, Count, Len, Acc) when Count =:= Len-1 ->
-    lists:reverse(Acc);
-bm_set_shifts([H|T], Count, Len, Acc) ->
-    Shift = Len - Count - 1,
-    bm_set_shifts(T, Count+1, Len, [{H+1,Shift}|Acc]).
-
-bm_next_shift([H|T1], [H|T2], Comparisons, Tbl) ->
-    bm_next_shift(T1, T2, Comparisons+1, Tbl);
-bm_next_shift([H|_], _, Comparisons, Tbl) ->
-    erlang:max(element(H+1, Tbl) - Comparisons, 1).
