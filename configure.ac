@@ -439,6 +439,18 @@ AS_IF([test "${crypto_hash}" = "true"],
 
 ###########################################################
 #
+# check for erlang:timestamp/0 for yaws
+#
+###########################################################
+erlang_timestamp=`"${ERL}" -noshell -eval 'io:format("~p~n", [[erlang:function_exported(erlang,timestamp,0)]]), erlang:halt().' | tail -1`
+AS_IF([test "${erlang_timestamp}" = "true"],
+      [AC_MSG_NOTICE([erlang:timestamp() is available])],
+      [YAWS_OPTIONS="${YAWS_OPTIONS}, {d, 'HAVE_ERLANG_NOW'}"
+       YAWS_OPTIONS_DIALYZER="${YAWS_OPTIONS_DIALYZER} -DHAVE_ERLANG_NOW"
+       AC_MSG_NOTICE([erlang:timestamp() is not available])])
+
+###########################################################
+#
 # all defines together...
 #
 ###########################################################
