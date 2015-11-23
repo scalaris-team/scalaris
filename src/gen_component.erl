@@ -483,7 +483,7 @@ start_link(Module, Handler, Args, Options) ->
                                   [Module, Handler, Args, Options1, self()],
                                   [link | SpawnOpt]);
               false ->
-                  log:log("[ gen_component ] the module ~p does not provide its own start/4 function",
+                  log:log("[ gen_component ] the module ~p does not provide its own start/5 function (please include gen_component.hrl)",
                           [Module]),
                   spawn_opt(?MODULE, start,
                                   [Module, Handler, Args, Options1, self()],

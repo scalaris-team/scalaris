@@ -13,8 +13,8 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc change the first function in processes from gen_component:start/4
-%%      to ?MODULE:start/4
+%% @doc change the first function in processes from gen_component:start/5
+%%      to ?MODULE:start/5
 %% @end
 
 -export([start/5]).
