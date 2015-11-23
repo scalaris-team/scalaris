@@ -111,6 +111,8 @@
     {group_and_name_of, Pid::comm:mypid(), Source::comm:mypid()} |
     {'EXIT', pid(), Reason::any()}).
 
+-include("gen_component.hrl").
+
 %%% group creation
 %% @doc create a new group with a random name.
 -spec new() -> groupname().

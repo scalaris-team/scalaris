@@ -1,4 +1,4 @@
-%% @copyright 2007-2014 Zuse Institute Berlin
+%% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,6 +43,8 @@
 -include("scalaris.hrl").
 
 -export_type([job/0]).
+
+-include("gen_component.hrl").
 
 -type(mr_job() :: {mr_state:fun_term(),
                    Data::db_ets:db(), Interval::intervals:interval()}).

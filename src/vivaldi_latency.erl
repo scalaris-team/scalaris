@@ -1,4 +1,4 @@
-%  @copyright 2009-2014 Zuse Institute Berlin
+%  @copyright 2009-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@
 -export([on/2, init/1]).
 
 -export([measure_latency/3, check_config/0]).
+
+-include("gen_component.hrl").
 
 % state of the vivaldi loop
 -type state() ::

@@ -32,6 +32,8 @@
 
 -export([init/1, on/2]).
 
+-include("gen_component.hrl").
+
 % accepted messages of the mgmt_server process
 -type(message() ::
     {fd_notify, fd:event(), PID::comm:mypid(), Reason::fd:reason()} |

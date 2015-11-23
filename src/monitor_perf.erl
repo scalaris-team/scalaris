@@ -29,6 +29,8 @@
 % monitor process functions
 -export([start_link/1, init/1, on/2, check_config/0]).
 
+-include("gen_component.hrl").
+
 -record(state,
         {id        = ?required(state, id)        :: uid:global_uid(),
          perf_rr   = ?required(state, perf_rr)   :: rrd:rrd(),

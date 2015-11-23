@@ -59,6 +59,7 @@
 
 -type rtms() :: [rtm()].
 
+-include("gen_component.hrl").
 -include("tx_item_state.hrl").
 -include("tx_state.hrl").
 

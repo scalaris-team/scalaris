@@ -1,4 +1,4 @@
-%  @copyright 2014 Zuse Institute Berlin
+%  @copyright 2014-2015 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -93,6 +93,8 @@
 
 %% options for sending messages directly to the lb_active process
 -define(lb, [{group_member, ?MODULE}]).
+
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Initialization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -1828,6 +1828,15 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
                     {error, ?F("Expect existing file at line ~w", [Lno])}
             end;
 
+        ["dhfile", '=', Val] ->
+            case is_file(Val) of
+                true ->
+                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{dhfile = Val}},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect existing file at line ~w", [Lno])}
+            end;
+
         ["verify", '=', Val0] ->
             Val = try
                       list_to_integer(Val0)
@@ -1891,6 +1900,24 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
+        ["client_renegotiation", '=', Bool] ->
+            %% below, ignore dialyzer warning:
+            case ?SSL_CLIENT_RENEGOTIATION of
+                true ->
+                    case is_bool(Bool) of
+                        {true, Val} ->
+                            C1 = C#sconf{ssl=(C#sconf.ssl)#ssl{client_renegotiation=Val}},
+                            fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+                        false ->
+                            {error, ?F("Expect true|false at line ~w", [Lno])}
+                    end;
+                _ ->
+                    error_logger:info_msg("Warning, client_renegotiation SSL "
+                                          "option is not supported "
+                                          "at line ~w~n", [Lno]),
+                    fload(FD, ssl, GC, C, Lno+1, ?NEXTLINE)
+            end;
+
         ["honor_cipher_order", '=', Bool] ->
             %% below, ignore dialyzer warning:
             case ?HONOR_CIPHER_ORDER of
@@ -1914,7 +1941,6 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
         ["protocol_version", '=' | Vsns0] ->
             try
                 Vsns = [list_to_existing_atom(V) || V <- Vsns0, not is_atom(V)],
-                ok = application:set_env(ssl, protocol_version, Vsns),
                 C1 = C#sconf{
                        ssl=(C#sconf.ssl)#ssl{protocol_version=Vsns}
                       },
@@ -2584,9 +2610,11 @@ parse_revproxy_url(Prefix, Url) ->
     end.
 
 
-parse_expires(['<', MimeType, ',' , Expire, '>' | Tail], Ack) ->
-    {Type, Value} =
+parse_expires(['<', MimeType, ',' , Expire, '>' | Tail], Acc) ->
+    {EType, Value} =
         case string:tokens(Expire, "+") of
+            ["always"] ->
+                {always, 0};
             [Secs] ->
                 {access, (catch list_to_integer(Secs))};
             ["access", Secs] ->
@@ -2597,16 +2625,27 @@ parse_expires(['<', MimeType, ',' , Expire, '>' | Tail], Ack) ->
                 {error, "Bad expires syntax"}
         end,
     if
-        Type =:= error ->
-            {Type, Value};
+        EType =:= error ->
+            {EType, Value};
         not is_integer(Value) ->
             {error, "Bad expires syntax"};
         true ->
-            E = {MimeType, Type, Value},
-            parse_expires(Tail, [E |Ack])
+            case parse_mime_type(MimeType) of
+                {ok, "*", "*"} ->
+                    E = {all, EType, Value},
+                    parse_expires(Tail, [E |Acc]);
+                {ok, Type, "*"} ->
+                    E = {{Type, all}, EType, Value},
+                    parse_expires(Tail, [E |Acc]);
+                {ok, _Type, _SubType} ->
+                    E = {MimeType, EType, Value},
+                    parse_expires(Tail, [E |Acc]);
+                Error ->
+                    Error
+            end
     end;
-parse_expires([], Ack)->
-    {ok, Ack}.
+parse_expires([], Acc)->
+    {ok, Acc}.
 
 
 parse_phpmod(['<', "cgi", ',', DefaultPhpPath, '>'], DefaultPhpPath) ->
@@ -2647,25 +2686,34 @@ parse_compressible_mime_types(_, all) ->
     {ok, all};
 parse_compressible_mime_types(["all"|_], _Acc) ->
     {ok, all};
-parse_compressible_mime_types(["*/*"|_], _Acc) ->
-    {ok, all};
 parse_compressible_mime_types(["defaults"|Rest], Acc) ->
     parse_compressible_mime_types(Rest, ?DEFAULT_COMPRESSIBLE_MIME_TYPES++Acc);
 parse_compressible_mime_types([',' | Rest], Acc) ->
     parse_compressible_mime_types(Rest, Acc);
 parse_compressible_mime_types([MimeType | Rest], Acc) ->
-    Res = re:run(MimeType, "^([-\\w\+]+)/([-\\w\+\.]+|\\*)$",
-                 [{capture, all_but_first, list}]),
-    case Res of
-        {match, [Type,"*"]} ->
+    case parse_mime_type(MimeType) of
+        {ok, "*", "*"} ->
+            {ok, all};
+        {ok, Type, "*"} ->
             parse_compressible_mime_types(Rest, [{Type, all}|Acc]);
-        {match, [Type,SubType]} ->
+        {ok, Type, SubType} ->
             parse_compressible_mime_types(Rest, [{Type, SubType}|Acc]);
-        nomatch ->
-            {error, "Invalid MimeType"}
+        Error ->
+            Error
     end;
 parse_compressible_mime_types([], Acc) ->
     {ok, Acc}.
+
+
+parse_mime_type(MimeType) ->
+    Res = re:run(MimeType, "^([-\\w\+]+|\\*)/([-\\w\+\.]+|\\*)$",
+                 [{capture, all_but_first, list}]),
+    case Res of
+        {match, [Type,SubType]} ->
+            {ok, Type, SubType};
+        nomatch ->
+            {error, "Invalid MimeType"}
+    end.
 
 
 parse_index_files([]) ->

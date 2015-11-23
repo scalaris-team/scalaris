@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@
 -export([start_link/1]).
 -export([init/1, on_active/2, on_inactive/2,
          activate/0, deactivate/0]).
+
+-include("gen_component.hrl").
 
 -type(message() ::
     {register_trigger} |

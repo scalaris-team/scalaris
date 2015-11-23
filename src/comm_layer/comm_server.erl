@@ -38,6 +38,8 @@
 -export([unregister_connection/2, create_connection/4,
          set_local_address/2, get_local_address_port/0]).
 
+-include("gen_component.hrl").
+
 -type tcp_port() :: 0..65535.
 -type message() ::
     {create_connection, Address::inet:ip_address(), Port::tcp_port(), Socket::inet:socket() | notconnected, Channel::comm:channel(), Client::pid()} |

@@ -43,6 +43,7 @@
 % feeder for tester
 -export([extract_from_tlog_feeder/4]).
 
+-include("gen_component.hrl").
 -include("rdht_tx_read_state.hrl").
 
 %% reply messages a client should expect (when calling asynch work_phase/3)

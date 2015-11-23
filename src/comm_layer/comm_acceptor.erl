@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@
 -vsn('$Id$').
 
 -export([start_link/1, init/2, check_config/0]).
+
+-include("gen_component.hrl").
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(GroupName) ->

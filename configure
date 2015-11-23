@@ -7004,6 +7004,22 @@ fi
 
 ###########################################################
 #
+# check for erlang:timestamp/0 for yaws
+#
+###########################################################
+erlang_timestamp=`"${ERL}" -noshell -eval 'io:format("~p~n", [erlang:function_exported(erlang,timestamp,0)]), erlang:halt().' | tail -1`
+if test "${erlang_timestamp}" = "true"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() is available" >&5
+$as_echo "$as_me: erlang:timestamp() is available" >&6;}
+else
+  YAWS_OPTIONS="${YAWS_OPTIONS}, {d, 'HAVE_ERLANG_NOW'}"
+       YAWS_OPTIONS_DIALYZER="${YAWS_OPTIONS_DIALYZER} -DHAVE_ERLANG_NOW"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() is not available" >&5
+$as_echo "$as_me: erlang:timestamp() is not available" >&6;}
+fi
+
+###########################################################
+#
 # all defines together...
 #
 ###########################################################

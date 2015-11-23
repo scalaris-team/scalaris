@@ -22,7 +22,7 @@
 
 -behaviour(gen_component).
 
--export([dump_node_states/0, kill_nodes/1, kill_nodes_by_name/1, register_dht_node/1, 
+-export([dump_node_states/0, kill_nodes/1, kill_nodes_by_name/1, register_dht_node/1,
          deregister_dht_node/1, is_scalaris_ready/0]).
 
 -export([start_link/1, init/1, on/2]).
@@ -41,6 +41,7 @@
     {hi}.
 
 -include("scalaris.hrl").
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API

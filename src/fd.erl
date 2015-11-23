@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@
 
 %% debug purposes
 -export([subscriptions/0]).
+
+-include("gen_component.hrl").
 
 -type reason() :: 'DOWN' | noconnection | term().
 -type event() :: crash | jump | leave.

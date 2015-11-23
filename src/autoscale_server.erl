@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@
 
 -export([start_link/1, init/1, on/2]).
 -export([check_config/0, log/1, log/2]).
+
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % types

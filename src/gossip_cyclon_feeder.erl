@@ -34,6 +34,8 @@
 
 -export([start_link/1, on/2, init/1]).
 
+-include("gen_component.hrl").
+
 -record(state, {
           local_nodes = ?required(state, local_nodes) :: [pid()],
           remote_nodes = ?required(state, remote_nodes) :: [comm:mypid_plain()],

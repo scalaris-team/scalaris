@@ -32,6 +32,8 @@
 
 -export_type([message/0]).
 
+-include("gen_component.hrl").
+
 -type(database_message() ::
       {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |

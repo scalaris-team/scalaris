@@ -1,13 +1,12 @@
 1) download new version
 2) extract somewhere else
 3) copy ebin/, include/, src/, LICENSE, vsn.mk to <scalaris>/contrib/yaws
-4) ./configure && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
+4) autoreconf -fi && ./configure --disable-pam && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
 5) copy src/mime_types.erl, src/yaws_appdeps.hrl, src/yaws_charset.hrl and
    src/yaws_generated.erl to <scalaris>/contrib/yaws/src
-5a) fix absolute include path in mime_types.erl to yaws.hrl
+5a) fix absolute include path in mime_types.erl to "yaws.hrl"
 5b) remove src/*.hrl.in
 5c) reverse yaws-2e86da12b3.patch in <scalaris>/contrib/yaws:
     patch -Rp1 < ../yaws-2e86da12b3.patch
-6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
-%-define(HAVE_SENDFILE, true).
+6) delete <scalaris>/contrib/yaws/ebin/Makefile.in, <scalaris>/contrib/yaws/include/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.am
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make

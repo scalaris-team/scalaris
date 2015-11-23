@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@
 -include("scalaris.hrl").
 
 -export([run_threads/2]).
+
+-include("gen_component.hrl").
 
 -record(state,
         {load_pid             :: pid() | ok,

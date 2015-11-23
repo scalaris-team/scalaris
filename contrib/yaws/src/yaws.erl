@@ -64,9 +64,12 @@
          ssl_depth/1, ssl_depth/2,
          ssl_password/1, ssl_password/2,
          ssl_cacertfile/1, ssl_cacertfile/2,
+         ssl_dhfile/1, ssl_dhfile/2,
          ssl_ciphers/1, ssl_ciphers/2,
          ssl_cachetimeout/1, ssl_cachetimeout/2,
          ssl_secure_renegotiate/1, ssl_secure_renegotiate/2,
+         ssl_client_renegotiation/1, ssl_client_renegotiation/2,
+         ssl_protocol_version/1, ssl_protocol_version/2,
          ssl_honor_cipher_order/1, ssl_honor_cipher_order/2]).
 
 -export([new_deflate/0,
@@ -93,7 +96,7 @@
          printversion/0, strip_spaces/1, strip_spaces/2,
          month/1, mk2/1, home/0, arg_rewrite/1, to_lowerchar/1, to_lower/1,
          funreverse/2, is_prefix/2, split_sep/2, join_sep/2, accepts_gzip/2,
-         upto_char/2, deepmap/2, ticker/2, ticker/3,
+         upto_char/2, deepmap/2, ticker/2, ticker/3, unique_triple/0, get_time_tuple/0,
          parse_qvalue/1, parse_auth/1]).
 
 -export([outh_set_status_code/1,
@@ -210,7 +213,11 @@ add_server(DocRoot, SL) when is_list(DocRoot),is_list(SL) ->
     yaws_config:add_sconf(SC1).
 
 create_gconf(GL, Id) when is_list(GL) ->
-    setup_gconf(GL, yaws_config:make_default_gconf(false, Id)).
+    Debug = case application:get_env(yaws, debug) of
+                undefined -> false;
+                {ok, D}   -> D
+            end,
+    setup_gconf(GL, yaws_config:make_default_gconf(Debug, Id)).
 
 create_sconf(DocRoot, SL) when is_list(DocRoot), is_list(SL) ->
     SC = yaws_config:make_default_sconf(DocRoot, lkup(port, SL, undefined)),
@@ -357,9 +364,12 @@ ssl_fail_if_no_peer_cert(#ssl{fail_if_no_peer_cert = X}) -> X.
 ssl_depth               (#ssl{depth                = X}) -> X.
 ssl_password            (#ssl{password             = X}) -> X.
 ssl_cacertfile          (#ssl{cacertfile           = X}) -> X.
+ssl_dhfile              (#ssl{dhfile               = X}) -> X.
 ssl_ciphers             (#ssl{ciphers              = X}) -> X.
 ssl_cachetimeout        (#ssl{cachetimeout         = X}) -> X.
 ssl_secure_renegotiate  (#ssl{secure_renegotiate   = X}) -> X.
+ssl_client_renegotiation(#ssl{client_renegotiation = X}) -> X.
+ssl_protocol_version    (#ssl{protocol_version     = X}) -> X.
 ssl_honor_cipher_order  (#ssl{honor_cipher_order   = X}) -> X.
 
 ssl_keyfile             (S, File)    -> S#ssl{keyfile              = File}.
@@ -369,9 +379,11 @@ ssl_fail_if_no_peer_cert(S, Bool)    -> S#ssl{fail_if_no_peer_cert = Bool}.
 ssl_depth               (S, Depth)   -> S#ssl{depth                = Depth}.
 ssl_password            (S, Pass)    -> S#ssl{password             = Pass}.
 ssl_cacertfile          (S, File)    -> S#ssl{cacertfile           = File}.
+ssl_dhfile              (S, File)    -> S#ssl{dhfile               = File}.
 ssl_ciphers             (S, Ciphers) -> S#ssl{ciphers              = Ciphers}.
 ssl_cachetimeout        (S, Timeout) -> S#ssl{cachetimeout         = Timeout}.
 ssl_secure_renegotiate  (S, Bool)    -> S#ssl{secure_renegotiate   = Bool}.
+ssl_protocol_version    (S, Vsns)    -> S#ssl{protocol_version     = Vsns}.
 
 -ifdef(HAVE_SSL_HONOR_CIPHER_ORDER).
 ssl_honor_cipher_order  (S, Bool)    -> S#ssl{honor_cipher_order   = Bool}.
@@ -379,26 +391,19 @@ ssl_honor_cipher_order  (S, Bool)    -> S#ssl{honor_cipher_order   = Bool}.
 ssl_honor_cipher_order  (S, _)       -> S.
 -endif.
 
+-ifdef(HAVE_SSL_CLIENT_RENEGOTIATION).
+ssl_client_renegotiation(S, Bool)    -> S#ssl{client_renegotiation = Bool}.
+-else.
+ssl_client_renegotiation(S, _)       -> S.
+-endif.
+
 setup_ssl(SL, DefaultSSL) ->
     case lkup(ssl, SL, undefined) of
         undefined ->
             DefaultSSL;
         SSL when is_record(SSL, ssl) ->
-            #ssl{protocol_version=ProtocolVersion} = SSL,
-            case ProtocolVersion of
-                undefined -> ok;
-                _ ->
-                    ok = application:set_env(ssl, protocol_version, ProtocolVersion)
-            end,
             SSL;
         SSLProps when is_list(SSLProps) ->
-            ProtocolVersion = case lkup(protocol_version, SSLProps, undefined) of
-                                  undefined -> undefined;
-                                  PVList ->
-                                      ok = application:set_env(ssl, protocol_version,
-                                                               PVList),
-                                      PVList
-                              end,
             SSL = #ssl{},
             #ssl{keyfile              = lkup(keyfile, SSLProps,
                                              SSL#ssl.keyfile),
@@ -412,15 +417,20 @@ setup_ssl(SL, DefaultSSL) ->
                                              SSL#ssl.password),
                  cacertfile           = lkup(cacertfile, SSLProps,
                                              SSL#ssl.cacertfile),
+                 dhfile               = lkup(dhfile, SSLProps,
+                                             SSL#ssl.dhfile),
                  ciphers              = lkup(ciphers, SSLProps,
                                              SSL#ssl.ciphers),
                  cachetimeout         = lkup(cachetimeout, SSLProps,
                                              SSL#ssl.cachetimeout),
                  secure_renegotiate   = lkup(secure_renegotiate, SSLProps,
                                              SSL#ssl.secure_renegotiate),
+                 client_renegotiation = lkup(client_renegotiation, SSLProps,
+                                             SSL#ssl.client_renegotiation),
                  honor_cipher_order   = lkup(honor_cipher_order, SSLProps,
                                              SSL#ssl.honor_cipher_order),
-                 protocol_version     = ProtocolVersion}
+                 protocol_version     = lkup(protocol_version, SSLProps,
+                                             undefined)}
     end.
 
 
@@ -1067,6 +1077,24 @@ join_sep([], Sep) when is_list(Sep) ->
 join_sep([H|T], Sep) ->
     H ++ lists:append([Sep ++ X || X <- T]).
 
+%% Provide a unique 3-tuple of positive integers.
+-ifdef(HAVE_ERLANG_NOW).
+unique_triple() -> now().
+-else.
+unique_triple() ->
+    {erlang:unique_integer([positive]),
+     erlang:unique_integer([positive]),
+     erlang:unique_integer([positive])}.
+-endif.
+
+%% Get a current time 3-tuple.
+-ifdef(HAVE_ERLANG_NOW).
+get_time_tuple() ->
+    now().
+-else.
+get_time_tuple() ->
+    erlang:timestamp().
+-endif.
 
 %% header parsing
 parse_qval(S) ->
@@ -1514,19 +1542,47 @@ make_last_modified_header(FI) ->
     ["Last-Modified: ", local_time_as_gmt_string(Then), "\r\n"].
 
 
-make_expires_header(MimeType0, FI) ->
+make_expires_header(all, FI) ->
+    SC = get(sc),
+    case lists:keyfind(all, 1, SC#sconf.expires) of
+        {_, EType, TTL} -> make_expires_header(EType, TTL, FI);
+        false           -> {undefined, undefined}
+    end;
+make_expires_header({Type,all}, FI) ->
+    SC = get(sc),
+    case lists:keyfind({Type,all}, 1, SC#sconf.expires) of
+        {_, EType, TTL} -> make_expires_header(EType, TTL, FI);
+        false           -> make_expires_header(all, FI)
+    end;
+make_expires_header({Type,SubType}, FI) ->
+    SC = get(sc),
+    case lists:keyfind({Type,SubType}, 1, SC#sconf.expires) of
+        {_, EType, TTL} -> make_expires_header(EType, TTL, FI);
+        false           -> make_expires_header({Type,all}, FI)
+    end;
+make_expires_header(MT0, FI) ->
     SC = get(sc),
     %% Use split_sep to remove charset
-    case yaws:split_sep(MimeType0, $;) of
+    case yaws:split_sep(MT0, $;) of
         [] -> {undefined, undefined};
-        [MimeType1|_] ->
-            case lists:keyfind(MimeType1, 1, SC#sconf.expires) of
-                {MimeType1, Type, TTL} -> make_expires_header(Type, TTL, FI);
-                false                  -> {undefined, undefined}
+        [MT1|_] ->
+            case lists:keyfind(MT1, 1, SC#sconf.expires) of
+                {_, EType, TTL} ->
+                    make_expires_header(EType, TTL, FI);
+                false ->
+                    case split_sep(MT1, $/) of
+                        [Type, SubType] ->
+                            make_expires_header({Type,SubType}, FI);
+                        false ->
+                            make_expires_header(all, FI)
+                    end
             end
     end.
 
 
+make_expires_header(always, _TTL, _FI) ->
+    {["Expires: ", "Thu, 01 Jan 1970 00:00:00 GMT\r\n"],
+     ["Cache-Control: ", "private, no-cache, no-store, must-revalidate, max-age=0, proxy-revalidate, s-maxage=0\r\n"]};
 make_expires_header(access, TTL, _FI) ->
     Secs = calendar:datetime_to_gregorian_seconds(erlang:universaltime()),
     ExpireTime = calendar:gregorian_seconds_to_datetime(Secs+TTL),
@@ -1551,20 +1607,9 @@ make_etag_header(FI) ->
     ["Etag: ", ETag, "\r\n"].
 
 make_etag(FI) ->
-    {{Y,M,D}, {H,Min, S}}  = FI#file_info.mtime,
-    Inode = FI#file_info.inode,
-    pack_bin(<<0:6,(Y band 2#11111111):8,M:4,D:5,H:5,Min:6,S:6,Inode:32>>).
-
-pack_bin(<<_:6,A:6,B:6,C:6,D:6,E:6,F:6,G:6,H:6,I:6,J:6,K:6>>) ->
-    [$", pc(A),pc(B),pc(C),pc(D),pc(E),pc(F),pc(G),pc(H),pc(I),pc(J),pc(K), $"].
-
-
-%% Like Base64 for no particular reason.
-pc(X) when X >= 0,  X < 26 -> X + $A;
-pc(X) when X >= 26, X < 52 -> X - 26 + $a;
-pc(X) when X >= 52, X < 62 -> X - 52 + $0;
-pc(62)                     -> $+;
-pc(63)                     -> $/.
+    Stamp = {FI#file_info.size, FI#file_info.mtime},
+    ETag = integer_to_list(erlang:phash2(Stamp, 16#100000000), 19),
+    lists:flatten([$", ETag, $"]).
 
 
 make_content_type_header(no_content_type) ->
@@ -1711,21 +1756,24 @@ outh_serialize() ->
     %% Add 'Accept-Encoding' in the 'Vary:' header if the compression is enabled
     %% or if the response is compressed _AND_ if the response has a non-empty
     %% body.
-    SC=get(sc),
-    Vary = case (?sc_has_deflate(SC) orelse H#outh.encoding == deflate) of
-               true when H#outh.contlen /= undefined, H#outh.contlen /= 0;
-                         H#outh.act_contlen /= undefined,
-                         H#outh.act_contlen /= 0 ->
-                   Fields = outh_get_vary_fields(),
-                   Fun    = fun("*") -> true;
-                               (F)   -> (to_lower(F) == "accept-encoding")
-                            end,
-                   case lists:any(Fun, Fields) of
-                       true  -> H#outh.vary;
-                       false -> make_vary_header(["Accept-Encoding"|Fields])
-                   end;
-               _ ->
-                   H#outh.vary
+    Vary = case get(sc) of
+               undefined -> undefined;
+               SC ->
+                   case (?sc_has_deflate(SC) orelse H#outh.encoding == deflate) of
+                       true when H#outh.contlen /= undefined, H#outh.contlen /= 0;
+                                 H#outh.act_contlen /= undefined,
+                                 H#outh.act_contlen /= 0 ->
+                           Fields = outh_get_vary_fields(),
+                           Fun    = fun("*") -> true;
+                                       (F)   -> (to_lower(F) == "accept-encoding")
+                                    end,
+                           case lists:any(Fun, Fields) of
+                               true  -> H#outh.vary;
+                               false -> make_vary_header(["Accept-Encoding"|Fields])
+                           end;
+                       _ ->
+                           H#outh.vary
+                   end
            end,
 
     Headers = [noundef(H#outh.connection),
@@ -2186,15 +2234,28 @@ cli_recv_trace(Trace, Res) ->
 
 
 gen_tcp_send(S, Data) ->
-    Res = case (get(sc))#sconf.ssl of
-              undefined -> gen_tcp:send(S, Data);
-              _SSL      -> ssl:send(S, Data)
+    SC = get(sc),
+    Res = case SC of
+              undefined ->
+                  case catch ssl:sockname(S) of
+                      {ok, _} -> ssl:send(S, Data);
+                      _ -> gen_tcp:send(S, Data)
+                  end;
+              _ ->
+                  case SC#sconf.ssl of
+                      undefined -> gen_tcp:send(S, Data);
+                      _SSL      -> ssl:send(S, Data)
+                  end
           end,
     case ?gc_has_debug((get(gc))) of
         false ->
             case Res of
                 ok ->
-                    yaws_stats:sent(iolist_size(Data)),
+                    case SC of
+                        undefined -> ok;
+                        _ ->
+                            yaws_stats:sent(iolist_size(Data))
+                    end,
                     ok;
                 _Err ->
                     exit(normal)   %% keep quiet
@@ -2202,7 +2263,11 @@ gen_tcp_send(S, Data) ->
         true ->
             case Res of
                 ok ->
-                    yaws_stats:sent(iolist_size(Data)),
+                    case SC of
+                        undefined -> ok;
+                        _ ->
+                            yaws_stats:sent(iolist_size(Data))
+                    end,
                     ?Debug("Sent ~p~n", [yaws_debug:nobin(Data)]),
                     ok;
                 Err ->
@@ -2289,8 +2354,15 @@ http_collect_headers(CliSock, Req, H, SSL, Count) when Count < 1000 ->
     Recv = do_recv(CliSock, 0, SSL),
     case Recv of
         {ok, {http_header,  _Num, 'Host', _, Host}} ->
-            http_collect_headers(CliSock, Req, H#headers{host = Host},
-                                 SSL, Count+1);
+            NewHostH = case H#headers.host of
+                           undefined ->
+                               H#headers{host = Host};
+                           {Hosts} ->
+                               H#headers{host = {[Host | Hosts]}};
+                           CurrentHost ->
+                               H#headers{host = {[Host, CurrentHost]}}
+                       end,
+            http_collect_headers(CliSock, Req, NewHostH, SSL, Count+1);
         {ok, {http_header, _Num, 'Connection', _, Conn}} ->
             http_collect_headers(CliSock, Req,
                                  H#headers{connection = Conn},SSL, Count+1);
@@ -2585,7 +2657,7 @@ mktemp(Template, Ret) ->
     mktemp(Tdir, Template, Ret, 0, Max, "").
 
 mktemp(Dir, Template, Ret, I, Max, Suffix) when I < Max ->
-    {X,Y,Z}  = now(),
+    {X,Y,Z} = unique_triple(),
     PostFix = erlang:integer_to_list(X) ++ "-" ++
         erlang:integer_to_list(Y) ++ "-" ++
         erlang:integer_to_list(Z),

@@ -1,4 +1,4 @@
-% @copyright 2009-2014 Zuse Institute Berlin
+% @copyright 2009-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@
 -export([start_link/2]).
 -export([on/2, init/1]).
 
+-include("gen_component.hrl").
 -include("proposer_state.hrl").
 
 -type state() :: atom(). % TableName

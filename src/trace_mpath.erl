@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin
+% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -110,6 +110,8 @@
 
 -export_type([trace/0, trace_event/0]).
 -export_type([pidinfo/0, logger/0, passed_state/0]).
+
+-include("gen_component.hrl").
 
 -spec start() -> ok.
 start() -> start(default).
