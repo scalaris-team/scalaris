@@ -1,4 +1,4 @@
-%  @copyright 2012 Zuse Institute Berlin
+%  @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@
 -type message() :: init_message() | result_message().
 
 -export_type([result_message/0]).
+
+-include("gen_component.hrl").
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.

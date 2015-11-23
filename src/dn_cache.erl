@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,6 +28,9 @@
 -export([init/1, on/2]).
 
 -export([add_zombie_candidate/1, subscribe/0, unsubscribe/0]).
+
+-include("gen_component.hrl").
+
 -type(message() ::
     {trigger} |
     {trigger_reply, {pong, PidName::pid_groups:pidname() | undefined}, node:node_type()} |

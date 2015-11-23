@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -50,6 +50,8 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_link/2, check_config/0]).
+
+-include("gen_component.hrl").
 
 -type(rempid() :: %% locally existing subscriptions for remote pids
         {

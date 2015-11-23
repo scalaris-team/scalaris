@@ -27,6 +27,8 @@
 -export([start_link/1, init/1, on/2,
          check_config/0]).
 
+-include("gen_component.hrl").
+
 -define(TRACE(X,Y), ok).
 %define(TRACE(X,Y), io:format(X, Y)).
 

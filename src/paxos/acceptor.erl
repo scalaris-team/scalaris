@@ -1,4 +1,4 @@
-% @copyright 2009-2014 Zuse Institute Berlin,
+% @copyright 2009-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@
 -export([on/2, init/1]).
 -export([check_config/0]).
 
+-include("gen_component.hrl").
 -include("acceptor_state.hrl").
 
 -compile({inline, [initialize/4, inform_learner/3]}).

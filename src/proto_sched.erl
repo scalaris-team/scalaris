@@ -187,6 +187,8 @@
          :: pid() | none
         }).
 
+-include("gen_component.hrl").
+
 -type state_t() :: #state{}.
 -type state()   :: [{trace_id(), state_t()}].
 

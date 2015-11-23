@@ -1,4 +1,4 @@
-% @copyright 2011-2014 Zuse Institute Berlin
+% @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -212,6 +212,8 @@
     {fd_notify, fd:event(), DeadPid::comm:mypid(), Reason::fd:reason()} |
     {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}
     .
+
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling

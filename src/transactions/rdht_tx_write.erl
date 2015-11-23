@@ -1,4 +1,4 @@
-%% @copyright 2009-2013 Zuse Institute Berlin
+%% @copyright 2009-2015 Zuse Institute Berlin
 %%                 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +41,8 @@
 -export([check_config/0]).
 
 -export_type([req_id/0]).
+
+-include("gen_component.hrl").
 
 -type req_id() :: {rdht_tx:req_id(), pid(), any()}.
 

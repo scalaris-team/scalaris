@@ -45,6 +45,8 @@
 %% functions for gen_component module and supervisor callbacks
 -export([start_link/1, on/2, init/1]).
 
+-include("gen_component.hrl").
+
 % accepted messages of the msg_delay process
 -type message() ::
     {msg_delay_req, Seconds::pos_integer(), Dest::comm:erl_local_pid(),

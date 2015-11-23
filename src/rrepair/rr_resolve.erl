@@ -1,4 +1,4 @@
-% @copyright 2011-2014 Zuse Institute Berlin
+% @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -102,6 +102,8 @@
     {get_state_response, intervals:interval()} |
     {update_key_entries_ack, [{db_entry:entry_ex(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}.
+
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug

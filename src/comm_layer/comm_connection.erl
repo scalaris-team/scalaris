@@ -59,6 +59,8 @@
 
 -export([start_link/6, init/1, on/2]).
 
+-include("gen_component.hrl").
+
 -type msg_queue() :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
                       OQueue::[comm:send_options()]}.
 -type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),

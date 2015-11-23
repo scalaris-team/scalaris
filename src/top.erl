@@ -30,6 +30,8 @@
 -export([top/0]).
 -export([trace_fwd/2]).
 
+-include("gen_component.hrl").
+
 -type state() :: { pdb:tableid(),
                    false | all | pid, %% sampling: no, all or a single pid
                    false | all | pid, %% output: no, all, or a single pid

@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin
+% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@
 
 -export([start_link/1, init/1, on/2]).
 -export([get_stats/0, get_no_of_ch/0]).
+
+-include("gen_component.hrl").
 
 -type state() :: {StartTime::erlang_timestamp(), RcvCnt::non_neg_integer(),
                   RcvBytes::non_neg_integer(), SendCnt::non_neg_integer(),

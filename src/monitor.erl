@@ -49,6 +49,8 @@
 
 -export_type([key/0, table_index/0]).
 
+-include("gen_component.hrl").
+
 -type key() :: atom().
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.

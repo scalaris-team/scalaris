@@ -55,6 +55,8 @@
 
 -export_type([tx_id/0]).
 
+-include("gen_component.hrl").
+
 
 %% TM on kv_on_cseq
 

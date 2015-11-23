@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@
          rm_neighbor_change/3, rm_send_update/5]).
 
 -export_type([state_active/0]).
+
+-include("gen_component.hrl").
 
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state

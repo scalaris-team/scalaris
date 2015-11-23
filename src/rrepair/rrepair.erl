@@ -1,4 +1,4 @@
-% @copyright 2011-2014 Zuse Institute Berlin
+% @copyright 2011-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -114,6 +114,8 @@
     {recon_progress_report, Sender::comm:mypid(), Initiator::boolean(),
      DestRR::comm:mypid(), DestRC::comm:mypid() | undefined, Stats::rr_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Stats::rr_resolve:stats()}.
+
+-include("gen_component.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API messages

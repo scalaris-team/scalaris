@@ -72,6 +72,8 @@
 
 -export_type([check_next_step/0]).
 
+-include("gen_component.hrl").
+
 %% quorum read protocol for consensus sequence
 %%
 %% user definable functions and types for qread and abbreviations:

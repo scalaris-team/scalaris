@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@
 -behaviour(gen_component).
 
 -export([start_link/2, on/2, init/1]).
+
+-include("gen_component.hrl").
 
 % accepted messages of dht_node_monitor processes
 -type message() :: {Key::lookup_hops, Value::pos_integer()} |

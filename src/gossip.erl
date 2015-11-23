@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -177,6 +177,8 @@
 
 % testing and debugging
 -export([start_gossip_task/2, stop_gossip_task/1, tester_create_cb_module_names/1]).
+
+-include("gen_component.hrl").
 
 %% -define(PDB, pdb_ets). % easier debugging because state accesible from outside the process
 -define(PDB_OPTIONS, [set]).
