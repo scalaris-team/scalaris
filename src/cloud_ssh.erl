@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@
 
 -include("scalaris.hrl").
 
--behavior(cloud_beh).
+-behaviour(cloud_beh).
 
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1, killall_vms/0]).
 -export([check_config/0]).

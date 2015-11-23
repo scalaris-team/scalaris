@@ -1,4 +1,4 @@
-%  @copyright 2014 Zuse Institute Berlin
+%  @copyright 2014-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 -author('michels@zib.de').
 -vsn('$Id$').
 
--behavior(lb_active_beh).
+-behaviour(lb_active_beh).
 %% implements
 -export([init/0, check_config/0]).
 -export([handle_msg/2, handle_dht_msg/2]).

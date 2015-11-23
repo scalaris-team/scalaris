@@ -46,7 +46,7 @@
 %%-define(TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(X,Y), log:log(warn, X, Y)).
 -define(TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(_X,_Y), ok).
 
--behavior(gen_component).
+-behaviour(gen_component).
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_link/2, check_config/0]).
