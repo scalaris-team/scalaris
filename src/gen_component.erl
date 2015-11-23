@@ -1,4 +1,4 @@
-%% @copyright 2007-2014 Zuse Institute Berlin
+%% @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -477,8 +477,18 @@ start_link(Module, Handler, Args, Options) ->
                  SpawnOpt = [],
                  ok
     end,
-    Pid = spawn_opt(?MODULE, start, [Module, Handler, Args, Options1, self()],
-                    [link | SpawnOpt]),
+    Pid = case erlang:function_exported(Module, start, 5) of
+              true ->
+                  spawn_opt(Module, start,
+                                  [Module, Handler, Args, Options1, self()],
+                                  [link | SpawnOpt]);
+              false ->
+                  log:log("[ gen_component ] the module ~p does not provide its own start/4 function",
+                          [Module]),
+                  spawn_opt(?MODULE, start,
+                                  [Module, Handler, Args, Options1, self()],
+                                  [link | SpawnOpt])
+    end,
     receive {started, Pid} -> {ok, Pid} end.
 
 -spec start(module(), handler(), term(), [option()]) -> {ok, pid()}.
