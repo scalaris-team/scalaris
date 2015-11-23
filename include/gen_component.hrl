@@ -19,7 +19,7 @@
 
 -export([start/5]).
 -spec start(module(), gen_component:handler(), term(), [gen_component:option()], pid()) ->
-                   {ok, pid()}.
+                   no_return() | ok.
 start(Module, Handler, Args, Options, Self) ->
     gen_component:start(Module, Handler, Args, Options, Self).
 

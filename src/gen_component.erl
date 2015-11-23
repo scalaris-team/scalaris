@@ -58,7 +58,7 @@
 -export([bp_about_to_kill/1,
          monitor/1, demonitor/1, demonitor/2]).
 
--export_type([handler/0]).
+-export_type([handler/0, option/0]).
 -export_type([bp_name/0]). %% for unittests
 
 -type bp_name() :: atom().
