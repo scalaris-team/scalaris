@@ -26,9 +26,7 @@ addons:
       name: scalaris-team/scalaris
       description: Scalaris, a distributed, transactional key-value store
     notification_email: scalaris-owners@googlegroups.com
-    build_command_prepend:
-      - CXX=clang++ ./configure
-      - make ycsb
+    build_command_prepend: CXX=clang++ ./configure ; make ycsb
     build_command: make coverity
     branch_pattern: coverity_scan
 
