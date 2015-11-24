@@ -35,6 +35,8 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
+-behaviour(gen_component).
+
 %% api:
 -export([qread/3, qread/4]).
 -export([qwrite/5, qwrite/7]).

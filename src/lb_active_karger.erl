@@ -1,4 +1,4 @@
-%  @copyright 2013-2014 Zuse Institute Berlin
+%  @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("lb_active_karger: " ++ X,Y)).
 
--behavior(lb_active_beh).
+-behaviour(lb_active_beh).
 
 -export([init/0, check_config/0]).
 -export([handle_msg/2, handle_dht_msg/2]).

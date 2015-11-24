@@ -137,8 +137,9 @@ sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
 is_gen_component(Pid) ->
     case erlang:process_info(Pid, initial_call) of
         undefined -> false; % process not alive
-        PInfo -> Call = element(2, PInfo),
-                 gen_component =:= element(1, Call)
+        {initial_call, {Module, Function, _Arity}} ->
+                gen_component =:= Module orelse
+                    start_gen_component =:= Function
     end.
 
 -spec runnable(Pid::pid()) -> boolean().
@@ -477,9 +478,9 @@ start_link(Module, Handler, Args, Options) ->
                  SpawnOpt = [],
                  ok
     end,
-    Pid = case erlang:function_exported(Module, start, 5) of
+    Pid = case erlang:function_exported(Module, start_gen_component, 5) of
               true ->
-                  spawn_opt(Module, start,
+                  spawn_opt(Module, start_gen_component,
                                   [Module, Handler, Args, Options1, self()],
                                   [link | SpawnOpt]);
               false ->

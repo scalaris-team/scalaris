@@ -20,7 +20,7 @@
 -author('hoffmann@zib.de').
 -vsn('$Id$').
 
--behavior(gen_component).
+-behaviour(gen_component).
 
 -include("scalaris.hrl").
 

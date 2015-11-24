@@ -14,12 +14,13 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc change the first function in processes from gen_component:start/5
-%%      to ?MODULE:start/5
+%%      to ?MODULE:start_gen_component/5
 %% @end
 
--export([start/5]).
--spec start(module(), gen_component:handler(), term(), [gen_component:option()], pid()) ->
-                   no_return() | ok.
-start(Module, Handler, Args, Options, Self) ->
+-export([start_gen_component/5]).
+-spec start_gen_component(module(), gen_component:handler(), term(),
+                          [gen_component:option()], pid()) ->
+                                 no_return() | ok.
+start_gen_component(Module, Handler, Args, Options, Self) ->
     gen_component:start(Module, Handler, Args, Options, Self).
 

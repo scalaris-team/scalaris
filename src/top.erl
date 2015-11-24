@@ -24,6 +24,8 @@
 -define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
 
+-behaviour(gen_component).
+
 -export([start_link/1]).
 -export([on/2, init/1]).
 
