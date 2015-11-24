@@ -252,6 +252,7 @@ tester_type_check_rbr(_Config) ->
           },
           {tx_tm,
            [{start_link, 2},       %% starts processes
+            {start_gen_component,5}, %% unsupported types
             {init, 1},             %% needs to be pid_group member
             {on, 2},               %% needs valid messages
             {on_init, 2},          %% needs valid messages
@@ -294,6 +295,7 @@ tester_type_check_rbr(_Config) ->
              {qread, 3},       %% tries to create envelopes
              {qread, 4},       %% needs fun as input
              {start_link, 3},  %% needs fun as input
+             {start_gen_component,5}, %% unsupported types
              {qwrite, 5},      %% needs funs as input
              {qwrite, 7},      %% needs funs as input
              {qwrite_fast, 7}, %% needs funs as input

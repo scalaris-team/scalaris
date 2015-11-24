@@ -161,7 +161,8 @@ tester_type_check_gossip(_Config) ->
                 {start_gossip_task, 2}, % spec to wide
                 {stop_gossip_task, 1}, % would prohibit subsequent tests
                 {on_inactive, 2}, % too much interaction / spec to wide
-                {on_active, 2} % too much interaction / spec to wide
+                {on_active, 2}, % too much interaction / spec to wide
+                {start_gen_component,5} %% unsupported types
             ],
             % excluded (private functions)
             [   {handle_msg, 2}, % spec to wide, sends messages
@@ -360,7 +361,8 @@ tester_type_check_paxos(_Config) ->
              {start_link,2}, %% tries to spawn processes
              {start_paxosid, 2}, %% tries to send messages
              {start_paxosid, 3}, %% tries to send messages
-             {stop_paxosids,2} %% tries to send messages
+             {stop_paxosids,2}, %% tries to send messages
+             {start_gen_component,5} %% unsupported types
            ],
            [ {msg_ack,5}, %% sends msgs
              {msg_nack,3}, %% sends msgs
@@ -373,7 +375,8 @@ tester_type_check_paxos(_Config) ->
            [ {on, 2}, %% spec for messages not tight enough
              {start_link,2}, %% tries to spawn processes
              {start_paxosid, 5}, %% tries to send messages
-             {stop_paxosids,2} %% tries to send messages
+             {stop_paxosids,2}, %% tries to send messages
+             {start_gen_component,5} %% unsupported types
            ],
            [ {msg_decide,4}, %% sends msg.
              {decide, 2} %% no spec & uses msg_decide
@@ -385,7 +388,8 @@ tester_type_check_paxos(_Config) ->
              {start_paxosid, 6}, %% tries to send messages
              {start_paxosid, 7}, %% tries to send messages
              {stop_paxosids, 2}, %% tries to send messages
-             {trigger, 2} %% tries to send messages
+             {trigger, 2}, %% tries to send messages
+             {start_gen_component,5} %% unsupported types
            ],
            [ {msg_prepare,4}, %% tries to send messages
              {proposer_trigger, 4}, %% tries to send messages
@@ -454,7 +458,8 @@ tester_type_check_rrepair(_Config) ->
              {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
              {pos_to_bitstring, 4}, % needs to fulfil certain preconditions
              {bitstring_to_k_list_k, 3}, % needs a special binary to correspond to a number of Key entries
-             {bitstring_to_k_list_kv, 3} % needs a special binary to correspond to a number of KV entries
+             {bitstring_to_k_list_kv, 3}, % needs a special binary to correspond to a number of KV entries
+             {start_gen_component,5} %% unsupported types
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -505,6 +510,7 @@ tester_type_check_rrepair(_Config) ->
              {init, 1}, %% registers a monitor (only one allowed per PID)
              {on, 2}, %% tries to send messages, needs valid state with pid
              {start, 1}, %% tries to spawn processes
+             {start_gen_component,5}, %% unsupported types
              {merge_stats, 2} %% tested via feeder
            ],
            [
@@ -559,7 +565,8 @@ tester_type_check_tx(_Config) ->
              {msg_commit_reply, 3},
              {on,2},
              {on_init,2},
-             {start_link,2}
+             {start_link,2},
+             {start_gen_component,5} %% unsupported types
            ],
            [ {get_paxos_ids, 2}, %% requires item entries in dictionary
              {get_failed_keys, 2}, %% needs number of aborts in item list to match numabort
@@ -605,6 +612,7 @@ tester_type_check_rdht_tx(_Config) ->
              {init, 1},
              {on,2},
              {start_link, 1},
+             {start_gen_component,5}, %% unsupported types
              {validate_prefilter, 1}, %% TODO: not a list error
              {validate, 3},
              {work_phase, 3}
@@ -616,6 +624,7 @@ tester_type_check_rdht_tx(_Config) ->
            [ {abort, 5},
              {commit, 5},
              {start_link, 1}, {init, 1}, {on,2},
+             {start_gen_component,5}, %% unsupported types
              {validate_prefilter, 1}, %% TODO: not a list error
              {validate, 3},
              {work_phase, 3}
@@ -714,7 +723,8 @@ tester_type_check_util(_Config) ->
              {on, 2},
              {pids_to_names, 2}, %% sends remote messages
              {filename_to_group, 1}, %% not every string is convertible
-             {start_link, 0}
+             {start_link, 0},
+             {start_gen_component,5} %% unsupported types
            ], []},
           {quorum, [], []},
           %% {rrd,

@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -107,6 +107,7 @@ tester_type_check_rm_leases(_Config) ->
         [ {rm_leases,
            [
             {start_link, 1},
+            {start_gen_component,5}, %% unsupported types
             {on, 2},
             {get_takeovers, 1} %% sends messages
            ],
