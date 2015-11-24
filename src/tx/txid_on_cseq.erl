@@ -50,8 +50,6 @@
 
 -export_type([txid/0]).
 
--include("gen_component.hrl").
-
 -spec read(txid(), comm:erl_local_pid()) -> ok.
 read(Key, ReplyTo) ->
     %% decide which db is responsible, ie. if the key is from
