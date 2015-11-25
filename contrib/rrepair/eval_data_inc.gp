@@ -9,6 +9,8 @@
 #	srcFile3_title -> prepend this to titles of lines from srcFile3 (optional unless srcFile3 given)
 #	srcFile4 -> source file 4 path (optional)
 #	srcFile4_title -> prepend this to titles of lines from srcFile4 (optional unless srcFile4 given)
+#	srcFile5 -> source file 5 path (optional)
+#	srcFile5_title -> prepend this to titles of lines from srcFile5 (optional unless srcFile5 given)
 #	destDir -> destination path for pdfs
 #	regenAccInPercent -> whether to show the regen accuracy in percent instead of absolute values (useful for bloom)
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
@@ -17,10 +19,10 @@ set macro
 
 load colDefFile
 
-plotCount = exists("srcFile4") ? 4 : exists("srcFile3") ? 3 : exists("srcFile2") ? 2 : 1
-files = srcFile1 . (plotCount >= 2 ? " " . srcFile2 : "") . (plotCount >= 3 ? " " . srcFile3 : "") . (plotCount >= 4 ? " " . srcFile4 : "")
-get_file(i) = (i == 4) ? srcFile4 : (i == 3) ? srcFile3 : (i == 2) ? srcFile2 : srcFile1
-get_title(i) = (i == 4) ? srcFile4_title : (i == 3) ? srcFile3_title : (i == 2) ? srcFile2_title : srcFile1_title
+plotCount = exists("srcFile5") ? 5 : exists("srcFile4") ? 4 : exists("srcFile3") ? 3 : exists("srcFile2") ? 2 : 1
+files = srcFile1 . (plotCount >= 2 ? " " . srcFile2 : "") . (plotCount >= 3 ? " " . srcFile3 : "") . (plotCount >= 4 ? " " . srcFile4 : "") . (plotCount >= 5 ? " " . srcFile5 : "")
+get_file(i) = (i == 5) ? srcFile5 : (i == 4) ? srcFile4 : (i == 3) ? srcFile3 : (i == 2) ? srcFile2 : srcFile1
+get_title(i) = (i == 5) ? srcFile5_title : (i == 4) ? srcFile4_title : (i == 3) ? srcFile3_title : (i == 2) ? srcFile2_title : srcFile1_title
 
 # http://colorbrewer2.org/?type=qualitative&scheme=Set1&n=5
 # (#e41a1c, #377eb8, #4daf4a, #984ea3, #ff7f00)
@@ -30,6 +32,7 @@ set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
 set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
 set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
 set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
+set style line 6 lw 3 lc rgb "#777777" pt 8 lt 3 # gray (for the naive line)
 
 set style line 101 lw 3 lt 1 lc rgb '#ff191b' pt 0 # dark red
 set style line 102 lw 3 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
@@ -37,20 +40,23 @@ set style line 103 lw 3 lt 1 lc rgb '#59c955' pt 0 # dark green
 set style line 104 lw 3 lt 1 lc rgb '#b05abd' pt 0 # dark purple
 set style line 105 lw 3 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
 
-if (plotCount == 4) {
-  plotShift(x, i) = (i == 4) ? (x + (x / 1.9)) : (i == 3) ? (x + (x / 6.5)) : (i == 2) ? (x - (x / 7.9)) : (x - (x / 2.95))
+if (plotCount == 5) {
+  plotShift(x, i) = (i == 5) ? (x + (x / 1.6)) : (i == 4) ? (x + (x / 3.7)) : (i == 3) ? (x) : (i == 2) ? (x - (x / 4.6)) : (x - (x / 2.6))
 } else {
-  if (plotCount == 3) {
-    plotShift(x, i) = (i == 3) ? (x + (x / 2.3)) : (i == 2) ? (x) : (x - (x / 3.2))
+  if (plotCount == 4) {
+    plotShift(x, i) = (i == 4) ? (x + (x / 1.9)) : (i == 3) ? (x + (x / 6.5)) : (i == 2) ? (x - (x / 7.9)) : (x - (x / 2.95))
   } else {
-    if (plotCount == 2) {
-      plotShift(x, i) = (i == 2) ? (x + (x / 3)) : (x - (x / 4))
+    if (plotCount == 3) {
+      plotShift(x, i) = (i == 3) ? (x + (x / 2.3)) : (i == 2) ? (x) : (x - (x / 3.2))
     } else {
-      plotShift(x, i) = x
+      if (plotCount == 2) {
+        plotShift(x, i) = (i == 2) ? (x + (x / 3)) : (x - (x / 4))
+      } else {
+        plotShift(x, i) = x
+      }
     }
   }
 }
-set style line 5 lw 3 lc rgb "#777777" pt 8 lt 3
 if (exists("regenAccInPercent") && regenAccInPercent == 1) {
   regenAcc(found, existing) = 100 - 100 * found / existing
   regenAccErr(found1, found2, existingSum) = stderrSum(found1, found2) * (100 / existingSum)
@@ -149,7 +155,7 @@ if (plotCount == 1) {
 set logscale x 2
 set xrange [2:8192] # TODO: adapt if number of data points changes!
 set grid layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
-set pointsize (plotCount == 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
+set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
 arrow_dx=.166666666667 # grid spacing in x
 arrow_di=0 # added to each i in loop - arrows drawn at (i+arrow_di)*arrow_dx
 arrow_xpoints=6 # TODO: adapt if number of data points changes!
@@ -185,9 +191,9 @@ unset xlabel
 set format x ""
 set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
-set format y " %2.1f"
+set format y " %4.1f"
 if (plotCount > 1) {
-  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -202,10 +208,10 @@ unset ytics
 set grid y2tics
 set size all_width_r,acc_height
 if (regenAccInPercent == 1) {
-  set y2tics mirror format "%-2.0f_{ }%%" offset 0 scale 0.8
+  set y2tics mirror format "%-3.0f_{ }%%" offset 0 scale 0.8
   set y2range [(acc_reg_avg-acc_reg_max):(acc_reg_avg+acc_reg_max)]
 } else {
-  set y2tics mirror format "%-1.1f " scale 0.8
+  set y2tics mirror format "%-4.1f " scale 0.8
   set y2range [0:acc_reg_max]
 }
 
@@ -229,11 +235,11 @@ set ylabel "rel. Red." font ",16" # transferred / updated
 set yrange [0:red_max]
 set y2range [0:red_max]
 if (red_max > 10) {
-  set format y "  %1.0f"
-  set format y2 "%-1.0f "
+  set format y "  %3.0f"
+  set format y2 "%-3.0f "
 } else {
-  set format y " %1.1f"
-  set format y2 "%-1.1f "
+  set format y " %4.1f"
+  set format y2 "%-4.1f "
 }
 unset key
 
@@ -271,16 +277,16 @@ set yrange [1:bw_max*1.2]
 set y2range [1:bw_max*1.2]
 set logscale y 2
 set logscale y2 2
-set format y "%4.0f"
+set format y "%5.0f"
 set format x
 if (plotCount > 1) {
-  set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (key_width+1) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 
-LABEL = "naïve approach"
-set label 10 at 22,112000*(128+32)/8/1024 LABEL front center font ",12" textcolor rgb "#777777"
+LABEL = "n × (128+32) bits\n_{(≥ naïve approach)}"
+set label 10 at 6,264000*(128+32)/8/1024 LABEL front left font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
@@ -291,7 +297,7 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 6
 
 set size all_width_r,bw_height
 set origin 0.49,-0.025
@@ -300,7 +306,7 @@ unset key
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror format "%-4.0f" scale 0.8
+set y2tics mirror format "%-5.0f" scale 0.8
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
@@ -311,4 +317,4 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 2)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 5
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 6
