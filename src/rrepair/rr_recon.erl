@@ -1108,7 +1108,7 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
     % => use Taylor expansion of math:log(1 / (1-P1E))  at P1E = 0
     %    (small terms first)
     P = lists:sum([math:pow(P1E, X) / X || X <- lists:seq(5, 1, -1)]), % +O[p^6]
-    min_max(util:ceil(util:log2(NT * (2 * NT - 1) / P)), get_min_hash_bits(), MaxSize).
+    min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
