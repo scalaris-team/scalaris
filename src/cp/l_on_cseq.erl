@@ -69,7 +69,7 @@
 -export([unittest_get_delta/0]).
 
 % lease accessors
--export([get_version/1,set_version/2,
+-export([is_a_lease/1, get_version/1,set_version/2,
          get_epoch/1, set_epoch/2,
          new_timeout/0, set_timeout/1, get_timeout/1, get_pretty_timeout/1,
          get_id/1,
@@ -1374,6 +1374,10 @@ unittest_create_lease_with_range(From, To, Owner) ->
 -spec new_timeout() -> erlang_timestamp().
 new_timeout() ->
     util:time_plus_s(os:timestamp(), delta()).
+
+-spec is_a_lease(term()) -> boolean().
+is_a_lease(L) ->
+    is_record(L, lease).
 
 -spec get_version(lease_t()) -> non_neg_integer().
 get_version(#lease{version=Version}) -> Version.
