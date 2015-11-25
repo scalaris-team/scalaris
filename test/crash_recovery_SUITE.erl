@@ -1,4 +1,4 @@
-%% @copyright 2012-2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ test_crash_recovery(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% crash recovery test with one 'new' node 
+% crash recovery test with one 'new' node
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_crash_recovery_one_new_node(_Config) ->
@@ -163,7 +163,7 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
     % trigger renewal on all nodes
     ct:pal("cr: renew all nodes ~p", [DHTNodes]),
     [ comm:send_local(Node, {l_on_cseq, renew_leases}) || Node <- DHTNodes],
-    
+
     % wait for leases to reappear
     ct:pal("cr: wait for leases to reappear"),
     case config:read(replication_factor) of
@@ -217,7 +217,6 @@ change_owner_pids(DHTNodes) ->
                                   ok
                           end
                   end, DHTNodes).
-    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -228,16 +227,20 @@ change_owner_pids(DHTNodes) ->
 change_owner_pid(Pid, State, DBName) ->
     LeaseDB = dht_node_state:get(State, DBName),
     ct:pal("LeaseDB ~p", [LeaseDB]),
-    _ = [ 
-      prbr:set_entry({Key, 
-                      {ReadRound, ReadClientId, ReadWriteFilter}, 
-                      {WriteRound, WriteClientId, WriteWriteFilter}, 
-                      l_on_cseq:set_owner(Lease, Pid)}, LeaseDB)
-
-      || {Key, 
-          {ReadRound, ReadClientId, ReadWriteFilter}, 
+    _ = [
+         case l_on_cseq:is_a_lease(Lease) of
+             true ->
+                 prbr:set_entry({Key,
+                                 {ReadRound, ReadClientId, ReadWriteFilter},
+                                 {WriteRound, WriteClientId, WriteWriteFilter},
+                                 l_on_cseq:set_owner(Lease, Pid)}, LeaseDB);
+             false ->
+                 ct:fail("the lease db contains a ~p, which is not a lease record", [Lease])
+         end
+      || {Key,
+          {ReadRound, ReadClientId, ReadWriteFilter},
           {WriteRound, WriteClientId, WriteWriteFilter},
-          Lease} 
+          Lease}
              <- prbr:tab2list_raw_unittest(LeaseDB)],
     ok.
 
