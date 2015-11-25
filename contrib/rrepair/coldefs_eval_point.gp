@@ -60,3 +60,4 @@ col_ftype = 59
 col_fdist = 60
 col_dtype = 61
 col_tprob = 62
+col_merkle_num_trees = 63
