@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2015 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ get_active_passive(LocalLeases) ->
 
 -spec restart_node() -> no_return().
 restart_node() ->
-    log:log("we are stopping ~p -> ~p~n", [comm:this()]),
+    log:log("we are stopping ~p~n", [comm:this()]),
     %% async. call!
     service_per_vm:kill_nodes_by_name([pid_groups:my_groupname()]),
     util:sleep_for_ever().
