@@ -223,8 +223,13 @@ check_data_integrity() ->
     end.
 
 repair_replicas() ->
-    io:format("show prbr statistics for the ring~n"),
-    lease_checker2:get_kv_db(),
-    _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
-    io:format("show prbr statistics for the ring~n"),
-    lease_checker2:get_kv_db().
+    case config:read(replication_factor) rem 2 =:= 1 of
+        true -> %% only repair for odd replication factors
+            io:format("show prbr statistics for the ring~n"),
+            lease_checker2:get_kv_db(),
+            _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+            io:format("show prbr statistics for the ring~n"),
+            lease_checker2:get_kv_db();
+        false ->
+            ok
+    end.
