@@ -29,10 +29,12 @@ namespace scalaris {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
     std::string hostname;
+    std::string link;
     bool closed=false;
   public:
-    Connection(const std::string& _hostname, const std::string& port)
-      : socket(ioservice), hostname(_hostname) {
+    Connection(const std::string& _hostname, const std::string& port,
+               const std::string& _link = "jsonrpc.yaws")
+      : socket(ioservice), hostname(_hostname), link(_link) {
       using boost::asio::ip::tcp;
 
       // Determine the location of the server.
@@ -82,18 +84,17 @@ namespace scalaris {
       call["id"]=0;
       std::stringstream json_call;
       Json::StreamWriterBuilder builder;
-      std::unique_ptr<Json::StreamWriter> writer(
-                                                 builder.newStreamWriter());
+      std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
       writer->write(call, &json_call);
       std::string json_call_str = json_call.str();
 
       boost::asio::streambuf request;
       std::ostream request_stream(&request);
-      request_stream << "POST /jsonrpc.yaws HTTP/1.0\r\n";
+      request_stream << "POST /" << link << " HTTP/1.1\r\n";
       request_stream << "Host: " << hostname << "\r\n";
       request_stream << "Content-Type: application/json-rpc\r\n";
       request_stream << "Content-Length: " << json_call_str.size() << "\r\n";
-      request_stream << "Connection: close\r\n\r\n";
+      request_stream << "Connection: keep-alive\r\n\r\n";
       request_stream << json_call_str << "\r\n\r\n";
 
       // Send the request.
@@ -140,14 +141,6 @@ namespace scalaris {
       // Write whatever content we already have to output.
       if (response.size() > 0)
         json_result << &response;
-
-      // Read until EOF, writing data to output as we go.
-      boost::system::error_code error;
-      while (boost::asio::read(socket, response,
-                               boost::asio::transfer_at_least(1), error))
-        json_result << &response;
-      if (error != boost::asio::error::eof)
-        throw boost::system::system_error(error);
 
       Json::CharReaderBuilder reader_builder;
       reader_builder["collectComments"] = false;
