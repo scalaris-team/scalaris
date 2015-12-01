@@ -8,6 +8,8 @@ fi
 export VMS_PER_NODE=${VMS_PER_NODE:-1}
 export DHT_NODES_PER_VM=${DHT_NODES_PER_VM:-1}
 export ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS:-""}
+export SCALARISCTL_PARAMS=${SCALARISCTL_PARAMS:-""} # additional params for scalarisctl
+
 export COLLECTL=${COLLECTL:-"false"}
 
 export ETCDIR=$SCALARIS_DIR/bin

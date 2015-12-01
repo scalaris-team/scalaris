@@ -44,6 +44,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # LOAD_GENERATORS=2
 #
 # TIMEOUT=60
+# SCALARISCTL_PARAMS="-l $HOME/bbench"
 
 #=============================
 
@@ -207,6 +208,7 @@ start_scalaris() {
     [[ -n $WD ]] && export WD
     [[ -n $COLLECTL ]] && export COLLECTL
     [[ -n $COLLECTL_DIR ]] && export COLLECTL_DIR
+    [[ -n $SCALARISCTL_PARAMS ]] && export SCALARISCTL_PARAMS
 
     # start sbatch command and capture output
     # the ${var:+...} expands only, if the variable is set and non-empty
