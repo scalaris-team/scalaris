@@ -47,6 +47,10 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # SCALARIS_LOCAL=true
 # SCALARISCTL_PARAMS="-l $HOME/bbench"
 
+# COLLECTL_SUBSYSTEMS="-s cmnd"
+# COLLECTL_INTERVAL="-i 10"
+# COLLECTL_FLUSH="-F 0"
+
 #=============================
 
 main(){
@@ -174,13 +178,16 @@ tag(){
 }
 
 start_collectl() {
+    export COLLECTL_SUBSYSTEMS
+    export COLLECTL_INTERVAL
+    export COLLECTL_FLUSH
     # start collectl at the load generators
     for host in ${LG_HOSTS[@]}; do
         log info "starting collectl on $host"
         if [[ $(hostname -f) = $host ]]; then
-            collectl -f $WD/collectl/lg_$host -i5 2>/dev/null -F0 &
+            collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
         else
-            ssh $host collectl -f $WD/collectl/lg_$host -i5 2>/dev/null -F0 &
+            ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
         fi
     done
 }

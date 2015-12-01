@@ -130,7 +130,7 @@ function start_collectl(){
 
     # collectl will be started in a screen session which will be cleaned up by the watchdog
     srun -N$SLURM_NNODES screen -S "scalaris_collectl_SLURM_JOBID_${SLURM_JOBID}" -d -m \
-        bash -c "collectl -f $COLLECTL_DIR -i5 -F0; sleep 365d"
+        bash -c "collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $COLLECTL_DIR; sleep 365d"
 }
 
 fix_known_hosts

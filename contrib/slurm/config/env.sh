@@ -17,6 +17,11 @@ export BINDIR=$SCALARIS_DIR/bin
 export BEAMDIR=$SCALARIS_DIR/ebin
 export COLLECTL_DIR=${COLLECTL_DIR:-"$(pwd)/collectl/"}
 
+# collectl arguments
+export COLLECTL_SUBSYSTEMS=${COLLECTL_SUBSYSTEMS:-"-s cmnd"}
+export COLLECTL_INTERVAL=${COLLECTL_INTERVAL:-"-i 10"}
+export COLLECTL_FLUSH=${COLLECTL_FLUSH:-"-F 0"}
+
 export SHUFFLE_NODE_IDS=1
 export WATCHDOG_INTERVAL=10
 
