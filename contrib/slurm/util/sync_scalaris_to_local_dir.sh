@@ -2,7 +2,6 @@
 
 # SCALARIS_SRC and SCALARIS_DIR inherited from environment
 
-set -x
 echo $SCALARIS_SRC
 echo $SCALARIS_DIR
 

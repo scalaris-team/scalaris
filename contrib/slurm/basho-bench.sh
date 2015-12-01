@@ -44,6 +44,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # LOAD_GENERATORS=2
 #
 # TIMEOUT=60
+# SCALARIS_LOCAL=true
 # SCALARISCTL_PARAMS="-l $HOME/bbench"
 
 #=============================
@@ -151,10 +152,9 @@ print_env(){
 }
 
 check_compile(){
-    local curdir=$(pwd)
-    cd $SCALARIS_DIR
+    pushd $SCALARIS_DIR >/dev/null
     local res=$(erl -pa contrib/yaws -pa ebin -noinput +B -eval 'R=make:all([noexec]), halt(0).')
-    cd $curdir
+    popd >/dev/null
     if [[ -n $res ]]; then
         log error "Scalaris binaries do not match source version:"
         echo $res
@@ -208,6 +208,7 @@ start_scalaris() {
     [[ -n $WD ]] && export WD
     [[ -n $COLLECTL ]] && export COLLECTL
     [[ -n $COLLECTL_DIR ]] && export COLLECTL_DIR
+    [[ -n $SCALARIS_LOCAL ]] && export SCALARIS_LOCAL
     [[ -n $SCALARISCTL_PARAMS ]] && export SCALARISCTL_PARAMS
 
     # start sbatch command and capture output

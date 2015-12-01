@@ -65,10 +65,9 @@ function print_env() {
 }
 
 check_compile(){
-    local curdir=$(pwd)
-    cd $SCALARIS_DIR
+    pushd $SCALARIS_DIR >/dev/null
     local res=$(erl -pa contrib/yaws -pa ebin -noinput +B -eval 'R=make:all([noexec]), halt(0).')
-    cd $curdir
+    popd >/dev/null
     if [[ -n $res ]]; then
         echo "Scalaris binaries do not match source version:"
         echo $res
