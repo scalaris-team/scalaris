@@ -33,7 +33,7 @@ BOOST_AUTO_TEST_SUITE(TransactionSingleOpSuite)
 
 BOOST_AUTO_TEST_CASE( read_unknown_key )
 {
-  Connection c = { "localhost", "8000" };
+  Connection c = { "localhost" };
   TransactionSingleOp op = { c };
 
   BOOST_CHECK_THROW(std::string val = op.read("_no_such_key"), ReadFailedError);
@@ -41,7 +41,7 @@ BOOST_AUTO_TEST_CASE( read_unknown_key )
 
 BOOST_AUTO_TEST_CASE( write )
 {
-  Connection c = { "localhost", "8000" };
+  Connection c = { "localhost" };
   TransactionSingleOp op = { c };
 
   op.write("bar", "foo");
@@ -50,13 +50,13 @@ BOOST_AUTO_TEST_CASE( write )
 BOOST_AUTO_TEST_CASE( write_read )
 {
   {
-    Connection c = { "localhost", "8000" };
+    Connection c = { "localhost" };
     TransactionSingleOp op = { c };
 
     op.write("write_read", "foo");
   }
   {
-    Connection c = { "localhost", "8000" };
+    Connection c = { "localhost" };
     TransactionSingleOp op = { c };
 
     std::string res = op.read("write_read");

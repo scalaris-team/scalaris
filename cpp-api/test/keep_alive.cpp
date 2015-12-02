@@ -33,8 +33,9 @@ BOOST_AUTO_TEST_SUITE(ConnectionKeepAliveSuite)
 
 BOOST_AUTO_TEST_CASE( keep_alive )
 {
-  Connection c("localhost", "8000", "jsonrpc.yaws");
-  RoutingTable rt(c);
+  Connection c = { "localhost" };
+  RoutingTable rt = { c };
+
   for(int i = 0; i<10; i++) {
     int r = rt.get_replication_factor();
     BOOST_CHECK(r > 0);
