@@ -37,6 +37,9 @@
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
+%% -export([calc_signature_size_nm_pair/4, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3,
+%%          trivial_worst_case_failprob/3,
+%%          bloom_fp/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -94,7 +97,7 @@
          reconPid = undefined                                 :: comm:mypid() | undefined,
          db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
          sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
-         p1e      = ?required(trivial_recon_struct, p1e)      :: float()
+         p1e_p2   = ?required(trivial_recon_struct, p1e_p2)   :: float()
         }).
 
 -record(bloom_recon_struct,
@@ -410,7 +413,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = shash,
                            params = #shash_recon_struct{sig_size = SigSize,
-                                                      p1e = P1E} = Params,
+                                                        p1e_p2 = P1E_p2} = Params,
                            stats = Stats,             kv_list = KVList,
                            misc = [{db_chunk, OtherDBChunk},
                                    {oicount, OtherItemCount}],
@@ -442,12 +445,11 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
                   % NOTE: reduce P1E for the two parts here (SHash and trivial RC)
-                  P1E_sub = calc_n_subparts_p1e(2, P1E),
                   {BuildTime, {MyDiff, SigSizeT, VSizeT}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        OtherItemCount, P1E_sub)
+                                        OtherItemCount, P1E_p2)
                               end),
                   KList = [element(1, KV) || KV <- NewKVList],
                   OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
@@ -2091,6 +2093,23 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
               + (6*N3 - 11*N2 + 6*N - 1) * math:pow(P1E, 4) / (24 * N4)
               + (24*N4 - 50*N3 + 35*N2 - 10*N + 1) * math:pow(P1E, 5) / (120 * N5). % +O[p^6]
 
+%% @doc Splits P1E into N further (equal) independent sub-processes and returns
+%%      the P1E to use for the next of these sub-processes with the previous
+%%      sub-processes having a success probability of PrevP0 (a product of
+%%      all (1-P1E_sub)).
+%%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
+-spec calc_n_subparts_p1e(N::pos_integer(), P1E::float(), PrevP0::float())
+        -> P1E_sub::float().
+calc_n_subparts_p1e(N, P1E, PrevP0) when P1E > 0 andalso P1E < 1 andalso
+                                             PrevP0 > 0 andalso PrevP0 < 1 ->
+    N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
+    Q = math:pow(1 / PrevP0, 1 / N),
+    _VP = (1 - Q) + (P1E * Q) / N +
+              ((N-1) * math:pow(P1E, 2) * Q) / (2 * N2) +
+              ((N-1) * (2 * N - 1) * math:pow(P1E, 3) * Q) / (6 * N3) +
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * math:pow(P1E, 4) * Q) / (24 * N4) +
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * math:pow(P1E, 5) * Q) / (120 * N5). % +O[p^6]
+
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
@@ -2123,6 +2142,24 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
 %%             "MyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, _SigSize, _VSize, ItemCount, OtherItemCount]),
     Res.
+
+%% @doc Calculates the worst-case failure probability of the trivial algorithm
+%%      with the given signature size and item counts.
+%%      NOTE: Precision loss may occur for very high values!
+-spec trivial_worst_case_failprob(SigSize::signature_size(),
+                                  ItemCount::non_neg_integer(),
+                                  OtherItemCount::non_neg_integer()) -> float().
+trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount) ->
+    BK2 = util:pow(2, SigSize),
+    % both solutions have their problems with floats near 1
+    % -> use fastest as they are quite close
+    % exact:
+%%     1 - util:for_to_fold(1, (ItemCount + OtherItemCount) - 1,
+%%                          fun(I) -> (1 - I / BK2) end,
+%%                          fun erlang:'*'/2, 1).
+    % approx:
+    1 - math:exp(-((ItemCount + OtherItemCount) * (ItemCount + OtherItemCount - 1)
+                       / 2) / BK2).
 
 %% @doc Creates a compressed key-value list comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
@@ -2233,9 +2270,11 @@ build_recon_struct(shash, I, DBItems, _Params) ->
     P1E = get_p1e(),
     {DBChunkBin, SigSize} =
         shash_compress_k_list_p1e(DBItems, ItemCount, ItemCount, P1E),
+    P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount),
+    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
     #shash_recon_struct{interval = I, reconPid = comm:this(),
                         db_chunk = DBChunkBin, sig_size = SigSize,
-                        p1e = P1E};
+                        p1e_p2 = P1E_p2};
 build_recon_struct(bloom, I, DBItems, _Params) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
