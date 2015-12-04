@@ -2100,6 +2100,9 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
 -spec calc_n_subparts_p1e(N::pos_integer(), P1E::float(), PrevP0::float())
         -> P1E_sub::float().
+calc_n_subparts_p1e(_N, P1E, 1.0) ->
+    % special case with e.g. no items in the first/previous phase
+    P1E;
 calc_n_subparts_p1e(N, P1E, PrevP0) when P1E > 0 andalso P1E < 1 andalso
                                              PrevP0 > 0 andalso PrevP0 < 1 ->
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
