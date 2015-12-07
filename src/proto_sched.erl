@@ -309,13 +309,21 @@ get_infos(TraceId) ->
     case pid_groups:find_a(proto_sched) of
         failed -> [];
         LoggerPid ->
-            clear_infection(),
-            comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
-            receive
-                ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
-                end,
-            restore_infection(),
-            Infos
+            This = comm:this(),
+            case comm:is_valid(This) of
+                true ->
+                    clear_infection(),
+                    comm:send_local(LoggerPid, {get_infos, This, TraceId}),
+                    receive
+                        ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
+                    end,
+                    restore_infection(),
+                    Infos;
+                false ->
+                    log:log("Requesting proto_sched trace infos without a valid Pid (~p)",
+                            [This]),
+                    []
+            end
     end.
 
 -spec infected() -> boolean().
