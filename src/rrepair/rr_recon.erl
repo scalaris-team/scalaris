@@ -444,7 +444,6 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   % send idx of non-matching other items & KV-List of my diff items
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
-                  % NOTE: reduce P1E for the two parts here (SHash and trivial RC)
                   {BuildTime, {MyDiff, SigSizeT, VSizeT}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
@@ -515,13 +514,14 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            if FullDiffSize > 0 andalso BFCount > 0 ->
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
-                  % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
-                  P1E_sub = calc_n_subparts_p1e(2, P1E),
+                  % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
+                  P1E_p1 = bloom:get_property(BF, fpr),
+                  P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
                   {BuildTime, {DBChunk, SigSize, VSize}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        BFCount, P1E_sub)
+                                        BFCount, P1E_p2)
                               end),
                   ?DBG_ASSERT(DBChunk =/= <<>>),
                   
@@ -2273,6 +2273,7 @@ build_recon_struct(shash, I, DBItems, _Params) ->
     P1E = get_p1e(),
     {DBChunkBin, SigSize} =
         shash_compress_k_list_p1e(DBItems, ItemCount, ItemCount, P1E),
+    % NOTE: use left-over P1E after phase 1 (SHash) for phase 2 (trivial RC)
     P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount),
     P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
     #shash_recon_struct{interval = I, reconPid = comm:this(),
