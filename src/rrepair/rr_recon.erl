@@ -1511,7 +1511,7 @@ shash_bloom_perform_resolve(
                  pos_to_bitstring(% note: ReqIdx positions start with 0
                    ReqIdx, [], 0, ?IIF(ReqIdx =:= [], 0, lists:last(ReqIdx) + 1)))),
     ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
-           [_RMethod, SID, erlang:byte_size(ToReq2)]),
+           [_RMethod, rr_recon_stats:get(session_id, NewStats1), erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
     % the initiator will use key_upd_send and we must thus increase
     % the number of resolve processes here!
