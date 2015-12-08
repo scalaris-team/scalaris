@@ -359,6 +359,8 @@ calc_least_size(N, FP, K) ->
 %%      FP = (1-(1-1/M)^(K*N))^K
 -spec calc_FPR(M::pos_integer(), N::non_neg_integer(), K::pos_integer())
         -> FP::float().
+calc_FPR(_M, 0, _K) ->
+    0.0;
 calc_FPR(M, N, K) ->
     math:pow(1 - math:pow(1 - 1/M, K * N), K).
 
