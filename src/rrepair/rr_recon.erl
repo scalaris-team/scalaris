@@ -2103,10 +2103,11 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 calc_n_subparts_p1e(_N, P1E, 1.0) ->
     % special case with e.g. no items in the first/previous phase
     P1E;
-calc_n_subparts_p1e(N, P1E, PrevP0) when P1E > 0 andalso P1E < 1 andalso
-                                             PrevP0 > 0 andalso PrevP0 < 1 ->
+calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
+                                             PrevP0E > 0 andalso PrevP0E < 1 ->
+    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%28%281+-+p%29%2Fq%29^%281%2Fn%29++at+p+%3D+0
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
-    Q = math:pow(1 / PrevP0, 1 / N),
+    Q = math:pow(1 / PrevP0E, 1 / N),
     _VP = (1 - Q) + (P1E * Q) / N +
               ((N-1) * math:pow(P1E, 2) * Q) / (2 * N2) +
               ((N-1) * (2 * N - 1) * math:pow(P1E, 3) * Q) / (6 * N3) +
@@ -2152,6 +2153,12 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
 -spec trivial_worst_case_failprob(SigSize::signature_size(),
                                   ItemCount::non_neg_integer(),
                                   OtherItemCount::non_neg_integer()) -> float().
+trivial_worst_case_failprob(0, 0, _OtherItemCount) ->
+    % this is exact! (see special case in trivial_signature_sizes/3)
+    0.0;
+trivial_worst_case_failprob(0, _ItemCount, 0) ->
+    % this is exact! (see special case in trivial_signature_sizes/3)
+    0.0;
 trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount) ->
     BK2 = util:pow(2, SigSize),
     % both solutions have their problems with floats near 1
