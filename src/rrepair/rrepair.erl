@@ -55,7 +55,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -export([start_link/1, init/1, on/2, check_config/0,
-         select_sync_node/2]).
+         select_sync_node/2,
+         session_get/2]).
 
 -export_type([session_id/0, session/0]).
 
@@ -434,6 +435,27 @@ init([]) ->
     end,
     msg_delay:send_trigger(get_gc_interval(), {rr_gc_trigger}),
     #rrepair_state{}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% API functions for the session record
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec session_get(id, session())          -> session_id();
+                 (principal, session())   -> principal_id();
+                 (rc_method, session())   -> rr_recon:method();
+                 (rc_stats, session())    -> rr_recon_stats:stats() | none;
+                 (rs_stats, session())    -> rr_resolve:stats() | none;
+                 (rs_expected, session()) -> non_neg_integer();
+                 (rs_finish, session())   -> non_neg_integer();
+                 (ttl, session())         -> pos_integer().
+session_get(id         , #session{id          = X}) -> X;
+session_get(principal  , #session{principal   = X}) -> X;
+session_get(rc_method  , #session{rc_method   = X}) -> X;
+session_get(rc_stats   , #session{rc_stats    = X}) -> X;
+session_get(rs_stats   , #session{rs_stats    = X}) -> X;
+session_get(rs_expected, #session{rs_expected = X}) -> X;
+session_get(rs_finish  , #session{rs_finish   = X}) -> X;
+session_get(ttl        , #session{ttl         = X}) -> X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
