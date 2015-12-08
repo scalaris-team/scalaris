@@ -45,7 +45,7 @@
 
 -record(bloom, {
                 size          = ?required(bloom, size):: pos_integer(),    %bit-length of the bloom filter - requirement: size rem 8 = 0
-                filter        = <<>>                  :: binary(),         %length = size div 8
+                filter        = <<>>                  :: binary(),         %length = size div 8 (<<>> allowed when empty)
                 hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
                 items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
@@ -85,7 +85,7 @@ new_bpi(MaxItems, BitPerItem, Hfs) ->
 -spec new_bin(Filter::binary(), ?REP_HFS:hfs(), ItemsCount::non_neg_integer())
         -> bloom_filter().
 new_bin(Filter, Hfs, ItemsCount) ->
-    BitSize = erlang:bit_size(Filter),
+    BitSize = erlang:max(erlang:bit_size(Filter), 8),
     ?ASSERT((BitSize rem 8) =:= 0),
     #bloom{size = BitSize, filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
