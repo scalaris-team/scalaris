@@ -490,10 +490,10 @@ tester_type_check_rrepair(_Config) ->
              {shash_bloom_perform_resolve, 7}, %% needs a special binary to correspond to a number of bits
              {merkle_check_node, 17}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 16}, %% needs matching result and merkle nodes
-             {merkle_resolve_add_leaf_hash, 6}, %% needs KV-List merkle buckets
-             {merkle_resolve_retrieve_leaf_hashes, 4}, %% needs special bitstring
-             {merkle_resolve_leaves_send, 4}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_receive, 8}, % needs only leaf nodes in node list
+             {merkle_resolve_add_leaf_hash, 7}, %% needs KV-List merkle buckets
+             {merkle_resolve_retrieve_leaf_hashes, 6}, %% needs special bitstring
+             {merkle_resolve_leaves_send, 5}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_receive, 9}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages

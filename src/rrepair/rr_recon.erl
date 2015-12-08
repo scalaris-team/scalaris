@@ -38,7 +38,7 @@
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 %% -export([calc_signature_size_nm_pair/4, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3,
-%%          trivial_worst_case_failprob/3,
+%%          trivial_signature_sizes/3, trivial_worst_case_failprob/3,
 %%          bloom_fp/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -703,11 +703,10 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
             MerkleSyncNewRcvL = length(MerkleSyncNewRcv),
             TrivialProcs = MerkleSyncNewSendL + MerkleSyncNewRcvL,
             ?DBG_ASSERT(TrivialProcs > 0), % should always be true in this case!
-            P1EOneLeaf = calc_n_subparts_p1e(TrivialProcs, P1EAllLeaves),
-            ?MERKLE_DEBUG("merkle (NI) - LeafSync~n~B/~B (send), ~B (receive)\tP1EAllLeaves: ~g"
-                          "\tP1EOneLeaf: ~g\tItemsToSend: ~B+~B (~g per leaf)",
+            ?MERKLE_DEBUG("merkle (NI) - LeafSync~n~B/~B (send), ~B (receive)\tP1EAllLeaves: ~g\t"
+                          "ItemsToSend: ~B+~B (~g per leaf)",
                           [SyncDRLCount, MerkleSyncNewSendL, MerkleSyncNewRcvL,
-                           P1EAllLeaves, P1EOneLeaf, length(SyncDRK),
+                           P1EAllLeaves, length(SyncDRK),
                            lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]),
                            ?IIF(MerkleSyncNewSend =/=[],
                                 lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]) /
@@ -716,7 +715,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
             if MerkleSyncNewSend =/= [] ->
                    {Hashes, NStats3} =
                        merkle_resolve_leaves_send(MerkleSyncNewSend, NStats2,
-                                                  Params, P1EOneLeaf),
+                                                  Params, P1EAllLeaves, TrivialProcs),
                    ?MERKLE_DEBUG("merkle (NI) - HashesSize: ~B (~B compressed)",
                                  [erlang:byte_size(Hashes),
                                   erlang:byte_size(
@@ -726,12 +725,14 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                    send(DestReconPid, {resolve_req, Hashes}),
                    NewState#rr_recon_state{stage = resolve, stats = NStats3,
                                            merkle_sync = MerkleSyncNew1,
-                                           misc = [{one_leaf_p1e, P1EOneLeaf}]};
+                                           misc = [{all_leaf_p1e, P1EAllLeaves},
+                                                   {trivial_procs, TrivialProcs}]};
                true ->
                    % only wait for the other node's resolve_req
                    NewState#rr_recon_state{stage = resolve, stats = NStats2,
                                            merkle_sync = MerkleSyncNew1,
-                                           misc = [{one_leaf_p1e, P1EOneLeaf}]}
+                                           misc = [{all_leaf_p1e, P1EAllLeaves},
+                                                   {trivial_procs, TrivialProcs}]}
             end;
         _ ->
             send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
@@ -775,11 +776,10 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
             MerkleSyncNewRcvL = length(MerkleSyncNewRcv),
             TrivialProcs = MerkleSyncNewSendL + MerkleSyncNewRcvL,
             ?DBG_ASSERT(TrivialProcs > 0), % should always be true in this case!
-            P1EOneLeaf = calc_n_subparts_p1e(TrivialProcs, P1EAllLeaves),
             ?MERKLE_DEBUG("merkle (I) - LeafSync~n~B (send), ~B/~B (receive)\tP1EAllLeaves: ~g\t"
-                          "P1EOneLeaf: ~g\tItemsToSend: ~B (~g per leaf)",
+                          "ItemsToSend: ~B (~g per leaf)",
                           [MerkleSyncNewSendL, SyncDRLCount, MerkleSyncNewRcvL,
-                           P1EAllLeaves, P1EOneLeaf,
+                           P1EAllLeaves,
                            lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]),
                            ?IIF(MerkleSyncNewSend =/=[],
                                 lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]) /
@@ -787,7 +787,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
             if MerkleSyncNewSend =/= [] ->
                    {Hashes, NStats2} =
                        merkle_resolve_leaves_send(MerkleSyncNewSend, NStats1,
-                                                  Params, P1EOneLeaf),
+                                                  Params, P1EAllLeaves, TrivialProcs),
                    ?MERKLE_DEBUG("merkle (I) - HashesSize: ~B (~B compressed)",
                                  [erlang:byte_size(Hashes),
                                   erlang:byte_size(
@@ -795,11 +795,13 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                    ?DBG_ASSERT(Hashes =/= <<>>),
                    send(DestReconPid, {resolve_req, Hashes}),
                    NewState#rr_recon_state{stage = resolve, stats = NStats2,
-                                           misc = [{one_leaf_p1e, P1EOneLeaf}]};
+                                           misc = [{all_leaf_p1e, P1EAllLeaves},
+                                                   {trivial_procs, TrivialProcs}]};
                true ->
                    % only wait for the other node's resolve_req
                    NewState#rr_recon_state{stage = resolve, stats = NStats1,
-                                           misc = [{one_leaf_p1e, P1EOneLeaf}]}
+                                           misc = [{all_leaf_p1e, P1EAllLeaves},
+                                                   {trivial_procs, TrivialProcs}]}
             end;
         _ ->
             {P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL} =
@@ -822,17 +824,19 @@ on({resolve_req, Hashes} = _Msg,
                            params = Params,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            dest_recon_pid = DestRCPid, stats = Stats,
-                           misc = [{one_leaf_p1e, P1EOneLeaf}]})
+                           misc = [{all_leaf_p1e, P1EAllLeaves},
+                                   {trivial_procs, TrivialProcs}]})
   when is_bitstring(Hashes) ->
     ?TRACE1(_Msg, State),
     ?DBG_ASSERT(?implies(not IsInitiator, Hashes =/= <<>>)),
     {BinIdxList, NStats} =
         merkle_resolve_leaves_receive(SyncRcv, Hashes, DestRRPid, Stats,
-                                      OwnerL, Params, P1EOneLeaf, IsInitiator),
+                                      OwnerL, Params, P1EAllLeaves, TrivialProcs,
+                                      IsInitiator),
     comm:send(DestRCPid, {resolve_req, idx, BinIdxList}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {SyncSend, [], DirectResolve},
-                                    stats = NStats, misc = [{one_leaf_p1e, P1EOneLeaf}]},
+                                    stats = NStats},
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
     %       -> shutdown if nothing was sent
@@ -1821,51 +1825,75 @@ merkle_max_bucket_size_bits(Params) ->
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
 -spec merkle_resolve_add_leaf_hash(
-        Bucket::merkle_tree:mt_bucket(), BucketSize::non_neg_integer(), P1E::float(),
+        Bucket::merkle_tree:mt_bucket(), BucketSize::non_neg_integer(),
+        P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         OtherMaxItemsCount::non_neg_integer(), BucketSizeBits::pos_integer(),
-        HashesReplyIn::bitstring()) -> HashesReplyOut::bitstring().
-merkle_resolve_add_leaf_hash(Bucket, BucketSize, P1E, OtherMaxItemsCount,
-                             BucketSizeBits, HashesReply) ->
+        AccIn::X) -> AccOut::X
+        when is_subtype(X, {Hashes::bitstring(), PrevP0E::float()}).
+merkle_resolve_add_leaf_hash(
+  Bucket, BucketSize, P1EAllLeaves, NumRestLeaves, OtherMaxItemsCount, BucketSizeBits,
+  {HashesReply, PrevP0E}) ->
     ?DBG_ASSERT(BucketSize < util:pow(2, BucketSizeBits)),
     ?DBG_ASSERT(BucketSize =:= length(Bucket)),
     HashesReply1 = <<HashesReply/bitstring, BucketSize:BucketSizeBits>>,
-    {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, P1E),
-    compress_kv_list(Bucket, HashesReply1, SigSize, VSize).
+    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
+%%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
+%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
+    {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, P1E_next),
+    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount),
+    NextP0E = PrevP0E * (1 - P1E_p1),
+%%     log:pal("merkle_send [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
+%%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
+    {compress_kv_list(Bucket, HashesReply1, SigSize, VSize), NextP0E}.
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
 %%      returned by merkle_resolve_add_leaf_hash/6 during merkle sync.
 -spec merkle_resolve_retrieve_leaf_hashes(
-        Hashes::bitstring(), P1E::float(), MyMaxItemsCount::non_neg_integer(),
+        Hashes::bitstring(), P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
+        PrevP0E::float(), MyMaxItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer())
         -> {NHashes::bitstring(), OtherBucketTree::kvi_tree(),
             OrigDBChunkLen::non_neg_integer(),
-            SigSize::signature_size(), VSize::signature_size()}.
-merkle_resolve_retrieve_leaf_hashes(Hashes, P1E, MyMaxItemsCount, BucketSizeBits) ->
-    <<BSize:BucketSizeBits/integer-unit:1, HashesT/bitstring>> = Hashes,
-    {SigSize, VSize} = trivial_signature_sizes(BSize, MyMaxItemsCount, P1E),
-    OBucketBinSize = BSize * (SigSize + VSize),
+            SigSize::signature_size(), VSize::signature_size(), PrevP0E::float()}.
+merkle_resolve_retrieve_leaf_hashes(
+  Hashes, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount, BucketSizeBits) ->
+    <<BucketSize:BucketSizeBits/integer-unit:1, HashesT/bitstring>> = Hashes,
+    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
+%%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
+%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, MyMaxItemsCount, P1E_next}]),
+    {SigSize, VSize} = trivial_signature_sizes(BucketSize, MyMaxItemsCount, P1E_next),
+    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount),
+    NextP0E = PrevP0E * (1 - P1E_p1),
+%%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
+%%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
+    OBucketBinSize = BucketSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
     OBucketTree = decompress_kv_list(OBucketBin, [], SigSize, VSize, 0),
-    {NHashes, OBucketTree, BSize, SigSize, VSize}.
+    {NHashes, OBucketTree, BucketSize, SigSize, VSize, NextP0E}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
 -spec merkle_resolve_leaves_send(
         Sync::[merkle_sync_send(),...], Stats, Params::#merkle_params{},
-        P1EOneLeaf::float()) -> {Hashes::bitstring(), NewStats::Stats}
+        P1EAllLeaves::float(), TrivialProcs::pos_integer())
+        -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
-merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf) ->
+merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EAllLeaves, TrivialProcs) ->
     BucketSizeBits = merkle_max_bucket_size_bits(Params),
-    {Hashes, LeafCount} =
-        lists:foldl(fun({OtherMaxItemsCount, MyKVItems, MyItemCount},
-                        {Hashes, LeafNAcc}) ->
-                            {merkle_resolve_add_leaf_hash(
-                               MyKVItems, MyItemCount, P1EOneLeaf, OtherMaxItemsCount,
-                               BucketSizeBits, Hashes), LeafNAcc + 1}
-                    end, {<<>>, 0}, Sync),
+    % note: 1 trivial proc contains 1 leaf
+    {{Hashes, ThisP0E}, LeafCount} =
+        lists:foldl(
+          fun({OtherMaxItemsCount, MyKVItems, MyItemCount},
+              {HashesAcc, LeafNAcc}) ->
+                  {merkle_resolve_add_leaf_hash(
+                     MyKVItems, MyItemCount, P1EAllLeaves, TrivialProcs - LeafNAcc,
+                     OtherMaxItemsCount, BucketSizeBits, HashesAcc), LeafNAcc + 1}
+          end, {{<<>>, 1.0}, 0}, Sync),
     % the other node will send its items from this CKV list - increase rs_expected, too
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
-                                 {rs_expected, 1}], Stats),
+    NStats1 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
+                                  {rs_expected, 1}], Stats),
+    ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, NStats1) =:= 0.0),
+    NStats  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E}], NStats1),
     {Hashes, NStats}.
 
 %% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/4
@@ -1874,22 +1902,24 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EOneLeaf) ->
 -spec merkle_resolve_leaves_receive(
         Sync::[merkle_sync_rcv()], Hashes::bitstring(), DestRRPid::comm:mypid(),
         Stats, OwnerL::comm:erl_local_pid(), Params::#merkle_params{},
-        P1EOneLeaf::float(), IsInitiator::boolean())
+        P1EAllLeaves::float(), TrivialProcs::pos_integer(), IsInitiator::boolean())
         -> {HashesReq::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
-                              P1EOneLeaf, IsInitiator) ->
+                              P1EAllLeaves, TrivialProcs, IsInitiator) ->
     BucketSizeBits = merkle_max_bucket_size_bits(Params),
     % mismatches to resolve:
     % * at initiator    : inner(I)-leaf(NI) or leaf(NI)-non-empty-leaf(I)
     % * at non-initiator: inner(NI)-leaf(I)
-    {<<>>, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc} =
+    % note: 1 trivial proc may contain more than 1 leaf!
+    {<<>>, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, _TrivialProcsRest, ThisP0E} =
         lists:foldl(
           fun({MyMaxItemsCount, MyKVItems, LeafCount},
-              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc}) ->
-                  {NHashes, OBucketTree, _OrigDBChunkLen, SigSize, VSize} =
+              {HashesAcc, ToSend, ToResolve, ResolveNonEmpty, LeafNAcc, TProcsAcc, P0EIn}) ->
+                  {NHashes, OBucketTree, _OrigDBChunkLen, SigSize, VSize, ThisP0E} =
                       merkle_resolve_retrieve_leaf_hashes(
-                        HashesAcc, P1EOneLeaf, MyMaxItemsCount, BucketSizeBits),
+                        HashesAcc, P1EAllLeaves, TProcsAcc, P0EIn,
+                        MyMaxItemsCount, BucketSizeBits),
                   % calc diff (trivial sync)
                   {ToSend1, ToReqIdx1, OBucketTree1} =
                       get_full_diff(
@@ -1901,8 +1931,8 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                                                 Params#merkle_params.bucket_size),
                   {NHashes, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   LeafNAcc + LeafCount}
-          end, {Hashes, [], [], false, 0}, Sync),
+                   LeafNAcc + LeafCount, TProcsAcc - 1, ThisP0E}
+          end, {Hashes, [], [], false, 0, TrivialProcs, 1.0}, Sync),
 
     % send resolve message:
     % resolve items we should send as key_upd:
@@ -1919,11 +1949,13 @@ merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
            ToResolve1 = <<>>,
            MerkleResReqs = 0
     end,
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
-                                 {rs_expected, MerkleResReqs}],
-                                Stats1),
+    NStats1 = rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
+                                  {rs_expected, MerkleResReqs}], Stats1),
+    PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, NStats1),
+    NStats  = rr_recon_stats:set(
+                [{p1e_phase2, 1 - (1 - PrevP1E_p2) * ThisP0E}], NStats1),
     ?TRACE("resolve_req Merkle Session=~p ; resolve expexted=~B",
-           [rr_recon_stats:get(session_id, Stats),
+           [rr_recon_stats:get(session_id, NStats),
             rr_recon_stats:get(rs_expected, NStats)]),
     {ToResolve1, NStats}.
 
