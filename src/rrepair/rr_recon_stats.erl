@@ -26,7 +26,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported functions and types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([new/1, new/2, inc/2, set/2, get/2, merge/2, print/1]).
+-export([new/1, new/2, inc/2, set/2, get/2, print/1]).
 
 -export_type([stats/0, status/0]).
 
@@ -42,6 +42,8 @@
          tree_nodesCompared = 0       :: non_neg_integer(),
          tree_compareSkipped= 0       :: non_neg_integer(),
          tree_leavesSynced  = 0       :: non_neg_integer(),
+         p1e_phase1         = 0.0     :: float(),
+         p1e_phase2         = 0.0     :: float(),
          build_time         = 0       :: non_neg_integer(),      %in us
          recon_time         = 0       :: non_neg_integer(),      %in us
          rs_expected        = 0       :: non_neg_integer(),      %number of resolve expected requests
@@ -59,7 +61,8 @@
                {rs_expected, non_neg_integer()}].
 
 -type field_list2()  ::
-          [{status, status()}] | field_list1().
+          [{status, status()} | {p1e_phase1, float()} | {p1e_phase2, float()}]
+            | field_list1().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API Functions
@@ -116,6 +119,8 @@ set([{K, V} | L], Stats) ->
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
+             p1e_phase1          -> Stats#rr_recon_stats{p1e_phase1 = V};
+             p1e_phase2          -> Stats#rr_recon_stats{p1e_phase2 = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
              rs_expected         -> Stats#rr_recon_stats{rs_expected = V};
@@ -128,6 +133,7 @@ set([{K, V} | L], Stats) ->
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
          (tree_leavesSynced, stats())  -> non_neg_integer();
+         (p1e_phase1 | p1e_phase2, stats()) -> float();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
          (rs_expected, stats())        -> non_neg_integer();
@@ -137,26 +143,12 @@ get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
 get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
 get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
+get(p1e_phase1         , #rr_recon_stats{p1e_phase1          = X}) -> X;
+get(p1e_phase2         , #rr_recon_stats{p1e_phase2          = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
 get(rs_expected        , #rr_recon_stats{rs_expected         = X}) -> X;
 get(status             , #rr_recon_stats{status              = X}) -> X.
-
--spec merge(stats(), stats()) -> stats().
-merge(A, #rr_recon_stats{ tree_size = TS,
-                          tree_nodesCompared = TNC,
-                          tree_leavesSynced = TLS,
-                          tree_compareSkipped = TCS,
-                          build_time = BT,
-                          recon_time = RC,
-                          rs_expected = RS }) ->
-    inc([{tree_size, TS},
-         {tree_nodesCompared, TNC},
-         {tree_leavesSynced, TLS},
-         {tree_compareSkipped, TCS},
-         {build_time, BT},
-         {recon_time, RC},
-         {rs_expected, RS}], A).
 
 -spec print(stats()) -> [any()].
 print(Stats) ->
