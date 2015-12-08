@@ -265,7 +265,7 @@ on({create_struct2, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     build_struct(DBList, DestI, RestI, State);
 
 on({start_recon, RMethod, Params} = _Msg,
-   State = #rr_recon_state{dest_rr_pid = DestRRPid, misc = Misc}) ->
+   State = #rr_recon_state{dest_rr_pid = DestRRPid, stats = Stats, misc = Misc}) ->
     ?TRACE1(_Msg, State),
     % initiator got other node's sync struct or parameters over sync interval
     % (mapped to the initiator's range)
@@ -285,6 +285,8 @@ on({start_recon, RMethod, Params} = _Msg,
             OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize + VSize),
             DBChunkTree =
                 decompress_kv_list(DBChunk, [], SigSize, VSize, 0),
+            % calculate P1E(phase1) from the point of view of the non-initiator:
+            P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen}}],
             Reconcile = resolve,
@@ -299,6 +301,8 @@ on({start_recon, RMethod, Params} = _Msg,
             OrigDBChunkLen = calc_items_in_chunk(DBChunk, SigSize),
             DBChunkSet =
                 shash_decompress_kv_list(DBChunk, [], SigSize),
+            % calculate P1E(phase1) from the point of view of the non-initiator:
+            P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, DBChunkSet},
                      {oicount, OrigDBChunkLen}],
@@ -316,6 +320,7 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(Misc =:= []),
             FP = bloom_fp(BFCount, P1E),
             BF = bloom:new_bin(BFBin, ?REP_HFS:new(bloom:calc_HF_numEx(BFCount, FP)), BFCount),
+            P1E_p1 = bloom:get_property(BF, fpr),
             Misc1 = [{bloom, BF}],
             Reconcile = reconcile,
             Stage = reconciliation;
@@ -324,6 +329,7 @@ on({start_recon, RMethod, Params} = _Msg,
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
+            P1E_p1 = 0.0, % needs to be set at the end of phase 1!
             Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation;
@@ -331,6 +337,7 @@ on({start_recon, RMethod, Params} = _Msg,
             MySyncI = art:get_interval(Params#art_recon_struct.art),
             Params1 = Params,
             DestReconPid = undefined,
+            P1E_p1 = 0.0, % TODO
             Misc1 = Misc,
             Reconcile = reconcile,
             Stage = reconciliation
@@ -340,11 +347,12 @@ on({start_recon, RMethod, Params} = _Msg,
     
     send_chunk_req(pid_groups:get_my(dht_node), self(),
                    MySyncI, MySyncI, get_max_items(), Reconcile),
+    NStats  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
     State#rr_recon_state{stage = Stage, params = Params1,
                          method = RMethod, initiator = true,
                          my_sync_interval = MySyncI,
                          dest_recon_pid = DestReconPid,
-                         misc = Misc1};
+                         stats = NStats, misc = Misc1};
 
 on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = resolve,            initiator = true,
@@ -450,6 +458,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                         NewKVList, FullDiffSize,
                                         OtherItemCount, P1E_p2)
                               end),
+                  P1E_p2_real = trivial_worst_case_failprob(
+                                  SigSizeT, FullDiffSize, OtherItemCount),
                   KList = [element(1, KV) || KV <- NewKVList],
                   OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
                   Params1 = Params#shash_recon_struct{db_chunk = <<>>},
@@ -460,8 +470,9 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
                   % the non-initiator will use key_upd_send and we must thus increase
                   % the number of resolve processes here!
-                  NewStats = rr_recon_stats:inc([{rs_expected, 1},
-                                                 {build_time, BuildTime}], Stats),
+                  NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
+                                                  {build_time, BuildTime}], Stats),
+                  NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
                   NewState#rr_recon_state{stats = NewStats, stage = resolve,
                                           params = Params1,
                                           kv_list = [], k_list = KList};
@@ -524,13 +535,16 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                         BFCount, P1E_p2)
                               end),
                   ?DBG_ASSERT(DBChunk =/= <<>>),
+                  P1E_p2_real = trivial_worst_case_failprob(
+                                  SigSize, FullDiffSize, BFCount),
                   
                   send(DestReconPid,
                        {resolve_req, DBChunk, SigSize, VSize, comm:this()}),
                   % the non-initiator will use key_upd_send and we must thus increase
                   % the number of resolve processes here!
-                  NewStats = rr_recon_stats:inc([{rs_expected, 1},
-                                                 {build_time, BuildTime}], Stats),
+                  NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
+                                                  {build_time, BuildTime}], Stats),
+                  NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
                                        kv_list = [],
                                        k_list = [element(1, KV) || KV <- NewKVList],
@@ -900,12 +914,13 @@ build_struct(DBList, SyncI, RestI,
            ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
                         true -> RMethod
                      end,
-           {BuildTime, SyncStruct} =
+           {BuildTime, {SyncStruct, P1E_p1}} =
                util:tc(fun() -> build_recon_struct(ToBuild, SyncI,
                                                    NewKVList, Params)
                        end),
            Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
-           NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1,
+           Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
+           NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats2,
                                            kv_list = NewKVList},
            begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
        true ->
@@ -2297,15 +2312,16 @@ bloom_fp(MaxItems, P1E) ->
 
 -spec build_recon_struct(method(), DestI::intervals:non_empty_interval(),
                          db_chunk_kv(), Params::parameters() | {})
-        -> sync_struct().
+        -> {sync_struct(), P1E_p1::float()}.
 build_recon_struct(trivial, I, DBItems, _Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
     {DBChunkBin, SigSize, VSize} =
         compress_kv_list_p1e(DBItems, ItemCount, ItemCount, get_p1e()),
-    #trivial_recon_struct{interval = I, reconPid = comm:this(),
-                          db_chunk = DBChunkBin,
-                          sig_size = SigSize, ver_size = VSize};
+    {#trivial_recon_struct{interval = I, reconPid = comm:this(),
+                           db_chunk = DBChunkBin,
+                           sig_size = SigSize, ver_size = VSize},
+     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount)};
 build_recon_struct(shash, I, DBItems, _Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
@@ -2315,9 +2331,10 @@ build_recon_struct(shash, I, DBItems, _Params) ->
     % NOTE: use left-over P1E after phase 1 (SHash) for phase 2 (trivial RC)
     P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount),
     P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
-    #shash_recon_struct{interval = I, reconPid = comm:this(),
-                        db_chunk = DBChunkBin, sig_size = SigSize,
-                        p1e_p2 = P1E_p2};
+    {#shash_recon_struct{interval = I, reconPid = comm:this(),
+                         db_chunk = DBChunkBin, sig_size = SigSize,
+                         p1e_p2 = P1E_p2},
+     P1E_p1};
 build_recon_struct(bloom, I, DBItems, _Params) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
@@ -2327,11 +2344,13 @@ build_recon_struct(bloom, I, DBItems, _Params) ->
     FP = bloom_fp(MaxItems, P1E),
     BF0 = bloom:new_fpr(MaxItems, FP, ?REP_HFS:new(bloom:calc_HF_numEx(MaxItems, FP))),
     BF = bloom:add_list(BF0, DBItems),
-    #bloom_recon_struct{interval = I, reconPid = comm:this(),
-                        bf_bin = bloom:get_property(BF, filter),
-                        item_count = MaxItems, p1e = P1E};
+    {#bloom_recon_struct{interval = I, reconPid = comm:this(),
+                         bf_bin = bloom:get_property(BF, filter),
+                         item_count = MaxItems, p1e = P1E},
+     _P1E_p1 = bloom:get_property(BF, fpr)};
 build_recon_struct(merkle_tree, I, DBItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
+    P1E_p1 = 0.0, % needs to be set at the end of phase 1!
     case Params of
         {} ->
             % merkle_tree - at non-initiator!
@@ -2340,7 +2359,7 @@ build_recon_struct(merkle_tree, I, DBItems, Params) ->
             % do not build the real tree here - build during begin_sync so that
             % the initiator can start creating its struct earlier and in parallel
             % the actual build process is executed in begin_sync/3
-            merkle_tree:new(I, [{keep_bucket, true} | MOpts]);
+            {merkle_tree:new(I, [{keep_bucket, true} | MOpts]), P1E_p1};
         #merkle_params{branch_factor = BranchFactor,
                        bucket_size = BucketSize,
                        num_trees = NumTrees} ->
@@ -2350,15 +2369,18 @@ build_recon_struct(merkle_tree, I, DBItems, Params) ->
             % build now
             RootsI = intervals:split(I, NumTrees),
             ICBList = merkle_tree:keys_to_intervals(DBItems, RootsI),
-            [merkle_tree:get_root(
+            {[merkle_tree:get_root(
                merkle_tree:new(SubI, Bucket, [{keep_bucket, true} | MOpts]))
-               || {SubI, _Count, Bucket} <- ICBList];
+               || {SubI, _Count, Bucket} <- ICBList], P1E_p1};
         #art_recon_struct{branch_factor = BranchFactor,
                           bucket_size = BucketSize} ->
+            % ART at initiator
             MOpts = [{branch_factor, BranchFactor},
                      {bucket_size, BucketSize},
                      {leaf_hf, fun art:merkle_leaf_hf/2}],
-            merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts])
+            {merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]),
+             P1E_p1 % TODO
+            }
     end;
 build_recon_struct(art, I, DBItems, _Params = {}) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
@@ -2369,9 +2391,11 @@ build_recon_struct(art, I, DBItems, _Params = {}) ->
                                         {leaf_hf, fun art:merkle_leaf_hf/2},
                                         {keep_bucket, true}]),
     % create art struct:
-    #art_recon_struct{art = art:new(Tree, get_art_config()),
-                      branch_factor = BranchFactor,
-                      bucket_size = BucketSize}.
+    {#art_recon_struct{art = art:new(Tree, get_art_config()),
+                       branch_factor = BranchFactor,
+                       bucket_size = BucketSize},
+     _P1E_p1 = 0.0 % TODO
+    }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
