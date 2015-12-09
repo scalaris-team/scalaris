@@ -61,8 +61,8 @@
 %% write_filter(OldLocalDBentry :: custom_data(),
 %%              InfosToUpdateOutdatedEntry :: info_passed_from_read_to_write(),
 %%              ValueForWriteOperation:: Value())
-%% -> custom_data()
--type write_filter() :: fun((term(), term(), term()) -> term()).
+%% -> {custom_data(), value_returned_to_caller()}
+-type write_filter() :: fun((term(), term(), term()) -> {term(), term()}).
 
 -type state() :: ?PDB:db().
 
@@ -118,8 +118,8 @@ msg_write_deny(Client, Cons, Key, NewerRound) ->
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
 
--spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> term().
-noop_write_filter(_, _, X) -> X.
+-spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> {term(), none}.
+noop_write_filter(_, _, X) -> {X, none}.
 
 %% initialize: return initial state.
 -spec init(atom() | tuple()) -> state().
@@ -169,7 +169,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
         end,
     _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
-                NewVal = WriteFilter(entry_val(NewKeyEntry),
+                {NewVal, _Ret} = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
 %%                case kvx =/= _DB of
 %%                    true ->
