@@ -661,10 +661,11 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
     MPFile = proplists:get_value(mp_file, Options, null),
     EvalRepeats = proplists:get_value(eval_repeats, Options),
     ?ASSERT(EvalRepeats =/= undefined),
-    StepValue = case IncSize of
-                    power -> erlang:round(get_param_value({RingP, ReconP}, IncParam) * math:pow(4, StepCount));
-                    _ -> (IncSize * StepCount) + get_param_value({RingP, ReconP}, IncParam)
-                end,
+    StepValue =
+        case IncSize of
+            power -> erlang:round(get_param_value({RingP, ReconP}, IncParam) * math:pow(4, StepCount));
+            _ -> (IncSize * StepCount) + get_param_value({RingP, ReconP}, IncParam)
+        end,
     {StepRing, StepRC} = set_params({RingP, ReconP}, IncParam, StepValue),
     io:format(">EVALUATE STEPS LEFT: ~p (Repeats per Step: ~p)~cStepValue=~p~n~c~s~n",
               [StepCount, EvalRepeats, ?TAB, StepValue, ?TAB, rc_conf_comment(StepRC)]),
@@ -677,38 +678,40 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
 %    EvalDir = proplists:get_value(eval_dir, Options, "../"),
 %    {Hour, Min, Sec} = proplists:get_value(eval_time, Options, {0, 0, 0}),
     
-    MPList = util:for_to_ex(1, EvalRepeats,
-                            fun(I) ->
-                                    ActI = EvalRepeats - I + 1,
-                                    io:format("~p ", [ActI]),
-                                    {_DBSize, _Load, Missing, Outdated} =
-                                        build_dht({Scen, StepRing, StepRC}),
-                                    InitMP = {Missing, Outdated},
-                                    NodeList = get_node_list(),
-                                    ?ASSERT2(length(NodeList) =:= StepRing#ring_config.node_count,
-                                             "NODES NOT COMPLETE, ABORT"),
-                                    
-                                    %start sync
-                                    trace_mpath:start(TraceName, [{map_fun, fun bw_map_fun/3},
-                                                                  {filter_fun, fun bw_filter_fun/1}]),
-                                    RunRound(NodeList),
-                                    io:format("S "), % code for a successful sync run
-                                    trace_mpath:stop(),
-                                    Trace = trace_mpath:get_trace(TraceName, cleanup),
-                                    
-                                    MP = get_measure_point(EPId, ActI, 1, InitMP, Trace, NodeList),
-                                    
-                                    log:pal("Regenerated: ~B/~B, Updated: ~B/~B",
-                                            [element(5, MP), element(4, MP),
-                                             element(7, MP), element(6, MP)]),
-                                    
-                                    %Trace export
-                                    %rr_eval_export:write_raw(Trace, [{filename, io_lib:format("~p-~p-~p_TRACE_ID~p_I~p", [Hour, Min, Sec, EPId, ActI])},
-                                    %                              {subdir, io_lib:format("~s/Trace", [EvalDir])}]),
-                                    
-                                    reset(),
-                                    MP
-                            end),
+    MPList =
+        util:for_to_ex(
+          1, EvalRepeats,
+          fun(I) ->
+                  ActI = EvalRepeats - I + 1,
+                  io:format("~p ", [ActI]),
+                  {_DBSize, _Load, Missing, Outdated} =
+                      build_dht({Scen, StepRing, StepRC}),
+                  InitMP = {Missing, Outdated},
+                  NodeList = get_node_list(),
+                  ?ASSERT2(length(NodeList) =:= StepRing#ring_config.node_count,
+                           "NODES NOT COMPLETE, ABORT"),
+                  
+                  %start sync
+                  trace_mpath:start(TraceName, [{map_fun, fun bw_map_fun/3},
+                                                {filter_fun, fun bw_filter_fun/1}]),
+                  SessionStats = RunRound(NodeList),
+                  io:format("S "), % code for a successful sync run
+                  trace_mpath:stop(),
+                  Trace = trace_mpath:get_trace(TraceName, cleanup),
+                  
+                  MP = get_measure_point(EPId, ActI, 1, InitMP, Trace, NodeList, SessionStats),
+                  
+                  log:pal("Regenerated: ~B/~B, Updated: ~B/~B",
+                          [element(5, MP), element(4, MP),
+                           element(7, MP), element(6, MP)]),
+                  
+                  %Trace export
+                  %rr_eval_export:write_raw(Trace, [{filename, io_lib:format("~p-~p-~p_TRACE_ID~p_I~p", [Hour, Min, Sec, EPId, ActI])},
+                  %                              {subdir, io_lib:format("~s/Trace", [EvalDir])}]),
+                  
+                  reset(),
+                  MP
+          end),
     
     TimeDiff = erlang:round(timer:now_diff(os:timestamp(), StartT) / (1000*1000)),
     io:format("~n~c~c~cSTEP TIME=~ph ~pm ~ps~n~n", [?TAB, ?TAB, ?TAB,
@@ -748,36 +751,39 @@ system_sync({Scen, RingP, ReconP}, Options, Rounds, EPId) ->
     StartT = os:timestamp(),
     TraceName = rr_eval_trace,
     
-    Results = util:for_to_ex(1, EvalRepeats,
-                         fun(I) ->
-                                 ActI = EvalRepeats - I + 1,
-                                 io:format("~n~p r", [ActI]),
-                                 {_DBSize, Load, _Missing, Outdated} =
-                                     build_dht({Scen, RingP, ReconP}),
-                                 InitMO = {Load, Outdated},
-                                 NodeList = get_node_list(),
-                                 ?ASSERT2(length(NodeList) =:= RingP#ring_config.node_count,
-                                          "NODES NOT COMPLETE, ABORT"),
-                                 FirstMP = get_mp_round(0, ActI, 0, InitMO, [], NodeList),
-
-                                 %start sync
-                                 {_, _, MPL} = lists:foldl(
-                                                 fun(Round, {[ActNode|RNodes], LastMO, AccMP}) ->
-                                                         io:format("~p-", [Round]),
-                                                         trace_mpath:start(TraceName, [{map_fun, fun bw_map_fun/3}, {filter_fun, fun bw_filter_fun/1}]),
-                                                         start_round([ActNode]),
-                                                         trace_mpath:stop(),
-                                                         Trace = trace_mpath:get_trace(TraceName),
-                                                         trace_mpath:cleanup(TraceName),
-                                                         
-                                                         MP = get_mp_round(EPId + Round, ActI, Round, LastMO, Trace, NodeList),
-                                                         {lists:append(RNodes, [ActNode]), {element(4, MP), element(6, MP)}, [MP|AccMP]}
-                                                 end,
-                                                 {NodeList, InitMO, []},
-                                                 lists:seq(1, Rounds)),
-                                 reset(),
-                                 {MPL, FirstMP}
-                         end),
+    Results =
+        util:for_to_ex(
+          1, EvalRepeats,
+          fun(I) ->
+                  ActI = EvalRepeats - I + 1,
+                  io:format("~n~p r", [ActI]),
+                  {_DBSize, Load, _Missing, Outdated} =
+                      build_dht({Scen, RingP, ReconP}),
+                  InitMO = {Load, Outdated},
+                  NodeList = get_node_list(),
+                  ?ASSERT2(length(NodeList) =:= RingP#ring_config.node_count,
+                           "NODES NOT COMPLETE, ABORT"),
+                  FirstMP = get_mp_round(0, ActI, 0, InitMO, [], NodeList),
+                  
+                  %start sync
+                  {_, _, MPL} =
+                      lists:foldl(
+                        fun(Round, {[ActNode|RNodes], LastMO, AccMP}) ->
+                                io:format("~p-", [Round]),
+                                trace_mpath:start(TraceName, [{map_fun, fun bw_map_fun/3}, {filter_fun, fun bw_filter_fun/1}]),
+                                start_round([ActNode]),
+                                trace_mpath:stop(),
+                                Trace = trace_mpath:get_trace(TraceName),
+                                trace_mpath:cleanup(TraceName),
+                                
+                                MP = get_mp_round(EPId + Round, ActI, Round, LastMO, Trace, NodeList),
+                                {lists:append(RNodes, [ActNode]), {element(4, MP), element(6, MP)}, [MP|AccMP]}
+                        end,
+                        {NodeList, InitMO, []},
+                        lists:seq(1, Rounds)),
+                  reset(),
+                  {MPL, FirstMP}
+          end),
     MPList = lists:flatten([element(1, X) || X <- Results]),
     NullMP = element(2, hd(Results)),
     
@@ -905,13 +911,15 @@ start_round(Nodes) ->
                   end, Nodes),
     ok.
 
--spec wait_sync_end(Nodes::[comm:mypid()], PrincipalUsed::boolean()) -> ok.
+-spec wait_sync_end
+    (Nodes::[comm:mypid()], PrincipalUsed::false) -> ok;
+    (Nodes::[comm:mypid()], PrincipalUsed::true) -> rrepair:session().
 wait_sync_end(Nodes, true) ->
     receive
-        % TODO: use and verify stats for plausibility
-        ?SCALARIS_RECV({request_sync_complete, _Stats}, ok)
+        ?SCALARIS_RECV({request_sync_complete, Stats}, ok)
     end,
-    wait_sync_end(Nodes, false);
+    wait_sync_end(Nodes, false),
+    Stats;
 wait_sync_end(Nodes, false) ->
     Req = {get_state, comm:this(), [open_sessions, open_recon, open_resolve]},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, Nodes) end, 200),
@@ -1346,15 +1354,23 @@ get_bandwidth(Trace) ->
 
 -spec get_measure_point(rr_eval_point:point_id(), Iteration::non_neg_integer(),
                         Round::non_neg_integer(), init_mp(),
-                        Trace::trace_mpath:trace(), NodeList::[comm:mypid()])
+                        Trace::trace_mpath:trace(), NodeList::[comm:mypid()],
+                        SessionStats::rrepair:session())
         -> rr_eval_point:measure_point().
-get_measure_point(Id, Iter, Round, {Miss, Outd}, Trace, NodeList) ->
+get_measure_point(Id, Iter, Round, {Miss, Outd}, Trace, NodeList, SessionStats) ->
     {_, _, M, O} = get_db_status(NodeList),
     {RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV} = get_bandwidth(Trace),
+    
+    % TODO: use and verify stats for plausibility
+    RCStats = rrepair:session_get(rc_stats, SessionStats),
+    P1E_p1 = rr_recon_stats:get(p1e_phase1, RCStats),
+    P1E_p2 = rr_recon_stats:get(p1e_phase2, RCStats),
+%%     log:pal(" Stats: ~p", [rr_recon_stats:print(RCStats)]),
+    
     {Id, Iter, Round,
      Miss, Miss - M,
      Outd, Outd - O,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, P1E_p1, P1E_p2}.
 
 -spec get_mp_round(rr_eval_point:point_id(), Iteration::non_neg_integer(),
                    Round::non_neg_integer(), init_mp(),
@@ -1366,7 +1382,7 @@ get_mp_round(Id, Iter, Round, {Miss, Outd}, Trace, NodeList) ->
     {Id, Iter, Round,
      ActLoad, ActLoad - Miss,
      ActOut, Outd - ActOut,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, '-', '-'}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
