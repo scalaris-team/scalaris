@@ -125,10 +125,10 @@ is_valid_delete(ExistingEntry, _WriteFilter, prbr_bottom) ->
     end.
 
 %% write filters
-%% WF(old_dbdata(), UpdateInfo, value()) -> dbdata().
--spec wf_decide(txid_entry(), null, commit | abort) -> txid_entry().
+%% WF(old_dbdata(), UpdateInfo, value()) -> {dbdata(), val_passed_to_caller()}.
+-spec wf_decide(txid_entry(), null, commit | abort) -> {txid_entry(), none}.
 wf_decide(Old, null, Decision) ->
-    set_status(Old, Decision).
+    {set_status(Old, Decision), none}.
 
 %% abstract data type: txid_entry
 -spec new_entry(?RT:key(), [client_key()], comm:mypid()) -> txid_entry().

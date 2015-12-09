@@ -162,7 +162,7 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
              ?RT:key(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
-             fun ((any(), any(), any()) -> any()), %% write filter
+             fun ((any(), any(), any()) -> {any(), any()}), %% write filter
 %%              %% select what you need to read for the operation
 %%              fun ((CustomData) -> ReadInfo),
 %%              %% is it an allowed follow up operation? and what info is
@@ -171,8 +171,9 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
 %%                    {fun ((ReadInfo, WriteValue) -> CustomData),
 %%                     WriteValue}) -> {boolean(), PassedInfo}),
 %%              %% update the db entry with the given infos, must
-%%              %% generate a valid custom datatype
-%%              fun ((PassedInfo, WriteValue) -> CustomData),
+%%              %% generate a valid custom datatype. ReturnValue is included
+%%              %% in qwrite_done message for the caller.
+%%              fun ((PassedInfo, WriteValue) -> {CustomData, ReturnValue}),
 %%              %%module(),
              client_value()) -> ok.
 qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,

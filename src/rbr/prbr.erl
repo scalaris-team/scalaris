@@ -169,6 +169,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
         end,
     _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
+                % TODO: return _Ret as part of qwrite_done message
                 {NewVal, _Ret} = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
 %%                case kvx =/= _DB of
