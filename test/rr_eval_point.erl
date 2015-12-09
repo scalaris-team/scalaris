@@ -222,9 +222,10 @@ dist_to_name(Dist) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec mean_w_error(integer(), [tuple()])
-        -> {Mean::float(), StdError::float(), Min::integer(), Max::integer()}.
+        -> {Mean::float(), StdError::float(), Min::X, Max::X}
+        when is_subtype(X, number()).
 mean_w_error(_ElementPos, []) ->
-    {0, 0, 0, 0};
+    {0.0, 0.0, 0, 0};
 mean_w_error(ElementPos, [H | TL]) ->
     HE = element(ElementPos, H),
     {Len, Sum, Sum2, Min, Max} =
