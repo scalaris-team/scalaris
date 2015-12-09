@@ -485,8 +485,8 @@ tester_type_check_rrepair(_Config) ->
              {shash_compress_k_list, 7}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list_, 3}, %% needs a special binary to correspond to a number of bits
-             {decompress_idx_to_k_list_kv, 2}, %% needs a special binary to correspond to a number of bits
-             {decompress_idx_to_k_list_kv_, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_kv_list, 2}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_to_kv_list_, 3}, %% needs a special binary to correspond to a number of bits
              {shash_bloom_perform_resolve, 7}, %% needs a special binary to correspond to a number of bits
              {merkle_check_node, 17}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 16}, %% needs matching result and merkle nodes
