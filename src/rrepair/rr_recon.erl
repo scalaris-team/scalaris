@@ -2251,6 +2251,8 @@ bits_for_number(Number) ->
 %%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
 %%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
 -spec calc_n_subparts_p1e(N::number(), P1E::float()) -> P1E_sub::float().
+calc_n_subparts_p1e(N, P1E) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
+    P1E;
 calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%     _VP = 1 - math:pow(1 - P1E, 1 / N).
     % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
@@ -2269,7 +2271,7 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
 -spec calc_n_subparts_p1e(N::number(), P1E::float(), PrevP0::float())
         -> P1E_sub::float().
-calc_n_subparts_p1e(1, P1E, 1.0) ->
+calc_n_subparts_p1e(N, P1E, 1.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
     % special case with e.g. no items in the first/previous phase
     P1E;
 calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
