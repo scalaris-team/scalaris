@@ -701,7 +701,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                           MyLastMaxItemsCount, OtherMaxItemsCount, Params, Stats,
                           <<>>, [], [], [], [], 0, MerkleSync, 0, 0, 0,
                           0, 0),
-    ?IIF((1 - EffectiveP1E_I >= 1) orelse (1 - EffectiveP1E_L >= 1),
+    ?IIF((EffectiveP1E_I > 0 andalso (1 - EffectiveP1E_I >= 1)) orelse
+             (1 - EffectiveP1E_L >= 1), % EffectiveP1E_L is always greater than 0
          log:log("~w: [ ~p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
                  " P1E_I = ~g, P1E_L = ~g",
                  [?MODULE, pid_groups:my_groupname(), self(),
