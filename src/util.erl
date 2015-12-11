@@ -234,28 +234,22 @@ log(X, B) -> math:log10(X) / math:log10(B).
 
 %% @doc Logarithm of X to the base of 2.
 -spec log2(X::number()) -> float().
-log2(X) -> log(X, 2).
+log2(X) -> math:log10(X) / 0.3010299956639812. % use hard-coded math:log10(2)
 
 %% @doc Returns the largest integer not larger than X.
 -spec floor(X::number()) -> integer().
-floor(X) when X >= 0 ->
-    erlang:trunc(X);
 floor(X) ->
     T = erlang:trunc(X),
-    case T == X of
-        true -> T;
-        _    -> T - 1
+    if X < T -> T - 1;
+       true  -> T
     end.
 
 %% @doc Returns the smallest integer not smaller than X.
 -spec ceil(X::number()) -> integer().
-ceil(X) when X < 0 ->
-    erlang:trunc(X);
 ceil(X) ->
     T = erlang:trunc(X),
-    case T == X of
-        true -> T;
-        _    -> T + 1
+    if X > T -> T + 1;
+       true  -> T
     end.
 
 -spec logged_exec(Cmd::string() | atom()) -> ok.
