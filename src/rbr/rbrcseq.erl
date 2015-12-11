@@ -348,7 +348,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
                 case pr:get_wf(entry_latest_seen(ReadEntry)) of
                     none ->
-                        {fun prbr:noop_write_filter/3, null,
+                        {fun prbr:noop_write_filter/3, none,
                          entry_val(ReadEntry)};
                     WTInfos ->
                         %% WTInfo = write through infos
@@ -357,7 +357,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                         WTInfos
                  end,
             Filters = {fun prbr:noop_read_filter/1,
-                       fun(_,_,_) -> {true, null} end,
+                       fun(_,_,_) -> {true, none} end,
                        WTWF},
 
             Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
@@ -801,7 +801,7 @@ set_entry(NewEntry, TableName) ->
 entry_new_read(Debug, ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, Client,
      _MyRound = pr:new(0, 0), _NumAcked = 0,
-     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _AckVal = 0, Filter, 0}.
+     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _Val = empty_new_read_entry, Filter, 0}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
