@@ -153,7 +153,6 @@ if (plotCount == 1) {
   set style data yerrorbars
 }
 set xtics 0,step_size,5*step_size
-set format x "%g %%"
 set grid layerdefault   linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
 
@@ -185,15 +184,16 @@ acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height - 0.006) : (red_pos_y + re
 
 set size all_width_l,acc_height
 set origin -0.002,acc_pos_y
+if (acc_upd_max > 0.5 && acc_upd_max <= 1) {
+  set ytics 0.2
+} else {
+  set ytics autofreq
+}
 unset xlabel
 set format x ""
 set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
-if (bw_max > 1000) {
-  set format y " %2.1f"
-} else {
-  set format y "%2.1f"
-}
+set format y " %2.1f"
 if (plotCount > 1) {
   set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
@@ -204,38 +204,43 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
  u (plotShift(column(col_fprob), i)):(column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)):(stderrSum(column(col_sd_regen),column(col_sd_updated))) t get_title(i) ls i
 
 set origin 0.49,acc_pos_y
+set rmargin at screen 0.924
 unset key
 unset ylabel
 unset ytics
 set grid y2tics
 if (regenAccInPercent == 1) {
   set y2tics mirror offset 0 scale 0.8
-  if (bw_max > 1000) {
-    set size (all_width_r + 0.028),acc_height
-    set format y2 "%-2.1f_{ }%%"
-  } else {
-    set size (all_width_r + 0.01),acc_height
-    set format y2 "%-2.0f_{ }%%"
-  }
+  set size (all_width_r + 0.028),acc_height
+  set format y2 "%-2.1f_{ }%%"
   set y2range [(acc_reg_avg-acc_reg_max):(acc_reg_avg+acc_reg_max)]
 } else {
   set size all_width_r,acc_height
-  set y2tics mirror format "%-1.1f" scale 0.8
+  if (acc_reg_max > 0.5 && acc_reg_max <= 1) {
+    set y2tics 0.2 mirror format "%-1.1f" scale 0.8
+  } else {
+    set y2tics autofreq mirror format "%-1.1f" scale 0.8
+  }
   set y2range [0:acc_reg_max]
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_fprob), i)):(regenAcc(column(col_regen)+column(col_updated), column(col_missing)+column(col_outdated))):(regenAccErr(column(col_sd_regen),column(col_sd_updated),(column(col_missing)+column(col_outdated)))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
 
-set ytics scale 0.8
+set ytics autofreq scale 0.8
 unset y2tics
+unset rmargin
 set grid noy2tics
 
 # redundancy
 
-set ytics autofreq
 set size all_width_l,red_height
 set origin -0.002,red_pos_y
+if (red_max > 0.5 && red_max <= 1) {
+  set ytics 0.2
+} else {
+  set ytics autofreq
+}
 if (absoluteRedundancy == 1) {
 set ylabel "Red." font ",16" # transferred / updated
 } else {
@@ -243,13 +248,8 @@ set ylabel "rel. Red." font ",16" # transferred / updated
 }
 set yrange [0:red_max]
 set y2range [0:red_max]
-if (bw_max > 1000) {
-  set format y " %2.1f"
-  set format y2 "%-2.1f "
-} else {
-  set format y "%2.1f"
-  set format y2 "%-2.1f"
-}
+set format y " %2.1f"
+set format y2 "%-2.1f"
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
@@ -259,21 +259,27 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
 
 set size all_width_r,red_height
 set origin 0.49,red_pos_y
+set rmargin at screen 0.924
 if (plotCount == 1) {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror scale 0.8
+if (red_max > 0.5 && red_max <= 1) {
+  set y2tics 0.2 mirror scale 0.8
+} else {
+  set y2tics autofreq mirror scale 0.8
+}
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 with yerrorbars notitle ls (plotCount > 1 ? (100+i) : 100)
 
-set ytics scale 0.8
+set ytics autofreq scale 0.8
 unset y2tics
+unset rmargin
 set grid noy2tics
 
 # bandwidth
@@ -281,11 +287,11 @@ set grid noy2tics
 set size all_width_l,bw_height
 set origin -0.002,0
 set xlabel "total δ, update" font ",16"
-set xtics 0,step_size,5*step_size format "%g %%" rotate by -30 offset -1,0
+set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
 set ylabel "RC costs (phase 1+2) in KiB" font ",16"
 set yrange [0:bw_max]
 set y2range [0:bw_max]
-set format y "%3.0f"
+set format y "%4.0f"
 set mytics 2
 if (plotCount > 1) {
   set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
@@ -311,12 +317,13 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
 
 set size all_width_r,bw_height
 set origin 0.49,0
+set rmargin at screen 0.924
 set xlabel "total δ, regen" font ",16"
 unset key
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror format "%-3.0f" scale 0.8
+set y2tics autofreq mirror format "%-3.0f" scale 0.8
 set my2tics 2
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \

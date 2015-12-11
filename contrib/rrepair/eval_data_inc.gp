@@ -285,8 +285,8 @@ if (plotCount > 1) {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 
-LABEL = "n × (128+32) bits\n_{(≥ naïve approach)}"
-set label 10 at 6,264000*(128+32)/8/1024 LABEL front left font ",12" textcolor rgb "#777777"
+LABELu = "n × (128+32) bits\n_{(≥ naïve approach)}"
+set label 10 at 6,264000*(128+32)/8/1024 LABELu front left font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
@@ -308,6 +308,10 @@ unset ytics
 set grid y2tics
 set y2tics mirror format "%-5.0f" scale 0.8
 
+unset label 10
+LABELr = "n × (1-δ) × (128+32) bits\n_{(≥ naïve approach)}"
+set label 10 at 4,512000*(128+32)/8/1024 LABELr front left font ",12" textcolor rgb "#777777"
+
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
@@ -317,4 +321,4 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 6
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)*(1-column(col_fprob)/100.0)/4*(128+32)/8)) with linespoints notitle ls 6
