@@ -1174,7 +1174,9 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
     %         point representation is sub-optimal!
     % => use Taylor expansion of math:log(1 / (1-P1E))  at P1E = 0
     %    (small terms first)
-    P = lists:sum([math:pow(P1E, X) / X || X <- lists:seq(5, 1, -1)]), % +O[p^6]
+    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+log%281+%2F+%281-p%29%29++at+p+%3D+0
+    P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
+    P = P1E + P1E2/2 + P1E3/3 + P1E4/4 + P1E5/5, % +O[p^6]
     min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
@@ -2230,11 +2232,13 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
     % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
     %         point representation is sub-optimal!
     % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
+    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%281+-+p%29^%281%2Fn%29++at+p+%3D+0
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
-    _VP = P1E / N + (N - 1) * math:pow(P1E, 2) / (2 * N2)
-              + (2*N2 - 3*N + 1) * math:pow(P1E, 3) / (6 * N3)
-              + (6*N3 - 11*N2 + 6*N - 1) * math:pow(P1E, 4) / (24 * N4)
-              + (24*N4 - 50*N3 + 35*N2 - 10*N + 1) * math:pow(P1E, 5) / (120 * N5). % +O[p^6]
+    P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
+    _VP = P1E / N + (N - 1) * P1E2 / (2 * N2)
+              + (2*N2 - 3*N + 1) * P1E3 / (6 * N3)
+              + (6*N3 - 11*N2 + 6*N - 1) * P1E4 / (24 * N4)
+              + (24*N4 - 50*N3 + 35*N2 - 10*N + 1) * P1E5 / (120 * N5). % +O[p^6]
 
 %% @doc Splits P1E into N further (equal) independent sub-processes and returns
 %%      the P1E to use for the next of these sub-processes with the previous
@@ -2250,12 +2254,13 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
                                              PrevP0E > 0 andalso PrevP0E =< 1 ->
     % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%28%281+-+p%29%2Fq%29^%281%2Fn%29++at+p+%3D+0
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
+    P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
     Q = math:pow(1 / PrevP0E, 1 / N),
     _VP = (1 - Q) + (P1E * Q) / N +
-              ((N-1) * math:pow(P1E, 2) * Q) / (2 * N2) +
-              ((N-1) * (2 * N - 1) * math:pow(P1E, 3) * Q) / (6 * N3) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * math:pow(P1E, 4) * Q) / (24 * N4) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * math:pow(P1E, 5) * Q) / (120 * N5). % +O[p^6]
+              ((N-1) * P1E2 * Q) / (2 * N2) +
+              ((N-1) * (2 * N - 1) * P1E3 * Q) / (6 * N3) +
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * P1E4 * Q) / (24 * N4) +
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q) / (120 * N5). % +O[p^6]
 
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
