@@ -106,9 +106,9 @@ msg_read_reply(Client, Cons, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, Cons, YourRound, Val, LastWriteRound}).
 
 -spec msg_write_reply(comm:mypid(), Consistency::boolean(),
-                      any(), pr:pr(), pr:pr()) -> ok.
-msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite) ->
-    comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite}).
+                      any(), pr:pr(), pr:pr(), any()) -> ok.
+msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet) ->
+    comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet}).
 
 -spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), pr:pr())
                     -> ok.
@@ -169,8 +169,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
         end,
     _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
-                % TODO: return _Ret as part of qwrite_done message
-                {NewVal, _Ret} = WriteFilter(entry_val(NewKeyEntry),
+                {NewVal, Ret} = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
 %%                case kvx =/= _DB of
 %%                    true ->
@@ -180,7 +179,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
 %%                        "Val: ~p", [Key, KeyEntry, NewVal]);
 %%                    _ -> ok
 %%                end,
-                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound),
+                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound, Ret),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
 %%                case kvx =/= _DB of

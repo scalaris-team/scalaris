@@ -150,7 +150,7 @@ write(Key, Value) ->
                    fun ?MODULE:wf_set_vers_val/3, Value),
     trace_mpath:thread_yield(),
     receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value}, {ok}); %%;
+        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, _WriteRet}, {ok}); %%;
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
                        begin log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
                        {ok} end) %% TODO: extend write_result type {fail, Reason} )
@@ -158,7 +158,7 @@ write(Key, Value) ->
             log:log("~p write hangs at key ~p, ~p~n",
                     [self(), Key, erlang:process_info(self(), messages)]),
             receive
-                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value},
+                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value, _WriteRet},
                                begin
                                    log:log("~p write was only slow at key ~p~n",
                                            [self(), Key]),

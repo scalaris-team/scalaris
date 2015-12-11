@@ -362,7 +362,7 @@ test_split_but_lease_already_exists(_Config) ->
                                ContentCheck,
                                New),
                 receive
-                    {qwrite_done, _ReqId, _Round, _} -> ok;
+                    {qwrite_done, _ReqId, _Round, _, _} -> ok;
                     X -> ct:pal("wrong message ~p", [X]),
                           timer:sleep(4000)
                 end
