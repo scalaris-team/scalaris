@@ -1603,18 +1603,18 @@ merkle_next_signature_sizes(
            AffectedItemsI = MyMaxItemsCount + OtherMaxItemsCount,
            NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / P1E_I)),
                                   get_min_hash_bits(), 160),
-           EffectiveP1E_I = AffectedItemsI / util:pow(2, NextSigSizeI);
+           EffectiveP1E_I = float(AffectedItemsI / util:pow(2, NextSigSizeI));
        true ->
            NextSigSizeI = 0,
-           EffectiveP1E_I = 0
+           EffectiveP1E_I = 0.0
     end,
     ?DBG_ASSERT2(EffectiveP1E_I >= 0 andalso EffectiveP1E_I < 1, EffectiveP1E_I),
 
     AffectedItemsL = 2 * BucketSize,
     NextSigSizeL = min_max(util:ceil(util:log2(AffectedItemsL / P1E_L)),
                            get_min_hash_bits(), 160),
-    EffectiveP1E_L = AffectedItemsL / util:pow(2, NextSigSizeL),
-    ?DBG_ASSERT2(EffectiveP1E_L >= 0 andalso EffectiveP1E_L < 1, EffectiveP1E_L),
+    EffectiveP1E_L = float(AffectedItemsL / util:pow(2, NextSigSizeL)),
+    ?DBG_ASSERT2(EffectiveP1E_L > 0 andalso EffectiveP1E_L < 1, EffectiveP1E_L),
 
     ?MERKLE_DEBUG("merkle - signatures~nMyMI: ~B,\tOtMI: ~B"
                   "\tP1E_I: ~g,\tP1E_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
