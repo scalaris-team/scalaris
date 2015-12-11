@@ -336,7 +336,7 @@ on({tx_tm_commit, Client, ClientsID, TLog}, State) ->
 
 %% tx is stored in txid store
 on({tx_tm_txid_stored, TxId,
-    {qwrite_done, _ReqId, NextWriteRound, WrittenVal}}, State) ->
+    {qwrite_done, _ReqId, NextWriteRound, WrittenVal, _WriteRet}}, State) ->
     %% store NextWriteRound and WrittenValue for fast write of decision
     TxState = get_entry(TxId, State),
     T1TxState = tx_state_set_txid_next_write_token(TxState, NextWriteRound),
@@ -367,7 +367,7 @@ on({tx_tm_acquire_locks, TxId}, State) ->
 
 %% lock for a tlog entry was acquired (or not)
 on({tx_tm_lock_get_done, TxId, Key,
-    {qwrite_done, _ReqId, NextRound, WrittenVal}}, State) ->
+    {qwrite_done, _ReqId, NextRound, WrittenVal, _WriteRet}}, State) ->
     case get_entry(TxId, State) of
         undefined ->
             State;
@@ -435,7 +435,7 @@ on({tx_tm_write_decision, TxId, Decision, WriteRound, OldVal}, State) ->
     State;
 
 on({tx_tm_decision_stored, TxId,
-    {qwrite_done, _ReqId, _Round, Decision}}, State) ->
+    {qwrite_done, _ReqId, _Round, Decision, _WriteRet}}, State) ->
     gen_component:post_op({tx_tm_execute_decision, TxId, Decision}, State);
 
 on({tx_tm_execute_decision, TxId, Decision}, State) ->
@@ -468,7 +468,7 @@ on({tx_tm_execute_decision, TxId, Decision}, State) ->
 
 on({tx_tm_executed_decision, TxId, Key, Decision,
     _QwriteAnswer},
-    %% either: {qwrite_done, _ReqId, _Round, _Val}}
+    %% either: {qwrite_done, _ReqId, _Round, _Val, _WriteRet}}
     %% or:     {qwrite_deny, _ReqId, _Round, _Val, Reason}}
     %% deny is also ok, probably the decision was propagated otherwise
     %% (write_through during concurrency, so we accept a write deny).

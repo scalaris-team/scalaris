@@ -297,7 +297,7 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
     update_lease(ReplyTo, ContentCheck, Old, New, State),
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode, _Renew}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value, _WriteRet}, _New, Mode, _Renew}, State) ->
     %% log:pal("successful renew~n~w~n~w~n", [Value, l_on_cseq:get_id(Value)]),
     case lease_list:contains_lease(Value, State, Mode) of
         true ->
@@ -387,7 +387,7 @@ on({l_on_cseq, unittest_update,
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
+on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value, _WriteRet},
     Old, New, Mode, Caller}, State) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     %% io:format("successful update~n", []),
@@ -439,7 +439,7 @@ on({l_on_cseq, handover, Old = #lease{epoch=OldEpoch},
     State;
 
 
-on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
+on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value, _WriteRet}, ReplyTo,
     _NewOwner, _New}, State) ->
     % @todo if success update lease in State
     ?TRACE("successful handover ~p~n", [Value]),
@@ -492,7 +492,7 @@ on({l_on_cseq, takeover, Old = #lease{epoch=OldEpoch},
 
 
 on({l_on_cseq, takeover_reply, ReplyTo,
-    {qwrite_done, _ReqId, _Round, Value}}, State) ->
+    {qwrite_done, _ReqId, _Round, Value, _WriteRet}}, State) ->
     %% log:log("takeover success ~p~n", [Value]),
     comm:send_local(ReplyTo, {takeover, success, Value}),
     lease_list:update_lease_in_dht_node_state(Value, State, passive, takeover);
@@ -579,7 +579,7 @@ on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, merge_reply_step1, L2 = #lease{epoch=OldEpoch}, ReplyTo,
-    {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    {qwrite_done, _ReqId, _Round, L1, _WriteRet}}, State) ->
     % @todo if success update lease in State
     New = L2#lease{epoch   = OldEpoch + 1,
                    version = 0,
@@ -624,7 +624,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
         unexpected_timeout ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
         %unexpected_epoch ->
         %    % cannot happen
@@ -639,7 +639,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State))
     end;
 
@@ -649,7 +649,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=_OldEpoch}, ReplyTo,
-    {qwrite_done, _ReqId, _Round, L2}}, State) ->
+    {qwrite_done, _ReqId, _Round, L2, _WriteRet}}, State) ->
     New = prbr_bottom,
     ContentCheck = cc_delete_lease(L1, merge_step3),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step3,
@@ -712,7 +712,7 @@ on({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, merge_reply_step3, {L1Id, L2 = #lease{epoch=OldEpoch}}, ReplyTo,
-    {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    {qwrite_done, _ReqId, _Round, L1, _WriteRet}}, State) ->
     % @todo if success update lease in State
     ?TRACE("successful merge step3 ~p~n", [L1]),
     New = L2#lease{epoch   = OldEpoch + 1,
@@ -726,7 +726,7 @@ on({l_on_cseq, merge_reply_step3, {L1Id, L2 = #lease{epoch=OldEpoch}}, ReplyTo,
     lease_list:remove_lease_from_dht_node_state(L1, L1Id, State, passive);
 
 on({l_on_cseq, merge_reply_step4, {_L1Id, L1}, ReplyTo,
-    {qwrite_done, _ReqId, Round, L2}}, State) ->
+    {qwrite_done, _ReqId, Round, L2, _WriteRet}}, State) ->
     ?TRACE("successful merge ~p~p~n", [ReplyTo, L2]),
     comm:send_local(ReplyTo, {merge, success, L2, L1}),
     lease_list:update_lease_in_dht_node_state(L2,
@@ -745,12 +745,12 @@ on({l_on_cseq, merge_reply_step4, {L1Id, L1}, ReplyTo,
         unexpected_timeout ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State))
     end;
 
@@ -795,7 +795,7 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, _Keep, ReplyTo, _PostAux,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step1, L2=#lease{id=_Id,epoch=OldEpoch}, R1, R2,
-    Keep, ReplyTo, PostAux, {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    Keep, ReplyTo, PostAux, {qwrite_done, _ReqId, _Round, L1, _WriteRet}}, State) ->
     ?TRACE("split second step(~w): updating L2 (~p)~n", [self(), _Id]),
     _Active = get_active_lease(State),
     ?TRACE("split second step(~w):~n~w~n~w~n~w~n", [self(), _Active, L1, L2]),
@@ -833,25 +833,25 @@ on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         unexpected_epoch ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         unexpected_version ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State)
     end;
 
@@ -862,7 +862,7 @@ on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step2,
     L1 = #lease{id=_Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_done, _ReqId, _Round, L2}}, State) ->
+    {qwrite_done, _ReqId, _Round, L2, _WriteRet}}, State) ->
     ?TRACE("split third step(~w): renew L1 ~p~n", [self(), _Id]),
     _Active = get_active_lease(State),
     ?TRACE("split_reply_step2(~w):~n~w~n~w~n~w~n", [self(), _Active, L1, L2]),
@@ -893,25 +893,25 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                   {qwrite_done, fake_reqid, fake_round, L2, none}},
                                   State);
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                   {qwrite_done, fake_reqid, fake_round, L2, none}},
                                   State);
         unexpected_epoch ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                   {qwrite_done, fake_reqid, fake_round, L2, none}},
                                   State);
         unexpected_version ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                   {qwrite_done, fake_reqid, fake_round, L2, none}},
                                   State)
     end;
 
@@ -922,7 +922,7 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step3,
     L2 = #lease{id=_Id,epoch=OldEpoch}, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    {qwrite_done, _ReqId, _Round, L1, _WriteRet}}, State) ->
     ?TRACE("split fourth step: renew L2 ~p ~p ~p ~p~n", [R1, R2, _Id, PostAux]),
     New = L2#lease{
             epoch   = OldEpoch + 1,
@@ -936,7 +936,7 @@ on({l_on_cseq, split_reply_step3,
     lease_list:update_lease_in_dht_node_state(L1, State, passive, split_reply_step3);
 
 on({l_on_cseq, split_reply_step4, L1, _R1, _R2, _Keep, ReplyTo, _PostAux,
-    {qwrite_done, _ReqId, _Round, L2}}, State) ->
+    {qwrite_done, _ReqId, _Round, L2, _WriteRet}}, State) ->
     ?TRACE("successful split~n", []),
     ?TRACE("successful split ~p~n", [ReplyTo]),
     _Active = get_active_lease(State),
@@ -960,25 +960,25 @@ on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         unexpected_epoch ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State);
         unexpected_version ->
             % retry
             gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
                                    Keep, ReplyTo, PostAux,
-                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                   {qwrite_done, fake_reqid, fake_round, L1, none}},
                                   State)
     end;
 

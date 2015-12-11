@@ -150,7 +150,7 @@ write(Key, Value) ->
                    fun ?MODULE:wf_set_vers_val/3, Value),
     trace_mpath:thread_yield(),
     receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value}, {ok}); %%;
+        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, _WriteRet}, {ok}); %%;
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
                        begin log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
                        {ok} end) %% TODO: extend write_result type {fail, Reason} )
@@ -158,7 +158,7 @@ write(Key, Value) ->
             log:log("~p write hangs at key ~p, ~p~n",
                     [self(), Key, erlang:process_info(self(), messages)]),
             receive
-                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value},
+                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value, _WriteRet},
                                begin
                                    log:log("~p write was only slow at key ~p~n",
                                            [self(), Key]),
@@ -183,12 +183,12 @@ cc_single_write({RL, WL, Vers}, _WriteFilter, _Val) ->
     cc_return_val(cc_single_write, Checks, _UI_if_ok = Vers, ?LOG_CC_FAILS).
 
 -spec wf_set_vers_val(db_entry() | prbr_bottom, version(),
-                      client_value()) -> db_entry().
+                      client_value()) -> {db_entry(), none}.
 wf_set_vers_val(prbr_bottom, Version, WriteValue) ->
-    {_RL = [], _WL = no_write_lock, Version, WriteValue};
+    {{_RL = [], _WL = no_write_lock, Version, WriteValue}, none};
 wf_set_vers_val(Entry, Version, WriteValue) ->
     T = set_vers(Entry, Version + 1),
-    set_val(T, WriteValue).
+    {set_val(T, WriteValue), none}.
 
 
 
@@ -243,9 +243,9 @@ cc_set_rl({WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
     cc_return_val(cc_set_rl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_rl(db_entry(), UI :: {writelock(), version()} | no_value_yet,
-                {txid_on_cseq:txid(), version()}) -> db_entry().
+                {txid_on_cseq:txid(), version()}) -> {db_entry(), none}.
 wf_set_rl(DBEntry, _UI, {TxId, _Vers}) ->
-    set_readlock(DBEntry, TxId).
+    {set_readlock(DBEntry, TxId), none}.
 
 
 %% set_lock write: read filter, content check and write filter
@@ -275,15 +275,15 @@ cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
     cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_wl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), -1}) -> db_entry();
-       (db_entry(),  UI :: none, {txid_on_cseq:txid(), version()}) -> db_entry().
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), -1}) -> {db_entry(), none};
+       (db_entry(),  UI :: none, {txid_on_cseq:txid(), version()}) -> {db_entry(), none}.
 wf_set_wl(prbr_bottom, _UI = none, {TxId, -1}) ->
-    set_writelock(new_entry(), TxId);
+    {set_writelock(new_entry(), TxId), none};
 wf_set_wl(prbr_bottom, _UI = none, {TxId, _}) ->
 %%    ct:pal("should only happen in tester unittests~n"),
-    set_writelock(new_entry(), TxId);
+    {set_writelock(new_entry(), TxId), none};
 wf_set_wl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
-    set_writelock(DBEntry, TxId).
+    {set_writelock(DBEntry, TxId), none}.
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_read
@@ -340,11 +340,11 @@ cc_commit_read({_RL, _WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
     cc_return_val(cc_commit_read, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_rl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0}) -> prbr_bottom;
-       (db_entry(), UI :: none, {txid_on_cseq:txid(), version()}) -> db_entry().
-wf_unset_rl(prbr_bottom, _UI = none, {_TxId, _Vers}) -> prbr_bottom;
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0}) -> {prbr_bottom, none};
+       (db_entry(), UI :: none, {txid_on_cseq:txid(), version()}) -> {db_entry(), none}.
+wf_unset_rl(prbr_bottom, _UI = none, {_TxId, _Vers}) -> {prbr_bottom, none};
 wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
-    unset_readlock(DBEntry, TxId).
+    {unset_readlock(DBEntry, TxId), none}.
 
 
 
@@ -453,9 +453,9 @@ cc_commit_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
 
 
 -spec wf_val_unset_wl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> prbr_bottom;
-       (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
-wf_val_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> {prbr_bottom, none};
+       (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> {db_entry(), none}.
+wf_val_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> {prbr_bottom, none};
 wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
     case vers(DBEntry) =< TLogVers of
         true ->
@@ -463,9 +463,9 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
             T2 = set_val(T1, Val),
             T3 = reset_readlock(T2),
             %% increment version counter on write
-            set_vers(T3, 1 + TLogVers);
+            {set_vers(T3, 1 + TLogVers), none};
         _ ->
-            DBEntry
+            {DBEntry, none}
     end.
 
 
@@ -612,13 +612,13 @@ cc_abort_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
     cc_return_val(cc_abort_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_wl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> prbr_bottom;
-       (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
-wf_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> {prbr_bottom, none};
+       (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> {db_entry(), none}.
+wf_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> {prbr_bottom, none};
 wf_unset_wl(DBEntry, _UI = none, {TxId, _TLogVers, _Val}) ->
     case writelock(DBEntry) of
-       TxId -> set_writelock(DBEntry, no_write_lock);
-        _ -> DBEntry
+       TxId -> {set_writelock(DBEntry, no_write_lock), none};
+        _ -> {DBEntry, none}
     end.
 
 

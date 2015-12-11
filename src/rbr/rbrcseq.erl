@@ -162,7 +162,7 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
              ?RT:key(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
-             fun ((any(), any(), any()) -> any()), %% write filter
+             fun ((any(), any(), any()) -> {any(), any()}), %% write filter
 %%              %% select what you need to read for the operation
 %%              fun ((CustomData) -> ReadInfo),
 %%              %% is it an allowed follow up operation? and what info is
@@ -171,8 +171,9 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
 %%                    {fun ((ReadInfo, WriteValue) -> CustomData),
 %%                     WriteValue}) -> {boolean(), PassedInfo}),
 %%              %% update the db entry with the given infos, must
-%%              %% generate a valid custom datatype
-%%              fun ((PassedInfo, WriteValue) -> CustomData),
+%%              %% generate a valid custom datatype. ReturnValue is included
+%%              %% in qwrite_done message for the caller.
+%%              fun ((PassedInfo, WriteValue) -> {CustomData, ReturnValue}),
 %%              %%module(),
              client_value()) -> ok.
 qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
@@ -407,7 +408,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
     end;
 
 on({qread_write_through_collect, ReqId,
-    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound, WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -423,7 +424,7 @@ on({qread_write_through_collect, ReqId,
                 {true, NewEntry} ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
-                    inform_client(qwrite_done, ReplyEntry),
+                    inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -496,7 +497,7 @@ on({qread_write_through_collect, ReqId,
     end;
 
 on({qread_write_through_done, ReadEntry, _Filtering,
-    {qwrite_done, _ReqId, _Round, _Val}}, State) ->
+    {qwrite_done, _ReqId, _Round, _Val, _WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_done qwrite_done ~p ~p~n", [_ReqId, ReadEntry]),
     %% as we applied a write filter, the actual distributed consensus
     %% result may be different from the highest paxos version, that we
@@ -626,7 +627,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound, WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_reply~n", []),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -639,7 +640,7 @@ on({qwrite_collect, ReqId,
                 {false, NewEntry} -> set_entry(NewEntry, tablename(State));
                 {true, NewEntry} ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
-                    inform_client(qwrite_done, ReplyEntry),
+                    inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -972,14 +973,25 @@ add_write_deny(Entry, Round, _Cons) ->
     Done = (quorum:majority_for_deny(R) =< entry_num_denies(E2)),
     {Done, E2}.
 
--spec inform_client(qread_done | qwrite_done, entry()) -> ok.
-inform_client(Tag, Entry) ->
+-spec inform_client(qread_done, entry()) -> ok.
+inform_client(qread_done, Entry) ->
     comm:send_local(
       entry_client(Entry),
-      {Tag,
+      {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
        entry_val(Entry)
+      }).
+
+-spec inform_client(qwrite_done, entry(), any()) -> ok.
+inform_client(qwrite_done, Entry, WriteRet) ->
+    comm:send_local(
+      entry_client(Entry),
+      {qwrite_done,
+       entry_reqid(Entry),
+       entry_my_round(Entry), %% here: round for client's next fast qwrite
+       entry_val(Entry),
+       WriteRet
       }).
 
 %% @doc needs to be unique for this process in the whole system
