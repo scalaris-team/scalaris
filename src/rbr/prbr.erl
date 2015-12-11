@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2015 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -192,6 +192,16 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
+    TableName;
+
+on({prbr, delete_key, _DB, Client, Key}, TableName) ->
+    %% for normal delete we will have to have a special write operation taking
+    %% the Paxos round numbers into account...
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    ct:pal("R~p deleted~n", [?RT:get_key_segment(Key)]),
+    Entry = get_entry(Key, TableName),
+    ?PDB:delete_entry(TableName, Entry),
+    comm:send_local(Client, {delete_key_reply, Key}),
     TableName;
 
 %% on({prbr, tab2list, DB, Client}, TableName) ->

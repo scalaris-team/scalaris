@@ -28,10 +28,40 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_rbr,
-            rbr_concurrency_kv,
-            rbr_concurrency_leases,
-            rbr_consistency
+%            tester_type_check_rbr,
+%            rbr_concurrency_kv,
+%            rbr_concurrency_leases,
+%            rbr_consistency,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete,
+            rbr_consistency_delete
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -231,6 +261,53 @@ rbr_consistency(_Config) ->
 
     ok.
 
+rbr_consistency_delete(_Config) ->
+    %% create an rbr entry
+    %% update 1 to 3 of its replicas
+    %% perform read in all quorum permutations
+    %% (intercept read on a single dht node)
+    %% output must be the old value or the new value
+    %% if the new value was seen once, the old must not be readable again.
+
+    Nodes = pid_groups:find_all(dht_node),
+    Key = "a",
+
+    %% initialize key
+    {ok} = kv_on_cseq:write(Key, 1),
+
+    %% select a replica
+    Replicas = ?RT:get_replica_keys(?RT:hash_key(Key)),
+
+%%    print modified rbr entries
+%%    api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
+
+    ct:pal("Starting delete test~n"),
+
+
+    Res = [ begin
+                ct:pal("Read iteration: ~p~n", [R]),
+
+                {ok, Old} = kv_on_cseq:read(Key),
+
+                delete_rbr_entry_at_key(R),
+                Next = Old + 1,
+
+                ct:pal("Write in iteration: ~p~n", [R]),
+                kv_on_cseq:write(Key, Next),
+
+                %% ct:pal("After modification:"),
+                %% print modified rbr entries
+                %% api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
+
+                ct:pal("Reread in iteration: ~p~n", [R]),
+                {ok, Next} = kv_on_cseq:read(Key)
+          end || R <- Replicas],
+
+    ct:pal("Result: ~p~n", [Res]),
+    ok.
+
+
+
 tester_type_check_rbr(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
@@ -353,6 +430,12 @@ modify_rbr_at_key(R, N) ->
         {write_reply, _, R, _, _NextRound} ->
             ok
     end.
+
+delete_rbr_entry_at_key(R) ->
+    comm:send_local(pid_groups:find_a(dht_node),
+                    {?lookup_aux, R, 0,
+                    {prbr, delete_key, kv_db, self(), R}}),
+    receive {delete_key_reply, R} -> ok end.
 
 drop_prbr_read_request(Client, Tag) ->
     fun (Message, _State) ->

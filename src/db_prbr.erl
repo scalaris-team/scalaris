@@ -57,6 +57,7 @@
 -export([stop_record_changes/2]).
 -export([get_changes/2]).
 -export([delete_entries/2]).
+-export([delete_entry/2]).
 
 -type db() :: {KeyValueDB  :: term(),
                Subscribers :: db_ets:db(), %% for delta recording
