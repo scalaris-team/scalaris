@@ -1,4 +1,4 @@
-%% @copyright 2012-2014 Zuse Institute Berlin
+%% @copyright 2012-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -81,13 +81,13 @@ suite() -> [ {timetrap, {seconds, 180}} ].
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
 group(renew_tests) ->
-    [{timetrap, {seconds, 10}}];
+    [{timetrap, {seconds, 60}}];
 group(split_tests) ->
-    [{timetrap, {seconds, 20}}];
+    [{timetrap, {seconds, 60}}];
 group(takeover_tests) ->
-    [{timetrap, {seconds, 30}}];
+    [{timetrap, {seconds, 60}}];
 group(handover_tests) ->
-    [{timetrap, {seconds, 10}}];
+    [{timetrap, {seconds, 60}}];
 group(_) ->
     suite().
 
