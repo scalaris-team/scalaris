@@ -141,7 +141,7 @@ rbr_concurrency_leases(_Config) ->
         end,
     New = l_on_cseq:unittest_create_lease(Key),
     DB = rbrcseq:get_db_for_id(lease_db, Key),
-    rbrcseq:qwrite(DB, self(), Key,
+    rbrcseq:qwrite(DB, self(), Key, l_on_cseq,
                    ContentCheck,
                    New),
     receive

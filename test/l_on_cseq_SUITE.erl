@@ -358,7 +358,7 @@ test_split_but_lease_already_exists(_Config) ->
                           47),
                         11),
                 DB = rbrcseq:get_db_for_id(lease_db, LeftId),
-                rbrcseq:qwrite(DB, self(), LeftId,
+                rbrcseq:qwrite(DB, self(), LeftId, l_on_cseq,
                                ContentCheck,
                                New),
                 receive

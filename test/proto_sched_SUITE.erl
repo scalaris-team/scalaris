@@ -564,13 +564,13 @@ qwrite_qwrite_qread(_I) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     spawn(fun() ->
                   proto_sched:thread_begin(),
-                  rbrcseq:qwrite(DB, Self, Id, ContentCheck, Value1),
+                  rbrcseq:qwrite(DB, Self, Id, ?MODULE, ContentCheck, Value1),
                   ?TRACE("Thread 1 done", []),
                   proto_sched:thread_end()
           end),
     spawn(fun() ->
                   proto_sched:thread_begin(),
-                  rbrcseq:qwrite(DB, Self, Id, ContentCheck, Value2),
+                  rbrcseq:qwrite(DB, Self, Id, ?MODULE, ContentCheck, Value2),
                   ?TRACE("Thread 2 done", []),
                   proto_sched:thread_end()
           end),
@@ -592,7 +592,7 @@ qwrite_qwrite_qread(_I) ->
 % end test
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    rbrcseq:qread(DB, Self, Id),
+    rbrcseq:qread(DB, Self, Id, l_on_cseq),
     {test_rbr, {qread_done, _, _, Val}} = receive_answer(),
     %ct:pal("got ~p", [Val]),
     %ct:pal("~p", [Infos]),

@@ -38,9 +38,9 @@
 -behaviour(gen_component).
 
 %% api:
--export([qread/3, qread/4]).
--export([qwrite/5, qwrite/7]).
--export([qwrite_fast/7, qwrite_fast/9]).
+-export([qread/4, qread/5]).
+-export([qwrite/6, qwrite/8]).
+-export([qwrite_fast/8, qwrite_fast/10]).
 -export([get_db_for_id/2]).
 
 -export([start_link/3]).
@@ -90,13 +90,13 @@
 %%     send newest to client.
 
 %% This variant works on whole dbentries without filtering.
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key()) -> ok.
-qread(CSeqPidName, Client, Key) ->
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module()) -> ok.
+qread(CSeqPidName, Client, Key, Module) ->
     RF = fun prbr:noop_read_filter/1,
-    qread(CSeqPidName, Client, Key, RF).
+    qread(CSeqPidName, Client, Key, Module, RF).
 
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), prbr:read_filter()) -> ok.
-qread(CSeqPidName, Client, Key, ReadFilter) ->
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), sprbr:read_filter()) -> ok.
+qread(CSeqPidName, Client, Key, Module, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qread, Client, Key, ReadFilter, _RetriggerAfter = 1})
     %% the process will reply to the client directly
@@ -139,27 +139,30 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, CC, Value) ->
+qwrite(CSeqPidName, Client, Key, Module, CC, Value) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite(CSeqPidName, Client, Key, RF, CC, WF, Value).
+    qwrite(CSeqPidName, Client, Key, Module, RF, CC, WF, Value).
 
 -spec qwrite_fast(pid_groups:pidname(),
                   comm:erl_local_pid(),
                   ?RT:key(),
+                  module(),
                   fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
                   client_value(), pr:pr(),
                   client_value() | prbr_bottom) -> ok.
-qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
+qwrite_fast(CSeqPidName, Client, Key, Module, CC, Value, Round, OldVal) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite_fast(CSeqPidName, Client, Key, RF, CC, WF, Value, Round, OldVal).
+    qwrite_fast(CSeqPidName, Client, Key, Module, RF, CC, WF, Value, Round, OldVal).
 
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> {any(), any()}), %% write filter
@@ -176,7 +179,7 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
 %%              fun ((PassedInfo, WriteValue) -> {CustomData, ReturnValue}),
 %%              %%module(),
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
+qwrite(CSeqPidName, Client, Key, Module, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite, Client,
@@ -188,12 +191,13 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
 -spec qwrite_fast(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
              client_value(), pr:pr(), client_value() | prbr_bottom)
             -> ok.
-qwrite_fast(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
+qwrite_fast(CSeqPidName, Client, Key, Module, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite_fast, Client,

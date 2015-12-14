@@ -384,7 +384,7 @@ on({l_on_cseq, unittest_update,
     %% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, unittest_update_reply, '_',
                                      Old, New, Mode, Caller}),
-    rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
+    rbrcseq:qwrite(DB, Self, Id, ?MODULE, ContentCheck, New),
     State;
 
 on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value, _WriteRet},
@@ -776,7 +776,7 @@ on({l_on_cseq, split, Lease, R1, R2, Keep, ReplyTo, PostAux}, State) ->
     Self = comm:reply_as(self(), 9, {l_on_cseq, split_reply_step1, Lease, R1, R2,
                                      Keep, ReplyTo, PostAux, '_'}),
     %log:log("self in split firststep: ~w", [Self]),
-    rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
+    rbrcseq:qwrite(DB, Self, Id, ?MODULE, ContentCheck, New),
     State;
 
 on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, _Keep, ReplyTo, _PostAux,
@@ -1307,14 +1307,14 @@ read(Key, Pid) ->
     %% quarter -> use lease_db2, ...
     DB = rbrcseq:get_db_for_id(lease_db, Key),
     %% perform qread
-    rbrcseq:qread(DB, Pid, Key).
+    rbrcseq:qread(DB, Pid, Key, ?MODULE).
 
 %% write(Key, Value, ContentCheck) ->
 %%     %% decide which lease db is responsible, ie. if the key is from
 %%     %% the first quarter of the ring, use lease_db1, if from 2nd
 %%     %% quarter -> use lease_db2, ...
 %%         DB = rbrcseq:get_db_for_id(lease_db, Key),
-%%     rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
+%%     rbrcseq:qwrite(DB, self(), Key, ?MODULE, ContentCheck, Value),
 %%     trace_mpath:thread_yield(),
 %%     receive
 %%         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
@@ -1532,9 +1532,9 @@ update_lease(ReplyTo, ContentCheck, Old, New, State) ->
     DB = rbrcseq:get_db_for_id(lease_db, LeaseId),
     case lease_list:get_next_round(LeaseId, State) of
         failed ->
-            rbrcseq:qwrite     (DB, ReplyTo, LeaseId, ContentCheck, New);
+            rbrcseq:qwrite     (DB, ReplyTo, LeaseId, ?MODULE, ContentCheck, New);
         NextRound ->
-            rbrcseq:qwrite_fast(DB, ReplyTo, LeaseId, ContentCheck, New, NextRound, Old)
+            rbrcseq:qwrite_fast(DB, ReplyTo, LeaseId, ?MODULE, ContentCheck, New, NextRound, Old)
     end.
 
 % triggers renew of lease and updates known round number for the lease

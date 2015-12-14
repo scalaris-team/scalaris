@@ -94,7 +94,7 @@
 work_phase_async(ClientPid, ReqId, HashedKey, _Op) ->
     ReplyTo = comm:reply_as(ClientPid, 3,
                             {work_phase_async_done, ReqId, '_'}),
-    rbrcseq:qread(kv_db, ReplyTo, HashedKey,
+    rbrcseq:qread(kv_db, ReplyTo, HashedKey, ?MODULE,
                   fun ?MODULE:rf_val_vers/1),
     ok.
 
@@ -109,7 +109,7 @@ rf_val_vers(X)          -> {val(X), vers(X)}.
 %% %%%%%%%%%%%%%%%%%%%%%%
 -spec read(client_key()) -> api_tx:read_result().
 read(Key) ->
-    rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key),
+    rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
                   fun ?MODULE:rf_val/1),
     trace_mpath:thread_yield(),
     receive
@@ -144,7 +144,7 @@ rf_val(X)          -> val(X).
 %% %%%%%%%%%%%%%%%%%%%%%%
 -spec write(client_key(), client_value()) -> api_tx:write_result().
 write(Key, Value) ->
-    rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key),
+    rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
                    fun ?MODULE:rf_rl_wl_vers/1,
                    fun ?MODULE:cc_single_write/3,
                    fun ?MODULE:wf_set_vers_val/3, Value),
@@ -209,7 +209,7 @@ set_lock(TLogEntry, TxId, ReplyTo) ->
             ReadFilter = fun ?MODULE:rf_wl_vers/1, %% read lock is irrelevant for reads
             ContentCheck = fun ?MODULE:cc_set_rl/3,
             WriteFilter = fun ?MODULE:wf_set_rl/3,
-            rbrcseq:qwrite(kv_db, ReplyTo, HashedKey,
+            rbrcseq:qwrite(kv_db, ReplyTo, HashedKey, ?MODULE,
                            ReadFilter,
                            ContentCheck,
                            WriteFilter,
@@ -219,7 +219,7 @@ set_lock(TLogEntry, TxId, ReplyTo) ->
             ReadFilter = fun ?MODULE:rf_rl_wl_vers/1,
             ContentCheck = fun ?MODULE:cc_set_wl/3,
             WriteFilter = fun ?MODULE:wf_set_wl/3,
-            rbrcseq:qwrite(kv_db, ReplyTo, HashedKey,
+            rbrcseq:qwrite(kv_db, ReplyTo, HashedKey, ?MODULE,
                            ReadFilter,
                            ContentCheck,
                            WriteFilter, _Value = {TxId,
@@ -310,7 +310,7 @@ commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     ReadFilter = fun ?MODULE:rf_rl_vers/1,
     ContentCheck = fun ?MODULE:cc_commit_read/3,
     WriteFilter = fun ?MODULE:wf_unset_rl/3,
-    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey,
+    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey, ?MODULE,
                         ReadFilter,
                         ContentCheck,
                         WriteFilter,
@@ -380,7 +380,7 @@ commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     WriteFilter = fun ?MODULE:wf_val_unset_wl/3,
     {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     %% {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
-    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey,
+    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey, ?MODULE,
                         ReadFilter,
                         ContentCheck,
                         WriteFilter,
@@ -497,7 +497,7 @@ abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     ReadFilter = fun ?MODULE:rf_rl_vers/1,
     ContentCheck = fun ?MODULE:cc_abort_read/3,
     WriteFilter = fun ?MODULE:wf_unset_rl/3,
-    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey,
+    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey, ?MODULE,
                         ReadFilter,
                         ContentCheck,
                         WriteFilter,
@@ -573,7 +573,7 @@ abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     WriteFilter = fun ?MODULE:wf_unset_wl/3,
     {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
     %% {?value, Value} = tx_tlog:get_entry_value(TLogEntry),
-    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey,
+    rbrcseq:qwrite_fast(kv_db, ReplyTo, HashedKey, ?MODULE,
                         ReadFilter,
                         ContentCheck,
                         WriteFilter,
