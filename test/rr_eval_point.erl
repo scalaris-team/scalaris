@@ -254,12 +254,16 @@ mean_w_error(_ElementPos, []) ->
     {0.0, 0.0, 0, 0};
 mean_w_error(ElementPos, [H | TL]) ->
     HE = element(ElementPos, H),
-    {Len, Sum, Sum2, Min, Max} =
+    % Note: calculate the standard deviation via shifted values to be more
+    %       accurate with floating point values
+    %       -> https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Computing_shifted_data
+    {Len, Sum, SumStd1, SumStd2, Min, Max} =
         lists:foldl(
-          fun(T, {L, X1, X2, Min, Max}) ->
+          fun(T, {L, SummAcc, SumStd1Acc, SumStd2Acc, Min, Max}) ->
                   E = element(ElementPos, T),
-                  {L + 1, X1 + E, X2 + E * E,
+                  E2 = E - HE,
+                  {L + 1, SummAcc + E, SumStd1Acc + E2, SumStd2Acc + E2 * E2,
                    erlang:min(E, Min), erlang:max(E, Max)}
-          end, {1, HE, HE * HE, HE, HE}, TL),
+          end, {1, HE, 0, 0, HE, HE}, TL),
     % pay attention to possible loss of precision here:
-    {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len)), Min, Max}.
+    {Sum / Len, math:sqrt((Len * SumStd2 - SumStd1 * SumStd1) / (Len * Len)), Min, Max}.
