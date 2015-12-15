@@ -37,6 +37,7 @@
          merkle/5, merkle/9,
          merkle_ddists_fdists/5, merkle_ddists_fdists/9,
          merkle_scale/5, merkle_scale/8,
+         merkle_custom/11,
          % art
          art/5, art/7, 
          art_scale/5, art_scale/7,
@@ -419,6 +420,15 @@ merkle_scale(N, EvalRepeats, MBranch, MBucket, P1E) ->
                    MBucket::pos_integer(), P1E::p1e(), AlignToBytes::boolean())
         -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes) ->
+    merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E,
+                   AlignToBytes, power, 5, ?EVAL_FTYPES).
+
+-spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                    EvalRepeats::pos_integer(), MBranch::pos_integer(),
+                    MBucket::pos_integer(), P1E::p1e(), AlignToBytes::boolean(),
+                    StepSize::step_size() | power, Steps::pos_integer(),
+                    FTypes::[update | regen]) -> ok.
+merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes, StepSize, Steps, FTypes) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
@@ -433,9 +443,9 @@ merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes)
                          align_to_bytes = AlignToBytes },
 
     eval(pair,
-         gen_setup([random], ?EVAL_FTYPES, [random],
+         gen_setup([random], FTypes, [random],
                    Scenario, PairRing, [Merkle]),
-         data_count, 5, power, N, Options),
+         data_count, Steps, StepSize, N, Options),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
