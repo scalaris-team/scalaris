@@ -321,8 +321,8 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(Misc =:= []),
             FP = bloom_fp(BFCount, P1E),
             BF = bloom:new_bin(BFBin, ?REP_HFS:new(bloom:calc_HF_numEx(BFCount, FP)), BFCount),
-            P1E_p1 = bloom:get_property(BF, fpr),
-            Misc1 = [{bloom, BF}],
+            P1E_p1 = 0.0, % needs to be set when we know the number of chunks on this node!
+            Misc1 = [{bloom, BF}, {item_count, 0}],
             Reconcile = reconcile,
             Stage = reconciliation;
         merkle_tree ->
@@ -501,10 +501,11 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E},
                            stats = Stats,             kv_list = KVList,
-                           misc = [{bloom, BF}],
+                           misc = [{bloom, BF}, {item_count, MyPrevItemCount}],
                            dest_recon_pid = DestReconPid,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
     ?TRACE1(_Msg, State),
+    MyItemCount = MyPrevItemCount + length(DBList0),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
@@ -518,16 +519,20 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     if not SyncFinished ->
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, RestI, get_max_items(), reconcile),
-           State#rr_recon_state{kv_list = NewKVList};
+           State#rr_recon_state{kv_list = NewKVList,
+                                misc = [{bloom, BF}, {item_count, MyItemCount}]};
        true ->
            FullDiffSize = length(NewKVList),
+           % here, the failure probability is correct (as opposed by the
+           % non-initiator) since we know how many item checks we perform in BF
+           P1E_p1 = bloom_worst_case_failprob(BF, MyItemCount),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            ?TRACE("Reconcile Bloom Session=~p ; Diff=~p",
-                  [rr_recon_stats:get(session_id, Stats), FullDiffSize]),
+                  [rr_recon_stats:get(session_id, Stats1), FullDiffSize]),
            if FullDiffSize > 0 andalso BFCount > 0 ->
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
                   % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-                  P1E_p1 = bloom:get_property(BF, fpr),
                   P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
                   {BuildTime, {MyDiff, SigSize, VSize}} =
                       util:tc(fun() ->
@@ -544,7 +549,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   % the non-initiator will use key_upd_send and we must thus increase
                   % the number of resolve processes here!
                   NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
-                                                  {build_time, BuildTime}], Stats),
+                                                  {build_time, BuildTime}], Stats1),
                   NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
                   State#rr_recon_state{stats = NewStats, stage = resolve,
                                        kv_list = [],
@@ -556,18 +561,18 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   % empty BF with diff at our node -> the other node does not have any items!
                   % start a resolve here:
                   NewStats = send_resolve_request(
-                               Stats, [element(1, KV) || KV <- NewKVList], OwnerL,
+                               Stats1, [element(1, KV) || KV <- NewKVList], OwnerL,
                                DestRRPid, true, false),
                   NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
                                                   kv_list = NewKVList},
-                  shutdown(sync_finished, NewState);
+                  shutdown(sync_finished, NewState#rr_recon_state{stats = Stats1});
               BFCount =:= 0 ->
-                  shutdown(sync_finished, State#rr_recon_state{kv_list = NewKVList});
+                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1, kv_list = NewKVList});
               true -> % BFCount > 0
                   % must send resolve_req message for the non-initiator to shut down
                   send(DestReconPid, {resolve_req, shutdown}),
                   % note: kv_list has not changed, we can thus use the old State here:
-                  shutdown(sync_finished, State)
+                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1})
            end
     end;
 
@@ -2415,6 +2420,17 @@ bloom_fp(MaxItems, P1E) ->
     P1E_sub = calc_n_subparts_p1e(2, P1E),
     1 - math:pow(1 - P1E_sub, 1 / erlang:max(MaxItems, 1)).
 
+%% @doc Calculates the worst-case failure probability of the bloom algorithm
+%%      with the Bloom filter and number of items to check inside the filter.
+%%      NOTE: Precision loss may occur for very high values!
+-spec bloom_worst_case_failprob(
+        BF::bloom:bloom_filter(), ItemCount::non_neg_integer()) -> float().
+bloom_worst_case_failprob(_BF, 0) ->
+    0.0;
+bloom_worst_case_failprob(BF, ItemCount) ->
+    Fpr = bloom:get_property(BF, fpr),
+    1 - math:pow(1 - Fpr, ItemCount).
+
 -spec build_recon_struct(method(), DestI::intervals:non_empty_interval(),
                          db_chunk_kv(), Params::parameters() | {})
         -> {sync_struct(), P1E_p1::float()}.
@@ -2452,7 +2468,9 @@ build_recon_struct(bloom, I, DBItems, _Params) ->
     {#bloom_recon_struct{interval = I, reconPid = comm:this(),
                          bf_bin = bloom:get_property(BF, filter),
                          item_count = MaxItems, p1e = P1E},
-     _P1E_p1 = bloom:get_property(BF, fpr)};
+    % Note: we can only guess the number of items of the initiator here, so
+    %       this is not exactly the P1E of phase 1!
+     _P1E_p1 = bloom_worst_case_failprob(BF, MaxItems)};
 build_recon_struct(merkle_tree, I, DBItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     P1E_p1 = 0.0, % needs to be set at the end of phase 1!
