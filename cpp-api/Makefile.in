@@ -43,8 +43,8 @@ libscalaris.a: $(OBJS)
 	$(VC)$(CXX) -MD $(CXXFLAGS)  -c $< -o $@
 
 scalaris: libscalaris.a src/cli.o
-	$(NVC)echo -e "\e[0;31mCreating scalaris\031[39m"
-	$(VC)$(CXX) @LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_PROGRAM_OPTIONS_LIB@ -o $@ src/cli.o libscalaris.a
+	$(NVC)echo -e "\e[0;31mCreating scalaris\033[39m"
+	$(VC)$(CXX) -o $@ src/cli.o libscalaris.a @LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_PROGRAM_OPTIONS_LIB@ -lpthread
 
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')

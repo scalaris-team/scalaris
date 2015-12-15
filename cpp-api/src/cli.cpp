@@ -85,7 +85,8 @@ int main(int argc, char **argv) {
     pair<string,string> kv = vm["write"].as<pair<string,string>>();
     write(get<0>(kv), get<1>(kv));
   } else {
-    cout << "Compression level was not set.\n";
+    cout << desc << "\n";
+    return 1;
   }
   return 0;
 }
