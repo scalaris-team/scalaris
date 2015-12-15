@@ -55,6 +55,7 @@ if test "x$ENABLE_CPP" != xno ; then
   AX_BOOST_SYSTEM
   AX_BOOST_REGEX
   AX_BOOST_ASIO
+  AX_BOOST_PROGRAM_OPTIONS
   AX_BOOST_UNIT_TEST_FRAMEWORK
 else
   AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
