@@ -258,6 +258,11 @@ merkle_scale-all.unaligned/%/merkle_scale.dat: merkle_scale-all.unaligned/Makefi
 merkle_scale.unaligned-all: merkle_scale-all.unaligned/v2_b1_p0.01/merkle_scale.dat merkle_scale-all.unaligned/v4_b1_p0.01/merkle_scale.dat merkle_scale-all.unaligned/v4_b3_p0.01/merkle_scale.dat merkle_scale-all.unaligned/v4_b15_p0.01/merkle_scale.dat merkle_scale-all.unaligned/v16_b1_p0.01/merkle_scale.dat
 	
 
+merkle_effective_prob.unaligned/%/merkle_custom.dat: merkle_effective_prob.unaligned/Makefile
+	@echo " executing merkle_eff_prob $*, unaligned (start at N=$(SYSTEM_SIZE_SCALE))"
+	@mkdir -p "$(@D)"
+	STR="$*" ; STR_V=$${STR:`expr index "$$STR" v`} ; STR_B=$${STR:`expr index "$$STR" b`} ; STR_P=$${STR:`expr index "$$STR" p`} ; V=`expr match "$$STR_V" '\([0-9][.0-9]*\)'` ; B=`expr match "$$STR_B" '\([0-9][.0-9]*\)'` ; P=`expr match "$$STR_P" '\([0-9][.0-9]*\)'` ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE_SCALE)" -c "$$V,$$B,$$P,false,100,120,[update]" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s 100 > "$(@D)/eval.log"
+
 merkle.unaligned: merkle.unaligned-all merkle_dists.unaligned-all merkle_scale.unaligned-all
 	
 
