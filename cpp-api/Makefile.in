@@ -19,13 +19,13 @@ else
   NVC=@
 endif
 
-SRC_CPP=$(wildcard src/*.cpp)
+SRC_CPP=$(filter-out src/cli.cpp, $(wildcard src/*.cpp))
 TEST_SRC_CPP=$(wildcard test/*.cpp)
 
 OBJS=$(SRC_CPP:.cpp=.o)
 OBJS_TEST=$(TEST_SRC_CPP:.cpp=.o)
 
-all: libscalaris.a tests
+all: libscalaris.a scalaris tests
 
 cpp-test : tests
 	$(VC)./tests --report_level=detailed
@@ -42,10 +42,14 @@ libscalaris.a: $(OBJS)
 	$(NVC)echo -e "\e[0;32mCompiling" $< "\033[39m"
 	$(VC)$(CXX) -MD $(CXXFLAGS)  -c $< -o $@
 
+scalaris: libscalaris.a src/cli.o
+	$(NVC)echo -e "\e[0;31mCreating scalaris\031[39m"
+	$(VC)$(CXX) @LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_PROGRAM_OPTIONS_LIB@ -o $@ src/cli.o libscalaris.a
+
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
 	@-rm -rf $(shell find . -type f -name '*.d')
-	@-rm -f ./tests
+	@-rm -f ./tests ./scalaris
 
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST:.o=.d)
