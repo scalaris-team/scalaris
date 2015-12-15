@@ -565,10 +565,11 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                DestRRPid, true, false),
                   NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
                                                   kv_list = NewKVList},
-                  shutdown(sync_finished, NewState#rr_recon_state{stats = Stats1});
-              BFCount =:= 0 ->
-                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1, kv_list = NewKVList});
-              true -> % BFCount > 0
+                  shutdown(sync_finished, NewState);
+              BFCount =:= 0 -> % andalso FullDiffSize =:= 0 ->
+                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
+                                                               kv_list = NewKVList});
+              true -> % BFCount > 0, FullDiffSize =:= 0
                   % must send resolve_req message for the non-initiator to shut down
                   send(DestReconPid, {resolve_req, shutdown}),
                   % note: kv_list has not changed, we can thus use the old State here:
