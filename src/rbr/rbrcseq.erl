@@ -96,7 +96,7 @@ qread(CSeqPidName, Client, Key, DataType) ->
     RF = fun prbr:noop_read_filter/1,
     qread(CSeqPidName, Client, Key, DataType, RF).
 
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), sprbr:read_filter()) -> ok.
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), prbr:read_filter()) -> ok.
 qread(CSeqPidName, Client, Key, DataType, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qread, Client, Key, DataType, ReadFilter, _RetriggerAfter = 1})
