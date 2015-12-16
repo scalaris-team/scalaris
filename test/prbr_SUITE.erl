@@ -340,14 +340,14 @@ tester_type_check_rbr(_Config) ->
             ]},
           {rbrcseq,
            [ {on, 2},          %% sends messages
-             {qread, 3},       %% tries to create envelopes
-             {qread, 4},       %% needs fun as input
+             {qread, 4},       %% tries to create envelopes
+             {qread, 5},       %% needs fun as input
              {start_link, 3},  %% needs fun as input
              {start_gen_component,5}, %% unsupported types
-             {qwrite, 5},      %% needs funs as input
-             {qwrite, 7},      %% needs funs as input
-             {qwrite_fast, 7}, %% needs funs as input
-             {qwrite_fast, 9}  %% needs funs as input
+             {qwrite, 6},      %% needs funs as input
+             {qwrite, 8},      %% needs funs as input
+             {qwrite_fast, 8}, %% needs funs as input
+             {qwrite_fast, 10}  %% needs funs as input
            ],
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid ets:tid()
