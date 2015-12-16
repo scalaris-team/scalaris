@@ -59,6 +59,7 @@
                   non_neg_integer(), %% period of last retriggering / starting
                   non_neg_integer(), %% period of next retriggering
                   ?RT:key(), %% key
+                  module(), %% data type
                   comm:erl_local_pid(), %% client
                   pr:pr(), %% my round
                   non_neg_integer(), %% number of acks
@@ -91,14 +92,14 @@
 
 %% This variant works on whole dbentries without filtering.
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module()) -> ok.
-qread(CSeqPidName, Client, Key, Module) ->
+qread(CSeqPidName, Client, Key, DataType) ->
     RF = fun prbr:noop_read_filter/1,
-    qread(CSeqPidName, Client, Key, Module, RF).
+    qread(CSeqPidName, Client, Key, DataType, RF).
 
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), sprbr:read_filter()) -> ok.
-qread(CSeqPidName, Client, Key, Module, ReadFilter) ->
+qread(CSeqPidName, Client, Key, DataType, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qread, Client, Key, ReadFilter, _RetriggerAfter = 1})
+    comm:send_local(Pid, {qread, Client, Key, DataType, ReadFilter, _RetriggerAfter = 1})
     %% the process will reply to the client directly
     .
 
@@ -142,10 +143,10 @@ qread(CSeqPidName, Client, Key, Module, ReadFilter) ->
              module(),
              fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, Module, CC, Value) ->
+qwrite(CSeqPidName, Client, Key, DataType, CC, Value) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite(CSeqPidName, Client, Key, Module, RF, CC, WF, Value).
+    qwrite(CSeqPidName, Client, Key, DataType, RF, CC, WF, Value).
 
 -spec qwrite_fast(pid_groups:pidname(),
                   comm:erl_local_pid(),
@@ -154,10 +155,10 @@ qwrite(CSeqPidName, Client, Key, Module, CC, Value) ->
                   fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
                   client_value(), pr:pr(),
                   client_value() | prbr_bottom) -> ok.
-qwrite_fast(CSeqPidName, Client, Key, Module, CC, Value, Round, OldVal) ->
+qwrite_fast(CSeqPidName, Client, Key, DataType, CC, Value, Round, OldVal) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite_fast(CSeqPidName, Client, Key, Module, RF, CC, WF, Value, Round, OldVal).
+    qwrite_fast(CSeqPidName, Client, Key, DataType, RF, CC, WF, Value, Round, OldVal).
 
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
@@ -179,11 +180,11 @@ qwrite_fast(CSeqPidName, Client, Key, Module, CC, Value, Round, OldVal) ->
 %%              fun ((PassedInfo, WriteValue) -> {CustomData, ReturnValue}),
 %%              %%module(),
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, Module, ReadFilter, ContentCheck,
+qwrite(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qwrite, Client,
-                          Key, {ReadFilter, ContentCheck, WriteFilter},
+    comm:send_local(Pid, {qwrite, Client, Key,
+                          DataType, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 20}),
     %% the process will reply to the client directly
     ok.
@@ -197,11 +198,11 @@ qwrite(CSeqPidName, Client, Key, Module, ReadFilter, ContentCheck,
              fun ((any(), any(), any()) -> any()), %% write filter
              client_value(), pr:pr(), client_value() | prbr_bottom)
             -> ok.
-qwrite_fast(CSeqPidName, Client, Key, Module, ReadFilter, ContentCheck,
+qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qwrite_fast, Client,
-                          Key, {ReadFilter, ContentCheck, WriteFilter},
+    comm:send_local(Pid, {qwrite_fast, Client, Key,
+                          DataType, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 20, Round, OldValue}),
     %% the process will reply to the client directly
     ok.
@@ -225,7 +226,7 @@ init(DBSelector) ->
 
 
 %% normal qread step 1: preparation and starting read-phase
-on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
+on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qread, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
@@ -263,7 +264,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     %% {next_period, ...}
 
     %% create local state for the request id
-    Entry = entry_new_read(qread, ReqId, Key, Client, period(State),
+    Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
                            ReadFilter, RetriggerAfter),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
@@ -366,6 +367,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                        WTWF},
 
             Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
+                                    entry_datatype(ReadEntry),
                                     This,
                                     period(State),
                                     Filters, WTVal,
@@ -405,7 +407,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op({qread, This, entry_key(ReadEntry),
+            gen_component:post_op({qread, This, entry_key(ReadEntry), entry_datatype(ReadEntry),
                fun prbr:noop_read_filter/1,
                entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
               State)
@@ -494,7 +496,7 @@ on({qread_write_through_collect, ReqId,
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op({qread, Client, Key, Filter,
+                    gen_component:post_op({qread, Client, Key, entry_datatype(Entry), Filter,
                        entry_retrigger(Entry) - entry_period(Entry)},
                       State)
             end
@@ -521,11 +523,12 @@ on({qread_write_through_done, ReadEntry, _Filtering,
 
     Client = entry_client(ReadEntry),
     Key = entry_key(ReadEntry),
+    DataType = entry_datatype(ReadEntry),
     ReadFilter = entry_filters(ReadEntry),
     RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
 
     gen_component:post_op(
-      {qread, Client, Key, ReadFilter, RetriggerAfter},
+      {qread, Client, Key, DataType, ReadFilter, RetriggerAfter},
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
@@ -544,19 +547,19 @@ on({qread_write_through_done, ReadEntry, Filtering,
     State;
 
 %% normal qwrite step 1: preparation and starting read-phase
-on({qwrite, Client, Key, Filters, Value, RetriggerAfter}, State) ->
+on({qwrite, Client, Key, DataType, Filters, Value, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qwrite~n", []),
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
                             Filters, Value, RetriggerAfter),
 
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     set_entry(Entry, tablename(State)),
-    gen_component:post_op({qread, This, Key, element(1, Filters), 1}, State);
+    gen_component:post_op({qread, This, Key, DataType, element(1, Filters), 1}, State);
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
@@ -565,7 +568,7 @@ on({qwrite_read_done, ReqId,
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
     gen_component:post_op({do_qwrite_fast, ReqId, Round, ReadValue}, State);
 
-on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
+on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
     WriteValue, RetriggerAfter, Round, ReadFilterResultValue}, State) ->
 
     %% create state and ReqId, store it and trigger 'do_qwrite_fast'
@@ -575,7 +578,7 @@ on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
                             Filters, WriteValue, RetriggerAfter),
 
     set_entry(Entry, tablename(State)),
@@ -748,7 +751,7 @@ on({next_period, NewPeriod}, State) ->
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             13 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+             14 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -758,11 +761,13 @@ on({next_period, NewPeriod}, State) ->
                                {qread,
                                 Client :: comm:erl_local_pid(),
                                 Key :: ?RT:key(),
+                                DataType :: module(),
                                 Filters :: any(),
                                 Delay :: non_neg_integer()}
                                | {qwrite,
                                 Client :: comm:erl_local_pid(),
                                 Key :: ?RT:key(),
+                                DataType :: module(),
                                 Filters :: any(),
                                 Val :: any(),
                                 Delay :: non_neg_integer()}.
@@ -771,15 +776,15 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 13),
-    if is_tuple(element(12, Entry)) -> %% write request
+    ?ASSERT(erlang:tuple_size(Entry) =:= 14),
+    if is_tuple(element(13, Entry)) -> %% write request
            {qwrite, entry_client(Entry),
-            entry_key(Entry), entry_filters(Entry),
-            entry_val(Entry),
+            entry_key(Entry), entry_datatype(Entry),
+            entry_filters(Entry), entry_val(Entry),
             RetriggerDelay};
        true -> %% read request
-           {qread, entry_client(Entry),
-            entry_key(Entry), entry_filters(Entry),
+           {qread, entry_client(Entry), entry_key(Entry),
+            entry_datatype(Entry), entry_filters(Entry),
             RetriggerDelay}
     end.
 
@@ -799,20 +804,20 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
 %% abstract data type to collect quorum read/write replies
--spec entry_new_read(any(), any(), ?RT:key(),
+-spec entry_new_read(any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer())
                     -> entry().
-entry_new_read(Debug, ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, Client,
+entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
      _MyRound = pr:new(0, 0), _NumAcked = 0,
      _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _Val = empty_new_read_entry, Filter, 0}.
 
--spec entry_new_write(any(), any(), ?RT:key(), comm:erl_local_pid(),
+-spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
-entry_new_write(Debug, ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
+entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
      _MyRound = pr:new(0, 0), _NumAcked = 0, _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), Value, Filters, 0}.
 
 -spec entry_reqid(entry())        -> any().
@@ -823,40 +828,42 @@ entry_period(Entry)               -> element(3, Entry).
 entry_retrigger(Entry)            -> element(4, Entry).
 -spec entry_key(entry())          -> any().
 entry_key(Entry)                  -> element(5, Entry).
+-spec entry_datatype(entry())     -> module().
+entry_datatype(Entry)             -> element(6, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
-entry_client(Entry)               -> element(6, Entry).
+entry_client(Entry)               -> element(7, Entry).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(7, Entry).
+entry_my_round(Entry)             -> element(8, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(7, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(8, Entry, Round).
 -spec entry_num_acks(entry())     -> non_neg_integer().
-entry_num_acks(Entry)             -> element(8, Entry).
+entry_num_acks(Entry)             -> element(9, Entry).
 -spec entry_inc_num_acks(entry()) -> entry().
-entry_inc_num_acks(Entry) -> setelement(8, Entry, element(8, Entry) + 1).
+entry_inc_num_acks(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
 -spec entry_set_num_acks(entry(), non_neg_integer()) -> entry().
-entry_set_num_acks(Entry, Num)    -> setelement(8, Entry, Num).
+entry_set_num_acks(Entry, Num)    -> setelement(9, Entry, Num).
 -spec entry_num_denies(entry())   -> non_neg_integer().
-entry_num_denies(Entry)           -> element(9, Entry).
+entry_num_denies(Entry)           -> element(10, Entry).
 -spec entry_inc_num_denies(entry()) -> entry().
-entry_inc_num_denies(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
+entry_inc_num_denies(Entry) -> setelement(10, Entry, element(10, Entry) + 1).
 -spec entry_set_num_denies(entry(), non_neg_integer()) -> entry().
-entry_set_num_denies(Entry, Val) -> setelement(9, Entry, Val).
+entry_set_num_denies(Entry, Val) -> setelement(10, Entry, Val).
 -spec entry_latest_seen(entry())  -> pr:pr().
-entry_latest_seen(Entry)          -> element(10, Entry).
+entry_latest_seen(Entry)          -> element(11, Entry).
 -spec entry_set_latest_seen(entry(), pr:pr()) -> entry().
-entry_set_latest_seen(Entry, Round) -> setelement(10, Entry, Round).
+entry_set_latest_seen(Entry, Round) -> setelement(11, Entry, Round).
 -spec entry_val(entry())           -> any().
-entry_val(Entry)                   -> element(11, Entry).
+entry_val(Entry)                   -> element(12, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
-entry_set_val(Entry, Val)          -> setelement(11, Entry, Val).
+entry_set_val(Entry, Val)          -> setelement(12, Entry, Val).
 -spec entry_filters(entry())       -> any().
-entry_filters(Entry)               -> element(12, Entry).
+entry_filters(Entry)               -> element(13, Entry).
 -spec entry_set_num_newest(entry(), non_neg_integer())  -> entry().
-entry_set_num_newest(Entry, Val)        -> setelement(13, Entry, Val).
+entry_set_num_newest(Entry, Val)        -> setelement(14, Entry, Val).
 -spec entry_inc_num_newest(entry()) -> entry().
-entry_inc_num_newest(Entry)        -> setelement(13, Entry, 1 + element(13, Entry)).
+entry_inc_num_newest(Entry)        -> setelement(14, Entry, 1 + element(14, Entry)).
 -spec entry_num_newest(entry())    -> non_neg_integer().
-entry_num_newest(Entry)            -> element(13, Entry).
+entry_num_newest(Entry)            -> element(14, Entry).
 
 -spec add_read_reply(entry(), dht_node_state:db_selector(),
                      pr:pr(), client_value(),
@@ -914,7 +921,7 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
                 T1 = case entry_val(Entry) of
                          Val -> Entry;
                          DifferingVal ->
-                             DataType = get_data_type(DBSelector),
+                             DataType = entry_datatype(Entry),
                              NewVal = DataType:max(Val, DifferingVal),
                              entry_set_val(Entry, NewVal)
                      end,
