@@ -24,36 +24,22 @@ namespace std {
   return in;
 }}
 
-void read(std::string key) {
-  // cout << "reading : " << key << endl;
+template<typename F>
+void exec_call(F& f){
   try {
     Connection c { "localhost" };
     TransactionSingleOp op = { c };
-    string value = op.read(key);
-    cout << value << endl;
+    f(op);
+  } catch (std::runtime_error& e) {
+    cout << "std::runtime_error: " << e.what() << endl;
   } catch (ConnectionError& e) {
     cout << "ConnectionError: " << e.what() << endl;
   } catch (MalFormedJsonError& e) {
     cout << "MalFormedJsonError: " << e.what() << endl;
   } catch (ReadFailedError& e) {
     cout << "ReadFailedError: " << e.what() << endl;
-  } catch (CommitFailedError& e) {
-    cout << "CommitFailedError: " << e.what() << endl;
-  } catch (NotSupportedError& e) {
-    cout << "NotSupportedError: " << e.what() << endl;
-  }
-}
-
-void write(std::string key, std::string value) {
-  // cout << "writing : " << key << ", " << value << endl;
-  try {
-    Connection c { "localhost" };
-    TransactionSingleOp op = { c };
-    op.write(key, value);
-  } catch (ConnectionError& e) {
-    cout << "ConnectionError: " << e.what() << endl;
-  } catch (MalFormedJsonError& e) {
-    cout << "MalFormedJsonError: " << e.what() << endl;
+  } catch (NotFoundError& e) {
+    cout << "NotFoundError: " << e.what() << endl;
   } catch (WriteFailedError& e) {
     cout << "WriteFailedError: " << e.what() << endl;
   } catch (CommitFailedError& e) {
@@ -80,10 +66,20 @@ int main(int argc, char **argv) {
     cout << desc << "\n";
     return 1;
   } else if (vm.count("read")) {
-    read(vm["read"].as<string>());
+    string key = vm["read"].as<string>();
+    auto p = [key](TransactionSingleOp& op) {
+      std::string value = op.read(key);
+      cout << value << endl;
+    };
+    exec_call(p);
   } else if (vm.count("write")) {
     pair<string,string> kv = vm["write"].as<pair<string,string>>();
-    write(get<0>(kv), get<1>(kv));
+    string key = get<0>(kv);
+    string value = get<1>(kv);
+    auto p = [key,value](TransactionSingleOp& op) {
+      op.write(key,value);
+    };
+    exec_call(p);
   } else {
     cout << desc << "\n";
     return 1;
