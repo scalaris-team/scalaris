@@ -37,7 +37,7 @@
          merkle/5, merkle/9,
          merkle_ddists_fdists/5, merkle_ddists_fdists/9,
          merkle_scale/5, merkle_scale/8,
-         merkle_custom/11,
+         merkle_custom/12,
          % art
          art/5, art/7, 
          art_scale/5, art_scale/7,
@@ -421,20 +421,21 @@ merkle_scale(N, EvalRepeats, MBranch, MBucket, P1E) ->
         -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes) ->
     merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E,
-                   AlignToBytes, power, 5, ?EVAL_FTYPES).
+                   AlignToBytes, power, 5, ?EVAL_FTYPES, 3).
 
 -spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), MBranch::pos_integer(),
                     MBucket::pos_integer(), P1E::p1e(), AlignToBytes::boolean(),
                     StepSize::step_size() | power, Steps::pos_integer(),
-                    FTypes::[update | regen]) -> ok.
-merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, AlignToBytes, StepSize, Steps, FTypes) ->
+                    FTypes::[update | regen], Delta::pos_integer()) -> ok.
+merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E,
+              AlignToBytes, StepSize, Steps, FTypes, Delta) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_prob = Delta,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
