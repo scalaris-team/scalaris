@@ -869,7 +869,7 @@ entry_num_newest(Entry)            -> element(14, Entry).
                      pr:pr(), client_value(),
                      pr:pr(), Consistency::boolean())
                     -> {Done::boolean() | write_through, entry()}.
-add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
+add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
@@ -922,7 +922,14 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
                          Val -> Entry;
                          DifferingVal ->
                              DataType = entry_datatype(Entry),
-                             NewVal = DataType:max(Val, DifferingVal),
+                             MaxFunModule =
+                                 case erlang:function_exported(DataType, max, 2) of
+                                     true  -> DataType;
+                                     %% this datatype has not defined their own max fun
+                                     %% therefore use the default util:max
+                                     _     -> util
+                                 end,
+                             NewVal = MaxFunModule:max(Val, DifferingVal),
                              entry_set_val(Entry, NewVal)
                      end,
                 entry_inc_num_newest(T1);
@@ -1022,20 +1029,6 @@ db_selector(State) -> element(2, State).
 period(State) -> element(3, State).
 -spec set_period(state(), non_neg_integer()) -> state().
 set_period(State, Val) -> setelement(3, State, Val).
-
-%% @doc determine from which module M to call M:max(A,B) to compare values
--spec get_data_type(dht_node_state:db_selector())
-                   -> kv_on_cseq | l_on_cseq | tx_id_on_cseq
-                          | util. %% default max function
-get_data_type(kv_db) ->
-    kv_on_cseq;
-get_data_type(_) ->
-    %% in practice this decision only happens for the kv data type.
-    %% for the others we have to set it for the tester.  if no special
-    %% comparision needed, we can use the standard one (util)
-    %% leases_1-4 -> l_on_cseq
-    %% txid_1-4 -> tx_id_on_cseq
-    util.
 
 -spec get_db_for_id(atom(), ?RT:key()) -> {atom(), pos_integer()}.
 get_db_for_id(DBName, Key) ->
