@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -35,11 +35,11 @@
 -type test_option() :: multi_threaded | {threads, pos_integer()} | with_feeder.
 -type test_options() :: [test_option()].
 
--spec test/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
+-spec test(module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test(Module, Func, Arity, Iterations) ->
     test(Module, Func, Arity, Iterations, []).
 
--spec test/5 :: (module(), atom(), non_neg_integer(), non_neg_integer(), test_options()) -> ok.
+-spec test(module(), atom(), non_neg_integer(), non_neg_integer(), test_options()) -> ok.
 test(Module, Func, Arity, Iterations, Options) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
     ParseState = tester_parse_state:find_fun_info(Module, Func, Arity, EmptyParseState),
@@ -50,7 +50,7 @@ test(Module, Func, Arity, Iterations, Options) ->
     run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options),
     ok.
 
--spec test_log/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
+-spec test_log(module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test_log(Module, Func, Arity, Iterations) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
     ParseState = tester_parse_state:find_fun_info(Module, Func, Arity, EmptyParseState),
@@ -77,9 +77,9 @@ start_pseudo_proc() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec run/7 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
-                tester_parse_state:state(), test_options(),
-                Thread::non_neg_integer()) -> any().
+-spec run(module(), atom(), non_neg_integer(), non_neg_integer(),
+          tester_parse_state:state(), test_options(),
+          Thread::non_neg_integer()) -> any().
 run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
     FeederFun = list_to_atom(atom_to_list(Func) ++ "_feeder"),
     case proplists:get_bool(with_feeder, Options) of
@@ -114,12 +114,12 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
                        ParseState, Options, Thread)
     end.
 
--spec run_helper/9 :: (Module::module(), Fun::atom(), Arity::non_neg_integer(),
-                       Iterations::non_neg_integer(),
-                       Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
-                       FeederFun::{var_type, [], {union_fun, [test_fun_type()]}},
-                       tester_parse_state:state(), test_options(),
-                       Thread::non_neg_integer()) -> any().
+-spec run_helper(Module::module(), Fun::atom(), Arity::non_neg_integer(),
+                 Iterations::non_neg_integer(),
+                 Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                 FeederFun::{var_type, [], {union_fun, [test_fun_type()]}},
+                 tester_parse_state:state(), test_options(),
+                 Thread::non_neg_integer()) -> any().
 run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options, _Thread) ->
     ok;
 run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options, Thread) ->
@@ -133,10 +133,10 @@ run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, O
             Error
     end.
 
--spec get_arg_and_result_type/3 :: (Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
-                                    FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
-                                    test_options()) -> 
-                                           {var_fun, [], test_fun_type()}.
+-spec get_arg_and_result_type(Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                              FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                              test_options()) ->
+                                     {var_fun, [], test_fun_type()}.
 get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
                         {var_type, [], {union_fun, FeederFunTypes}} = _FeederFunType, Options) ->
     case proplists:get_bool(with_feeder, Options) of
@@ -147,11 +147,11 @@ get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
                                     end.
 
 
--spec run_test_ttt/7 :: (Module::module(), Fun::atom(),
-                       Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
-                       FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
-                       tester_parse_state:state(), test_options(),
-                       Thread::non_neg_integer()) -> any().
+-spec run_test_ttt(Module::module(), Fun::atom(),
+                   Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                   FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                   tester_parse_state:state(), test_options(),
+                   Thread::non_neg_integer()) -> any().
 run_test_ttt(Module, Func,
              {var_type, [], {union_fun, FunTypes}} = FunType,
              {var_type, [], {union_fun, _FeederFunTypes}} = FeederFunType,
@@ -253,8 +253,8 @@ apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
              erlang:get_stacktrace(), util:get_linetrace()}
     end.
 
--spec run_test/7 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
-                     tester_parse_state:state(), integer(), test_options()) -> ok.
+-spec run_test(module(), atom(), non_neg_integer(), non_neg_integer(),
+               tester_parse_state:state(), integer(), test_options()) -> ok.
 run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
     Master = self(),
     Dict = erlang:get(),
