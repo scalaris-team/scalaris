@@ -240,7 +240,7 @@ rbr_consistency_delete(_Config) ->
     %% output must be the old value or the new value
     %% if the new value was seen once, the old must not be readable again.
 
-    Nodes = pid_groups:find_all(dht_node),
+    %% Nodes = pid_groups:find_all(dht_node),
     Key = "a",
 
     %% initialize key
@@ -264,7 +264,7 @@ rbr_consistency_delete(_Config) ->
                 Next = Old + 1,
 
                 ct:pal("Write in iteration: ~p~n", [R]),
-                kv_on_cseq:write(Key, Next),
+                _ = kv_on_cseq:write(Key, Next),
 
                 %% ct:pal("After modification:"),
                 %% print modified rbr entries

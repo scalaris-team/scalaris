@@ -200,7 +200,7 @@ on({prbr, delete_key, _DB, Client, Key}, TableName) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     ct:pal("R~p deleted~n", [?RT:get_key_segment(Key)]),
     Entry = get_entry(Key, TableName),
-    ?PDB:delete_entry(TableName, Entry),
+    _ = ?PDB:delete_entry(TableName, Entry),
     comm:send_local(Client, {delete_key_reply, Key}),
     TableName;
 
