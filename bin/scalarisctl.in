@@ -124,6 +124,7 @@ fix_paths() {
         SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris"
         SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris"
         SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris"
+        SCALARISCLIENT_CPP="$SCALARISDIR/cpp-api/scalaris"
     fi
 }
 
@@ -397,7 +398,7 @@ checkinstallation() {
     # test runtime
     if [ -z "$yaws_port" ]; then
         echo "  NOTE: yaws port not specified (you can specify it using -y <port> for $0)."
-        echo "        Python, Python3, Ruby API tests may fail if the port is different in"
+        echo "        Python, Python3, Ruby, C++ API tests may fail if the port is different in"
         echo "        one of the config files."
     else
         export SCALARIS_JSON_URL="http://localhost:$yaws_port" # for single operations
@@ -625,10 +626,48 @@ checkinstallation() {
         echo "$RUBY_OUTPUT"
     fi
 
+    # testing C++:
+    echo -n "  C++ API ... "
+    if [ -f "$SCALARISCLIENT_CPP" ]; then
+        CPP_OUTPUT=`echo -e "> $SCALARISCLIENT_CPP --help"`
+        CPPHELP_OUTPUT=`$SCALARISCLIENT_CPP --help 2>&1`
+        CPPHELP_FAILED=$?
+        if [ $CPPHELP_FAILED -eq 0 ]; then
+            # simple read/write
+            KEY="checkinstallation-cpp-$RANDOM"
+            CPP_OUTPUT=`echo -e "> $SCALARISCLIENT_CPP --read ${KEY}"`
+            CPPREAD1_OUTPUT=`$SCALARISCLIENT_CPP --read ${KEY} 2>&1`
+            echo "$CPPREAD1_OUTPUT" | grep "ReadFailedError" > /dev/null 2>&1
+            CPPREAD1_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD1_OUTPUT"`
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --write ${KEY},1"`
+            CPPWRITE1_OUTPUT=`$SCALARISCLIENT_CPP --write ${KEY},1 2>&1`
+            CPPWRITE1_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPWRITE1_OUTPUT"`
+            if [ $CPPREAD1_FAILED -ne 0 -o $CPPWRITE1_FAILED -ne 0 ]; then
+                CPP_FAILED=1
+                CPP_RESULT="$MSG_FAILED"
+            else
+                CPP_FAILED=0
+                CPP_RESULT="$MSG_SUCCESS"
+            fi
+        else
+            CPP_FAILED=1
+            CPP_RESULT="$MSG_FAILED"
+        fi
+    else
+        CPP_FAILED=0
+        CPP_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$CPP_RESULT"
+    if [ "$verbose" -eq 1 -o "$CPP_FAILED" -ne 0 ]; then
+        echo "$CPP_OUTPUT"
+    fi
+
     $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
 
     if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
-         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
+         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 -o "$CPP_FAILED" -ne 0 ]; then
         exit 1
     fi
 
