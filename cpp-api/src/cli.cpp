@@ -32,20 +32,28 @@ void exec_call(F& f){
     f(op);
   } catch (std::runtime_error& e) {
     cout << "std::runtime_error: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (ConnectionError& e) {
     cout << "ConnectionError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (MalFormedJsonError& e) {
     cout << "MalFormedJsonError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (ReadFailedError& e) {
     cout << "ReadFailedError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (NotFoundError& e) {
     cout << "NotFoundError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (WriteFailedError& e) {
     cout << "WriteFailedError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (CommitFailedError& e) {
     cout << "CommitFailedError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   } catch (NotSupportedError& e) {
     cout << "NotSupportedError: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -64,7 +72,7 @@ int main(int argc, char **argv) {
 
   if (vm.count("help")) {
     cout << desc << "\n";
-    return 1;
+    return 0;
   } else if (vm.count("read")) {
     string key = vm["read"].as<string>();
     auto p = [key](TransactionSingleOp& op) {
@@ -82,7 +90,7 @@ int main(int argc, char **argv) {
     exec_call(p);
   } else {
     cout << desc << "\n";
-    return 1;
+    return 0;
   }
   return 0;
 }
