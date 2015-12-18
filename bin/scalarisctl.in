@@ -617,11 +617,18 @@ checkinstallation() {
             echo "$CPPREAD1_OUTPUT" | grep "ReadFailedError" > /dev/null 2>&1
             CPPREAD1_FAILED=$?
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD1_OUTPUT"`
+
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --write ${KEY},1"`
             CPPWRITE1_OUTPUT=`$SCALARISCLIENT_CPP --write ${KEY},1 2>&1`
             CPPWRITE1_FAILED=$?
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPWRITE1_OUTPUT"`
-            if [ $CPPREAD1_FAILED -ne 0 -o $CPPWRITE1_FAILED -ne 0 ]; then
+
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --read ${KEY}"`
+            CPPREAD2_OUTPUT=`$SCALARISCLIENT_CPP -r ${KEY} 2>&1`
+            CPPREAD2_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD2_OUTPUT"`
+
+            if [ $CPPREAD1_FAILED -ne 0 -o $CPPWRITE1_FAILED -ne 0 -o $CPPREAD2_FAILED -ne 0 ]; then
                 CPP_FAILED=1
                 CPP_RESULT="$MSG_FAILED"
             else
