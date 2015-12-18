@@ -381,7 +381,7 @@ checkinstallation() {
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -sasl sasl_error_logger false -boot start_sasl \
-        -eval "ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0)." 2>&1`
+        -eval "ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0)."  > /dev/null 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
