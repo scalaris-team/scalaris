@@ -780,8 +780,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
             send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
             % calculate the remaining trees' failure prob based on the already
             % used failure prob
-            NextLvlP1E = calc_n_subparts_p1e(1, P1EPhaseX, NextP0E),
-            P1E_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, NextLvlP1E),
+            P1E_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP0E),
             NewState#rr_recon_state{stats = NStats,
                                     misc = [{p1e, P1E_I_2},
                                             {p1e_phase_x, P1EPhaseX},
@@ -869,8 +868,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
             ?DBG_ASSERT(NextLvlNodesAct >= 0),
             % calculate the remaining trees' failure prob based on the already
             % used failure prob
-            NextLvlP1E = calc_n_subparts_p1e(1, P1EPhaseX, NextP0E),
-            P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, NextLvlP1E),
+            P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP0E),
             {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
                 merkle_next_signature_sizes(Params, P1ETotal_I_2, MyMaxItemsCount,
                                             OtherMaxItemsCount),
