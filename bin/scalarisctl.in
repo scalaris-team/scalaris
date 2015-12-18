@@ -624,7 +624,7 @@ checkinstallation() {
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPWRITE1_OUTPUT"`
 
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --read ${KEY}"`
-            CPPREAD2_OUTPUT=`$SCALARISCLIENT_CPP -r ${KEY} 2>&1`
+            CPPREAD2_OUTPUT=`$SCALARISCLIENT_CPP --read ${KEY} 2>&1`
             CPPREAD2_FAILED=$?
             CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD2_OUTPUT"`
 
