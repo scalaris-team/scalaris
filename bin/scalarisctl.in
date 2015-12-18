@@ -444,11 +444,6 @@ checkinstallation() {
       fi
     done
 
-    # bench parameters:
-    BENCH_NR_OPS=10
-    BENCH_TPN=1 # threads per node
-    BENCH_TESTS=all
-
     # testing Java:
     echo -n "  Java-API ... "
     if [ "$HAS_JAVACLIENT" -eq 1 ]; then
@@ -470,13 +465,7 @@ checkinstallation() {
         JAVAREAD2_FAILED=$?
         JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD2_OUTPUT"`
 
-        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        JAVABENCH_OUTPUT=`$SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        JAVABENCH_FAILED=$?
-        echo "$JAVABENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && JAVABENCH_FAILED=1
-        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVABENCH_OUTPUT"`
-
-        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
+        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 ]; then
             JAVA_FAILED=1
             JAVA_RESULT="$MSG_FAILED"
         else
@@ -513,13 +502,7 @@ checkinstallation() {
         PYTHONREAD2_FAILED=$?
         PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD2_OUTPUT"`
 
-        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        PYTHONBENCH_OUTPUT=`$SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        PYTHONBENCH_FAILED=$?
-        echo "$PYTHONBENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHONBENCH_FAILED=1
-        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONBENCH_OUTPUT"`
-
-        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
+        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 ]; then
             PYTHON_FAILED=1
             PYTHON_RESULT="$MSG_FAILED"
         else
@@ -556,13 +539,7 @@ checkinstallation() {
         PYTHON3READ2_FAILED=$?
         PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ2_OUTPUT"`
 
-        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        PYTHON3BENCH_OUTPUT=`$SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        PYTHON3BENCH_FAILED=$?
-        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHON3BENCH_FAILED=1
-        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3BENCH_OUTPUT"`
-
-        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
+        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 ]; then
             PYTHON3_FAILED=1
             PYTHON3_RESULT="$MSG_FAILED"
         else
