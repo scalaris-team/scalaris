@@ -1024,19 +1024,16 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     ?TRACE("BEGIN SYNC", []),
     case Initiator of
         true ->
-            Stats1 =
-                rr_recon_stats:set(
-                  [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
+            MTSize = merkle_tree:size_detail(MySyncStruct),
+            Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
             #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
                            ni_item_count = OtherItemsCount} = Params,
             MyItemCount = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
             ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~n"
-                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B, Items/Leaf: ~g",
-                          [length(MySyncStruct), merkle_tree:size_detail(MySyncStruct),
+                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                          [length(MySyncStruct), MTSize,
                            length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-                                         merkle_tree:is_empty(L)]),
-                           lists:sum([merkle_tree:get_item_count(M) || M <- MySyncStruct]) /
-                               lists:sum([merkle_tree:get_leaf_count(M) || M <- MySyncStruct])]),
+                                         merkle_tree:is_empty(L)])]),
             P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
             P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
 
@@ -1095,17 +1092,14 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                                     {bucket_size, MerkleB}]))
                                    || {SubI, _Count, Bucket} <- ICBList]
                         end),
-            Stats1 =
-                rr_recon_stats:set(
-                  [{tree_size, merkle_tree:size_detail(SyncStruct)}], Stats),
+            MTSize = merkle_tree:size_detail(SyncStruct),
+            Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
             Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
             ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
-                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B, Items/Leaf: ~g",
-                          [length(SyncStruct), merkle_tree:size_detail(SyncStruct),
+                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                          [length(SyncStruct), MTSize,
                            length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-                                         merkle_tree:is_empty(L)]),
-                           lists:sum([merkle_tree:get_item_count(M) || M <- SyncStruct]) /
-                               lists:sum([merkle_tree:get_leaf_count(M) || M <- SyncStruct])]),
+                                         merkle_tree:is_empty(L)])]),
             
             State#rr_recon_state{struct = SyncStruct,
                                  stats = Stats2, params = MySyncParams,
