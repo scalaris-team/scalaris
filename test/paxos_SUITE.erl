@@ -275,7 +275,7 @@ step_until_decide(Processes, PaxId, SumSteps) ->
             ct:pal("No runnable processes of ~p~n", [length(Processes)]),
             timer:sleep(5), step_until_decide(Processes, PaxId, SumSteps);
         _ ->
-            Num = random:uniform(length(Runnable)),
+            Num = randoms:uniform(length(Runnable)),
             _ = gen_component:bp_step(comm:make_local(lists:nth(Num, Runnable))),
             receive
                 {learner_decide, cpaxidrndinterl, _, _Res} = _Any ->
