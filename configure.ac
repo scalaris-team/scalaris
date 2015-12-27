@@ -397,6 +397,14 @@ AS_IF([test "${ct_line}" = "true"],
        AC_MSG_NOTICE([ct_line is available])],
       [AC_MSG_NOTICE([ct_line is not available])])
 
+rand_module=`"${ERL}" -noshell -eval 'code:load_file(rand), io:format("~p~n", [[erlang:function_exported(rand,uniform,0)]]), erlang:halt().' | tail -1`
+AS_IF([test "${rand_module}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_rand}"
+       EDOCMACROS="${EDOCMACROS}, {with_rand, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_rand"
+       AC_MSG_NOTICE([rand:uniform/0 is available and usable])],
+      [AC_MSG_NOTICE([rand:uniform/0 is not available or not usable, falling back to random:uniform/0])])
+
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-callback init() -> ok.], [ok])],
        [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_callback_support}"
