@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@
 
 -include("scalaris.hrl").
 
--export([start/0, stop/0, getRandomString/0, getRandomInt/0, rand_uniform/2]).
+-export([start/0, stop/0, getRandomString/0, getRandomInt/0,
+         rand_uniform/2, uniform/0, uniform/1, seed/0]).
 
 %% for tester
 -export([rand_uniform_feeder/2]).
@@ -55,3 +56,37 @@ rand_uniform(Lo, Hi) ->
 %% @doc Stops the crypto module's server.
 -spec stop() -> ok.
 stop() -> crypto:stop().
+
+-spec uniform() -> float().
+-ifdef(with_rand).
+uniform() ->
+    rand:uniform().
+-else.
+uniform() ->
+    random:uniform().
+-endif.
+
+-spec uniform(X::pos_integer()) -> pos_integer().
+-ifdef(with_rand).
+uniform(X) ->
+    rand:uniform(X).
+-else.
+uniform(X) ->
+    random:uniform(X).
+-endif.
+
+-spec seed() -> ok.
+-ifdef(with_rand).
+seed() ->
+    %% rand automatically uses a different, time-dependent, seed
+    %% for every process.
+    ok.
+-else.
+seed() ->
+    %% random always uses the same default seed. The following will
+    %% set a time-dependent seed (as proposed by the Erlang documentation).
+    _ = random:seed(erlang:phash2([node()]),
+                    erlang:monotonic_time(),
+                    erlang:unique_integer()),
+    ok.
+-endif.
