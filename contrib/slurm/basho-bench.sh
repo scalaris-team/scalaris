@@ -45,7 +45,6 @@ trap 'trap_cleanup' SIGTERM SIGINT
 #
 # TIMEOUT=60
 # SCALARIS_LOCAL=true
-# SCALARISCTL_PARAMS="-l $HOME/bbench"
 
 # COLLECTL_SUBSYSTEMS="-s cCmMnNdD"
 # COLLECTL_INTERVAL="-i 10"
@@ -58,10 +57,8 @@ main(){
     source $(pwd)/config/basho-bench.cfg
     check_wdir
     setup_logging
-    setup_directories
     print_env
     check_compile
-    [[ $COLLECTL = true ]] && start_collectl
 
 
     for NODES in $NODES_SERIES; do
@@ -69,11 +66,19 @@ main(){
 
             # repeat the benchmarks
             for run in $(seq 1 $REPETITIONS); do
-                start_scalaris
-                log info "starting repetition $run..."
 
-                NAME="${PREFIX}$NODES-$VMS_PER_NODE-$SLURM_JOBID-r$run"
+                NAME="${PREFIX}$NODES-$VMS_PER_NODE-r$run"
                 mkdir ${WD}/${NAME}
+                setup_directories
+
+                SCALARISCTL_PARAMS="-l $WD/$NAME/logs"
+                echo ${!SCALARISCTL_PARAMS@}=$SCALARISCTL_PARAMS
+                COLLECTL_DIR=$WD/$NAME/collectl
+                echo ${!COLLECTL_DIR@}=$COLLECTL_DIR
+
+                log info "starting repetition $run..."
+                [[ $COLLECTL = true ]] && start_collectl
+                start_scalaris
 
                 wait_for_scalaris_startup
                 build_hostlist
@@ -87,11 +92,11 @@ main(){
 
                 log info "sleeping for $SLEEP1 seconds"
                 sleep $SLEEP1
+                [[ $COLLECTL = true ]] && stop_collectl
             done
 
             # finish
             # shutdown
-            [[ $COLLECTL = true ]] && stop_collectl
             if (( SLEEP2 > 0 )); then
                 log info "sleeping for $SLEEP2 seconds"
                 sleep $SLEEP2
@@ -133,11 +138,8 @@ setup_logging(){
 }
 
 setup_directories(){
-    if [[ ! -d $WD/slurm ]]; then
-        mkdir -p $WD/slurm
-    fi
-    if [[ $COLLECTL = true && ! -d $WD/collectl ]]; then
-        mkdir -p $WD/collectl
+    if [[ $COLLECTL = true && ! -d $WD/$NAME/collectl ]]; then
+        mkdir -p $WD/$NAME/collectl
     fi
 }
 
@@ -186,9 +188,9 @@ start_collectl() {
     for host in ${LG_HOSTS[@]}; do
         log info "starting collectl on $host"
         if [[ $(hostname -f) = $host ]]; then
-            collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
+            collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &
         else
-            ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
+            ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &
         fi
     done
 }
@@ -218,10 +220,11 @@ start_scalaris() {
     [[ -n $COLLECTL_DIR ]] && export COLLECTL_DIR
     [[ -n $SCALARIS_LOCAL ]] && export SCALARIS_LOCAL
     [[ -n $SCALARISCTL_PARAMS ]] && export SCALARISCTL_PARAMS
+    [[ -n $NAME ]] && export NAME
 
     # start sbatch command and capture output
     # the ${var:+...} expands only, if the variable is set and non-empty
-    RET=$( sbatch -A csr -o $WD/slurm/slurm-%j.out \
+    RET=$( sbatch -A csr -o $WD/$NAME/slurm-%j.out \
             ${PARTITION:+-p $PARTITION} \
             ${NODES:+-N $NODES} \
             ${NODELIST:+ --nodelist=$NODELIST} \

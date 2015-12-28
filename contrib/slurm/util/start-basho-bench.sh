@@ -65,7 +65,7 @@ check_running(){
 
 start_bbench() {
     local config="${WD}/${BBENCH_NAME}/lg${PARALELL_ID}.config"
-    $BBENCH_DIR/basho_bench -n results_lg${PARALELL_ID} -N vm${PARALELL_ID} \
+    $BBENCH_DIR/basho_bench -n lg${PARALELL_ID} -N vm${PARALELL_ID} \
         -C 'chocolate chip cookie' --results-dir $WD/$BBENCH_NAME $config
 }
 
