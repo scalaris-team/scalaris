@@ -329,6 +329,7 @@ write_config() {
 {operations, [{put,2}, {get, 8}]}.
 {driver, basho_bench_driver_scalaris}.
 {key_generator, {int_to_str, {uniform_int, 1114111}}}.
+%%{key_generator, {int_to_str, {uniform_int, 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}}}.
 %% size in Bytes
 {value_generator, {fixed_bin, 512}}.
 {scalarisclient_mynode, ['benchclient${PARALLEL_ID}']}.
