@@ -47,9 +47,10 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # SCALARIS_LOCAL=true
 # SCALARISCTL_PARAMS="-l $HOME/bbench"
 
-# COLLECTL_SUBSYSTEMS="-s cmnd"
+# COLLECTL_SUBSYSTEMS="-s cCmMnNdD"
 # COLLECTL_INTERVAL="-i 10"
 # COLLECTL_FLUSH="-F 0"
+
 
 #=============================
 
