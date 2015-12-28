@@ -57,7 +57,7 @@ check_running(){
     # check for running bbench instances
     ppids=$(pgrep -af basho_bench | grep -v $JOBID)
     if [[ -n $ppids ]]; then
-        echo "benchmarks still running, exiting..."
+        echo "[error] benchmarks still running, exiting..."
         pgrep -af basho_bench | grep -v $JOBID
         exit 1
     fi

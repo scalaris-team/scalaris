@@ -386,8 +386,17 @@ run_bbench() {
 kill_bbench(){
     # kill all remaining processes with the SLURM_ID of the current job
     # (ssh remote cmd execution doesn't reliable pass through signals
-    ssh bzcfisch@buildbot2.zib.de bash -c "'pkill -f $SLURM_JOBID'"
-    pkill -f $SLURM_JOBID
+    for host in ${LG_HOSTS[@]}; do
+        log info "killing bbench on $host"
+        if [[ $(hostname -f) = $host ]]; then
+            pkill -f $SLURM_JOBID
+            pkill -f basho_bench
+        else
+            ssh $host bash -c "'pkill -f $SLURM_JOBID'"
+            ssh $host bash -c "'pkill -f basho_bench'"
+        fi
+    done
+
 }
 
 trap_cleanup(){
