@@ -84,9 +84,8 @@ seed() ->
 -else.
 seed() ->
     %% random always uses the same default seed. The following will
-    %% set a time-dependent seed (as proposed by the Erlang documentation).
-    _ = random:seed(erlang:phash2([node()]),
-                    erlang:monotonic_time(),
-                    erlang:unique_integer()),
+    %% set a time-dependent seed.
+    {MS, S, US} = erlang:now(),
+    _ = random:seed(MS, S, US),
     ok.
 -endif.
