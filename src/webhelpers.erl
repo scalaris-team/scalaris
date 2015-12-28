@@ -133,9 +133,9 @@ color(Pid) ->
     Lo = 0,
     S1 = webhelpers:pid_to_integer(Pid),
     _ = random:seed(S1,S1,S1),
-    C1 = random:uniform(Hi-Lo)+Lo-1,
-    C2 = random:uniform(Hi-Lo)+Lo-1,
-    C3 = random:uniform(Hi-Lo)+Lo-1,
+    C1 = randoms:uniform(Hi-Lo)+Lo-1,
+    C2 = randoms:uniform(Hi-Lo)+Lo-1,
+    C3 = randoms:uniform(Hi-Lo)+Lo-1,
     io_lib:format("rgb(~p,~p,~p)",[C1,C2,C3])
     .
 
