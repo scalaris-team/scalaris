@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin,
+% @copyright 2007-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc web helpers module for mgmt server to generated the web interface
+%% @doc web helpers module for mgmt server to generate the web interface
 %% @version $Id$
 -module(webhelpers).
 -author('schuett@zib.de').
@@ -30,7 +30,6 @@
          getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1,
          safe_html_string/1, safe_html_string/2, html_pre/2,
-         pid_to_integer/1, color/1, format_coordinate/1,
          format_nodes/1, format_centroids/1
      ]).
 
@@ -119,25 +118,14 @@ get_vivaldi(Pids, Coords, TimeInMS) ->
         _ -> Coords
     end.
 
-% @doc Convert a Pid into an integer.
--spec pid_to_integer(comm:mypid()) -> integer().
-pid_to_integer(Pid) ->
-    {A,B,C,D} = comm:get_ip(Pid),
-    I = comm:get_port(Pid),
-    A+B+C+D+I.
-
 % @doc Choose a random color for a Pid
 -spec color(comm:mypid()) -> string().
 color(Pid) ->
-    Hi = 255,
-    Lo = 0,
-    S1 = webhelpers:pid_to_integer(Pid),
-    _ = random:seed(S1,S1,S1),
-    C1 = randoms:uniform(Hi-Lo)+Lo-1,
-    C2 = randoms:uniform(Hi-Lo)+Lo-1,
-    C3 = randoms:uniform(Hi-Lo)+Lo-1,
-    io_lib:format("rgb(~p,~p,~p)",[C1,C2,C3])
-    .
+    Hash = erlang:phash2(Pid, 256*256*256),
+    R = Hash rem 256,
+    G = (Hash div 256) rem 256,
+    B = (Hash div (256*256)) rem 256,
+    io_lib:format("rgb(~p,~p,~p)",[R,G,B]).
 
 % @doc Get a string representation for a vivaldi coordinate
 -spec format_coordinate([gossip_vivaldi:network_coordinate(),...]) -> string().
@@ -151,7 +139,7 @@ format_nodes(Nodes) ->
     % order nodes according to their datacenter (designated by color)
     NodesTree = lists:foldl(
         fun({{NodeName, NodeHost}, Coords}, Acc) ->
-            Key = webhelpers:color(NodeName),
+            Key = color(NodeName),
             PriorValue = gb_trees:lookup(Key, Acc),
             V = case PriorValue of
                 none -> [];
