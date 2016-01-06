@@ -253,7 +253,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
               LookupEnvelope =
                   dht_node_lookup:envelope(
                     4,
-                    {prbr, read, DB, '_', This, X, MyId, ReadFilter}),
+                    {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter}),
               comm:send_local(Dest,
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
@@ -386,6 +386,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                           dht_node_lookup:envelope(
                             4,
                             {prbr, write, DB, '_', Collector, X,
+                             entry_datatype(ReadEntry),
                              entry_my_round(ReadEntry),
                              WTVal,
                              WTUI,
@@ -601,6 +602,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
           ContentCheck = element(2, entry_filters(NewEntry)),
           WriteFilter = element(3, entry_filters(NewEntry)),
           WriteValue = entry_val(NewEntry),
+          DataType = entry_datatype(NewEntry),
 
           _ = case ContentCheck(OldRFResultValue,
                                 WriteFilter,
@@ -615,7 +617,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                     LookupEnvelope =
                       dht_node_lookup:envelope(
                         4,
-                        {prbr, write, DB, '_', This, X, Round,
+                        {prbr, write, DB, '_', This, X, DataType, Round,
                         WriteValue, PassedToUpdate, WriteFilter}),
                     api_dht_raw:unreliable_lookup(X, LookupEnvelope)
                   end

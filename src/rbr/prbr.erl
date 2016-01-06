@@ -136,7 +136,7 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
-on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, _DataType, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
@@ -154,7 +154,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, write, _DB, Cons, Proposer, Key, _DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
     %% we store the writefilter to be able to reproduce the request in

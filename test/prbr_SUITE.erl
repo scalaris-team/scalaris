@@ -374,7 +374,7 @@ modify_rbr_at_key(R, N) ->
                    LookupReadEnvelope = dht_node_lookup:envelope(
                                           4,
                                           {prbr, read, kv_db, '_', comm:this(),
-                                           Repl, unittest_rbr_consistency1_id,
+                                           Repl, kv_on_cseq, unittest_rbr_consistency1_id,
                                            fun prbr:noop_read_filter/1}),
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
@@ -390,7 +390,7 @@ modify_rbr_at_key(R, N) ->
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
                             {prbr, write, kv_db, '_', comm:this(),
-                             R, HighestRound,
+                             R, kv_on_cseq, HighestRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
                              fun prbr:noop_write_filter/3}),
