@@ -57,6 +57,7 @@
 -export_type([state/0]).
 -export_type([read_filter/0]).
 -export_type([write_filter/0]).
+-export_type([entry/0]).
 
 %% read_filter(custom_data() | no_value_yet) -> read_info()
 -type read_filter() :: fun((term()) -> term()).
