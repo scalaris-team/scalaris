@@ -1,4 +1,4 @@
-% @copyright 2013-2015 Zuse Institute Berlin,
+% @copyright 2013-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -201,7 +201,13 @@ get_chunk(State, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
     case intervals:is_empty(Interval) of
         true -> {intervals:empty(), []};
         false ->
-            get_chunk2(State, StartId, Interval, FilterFun, ValueFun, ChunkSize)
+            case config:read(db_prbr_chunker) of
+                db_prbr ->
+                    get_chunk2(State, StartId, Interval,
+                               FilterFun, ValueFun, ChunkSize);
+                Module -> Module:get_chunk2(State, StartId, Interval,
+                                            FilterFun, ValueFun, ChunkSize)
+            end
     end.
 
 %% @doc Helper for get_chunk/6.
