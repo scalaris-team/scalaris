@@ -329,13 +329,13 @@ tester_type_check_rbr(_Config) ->
              {on, 2},               %% sends messages
              {get_load, 1},         %% needs valid ets:tid()
              {set_entry, 2},        %% needs valid ets:tid()
+             {get_entry, 2},       %% needs valid ets:tid()
              {tab2list, 1},         %% needs valid ets:tid()
              {tab2list_raw_unittest, 1} %% needs valid ets:tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
              {msg_write_reply, 6}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
-             {get_entry, 2},       %% needs valid ets:tid()
              {tab2list_raw, 1}     %% needs valid ets:tid()
             ]},
           {rbrcseq,

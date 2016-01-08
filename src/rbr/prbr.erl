@@ -39,6 +39,9 @@
 -export([noop_write_filter/3]). %% See rbrcseq for explanation.
 -export([new/2]).
 -export([set_entry/2]).
+-export([get_entry/2]).
+-export([entry_val/1, entry_key/1]).
+
 -export([tester_create_write_filter/1]).
 
 %% let fetch the number of DB entries
@@ -136,9 +139,12 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
-on({prbr, read, _DB, Cons, Proposer, Key, _DataType, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
-    KeyEntry = get_entry(Key, TableName),
+    KeyEntry = case erlang:function_exported(DataType, prbr_read_handler, 3) of
+                   true -> DataType:prbr_read_handler(Key, TableName, ReadFilter);
+                   _    -> get_entry(Key, TableName)
+               end,
 
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
@@ -154,7 +160,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, _DataType, ProposerUID, ReadFilter}, T
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, _DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
     %% we store the writefilter to be able to reproduce the request in
@@ -169,8 +175,13 @@ on({prbr, write, _DB, Cons, Proposer, Key, _DataType, InRound, Value, PassedToUp
         end,
     _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
-                {NewVal, Ret} = WriteFilter(entry_val(NewKeyEntry),
-                                     PassedToUpdate, Value),
+                {NewVal, Ret} =
+                    case erlang:function_exported(DataType, prbr_write_handler, 5) of
+                        true -> DataType:prbr_write_handler(NewKeyEntry,
+                                     PassedToUpdate, Value, TableName, WriteFilter);
+                        _    -> WriteFilter(entry_val(NewKeyEntry),
+                                     PassedToUpdate, Value)
+                    end,
 %%                case kvx =/= _DB of
 %%                    true ->
 %%                log:log("write ok~n"
@@ -259,8 +270,8 @@ new(Key, Val) ->
      _Value = Val}.
 
 
-%% -spec entry_key(entry()) -> any().
-%% entry_key(Entry) -> element(1, Entry).
+-spec entry_key(entry()) -> any().
+entry_key(Entry) -> element(1, Entry).
 %% -spec entry_set_key(entry(), any()) -> entry().
 %% entry_set_key(Entry, Key) -> setelement(2, Entry, Key).
 -spec entry_r_read(entry()) -> pr:pr().
