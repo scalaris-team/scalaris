@@ -40,7 +40,10 @@
 -export([new/2]).
 -export([set_entry/2]).
 -export([get_entry/2]).
--export([entry_val/1, entry_key/1]).
+-export([delete_entry/2]).
+-export([entry_key/1]).
+-export([entry_val/1]).
+-export([entry_set_val/2]).
 
 -export([tester_create_write_filter/1]).
 
@@ -142,16 +145,18 @@ close_and_delete(State) -> ?PDB:close_and_delete(State).
 -spec on(message(), state()) -> state().
 on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
-    KeyEntry = case erlang:function_exported(DataType, prbr_read_handler, 3) of
-                   true -> DataType:prbr_read_handler(Key, TableName, ReadFilter);
-                   _    -> get_entry(Key, TableName)
+    KeyEntry = get_entry(Key, TableName),
+
+    ReadEntry = case erlang:function_exported(DataType, prbr_read_handler, 3) of
+                   true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
+                   _    -> KeyEntry
                end,
 
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
 %%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
     msg_read_reply(Proposer, Cons, AssignedReadRound,
-                   ReadFilter(entry_val(KeyEntry)),
+                   ReadFilter(entry_val(ReadEntry)),
                    entry_r_write(KeyEntry)),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
@@ -212,7 +217,7 @@ on({prbr, delete_key, _DB, Client, Key}, TableName) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     ct:pal("R~p deleted~n", [?RT:get_key_segment(Key)]),
     Entry = get_entry(Key, TableName),
-    _ = ?PDB:delete_entry(TableName, Entry),
+    _ = delete_entry(TableName, Entry),
     comm:send_local(Client, {delete_key_reply, Key}),
     TableName;
 
@@ -235,6 +240,10 @@ get_entry(Id, TableName) ->
 set_entry(NewEntry, TableName) ->
     _ = ?PDB:set(TableName, NewEntry),
     TableName.
+
+-spec delete_entry(state(), entry()) -> db_prbr:db().
+delete_entry(TableName, Entry) ->
+    ?PDB:delete_entry(TableName, Entry).
 
 -spec get_load(state()) -> non_neg_integer().
 get_load(State) -> ?PDB:get_load(State).
