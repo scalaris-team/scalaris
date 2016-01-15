@@ -44,6 +44,7 @@
 -export([close/1, close_and_delete/1]).
 -export([get_load/1, get_load/2]).
 -export([tab2list/1]).
+-export([get_chunk2/7]).
 
 %% raw whole db entry operations
 -export([get/2]).
@@ -221,13 +222,23 @@ get_chunk2(State, StartId, Interval, FilterFun, ValueFun, all) ->
         get_chunk2(State, StartId, Interval, FilterFun, ValueFun, get_load(State)),
     {intervals:empty(), Chunk};
 
+get_chunk2({DB, Subscr, Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+    AddDataFun = fun(Key, {Acc, RemainingChunkSize}) ->
+                     Entry = ?DB:get(DB, Key),
+                     case FilterFun(Entry) of
+                         true -> {[Entry | Acc],
+                                  RemainingChunkSize - 1};
+                         _    -> {Acc, RemainingChunkSize}
+                     end
+             end,
+    get_chunk2({DB, Subscr, Snap}, StartId, Interval, FilterFun, ValueFun, AddDataFun, ChunkSize).
 
 %%%%%%
 %% bulk entry operations on intervals or filter funs for replica
 %% repair and local use (for data slide)
 %%%%%%
 
-get_chunk2({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+get_chunk2({DB, _Subscr, _Snap}, StartId, Interval, _FilterFun, ValueFun, AddDataFun, ChunkSize) ->
     %% split intervals in a way so that the first simple interval of After
     %% either contains StartId or is the closest following after StartId
     ?TRACE_CHUNK("get_chunk:~nStartID: ~p~nInterval:~p~nChunksize: ~p~n",
@@ -257,14 +268,6 @@ get_chunk2({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSi
                     After ++ Before
             end
     end,
-    AddDataFun = fun(Key, {Acc, RemainingChunkSize}) ->
-                         Entry = ?DB:get(DB, Key),
-                         case FilterFun(Entry) of
-                             true -> {[Entry | Acc],
-                                      RemainingChunkSize - 1};
-                             _    -> {Acc, RemainingChunkSize}
-                         end
-                 end,
     ?TRACE_CHUNK("get_chunk2: asking db:foldl to look in those intervals ~p~n",
                  [RotatedInterval]),
     {Chunk, Remaining} = lists:foldl(
