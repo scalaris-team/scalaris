@@ -28,28 +28,30 @@ trap 'trap_cleanup' SIGTERM SIGINT
 
 # Values defined here override settings from the configuration file
 
-# workers / dht_node = load_generators * workers_base
-# total rate = # load generators * worker base * ringsize * rate
-
-# NODES_SERIES="2 4"
-# VMS_PER_NODE_SERIES="1 2"
 # REPETITIONS=2
+# DURATION=5
+# LOAD_GENERATORS=4
+#
+# PARTITION="CUMU"
+# TIMEOUT=15
+# SLEEP1=30
+# SLEEP2=30
+#
+# SCALARIS_LOCAL=true
 # COLLECTL=true
 #
-# DURATION=1
-# MODE="{rate, 100}"
-# PREFIX="bbench-"
-
-# WORKERS_BASE=2
-# LOAD_GENERATORS=2
+# # size scalability series (only uncomment 'size' or 'load'
+# KIND='size'
+# NODES_SERIES="1 2 4 8 16 32"
+# VMS_PER_NODE_SERIES="1"
+# WORKERS_BASE=4
 #
-# TIMEOUT=60
-# SCALARIS_LOCAL=true
-
-# COLLECTL_SUBSYSTEMS="-s cCmMnNdD"
-# COLLECTL_INTERVAL="-i 10"
-# COLLECTL_FLUSH="-F 0"
-
+# # load scalability series
+# KIND='load'
+# NODES=32
+# VMS_PER_NODE=1
+# BASES="1 2 4 8 16 32 64 128 256 512 1024 2048"
+#
 
 #=============================
 
@@ -60,50 +62,72 @@ main(){
     print_env
     check_compile
 
+    if [[ $KIND == "size" ]]; then
+        main_size
+    elif [[ $KIND == "load" ]]; then
+        main_load
+    else
+        log error "Unknown kind of benchmark, exiting"
+        exit 1
+    fi
+}
 
+
+main_size(){
     for NODES in $NODES_SERIES; do
         for VMS_PER_NODE in $VMS_PER_NODE_SERIES; do
-
-            # repeat the benchmarks
-            for run in $(seq 1 $REPETITIONS); do
-
-                NAME="${PREFIX}$NODES-$VMS_PER_NODE-r$run"
-                mkdir ${WD}/${NAME}
-                setup_directories
-
-                SCALARISCTL_PARAMS="-l $WD/$NAME/logs"
-                echo ${!SCALARISCTL_PARAMS@}=$SCALARISCTL_PARAMS
-                COLLECTL_DIR=$WD/$NAME/collectl
-                echo ${!COLLECTL_DIR@}=$COLLECTL_DIR
-
-                log info "starting repetition $run..."
-                [[ $COLLECTL = true ]] && start_collectl
-                start_scalaris
-
-                wait_for_scalaris_startup
-                build_hostlist
-
-                test_ring
-                run_bbench
-                test_ring
-
-                stop_scalaris
-                rm_lockfile
-
-                log info "sleeping for $SLEEP1 seconds"
-                sleep $SLEEP1
-                [[ $COLLECTL = true ]] && stop_collectl
-            done
-
-            # finish
-            # shutdown
-            if (( SLEEP2 > 0 )); then
-                log info "sleeping for $SLEEP2 seconds"
-                sleep $SLEEP2
-            fi
+            repeat_benchmark
         done
     done
 }
+
+main_load(){
+    for WORKERS_BASE in $BASES; do
+        ll=$((WORKERS_BASE*LOAD_GENERATORS))
+        ll=$(printf "%04i" $ll)
+        PREFIX="workers$ll-"
+        log info "starting load benchmark with $ll ($WORKERS_BASE*$LOAD_GENERATORS)"
+        repeat_benchmark
+    done
+}
+
+repeat_benchmark() {
+    for run in $(seq 1 $REPETITIONS); do
+
+        NAME="${PREFIX}$NODES-$VMS_PER_NODE-r$run"
+        mkdir ${WD}/${NAME}
+        setup_directories
+
+        SCALARISCTL_PARAMS="-l $WD/$NAME/logs"
+        echo ${!SCALARISCTL_PARAMS@}=$SCALARISCTL_PARAMS
+        COLLECTL_DIR=$WD/$NAME/collectl
+        echo ${!COLLECTL_DIR@}=$COLLECTL_DIR
+
+        log info "starting repetition $run..."
+        [[ $COLLECTL = true ]] && start_collectl
+        start_scalaris
+
+        wait_for_scalaris_startup
+        build_hostlist
+
+        test_ring
+        run_bbench
+        test_ring
+
+        stop_scalaris
+        rm_lockfile
+
+        log info "sleeping for $SLEEP1 seconds"; sleep $SLEEP1
+        [[ $COLLECTL = true ]] && stop_collectl
+    done
+
+    if (( SLEEP2 > 0 )); then
+        log info "sleeping for $SLEEP2 seconds"
+        sleep $SLEEP2
+    fi
+
+}
+
 
 #=====================
 # FUNCTIONS
@@ -145,17 +169,25 @@ setup_directories(){
 
 
 print_env(){
-    echo ${!NODES_SERIES@}=$NODES_SERIES
-    echo ${!VMS_PER_NODE_SERIES@}=$VMS_PER_NODE_SERIES
-    echo ${!TIMEOUT@}=$TIMEOUT
-    echo ${!REPETITIONS@}=$REPETITIONS
-    echo ${!DURATION@}=$DURATION
-    echo ${!WORKERS_BASE@}=$WORKERS_BASE
-    echo ${!LOAD_GENERATORS@}=$LOAD_GENERATORS
-    echo ${!SLEEP1@}=$SLEEP1
-    echo ${!SLEEP2@}=$SLEEP2
+    echo KIND=$KIND
+    if [[ $KIND == "load" ]]; then
+        echo NODES=$NODES
+        echo VMS_PER_NODE=$VMS_PER_NODE
+        echo BASES=$BASES
+    elif [[ $KIND == "size" ]]; then
+        echo NODES_SERIES=$NODES_SERIES
+        echo VMS_PER_NODE_SERIES=$VMS_PER_NODE_SERIES
+        echo WORKERS_BASE=$WORKERS_BASE
+    fi
+    echo TIMEOUT=$TIMEOUT
+    echo REPETITIONS=$REPETITIONS
+    echo DURATION=$DURATION
+    echo LOAD_GENERATORS=$LOAD_GENERATORS
+    echo LG_HOSTS=${LG_HOSTS[@]}
+    echo SLEEP1=$SLEEP1
+    echo SLEEP2=$SLEEP2
     echo "COLLECTL=$COLLECTL"
-    echo ${!LG_HOSTS@}=${LG_HOSTS[@]}
+    echo "PARTITION=$PARTITION"
 }
 
 check_compile(){
@@ -353,8 +385,14 @@ run_bbench() {
     for i in $(seq 1 $LOAD_GENERATORS); do
         PARALLEL_ID=$i
         RANDOM_SEED="{$((7*$i)), $((11*$i)), $((5*$i))}"
-        local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
-        WORKERS=$((ringsize*WORKERS_BASE))
+        # for size scale worker/node
+        # for load scale total number of workers
+        if [[ $KIND == "size" ]]; then
+            local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
+            WORKERS=$((ringsize*WORKERS_BASE))
+        elif [[ $KIND == "load" ]]; then
+            WORKERS=$WORKERS_BASE
+        fi
         write_config
 
         # build args. The ${var:+...} expands only, if the variable is set and non-empty
