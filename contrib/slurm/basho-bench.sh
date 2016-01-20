@@ -391,6 +391,7 @@ join() {
 }
 
 write_config() {
+    local max_key=$((NODES*2**17))
     local config=${WD}/${NAME}/lg${PARALLEL_ID}.config
     cat >  $config <<EOF
 {rng_seed, $RANDOM_SEED}.
@@ -399,7 +400,7 @@ write_config() {
 {concurrent, $WORKERS}.
 {operations, [{put,2}, {get, 8}]}.
 {driver, basho_bench_driver_scalaris}.
-{key_generator, {int_to_str, {uniform_int, 1114111}}}.
+{key_generator, {int_to_str, {uniform_int, $max_key}}}.
 %%{key_generator, {int_to_str, {uniform_int, 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}}}.
 %% size in Bytes
 {value_generator, {fixed_bin, 512}}.
