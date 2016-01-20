@@ -55,7 +55,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 
 #=============================
 
-main(){
+main() {
     source $(pwd)/config/basho-bench.cfg
     check_wdir
     setup_logging
@@ -105,6 +105,7 @@ repeat_benchmark() {
 
         log info "starting repetition $run..."
         [[ $COLLECTL = true ]] && start_collectl
+        [[ $TOPLOG = true ]] && start_toplog
         start_scalaris
 
         wait_for_scalaris_startup
@@ -119,6 +120,7 @@ repeat_benchmark() {
 
         log info "sleeping for $SLEEP1 seconds"; sleep $SLEEP1
         [[ $COLLECTL = true ]] && stop_collectl
+        [[ $TOPLOG = true ]] && stop_toplog
     done
 
     if (( SLEEP2 > 0 )); then
@@ -235,6 +237,30 @@ stop_collectl(){
             pkill -f lg_$host
         else
             ssh $host pkill -f lg_$host
+        fi
+    done
+}
+
+start_toplog() {
+    # start toplog at the load generators
+    for host in ${LG_HOSTS[@]}; do
+        log info "starting toplog on $host"
+        if [[ $(hostname -f) = $host ]]; then
+            $SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &
+        else
+            ssh $host $SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &
+        fi
+    done
+}
+
+stop_toplog(){
+    # stop toplog on load generators
+    for host in ${LG_HOSTS[@]}; do
+        log info "killing toplog on $host"
+        if [[ $(hostname -f) = $host ]]; then
+            pkill -f toplog.sh
+        else
+            ssh $host pkill -f toplog.sh
         fi
     done
 }
@@ -457,6 +483,7 @@ trap_cleanup(){
 shutdown(){
     stop_scalaris
     [[ $COLLECTL = true ]] && stop_collectl
+    [[ $TOPLOG = true ]] && stop_toplog
     rm_lockfile
 }
 
