@@ -409,6 +409,7 @@ write_config() {
 
 %{remote_nodes, [{'buildbot2.zib.de', 'nodeB'}]}.
 %{distribute_work, true}.
+{report_interval, 5}.
 
 {scalarisclient_nodes, [$HOSTLIST]}.
 EOF
