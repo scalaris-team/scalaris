@@ -291,6 +291,9 @@ wait_for_scalaris_startup() {
 }
 
 test_ring() {
+    local retries=$1
+    local res=0
+    [[ -z "$retries" ]] && retries=0
     local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
     log info "testing ring"
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
@@ -299,29 +302,36 @@ test_ring() {
              ok -> halt(0);
              Error -> io:format('check_ring: ~p~n', [Error]), halt(1)
          end."
-    local res=$((ret+=$?))
+    res=$((res+=$?))
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
         "A = rpc:call($FIRST, admin, check_ring_deep, []),
          case A of
              ok -> halt(0);
              Error -> io:format('check_ring_deep: ~p~n', [Error]), halt(1)
          end."
-    res=$((ret+=$?))
+    res=$((res+=$?))
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
         "A = rpc:call($FIRST, admin, number_of_nodes, []),
          case A of
              $ringsize -> halt(0);
              _ -> io:format('number_of_nodes: ~p~n', [A]), halt(1)
          end."
-    res=$((ret+=$?))
+    res=$((res+=$?))
 
-    if  [[ $ret -eq 0 ]]; then
+    if  [[ $res -eq 0 ]]; then
         log info "testing ring was successful"
     else
-        log error "test_ring was not successful, aborting..."
-        shutdown
-        kill_bbench
-        exit 1
+        if (( retries++ >= 2 )); then
+            log error "test_ring failed, after $retries retries. Aborting..."
+            shutdown
+            kill_bbench
+            exit 1
+        else
+            local sleeptime=20
+            log error "testing ring failed, retrying in $sleeptime seconds..."
+            sleep $sleeptime
+            test_ring $retries
+        fi
     fi
 }
 
