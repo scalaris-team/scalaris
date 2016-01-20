@@ -269,7 +269,6 @@ start_first_services() ->
     case IsLbActive or ExplicitOsMon of
         true -> %% for lb_stats
             application:set_env(os_mon, start_os_sup, false),
-            application:set_env(os_mon, start_disksup, false),
             _ = application:start(os_mon),
             ok;
         _ -> ok
