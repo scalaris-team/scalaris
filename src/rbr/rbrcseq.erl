@@ -22,6 +22,7 @@
 
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
+-define(REDUN_MODULE, (config:read(redundancy_module))).
 
 %%-define(TRACE(X,Y), log:pal("~p" X,[self()|Y])).
 %%-define(TRACE(X,Y),
