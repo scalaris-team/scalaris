@@ -259,7 +259,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
           end
-          || X <- ?RT:get_replica_keys(Key) ],
+          || X <- ?REDUN_MODULE:get_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
     %% {next_period, ...}
@@ -618,16 +618,18 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                 %% consens sequence
                 This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
                 DB = db_selector(State),
+                Keys = ?REDUN_MODULE:get_keys(entry_key(NewEntry)),
+                WrVals = ?REDUN_MODULE:write_values_for_keys(Keys,  WriteValue),
                 [ begin
                     %% let fill in whether lookup was consistent
                     LookupEnvelope =
                       dht_node_lookup:envelope(
                         4,
-                        {prbr, write, DB, '_', This, X, DataType, Round,
-                        WriteValue, PassedToUpdate, WriteFilter}),
-                    api_dht_raw:unreliable_lookup(X, LookupEnvelope)
+                        {prbr, write, DB, '_', This, K, DataType, Round,
+                        V, PassedToUpdate, WriteFilter}),
+                    api_dht_raw:unreliable_lookup(K, LookupEnvelope)
                   end
-                  || X <- ?RT:get_replica_keys(entry_key(NewEntry)) ];
+                  || {K, V} <- lists:zip(Keys, WrVals)];
                 {false, Reason} = _Err ->
                   %% own proposal not possible as of content check
                   comm:send_local(entry_client(NewEntry),
@@ -893,55 +895,23 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
         if SeenWriteRound > RLatestSeen ->
                 T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
-                entry_set_val(T2, Val);
+                ReadVal = ?REDUN_MODULE:collect_read_value(Val,
+                                             entry_datatype(Entry)),
+                entry_set_val(T2, ReadVal);
            SeenWriteRound =:= RLatestSeen ->
-                %% if this happens, consistency is probably broken by
-                %% too weak (wrong) content checks...?
-
-                %% unfortunately the following statement is not always
-                %% true: As we also update parts of the value (set
-                %% write lock) it can happen that the write lock is
-                %% set on a quorum inluding an outdated replica, which
-                %% can store a different value than the replicas
-                %% up-to-date. This is not a consistency issue, as the
-                %% tx write the new value to the entry.  But what in
-                %% case of rollback? We cannot safely restore the
-                %% latest value then by just removing the write_lock,
-                %% but would have to actively write the former value!
-
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
 
-                %% We use a user defined value selector to chose which
-                %% value is newer. If a data type (leases for example)
-                %% only allows consistent values at any time, this
-                %% callback can check for violation by checking
-                %% equality of all replicas. If a data type allows
-                %% partial write access (like kv_on_cseq for its
-                %% locks) we need an ordering of the values, as it
-                %% might be the case, that a writelock which was set
-                %% on an outdated replica had to be rolled back. Then
-                %% replicas with newest paxos time stamp may exist
-                %% with differing value and we have to chose that one
-                %% with the highest version number for a quorum read.
-
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
-                T1 = case entry_val(Entry) of
-                         Val -> Entry;
-                         DifferingVal ->
-                             DataType = entry_datatype(Entry),
-                             MaxFunModule =
-                                 case erlang:function_exported(DataType, max, 2) of
-                                     true  -> DataType;
-                                     %% this datatype has not defined their own max fun
-                                     %% therefore use the default util:max
-                                     _     -> util
-                                 end,
-                             NewVal = MaxFunModule:max(Val, DifferingVal),
-                             entry_set_val(Entry, NewVal)
+                CurrentVal = entry_val(Entry),
+                NewVal = ?REDUN_MODULE:collect_read_value(CurrentVal, Val,
+                                                      entry_datatype(Entry)),
+                T1 = case CurrentVal =:= NewVal of
+                          true  -> Entry;
+                          _     -> entry_set_val(Entry, NewVal)
                      end,
                 entry_inc_num_newest(T1);
            true -> Entry
@@ -950,18 +920,21 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
-    R = config:read(replication_factor),
-    Done =
-        case (quorum:majority_for_accept(R) =< E3NumAcks) of
-            true ->
-                %% we have majority of acks
-                case entry_num_newest(E3) of
-                    E3NumAcks -> true; %% done
-                    _ -> write_through
-                end;
-            _ -> false
-        end,
-     {Done, E3}.
+    case ?REDUN_MODULE:quorum_accepted(E3NumAcks) of
+        true ->
+            %% construct read value from replies
+            Collected = entry_val(E3),
+            Constructed = ?REDUN_MODULE:get_read_value(Collected),
+            T = entry_set_val(E3, Constructed),
+            %% we have majority of acks
+            Done = case entry_num_newest(T) of
+                     E3NumAcks -> true; %% done
+                     _ -> write_through
+                   end,
+            {Done, T};
+        _ ->
+            {false, E3}
+    end.
 
 -spec add_write_reply(entry(), pr:pr(), Consistency::boolean())
                      -> {Done::boolean(), entry()}.
@@ -979,14 +952,12 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    R = config:read(replication_factor),
-    Done = (quorum:majority_for_accept(R) =< entry_num_acks(E2)),
+    Done = ?REDUN_MODULE:quorum_accepted(entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), entry()}.
 add_write_deny(Entry, Round, _Cons) ->
-    R = config:read(replication_factor),
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
@@ -999,7 +970,7 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = (quorum:majority_for_deny(R) =< entry_num_denies(E2)),
+    Done = ?REDUN_MODULE:quorum_denied(entry_num_denies(E2)),
     {Done, E2}.
 
 -spec inform_client(qread_done, entry()) -> ok.
