@@ -922,7 +922,7 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
-    case ?REDUNDANCY:quorum_accepted(E3NumAcks) of
+    case ?REDUNDANCY:quorum_accepted(entry_key(E3), E3NumAcks) of
         true ->
             %% construct read value from replies
             Collected = entry_val(E3),
@@ -954,7 +954,7 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    Done = ?REDUNDANCY:quorum_accepted(entry_num_acks(E2)),
+    Done = ?REDUNDANCY:quorum_accepted(entry_key(E2), entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
@@ -972,7 +972,7 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = ?REDUNDANCY:quorum_denied(entry_num_denies(E2)),
+    Done = ?REDUNDANCY:quorum_denied(entry_key(E2), entry_num_denies(E2)),
     {Done, E2}.
 
 -spec inform_client(qread_done, entry()) -> ok.
