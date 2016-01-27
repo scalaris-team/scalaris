@@ -355,8 +355,10 @@ tester_type_check_rbr(_Config) ->
              {set_entry, 2},     %% needs valid ets:tid()
              {add_read_reply, 6},%% needs client_value matching db_type
              {add_write_reply, 3}%% needs valid entry()
-           ]
-          }
+           ]},
+          {replication,
+           [],
+           []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],

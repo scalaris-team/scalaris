@@ -21,6 +21,7 @@
 -vsn('$Id:$ ').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([get_keys/1]).
 -export([write_values_for_keys/2]).
@@ -28,22 +29,29 @@
 -export([collect_read_value/2, collect_read_value/3]).
 -export([get_read_value/1]).
 
+-spec get_keys(?RT:key()) -> [?RT:key()].
 get_keys(Key) ->
     ?RT:get_replica_keys(Key).
 
+-spec write_values_for_keys([?RT:key()], client_value()) -> [client_value()].
 write_values_for_keys(Keys, WriteValue) ->
     [WriteValue || K <- Keys].
 
+-spec quorum_accepted(integer()) -> boolean().
 quorum_accepted(AccCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_accept(R) =< AccCount.
 
+-spec quorum_denied(integer()) -> boolean().
 quorum_denied(DeniedCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_deny(R) =< DeniedCount.
 
+-spec collect_read_value(client_value(), module()) -> any().
 collect_read_value(NewValue, _DataType) ->
     NewValue.
+
+-spec collect_read_value(any(), client_value(), module()) -> any().
 collect_read_value(Collected, NewValue, DataType) ->
     case NewValue of
         Collected -> Collected;
@@ -84,4 +92,5 @@ collect_read_value(Collected, NewValue, DataType) ->
             MaxFunModule:max(Collected, DifferingVal)
     end.
 
+-spec get_read_value(any()) -> client_value().
 get_read_value(ReadValue) -> ReadValue.
