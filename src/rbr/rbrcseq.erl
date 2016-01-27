@@ -22,7 +22,7 @@
 
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
--define(REDUN_MODULE, (config:read(redundancy_module))).
+-define(REDUNDANCY, (config:read(redundancy_module))).
 
 %%-define(TRACE(X,Y), log:pal("~p" X,[self()|Y])).
 %%-define(TRACE(X,Y),
@@ -259,7 +259,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
           end
-          || X <- ?REDUN_MODULE:get_keys(Key) ],
+          || X <- ?REDUNDANCY:get_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
     %% {next_period, ...}
@@ -386,8 +386,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
 
             Dest = pid_groups:find_a(routing_table),
             DB = db_selector(State),
-            Keys = ?REDUN_MODULE:get_keys(entry_key(Entry)),
-            WTVals = ?REDUN_MODULE:write_values_for_keys(Keys,  WTVal),
+            Keys = ?REDUNDANCY:get_keys(entry_key(Entry)),
+            WTVals = ?REDUNDANCY:write_values_for_keys(Keys,  WTVal),
             _ = [ begin
                       %% let fill in whether lookup was consistent
                       LookupEnvelope =
@@ -620,8 +620,8 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                 %% consens sequence
                 This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
                 DB = db_selector(State),
-                Keys = ?REDUN_MODULE:get_keys(entry_key(NewEntry)),
-                WrVals = ?REDUN_MODULE:write_values_for_keys(Keys,  WriteValue),
+                Keys = ?REDUNDANCY:get_keys(entry_key(NewEntry)),
+                WrVals = ?REDUNDANCY:write_values_for_keys(Keys,  WriteValue),
                 [ begin
                     %% let fill in whether lookup was consistent
                     LookupEnvelope =
@@ -897,7 +897,7 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
         if SeenWriteRound > RLatestSeen ->
                 T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
-                ReadVal = ?REDUN_MODULE:collect_read_value(Val,
+                ReadVal = ?REDUNDANCY:collect_read_value(Val,
                                              entry_datatype(Entry)),
                 entry_set_val(T2, ReadVal);
            SeenWriteRound =:= RLatestSeen ->
@@ -909,7 +909,7 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
                 CurrentVal = entry_val(Entry),
-                NewVal = ?REDUN_MODULE:collect_read_value(CurrentVal, Val,
+                NewVal = ?REDUNDANCY:collect_read_value(CurrentVal, Val,
                                                       entry_datatype(Entry)),
                 T1 = case CurrentVal =:= NewVal of
                           true  -> Entry;
@@ -922,11 +922,11 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
-    case ?REDUN_MODULE:quorum_accepted(E3NumAcks) of
+    case ?REDUNDANCY:quorum_accepted(E3NumAcks) of
         true ->
             %% construct read value from replies
             Collected = entry_val(E3),
-            Constructed = ?REDUN_MODULE:get_read_value(Collected),
+            Constructed = ?REDUNDANCY:get_read_value(Collected),
             T = entry_set_val(E3, Constructed),
             %% we have majority of acks
             Done = case entry_num_newest(T) of
@@ -954,7 +954,7 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    Done = ?REDUN_MODULE:quorum_accepted(entry_num_acks(E2)),
+    Done = ?REDUNDANCY:quorum_accepted(entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
@@ -972,7 +972,7 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = ?REDUN_MODULE:quorum_denied(entry_num_denies(E2)),
+    Done = ?REDUNDANCY:quorum_denied(entry_num_denies(E2)),
     {Done, E2}.
 
 -spec inform_client(qread_done, entry()) -> ok.
