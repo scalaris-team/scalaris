@@ -922,11 +922,15 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
+    E3RF = case entry_filters(E3) of
+               {RF, _, _} -> RF;
+               RF         -> RF
+           end,
     case ?REDUNDANCY:quorum_accepted(entry_key(E3), E3NumAcks) of
         true ->
             %% construct read value from replies
             Collected = entry_val(E3),
-            Constructed = ?REDUNDANCY:get_read_value(Collected),
+            Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
             T = entry_set_val(E3, Constructed),
             %% we have majority of acks
             Done = case entry_num_newest(T) of
