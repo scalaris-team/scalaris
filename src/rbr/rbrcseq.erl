@@ -386,22 +386,24 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
 
             Dest = pid_groups:find_a(routing_table),
             DB = db_selector(State),
+            Keys = ?REDUN_MODULE:get_keys(entry_key(Entry)),
+            WTVals = ?REDUN_MODULE:write_values_for_keys(Keys,  WTVal),
             _ = [ begin
                       %% let fill in whether lookup was consistent
                       LookupEnvelope =
                           dht_node_lookup:envelope(
                             4,
-                            {prbr, write, DB, '_', Collector, X,
+                            {prbr, write, DB, '_', Collector, K,
                              entry_datatype(ReadEntry),
                              entry_my_round(ReadEntry),
-                             WTVal,
+                             V,
                              WTUI,
                              WTWF}),
                       comm:send_local(Dest,
-                                      {?lookup_aux, X, 0,
+                                      {?lookup_aux, K, 0,
                                        LookupEnvelope})
                   end
-                  || X <- ?RT:get_replica_keys(entry_key(Entry)) ],
+                  || {K, V} <- lists:zip(Keys, WTVals) ],
             set_entry(Entry, tablename(State)),
             State;
         false ->

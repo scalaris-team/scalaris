@@ -32,7 +32,7 @@ get_keys(Key) ->
     ?RT:get_replica_keys(Key).
 
 write_values_for_keys(Keys, WriteValue) ->
-    [{K, WriteValue} || K <- Keys].
+    [WriteValue || K <- Keys].
 
 quorum_accepted(AccCount) ->
     R = config:read(replication_factor),
