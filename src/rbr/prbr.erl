@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -154,7 +154,11 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
 
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
-%%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
+    trace_mpath:log_info(self(), {'prbr:on(read)',
+                                  %% key, Key,
+                                  round, AssignedReadRound,
+                                  val, entry_val(KeyEntry),
+                                  read_filter, ReadFilter}),
     msg_read_reply(Proposer, Cons, AssignedReadRound,
                    ReadFilter(entry_val(ReadEntry)),
                    entry_r_write(KeyEntry)),
@@ -168,6 +172,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
 
 on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
+    trace_mpath:log_info(self(), {prbr_on_write}),
     KeyEntry = get_entry(Key, TableName),
     %% we store the writefilter to be able to reproduce the request in
     %% write_throughs. We modify the InRound here to avoid duplicate
@@ -188,6 +193,13 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpd
                         _    -> WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value)
                     end,
+                trace_mpath:log_info(self(), {'prbr:on(write)',
+                                  %% key, Key,
+                                  round, RoundForWrite,
+                                  passed_to_update, PassedToUpdate,
+                                  val, Value,
+                                  write_filter, WriteFilter,
+                                  newval, NewVal}),
 %%                case kvx =/= _DB of
 %%                    true ->
 %%                log:log("write ok~n"
@@ -206,6 +218,10 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpd
 %%                        "Val: ~p", [Key, KeyEntry]);
 %%                    _ -> ok
 %%                end,
+                trace_mpath:log_info(self(), {'prbr:on(write) denied',
+                                  %% key, Key,
+                                  round, RoundForWrite,
+                                  newer_round, NewerRound}),
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,

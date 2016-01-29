@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -289,10 +289,14 @@ on({qread_collect,
         Entry ->
             case add_read_reply(Entry, db_selector(State), MyRwithId,
                                Val, SeenWriteRound, Cons) of
+                %% {decided?, Entry}
                 {false, NewEntry} ->
                     set_entry(NewEntry, tablename(State)),
                     State;
                 {true, NewEntry} ->
+                    trace_mpath:log_info(self(),
+                                         {qread_done,
+                                          readval, entry_val(NewEntry)}),
                     inform_client(qread_done, NewEntry),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
@@ -300,6 +304,7 @@ on({qread_collect,
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
+                    trace_mpath:log_info(self(), qread_write_through_necessary),
                     %% log:log("Write through necessary"),
                     case randoms:rand_uniform(1,4) of
                         1 ->
@@ -649,6 +654,9 @@ on({qwrite_collect, ReqId,
                 {false, NewEntry} -> set_entry(NewEntry, tablename(State));
                 {true, NewEntry} ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
+                    trace_mpath:log_info(self(),
+                                         {qwrite_done,
+                                          value, entry_val(ReplyEntry)}),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
