@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin
+% @copyright 2007-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -267,7 +267,7 @@ cached_lookup(SearchGrp, PidName) ->
                             %% processes not registered in a pid_group (failed)
                             %% io:format("Ring is created to find a ~p in ~p ~p~n",
                             %% [PidName, self(), pid_groups:group_and_name_of(self())]),
-                            Ring = ring_new([PidX || [PidX] <- Pids,
+                            Ring = ring_new([PidX || [PidX] <- util:shuffle(Pids),
                                                      erlang:is_process_alive(PidX),
                                                      erlang:process_info(PidX, priority) =/= {priority, low}]),
                             {Pid, NewPids} = ring_get(Ring),
