@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -206,8 +206,12 @@ lookup_fin_failed(State, _Target, {?lookup_fin, Key, Data, Msg} = _Message) ->
 
 deliver(State, Msg, Consistency, Hops) ->
     %log:log("lookup_fin success: ~p ~p", [self(), Msg]),
-    comm:send_local(pid_groups:get_my(dht_node_monitor),
-                    {lookup_hops, Hops}),
+    case config:read(dht_node_monitor) of
+        true ->
+            comm:send_local(pid_groups:get_my(dht_node_monitor),
+                            {lookup_hops, Hops});
+        _ -> ok
+    end,
     Unwrap = ?RT:unwrap_message(Msg, State),
     case Unwrap of
         {Nth, f, InnerMsg} ->
