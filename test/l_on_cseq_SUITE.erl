@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -823,8 +823,8 @@ wait_for_split_fail_msg() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_renew_helper(_Config, ModifyF, WaitF) ->
-    DHTNode = pid_groups:find_a(dht_node),
     pid_groups:join(pid_groups:group_with(dht_node)),
+    DHTNode = pid_groups:find_a(dht_node),
 
     % intercept lease renew
     M = {l_on_cseq, renew, Old, _Mode} = lease_helper:intercept_lease_renew(DHTNode),
