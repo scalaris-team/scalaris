@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@
 -export([id/1]).
 
 % for unit tests
--export([unittest_lease_update/3]).
+-export([unittest_lease_update/4, unittest_lease_update_unsafe/3]).
 -export([unittest_create_lease/1]).
 -export([unittest_create_lease_with_range/3]).
 -export([unittest_clear_lease_list/1]).
@@ -214,8 +214,24 @@ disable_lease(State, Lease) ->
     lease_list:remove_lease_from_dht_node_state(Lease, get_id(Lease), State, passive).
 
 % for unit tests
--spec unittest_lease_update(lease_t(), lease_t(), active | passive) -> ok | failed.
-unittest_lease_update(Old, New, Mode) ->
+-spec unittest_lease_update(lease_t(), lease_t(), active | passive, pid()) -> ok | failed.
+unittest_lease_update(Old, New, Mode, DHTNode) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    comm:send_local(DHTNode,
+                    {l_on_cseq, unittest_update, Old, New, Mode, self()}),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV(
+            {l_on_cseq, unittest_update_success, Old, New}, %% ->
+            ok);
+        ?SCALARIS_RECV(
+            {l_on_cseq, unittest_update_failed, Old, New}, %% ->
+            failed
+          )
+    end.
+
+-spec unittest_lease_update_unsafe(lease_t(), lease_t(), active | passive) -> ok | failed.
+unittest_lease_update_unsafe(Old, New, Mode) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, unittest_update, Old, New, Mode, self()}),
