@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ rbr_concurrency_leases(_Config) ->
                               F = fun(X) ->
                                           {ok, V} = l_on_cseq:read(Key),
                                           Update =
-                                              l_on_cseq:unittest_lease_update(
+                                              l_on_cseq:unittest_lease_update_unsafe(
                                                 V,
                                                 l_on_cseq:set_version(
                                                   V, l_on_cseq:get_version(V)+1), passive),
