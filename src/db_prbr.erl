@@ -238,6 +238,13 @@ get_chunk2({DB, Subscr, Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize
 %% repair and local use (for data slide)
 %%%%%%
 
+-spec get_chunk2(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
+                 FilterFun::fun((entry()) -> boolean()),
+                 ValueFun::fun((entry()) -> V),
+                 AddDataFun::fun((Key::?RT:key(), {Acc::[V], RemainingChunkSize::pos_integer()}) ->
+                                        {Acc::[V], RemainingChunkSize::pos_integer()}),
+                ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), [V]}.
 get_chunk2({DB, _Subscr, _Snap}, StartId, Interval, _FilterFun, ValueFun, AddDataFun, ChunkSize) ->
     %% split intervals in a way so that the first simple interval of After
     %% either contains StartId or is the closest following after StartId
