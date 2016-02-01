@@ -1,4 +1,4 @@
-%  @copyright 2007-2015 Zuse Institute Berlin
+%  @copyright 2007-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 
 -export([start/0, stop/0, getRandomString/0, getRandomInt/0,
-         rand_uniform/2, uniform/0, uniform/1, seed/0]).
+         rand_uniform/2, uniform/0, uniform/1]).
 
 %% for tester
 -export([rand_uniform_feeder/2]).
@@ -73,19 +73,4 @@ uniform(X) ->
 -else.
 uniform(X) ->
     random:uniform(X).
--endif.
-
--spec seed() -> ok.
--ifdef(with_rand).
-seed() ->
-    %% rand automatically uses a different, time-dependent, seed
-    %% for every process.
-    ok.
--else.
-seed() ->
-    %% random always uses the same default seed. The following will
-    %% set a time-dependent seed.
-    {MS, S, US} = erlang:now(),
-    _ = random:seed(MS, S, US),
-    ok.
 -endif.
