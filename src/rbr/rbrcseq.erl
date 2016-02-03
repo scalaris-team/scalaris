@@ -893,14 +893,19 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     %% on the same version). We ensure this by write_through on odd
     %% cases.
     RLatestSeen = entry_latest_seen(Entry),
+    %% extract write through info for round comparisons since
+    %% they can be key-dependent if something different than
+    %% replication is used for redundancy
+    RLatestSeenNoWTInfo = pr:set_wf(RLatestSeen, none),
+    SeenWriteRoundNoWTInfo = pr:set_wf(SeenWriteRound, none),
     E1 =
-        if SeenWriteRound > RLatestSeen ->
+        if SeenWriteRoundNoWTInfo > RLatestSeenNoWTInfo ->
                 T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
                 ReadVal = ?REDUNDANCY:collect_read_value(Val,
                                              entry_datatype(Entry)),
                 entry_set_val(T2, ReadVal);
-           SeenWriteRound =:= RLatestSeen ->
+           SeenWriteRoundNoWTInfo =:= RLatestSeenNoWTInfo ->
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
@@ -928,16 +933,25 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
            end,
     case ?REDUNDANCY:quorum_accepted(entry_key(E3), E3NumAcks) of
         true ->
+            %% we have majority of acks
+
             %% construct read value from replies
             Collected = entry_val(E3),
             Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
-            T = entry_set_val(E3, Constructed),
-            %% we have majority of acks
-            Done = case entry_num_newest(T) of
+            E4 = entry_set_val(E3, Constructed),
+            %% update write through value
+            E5 = case pr:get_wf(RLatestSeen) of
+                     none   -> E4;
+                     WTI    ->
+                        NewWTI = setelement(3, WTI, Constructed),
+                        NewRLatest = pr:set_wf(RLatestSeen, NewWTI),
+                        entry_set_latest_seen(E4, NewRLatest)
+                 end,
+            Done = case entry_num_newest(E5) of
                      E3NumAcks -> true; %% done
                      _ -> write_through
                    end,
-            {Done, T};
+            {Done, E5};
         _ ->
             {false, E3}
     end.
