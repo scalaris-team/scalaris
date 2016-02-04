@@ -298,7 +298,7 @@ test_renew_with_concurrent_aux_change_valid_merge(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_split(_Config) ->
-    NullF = fun (_Id, _Lease, DHTNode) -> ok end,
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
     WaitRightLeaseF = fun (Id, Lease) ->
                              OldEpoch   = l_on_cseq:get_epoch(Lease),
                              wait_for_lease_version(Id, OldEpoch+2, 0)
@@ -313,15 +313,15 @@ test_split(_Config) ->
     true.
 
 test_split_with_concurrent_renew(_Config) ->
-    NullF = fun (_Id, _Lease, DHTNode) -> ok end,
-    RenewLeaseLeftF = fun (_Id, Lease, DHTNode) ->
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
+    RenewLeaseLeftF = fun (_Id, Lease, _DHTNode) ->
                               log:log("left renew lease with ~w ~w", [_Id, Lease]),
                               l_on_cseq:lease_renew(Lease, passive),
                               wait_for_lease_version(l_on_cseq:get_id(Lease),
                                                      l_on_cseq:get_epoch(Lease),
                                                      l_on_cseq:get_version(Lease)+1)
                   end,
-    RenewLeaseRightF = fun (_Id, Lease, DHTNode) ->
+    RenewLeaseRightF = fun (_Id, Lease, _DHTNode) ->
                                log:log("right renew lease with ~w ~w", [_Id, Lease]),
                                l_on_cseq:lease_renew(Lease, active),
                                wait_for_lease_version(l_on_cseq:get_id(Lease),
@@ -394,7 +394,7 @@ test_split_with_owner_change_in_step1(_Config) ->
                         comm:this()),
                 l_on_cseq:unittest_lease_update(Lease, New, active, DHTNode)
         end,
-    NullF = fun (_Id, _Lease) -> ok end,
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
     WaitRightLeaseF = fun wait_for_delete/2,
     WaitLeftLeaseF = fun (_Id) -> ok end,
                             % we cannot read the left lease anymore, because
@@ -422,7 +422,7 @@ test_split_with_owner_change_in_step2(Config) ->
                         comm:this()),
                 l_on_cseq:unittest_lease_update(Lease, New, passive, DHTNode)
         end,
-    NullF = fun (_Id, _Lease) -> ok end,
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
     WaitRightLeaseF = fun (_Id, _Lease) -> ok end,
                             % we cannot read the left lease anymore, because
                             % consistent routing will prevent the delivery of
@@ -450,7 +450,7 @@ test_split_with_owner_change_in_step3(Config) ->
                         comm:this()),
                 l_on_cseq:unittest_lease_update(Lease, New, active, DHTNode)
         end,
-    NullF = fun (_Id, _Lease) -> ok end,
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
     WaitLeftLeaseF = fun (_Id) -> ok end,
                             % we cannot read the left lease anymore, because
                             % consistent routing will prevent the delivery of
@@ -477,7 +477,7 @@ test_split_with_aux_change_in_step1(_Config) ->
                         {invalid, merge, intervals:empty(), intervals:empty()}),
                 l_on_cseq:unittest_lease_update(Lease, New, passive, DHTNode)
         end,
-    NullF = fun (_Id, _Lease, DHTNode) -> ok end,
+    NullF = fun (_Id, _Lease, _DHTNode) -> ok end,
     WaitRightLeaseF = fun (Id, Lease) ->
                              wait_for_lease_version(Id, l_on_cseq:get_epoch(Lease) + 1, 0)
                       end,
