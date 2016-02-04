@@ -30,7 +30,7 @@
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_rkeys_to_quadrant/2,
          map_interval/2,
          quadrant_intervals/0]).
--export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
+-export([get_chunk_kv/1, get_chunk_filter/1]).
 %-export([compress_kv_list/4, calc_signature_size_nm_pair/4]).
 
 %export for testing
@@ -62,8 +62,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export_type([method/0, request/0,
-              db_chunk_kv/0, db_chunk_kvv/0]).
+-export_type([method/0, request/0]).
 
 -type method()         :: trivial | shash | bloom | merkle_tree | art.% | iblt.
 -type stage()          :: req_shared_interval | build_struct | reconciliation | resolve.
@@ -74,9 +73,6 @@
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
 -type db_chunk_kv()    :: [{?RT:key(), client_version()}].
--type 'db_chunk_kv+'() :: [{?RT:key(), client_version()},...].
--type db_chunk_kvv()   :: [{?RT:key(), client_version(), db_dht:value()}].
--type 'db_chunk_kvv+'():: [{?RT:key(), client_version(), db_dht:value()},...].
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
 -type kvi_tree()       :: gb_trees:tree(KeyBin::bitstring(), {VersionShort::non_neg_integer(), Idx::non_neg_integer()}).
@@ -210,7 +206,6 @@
     {create_struct2, DestI::intervals:interval(),
      {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
     {reconcile, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
-    {resolve, {get_chunk_response, {intervals:interval(), db_chunk_kvv()}}} |
     % internal
     {shutdown, exit_reason()} |
     {fd_notify, fd:event(), DeadPid::comm:mypid(), Reason::fd:reason()} |
@@ -289,9 +284,7 @@ on({start_recon, RMethod, Params} = _Msg,
             % calculate P1E(phase1) from the point of view of the non-initiator:
             P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen}}],
-            Reconcile = resolve,
-            Stage = resolve;
+            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen}}];
         shash ->
             #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                 db_chunk = DBChunk, sig_size = SigSize} = Params,
@@ -306,9 +299,7 @@ on({start_recon, RMethod, Params} = _Msg,
             P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, DBChunkSet},
-                     {oicount, OrigDBChunkLen}],
-            Reconcile = reconcile,
-            Stage = reconciliation;
+                     {oicount, OrigDBChunkLen}];
         bloom ->
             #bloom_recon_struct{interval = MySyncI,
                                 reconPid = DestReconPid,
@@ -322,45 +313,39 @@ on({start_recon, RMethod, Params} = _Msg,
             FP = bloom_fp(BFCount, P1E),
             BF = bloom:new_bin(BFBin, ?REP_HFS:new(bloom:calc_HF_numEx(BFCount, FP)), BFCount),
             P1E_p1 = 0.0, % needs to be set when we know the number of chunks on this node!
-            Misc1 = [{bloom, BF}, {item_count, 0}],
-            Reconcile = reconcile,
-            Stage = reconciliation;
+            Misc1 = [{bloom, BF}, {item_count, 0}];
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             P1E_p1 = 0.0, % needs to be set at the end of phase 1!
-            Misc1 = Misc,
-            Reconcile = reconcile,
-            Stage = reconciliation;
+            Misc1 = Misc;
         art ->
             MySyncI = art:get_interval(Params#art_recon_struct.art),
             Params1 = Params,
             DestReconPid = undefined,
             P1E_p1 = 0.0, % TODO
-            Misc1 = Misc,
-            Reconcile = reconcile,
-            Stage = reconciliation
+            Misc1 = Misc
     end,
     % client only sends non-empty sync intervals or exits
     ?DBG_ASSERT(not intervals:is_empty(MySyncI)),
     
     send_chunk_req(pid_groups:get_my(dht_node), self(),
-                   MySyncI, MySyncI, get_max_items(), Reconcile),
+                   MySyncI, MySyncI, get_max_items(), reconcile),
     NStats  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
-    State#rr_recon_state{stage = Stage, params = Params1,
+    State#rr_recon_state{stage = reconciliation, params = Params1,
                          method = RMethod, initiator = true,
                          my_sync_interval = MySyncI,
                          dest_recon_pid = DestReconPid,
                          stats = NStats, misc = Misc1};
 
-on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
-   State = #rr_recon_state{stage = resolve,            initiator = true,
+on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
+   State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = trivial,
                            params = #trivial_recon_struct{sig_size = SigSize,
                                                           ver_size = VSize},
-                           dest_rr_pid = DestRR_Pid,   stats = Stats,
+                           dest_rr_pid = DestRRPid,    stats = Stats,
                            ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
                            misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen}}],
                            dest_recon_pid = DestReconPid}) ->
@@ -369,42 +354,29 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
     % identify items to send, request and the remaining (non-matched) DBChunk:
     {ToSend1, ToReqIdx1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize, VSize),
-    ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
+    ?DBG_ASSERT2(length(ToSend1) =:= length(lists:usort(ToSend1)),
                  {non_unique_send_list, ToSend, ToSend1}),
 
     %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
     if SyncFinished ->
-           SID = rr_recon_stats:get(session_id, Stats),
-           ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p",
-                  [SID, length(ToSend1)]),
-           NewStats =
-               if ToSend1 =/= [] ->
-                      % send request_resolve to non-initiator
-                      send(DestRR_Pid, {request_resolve, SID,
-                                        {?key_upd, ToSend1, []},
-                                        [{from_my_node, 0},
-                                         {feedback_request, comm:make_global(OwnerL)}]}),
-                      % we will get one reply from a subsequent feedback response (?key_upd)
-                      rr_recon_stats:inc([{rs_expected, 1}], Stats);
-                  true ->
-                      Stats
-               end,
-
+           NewStats = send_resolve_request(Stats, ToSend1, OwnerL, DestRRPid,
+                                           true, true),
            % let the non-initiator's rr_recon process identify the remaining keys
            ReqIdx = lists:usort([Idx || {_Version, Idx} <- gb_trees:values(OtherDBChunk1)]
                                     ++ ToReqIdx1),
            ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
-           % the non-initiator will use key_upd_send and we must thus increase
-           % the number of resolve processes here!
            NewStats2 =
                if ReqIdx =/= [] ->
+                      % the non-initiator will use key_upd_send and we must thus increase
+                      % the number of resolve processes here!
                       rr_recon_stats:inc([{rs_expected, 1}], NewStats);
                   true -> NewStats
                end,
 
            ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
-                  [SID, length(ReqIdx), erlang:bit_size(ToReq2)]),
+                  [rr_recon_stats:get(session_id, Stats), length(ReqIdx),
+                   erlang:bit_size(ToReq2)]),
            comm:send(DestReconPid, {resolve_req, ToReq2}),
            
            shutdown(sync_finished,
@@ -413,7 +385,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                          misc = []});
        true ->
            send_chunk_req(pid_groups:get_my(dht_node), self(),
-                          RestI, RestI, get_max_items(), resolve),
+                          RestI, RestI, get_max_items(), reconcile),
            State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
                                 misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen}}]}
     end;
@@ -1212,61 +1184,32 @@ decompress_kv_list(Bin, AccList, SigSize, VSize, CurPos) ->
 %%      or the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
--spec get_full_diff
-        (MyEntries::[], MyIOtherKvTree::kvi_tree(),
-         AccFBItems::FBItems, AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
-            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
-        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
-        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+-spec get_full_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
+                    AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
+                    SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+            MyIOtherKvTree::kvi_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
     get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
                   util:pow(2, VSize)).
 
 %% @doc Helper for get_full_diff/6.
--spec get_full_diff_
-        (MyEntries::[], MyIOtherKvTree::kvi_tree(),
-         AccFBItems::FBItems, AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::FBItems, ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}
-            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
-        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()};
-        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kvi_tree(),
-         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-         SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+-spec get_full_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
+                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
+                     SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+            MyIOtherKvTree::kvi_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
-get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
-    Key = element(1, Tpl),
-    Version = element(2, Tpl),
-    TplSize = tuple_size(Tpl),
+get_full_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case gb_trees:lookup(KeyBin, MyIOtKvTree) of
-        none when TplSize =:= 3 ->
-            Value = element(3, Tpl),
-            get_full_diff_(Rest, MyIOtKvTree, [{Key, Value, Version} | FBItems],
-                           ReqItemsIdx, SigSize, VMod);
-        none when TplSize =:= 2 ->
+        none ->
             get_full_diff_(Rest, MyIOtKvTree, [Key | FBItems],
                            ReqItemsIdx, SigSize, VMod);
         {value, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = gb_trees:delete(KeyBin, MyIOtKvTree),
-            if VersionShort > OtherVersionShort andalso TplSize =:= 3 ->
-                   Value = element(3, Tpl),
-                   get_full_diff_(Rest, MyIOtKvTree2, [{Key, Value, Version} | FBItems],
-                                  ReqItemsIdx, SigSize, VMod);
-               VersionShort > OtherVersionShort andalso TplSize =:= 2 ->
+            if VersionShort > OtherVersionShort ->
                    get_full_diff_(Rest, MyIOtKvTree2, [Key | FBItems],
                                   ReqItemsIdx, SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
@@ -1285,7 +1228,8 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) -
 -spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
                     SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+            MyIOtherKvTree::kvi_tree()}.
 get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
     get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
                    util:pow(2, VSize)).
@@ -1294,7 +1238,8 @@ get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
 -spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                      AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
                      SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()], MyIOtherKvTree::kvi_tree()}.
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+            MyIOtherKvTree::kvi_tree()}.
 get_part_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
 get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
@@ -2570,7 +2515,7 @@ send_local(Pid, Msg) ->
 %%      for resolve) or {Key, Version} tuples (anything else).
 %%      The mapping to DestI is not done here!
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I,
-                     MaxItems::pos_integer() | all, create_struct | reconcile | resolve) -> ok when
+                     MaxItems::pos_integer() | all, create_struct | reconcile) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()).
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
@@ -2583,20 +2528,12 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, create_struct) ->
     SrcPidReply = comm:reply_as(SrcPid, 3, {create_struct2, DestI, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
-                fun get_chunk_kv/1, MaxItems});
-send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, resolve) ->
-    ?DBG_ASSERT(I =:= _DestI),
-    SrcPidReply = comm:reply_as(SrcPid, 2, {resolve, '_'}),
-    send_local(DhtPid,
-               {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
-                fun get_chunk_kvv/1, MaxItems}).
+                fun get_chunk_kv/1, MaxItems}).
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
 -spec get_chunk_kv(db_entry:entry()) -> {?RT:key(), client_version() | -1}.
 get_chunk_kv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
--spec get_chunk_kvv(db_entry:entry()) -> {?RT:key(), client_version() | -1, db_dht:value()}.
-get_chunk_kvv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry), db_entry:get_value(DBEntry)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
