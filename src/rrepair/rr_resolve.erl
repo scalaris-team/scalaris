@@ -98,7 +98,6 @@
     {start, operation(), options(), StartTag::atom()} |
     % internal
     {get_entries_response, db_dht:db_as_list()} |
-    {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
     {get_state_response, intervals:interval()} |
     {update_key_entries_ack, [{db_entry:entry_ex(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}.
