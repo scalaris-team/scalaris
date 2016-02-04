@@ -588,9 +588,9 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
     StartT = os:timestamp(),
     
     lists:foldl(
-      fun({Scenario, _RingP, _ReconP}, EPId) ->
-              ReconP = init_rc_conf(_ReconP, StepParam, Init),
-              RingP = init_ring_conf(_RingP, StepParam, Init),
+      fun({Scenario, RingP0, ReconP0}, EPId) ->
+              ReconP = init_rc_conf(ReconP0, StepParam, Init),
+              RingP = init_ring_conf(RingP0, StepParam, Init),
 
               SetupText = eval_setup_comment(Scenario, RingP, StepParam, StepSize, EvalRepeats),
               ReconText = rc_conf_comment(ReconP),
@@ -822,9 +822,9 @@ system_sync({Scen, RingP, ReconP}, Options, Rounds, EPId) ->
 -spec build_dht(ring_setup()) -> db_generator:db_status().
 build_dht({#scenario{ ring_type = RingType,
                       data_type = DBType,
-                      data_distribution = _DBDist,
+                      data_distribution = DBDist0,
                       data_failure_type = FType,
-                      fail_distribution = _FDist,
+                      fail_distribution = FDist0,
                       trigger_prob = TProb
                      },
            #ring_config{ data_count = DBSize,
@@ -835,12 +835,12 @@ build_dht({#scenario{ ring_type = RingType,
     _ = set_config(RCParams, TProb),
     make_ring(RingType, NodeCount),
     
-    DBDist = case _DBDist of
+    DBDist = case DBDist0 of
                  uniform -> uniform;
                  random -> random;
                  {binomial, P1} -> {non_uniform, random_bias:binomial(DBSize - 1, P1)}
              end,
-    FDist = case _FDist of
+    FDist = case FDist0 of
                 uniform -> uniform;
                 random -> random;
                 {binomial, _P2} when FProb == 0 -> uniform;
