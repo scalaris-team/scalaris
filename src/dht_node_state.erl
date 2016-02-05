@@ -214,7 +214,7 @@ delete_for_rejoin(
          (state(), join_time) -> erlang_timestamp();
          (state(), db) -> db_dht:db();
          (state(), tx_tp_db) -> any();
-         (state(), load) -> integer();
+         (state(), load) -> non_neg_integer();
          (state(), load2) -> unknown | lb_stats:load();
          (state(), load3) -> lb_stats:load();
          (state(), slide_pred) -> slide_op:slide_op() | null;
