@@ -106,7 +106,8 @@
     % internal
     {rr_trigger} |
     {rr_gc_trigger} |
-    {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
+    {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(),
+     {get_state_response, [{my_range, intervals:interval()} | {load, non_neg_integer()},...]}} |
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id(), ReqMsg::rr_recon:request()} |
     {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     % misc
@@ -182,10 +183,11 @@ on({rr_gc_trigger} = Msg, State = #rrepair_state{ open_sessions = Sessions }) ->
     msg_delay:send_trigger(Elapsed div 1000, Msg),
     State#rrepair_state{ open_sessions = NewSessions };
 
-on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}}, State) ->
+on({start_sync, get_range, SessionId, Method, DestKey,
+    {get_state_response, [{my_range, MyI}, {load, MyLoad}]}}, State) ->
     Msg = {?send_to_group_member, rrepair,
            {start_recon, comm:this(), SessionId,
-            {create_struct, Method, MyI}}},
+            {create_struct, Method, MyI, MyLoad}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI, true);
                _ -> DestKey
@@ -328,7 +330,7 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
     This0 = comm:this(),
     S = new_session(Round, This0, Method, Principal),
     This = comm:reply_as(This0, 6, {start_sync, get_range, S#session.id, Method, DestKey, '_'}),
-    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, my_range}),
+    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, [my_range, load]}),
     State#rrepair_state{ round = next_round(Round),
                          open_recon = OpenRecon + 1,
                          open_sessions = [S | Sessions] }.

@@ -1250,10 +1250,10 @@ bw_map_fun({request_sync, _Method, _DestKey} = Msg, _Source, _Dest, CalcMsgSize)
     {rr_map, msg_size(Msg, CalcMsgSize)};
 bw_map_fun({request_sync, _Method, _DestKey, _Principal} = Msg, _Source, _Dest, CalcMsgSize) ->
     {rr_map, msg_size(Msg, CalcMsgSize)};
-bw_map_fun({start_recon, _SenderPid, _SId, {create_struct, _Method, _SenderI}} = Msg,
+bw_map_fun({start_recon, _SenderPid, _SId, {create_struct, _Method, _SenderI_and_Load}} = Msg,
            _Source, _Dest, CalcMsgSize) ->
     {rr_map, msg_size(Msg, CalcMsgSize)};
-bw_map_fun({continue_recon, _SenderPid, _SId, {create_struct, _Method, _SenderI}} = Msg,
+bw_map_fun({continue_recon, _SenderPid, _SId, {create_struct, _Method, _SenderI_and_Load}} = Msg,
            _Source, _Dest, CalcMsgSize) ->
     {rr_map, msg_size(Msg, CalcMsgSize)};
 
