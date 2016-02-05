@@ -2739,6 +2739,10 @@ check_config() ->
                                   fun(variable) -> true;
                                      (X) -> erlang:is_integer(X) andalso X > 0
                                   end, "is not 'variable' or an integer > 0"),
+        config:cfg_test_and_error(rr_max_items,
+                                  fun(all) -> true;
+                                     (X) -> erlang:is_integer(X) andalso X > 0
+                                  end, "is not 'all' or an integer > 0"),
         config:cfg_is_integer(rr_recon_min_sig_size) andalso
         config:cfg_is_greater_than(rr_recon_min_sig_size, 0) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
@@ -2770,10 +2774,7 @@ get_min_hash_bits() ->
 %%      Tries to reduce the load of a single request in the dht_node process.
 -spec get_max_items() -> pos_integer() | all.
 get_max_items() ->
-    case config:read(rr_max_items) of
-        failed -> 100000;
-        CfgX   -> CfgX
-    end.
+    config:read(rr_max_items).
 
 %% @doc Merkle number of childs per inner node.
 -spec get_merkle_branch_factor() -> pos_integer().
