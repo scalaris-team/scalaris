@@ -463,7 +463,7 @@ tester_type_check_rrepair(_Config) ->
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
-             {build_struct, 4}, %% tries to send messages, needs valid state with pid
+             {build_struct, 3}, %% tries to send messages, needs valid state with pid
              {build_recon_struct, 4}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
@@ -502,7 +502,7 @@ tester_type_check_rrepair(_Config) ->
              {art_get_sync_leaves, 6}, %% needs non-empty bloom filters
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
-             {send_chunk_req, 6}, %% tries to send messages
+             {send_chunk_req, 4}, %% tries to send messages
              {quadrant_intervals_, 3}, %% special pre-conditions, only private to quadrant_intervals/0, tested enough in there
              {replicated_intervals, 1} %% interval must be in a single quadrant
            ]},
