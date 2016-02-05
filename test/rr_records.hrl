@@ -56,8 +56,7 @@
                     merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),
                     art_corr_factor = 2                                  :: non_neg_integer(),
                     art_leaf_fpr    = 0.1                                :: float(),
-                    art_inner_fpr   = 0.01                               :: float(),
-                    align_to_bytes  = true                               :: boolean()
+                    art_inner_fpr   = 0.01                               :: float()
                    }).
 -type rc_config() :: #rc_config{}.
 

@@ -1894,15 +1894,6 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                       SyncAccDRK, SyncAccDRLCount1, AccCmp + 1, AccSkip,
                       NextLvlNodesActIN, HashCmpI_IN, HashCmpL_OUT).
 
-%% @doc Gets the number of bits needed to encode all possible bucket sizes with
-%%      the given merkle params.
--spec merkle_max_bucket_size_bits(Params::#merkle_params{}) -> pos_integer().
-merkle_max_bucket_size_bits(Params) ->
-    BucketSizeBits0 = bits_for_number(Params#merkle_params.bucket_size),
-    ?IIF(config:read(rr_align_to_bytes),
-         bloom:resize(BucketSizeBits0, 8),
-         BucketSizeBits0).
-
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
 -spec merkle_resolve_add_leaf_hash(
@@ -1960,7 +1951,7 @@ merkle_resolve_retrieve_leaf_hashes(
         -> {Hashes::bitstring(), NewStats::Stats}
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EAllLeaves, TrivialProcs) ->
-    BucketSizeBits = merkle_max_bucket_size_bits(Params),
+    BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
     % note: 1 trivial proc contains 1 leaf
     {{Hashes, ThisP0E}, LeafCount} =
         lists:foldl(
@@ -1988,7 +1979,7 @@ merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EAllLeaves, TrivialPro
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_receive(Sync, Hashes, DestRRPid, Stats, OwnerL, Params,
                               P1EAllLeaves, TrivialProcs, IsInitiator) ->
-    BucketSizeBits = merkle_max_bucket_size_bits(Params),
+    BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
     % mismatches to resolve:
     % * at initiator    : inner(I)-leaf(NI) or leaf(NI)-non-empty-leaf(I)
     % * at non-initiator: inner(NI)-leaf(I)
@@ -2250,20 +2241,19 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
             % reduce P1E for the two parts here (key and version comparison)
             P1E_sub = calc_n_subparts_p1e(2, P1E),
             % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
+            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
             % note: we have n one-to-one comparisons
             VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
-            VSize0 = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
+            VSize = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
             ok;
-        VSize0 ->
-            SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
+        VSize ->
+            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
             ok
     end,
-    Res = {_SigSize, _VSize} = align_bitsize(SigSize0, VSize0),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
-%%             [self(), P1E, _SigSize, _VSize, ItemCount, OtherItemCount]),
-    Res.
+%%             [self(), P1E, SigSize, VSize, ItemCount, OtherItemCount]),
+    {SigSize, VSize}.
 
 %% @doc Calculates the worst-case failure probability of the trivial algorithm
 %%      with the given signature size and item counts.
@@ -2321,15 +2311,10 @@ shash_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     % reduce P1E for the two parts here (hash and trivial phases)
     P1E_sub = calc_n_subparts_p1e(2, P1E),
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
-    % align if required
-    Res = case config:read(rr_align_to_bytes) of
-              false -> SigSize0;
-              _     -> bloom:resize(SigSize0, 8)
-          end,
+    SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
 %%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
-%%             [self(), P1E, Res, ItemCount, OtherItemCount]),
-    Res.
+%%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
+    SigSize.
 
 %% @doc Creates a compressed key-value list comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items (including versions
@@ -2348,27 +2333,6 @@ shash_compress_k_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
     {DBChunkBin, SigSize}.
-
-%% @doc Aligns the two sizes so that their sum is a multiple of 8 in order to
-%%      (possibly) achieve a better compression in binaries.
--spec align_bitsize(SigSize, VSize) -> {SigSize, VSize}
-    when is_subtype(SigSize, pos_integer()),
-         is_subtype(VSize, pos_integer()).
-align_bitsize(SigSize0, VSize0) ->
-    case config:read(rr_align_to_bytes) of
-        false -> {SigSize0, VSize0};
-        _     ->
-            case get_min_version_bits() of
-                variable ->
-                    FullKVSize0 = SigSize0 + VSize0,
-                    FullKVSize = bloom:resize(FullKVSize0, 8),
-                    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
-                    SigSize = FullKVSize - VSize,
-                    {SigSize, VSize};
-                _ ->
-                    {bloom:resize(SigSize0, 8), VSize0}
-            end
-    end.
 
 %% @doc Calculates the bloom FP, i.e. a single comparison's failure probability,
 %%      assuming:
