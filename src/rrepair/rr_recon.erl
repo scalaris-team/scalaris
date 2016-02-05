@@ -2217,16 +2217,25 @@ calc_n_subparts_p1e(N, P1E, 1.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
     % special case with e.g. no items in the first/previous phase
     P1E;
 calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
-                                             PrevP0E > 0 andalso PrevP0E =< 1 ->
+                                              PrevP0E > 0 andalso PrevP0E =< 1 ->
     % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%28%281+-+p%29%2Fq%29^%281%2Fn%29++at+p+%3D+0
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
     P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
     Q = math:pow(1 / PrevP0E, 1 / N),
-    _VP = (1 - Q) + (P1E * Q) / N +
+    VP = (1 - Q) + (P1E * Q) / N +
               ((N-1) * P1E2 * Q) / (2 * N2) +
               ((N-1) * (2 * N - 1) * P1E3 * Q) / (6 * N3) +
               ((N-1) * (2 * N - 1) * (3 * N - 1) * P1E4 * Q) / (24 * N4) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q) / (120 * N5). % +O[p^6]
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q) / (120 * N5), % +O[p^6]
+    if VP > 0 andalso VP < 1 ->
+           VP;
+       VP =< 0 ->
+           log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
+                   " - continuing with smallest possible failure probability"
+                   " (instead of ~g)",
+                   [?MODULE, pid_groups:my_groupname(), self(), VP]),
+           1.0e-16 % do not go below this so that the opposite probability is possible as a float!
+    end.
 
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
