@@ -943,9 +943,16 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
             E5 = case pr:get_wf(RLatestSeen) of
                      none   -> E4;
                      WTI    ->
-                        NewWTI = setelement(3, WTI, Constructed),
-                        NewRLatest = pr:set_wf(RLatestSeen, NewWTI),
-                        entry_set_latest_seen(E4, NewRLatest)
+                        case entry_client(E4) of
+                            %% do not update WTI if this reply comes from
+                            %% a write through
+                            {_,_,_,{qread_write_through_done, _, _, _}} ->
+                                E4;
+                            _ ->
+                                NewWTI = setelement(3, WTI, Constructed),
+                                NewRLatest = pr:set_wf(RLatestSeen, NewWTI),
+                                entry_set_latest_seen(E4, NewRLatest)
+                        end
                  end,
             Done = case entry_num_newest(E5) of
                      E3NumAcks -> true; %% done
