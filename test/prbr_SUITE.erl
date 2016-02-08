@@ -357,7 +357,10 @@ tester_type_check_rbr(_Config) ->
              {add_write_reply, 3}%% needs valid entry()
            ]},
           {replication,
-           [],
+           [ {get_read_value, 2},     %% cannot create funs
+             {collect_read_value, 2}, %% needs client_value matching datatype
+             {collect_read_value, 3}  %% needs client_value matching datatype
+           ],
            []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
