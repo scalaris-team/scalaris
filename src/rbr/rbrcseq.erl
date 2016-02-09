@@ -305,7 +305,7 @@ on({qread_collect,
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
-                    trace_mpath:log_info(self(), qread_write_through_necessary),
+                    trace_mpath:log_info(self(), {qread_write_through_necessary}),
                     %% log:log("Write through necessary"),
                     case randoms:rand_uniform(1,4) of
                         1 ->

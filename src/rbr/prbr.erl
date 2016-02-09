@@ -76,12 +76,18 @@
 -type message() ::
         {prbr, read, DB :: dht_node_state:db_selector(),
          WasConsistentLookup :: boolean(),
-         Proposer :: comm:mypid(), ?RT:key(), InRound,
+         Proposer :: comm:mypid(), ?RT:key(), DataType :: module(),
+         InRound :: pr:pr(),
          read_filter()}
       | {prbr, write, DB :: dht_node_state:db_selector(),
          WasConsistentLookup :: boolean(),
-         Proposer :: comm:mypid(), ?RT:key(), InRound,
-         Value :: term(), PassedToUpdate :: term(), write_filter()}.
+         Proposer :: comm:mypid(), ?RT:key(), DataType :: module(),
+         InRound :: pr:pr(), Value :: term(), PassedToUpdate :: term(),
+         write_filter()}
+      | {prbr, delete_key, DB :: dht_node_state:db_selector(),
+         Client :: comm:mypid(), Key :: ?RT:key()}
+      | {prbr, tab2list_raw, DB :: dht_node_state:db_selector(),
+         Client :: comm:mypid()}.
 
 
 %% improvements to usual paxos:
