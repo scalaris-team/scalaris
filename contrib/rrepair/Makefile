@@ -85,8 +85,6 @@ trivial_scale-all: trivial_scale-all/0.01/trivial_scale.dat
 trivial: trivial-all trivial_dists-all trivial_scale-all
 	
 
-trivial: trivial
-
 # fprob analysis (different delta) for different shash recon parameters
 shash_single-all/Makefile: Makefile.tmpl2 shash_single-all/.gitignore
 	@mkdir -p "shash_single-all"
@@ -133,9 +131,6 @@ shash_scale-all: shash_scale-all/0.01/shash_scale.dat
 shash: shash-all shash_dists-all shash_scale-all
 	
 
-shash: shash
-	
-
 # fprob analysis (different delta) for different bloom recon parameters
 bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
 	@mkdir -p "bloom_single-all"
@@ -180,9 +175,6 @@ bloom_scale-all: bloom_scale-all/0.01/bloom_scale.dat
 	
 
 bloom: bloom-all bloom_dists-all bloom_scale-all
-	
-
-bloom: bloom
 	
 
 # fprob analysis (different delta) for different merkle recon parameters
@@ -232,7 +224,4 @@ merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	STR="$*" ; STR_V=$${STR:`expr index "$$STR" v`} ; STR_B=$${STR:`expr index "$$STR" b`} ; STR_P=$${STR:`expr index "$$STR" p`} ; STR_D=$${STR:`expr index "$$STR" d`} ; STR_N=$${STR:`expr index "$$STR" n`} ; V=`expr match "$$STR_V" '\([0-9][.0-9]*\)'` ; B=`expr match "$$STR_B" '\([0-9][.0-9]*\)'` ; P=`expr match "$$STR_P" '\([0-9][.0-9]*\)'` ; D=`expr match "$$STR_D" '\([0-9][.0-9]*\)'` ; START=`expr match "$$STR_N" '\([0-9][0-9]*\)-[0-9][0-9]*,[0-9][0-9]*'` ; END=`expr match "$$STR_N" '[0-9][0-9]*-\([0-9][0-9]*\),[0-9][0-9]*'` ; STEPSIZE=`expr match "$$STR_N" '[0-9][0-9]*-[0-9][0-9]*,\([0-9][0-9]*\)'`; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
 merkle: merkle-all merkle_dists-all merkle_scale-all
-	
-
-merkle: merkle
 	
