@@ -133,7 +133,7 @@ set([{K, V} | L], Stats) ->
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
          (tree_leavesSynced, stats())  -> non_neg_integer();
-         (p1e_phase1 | p1e_phase2, stats()) -> float();
+         (p1e_phase1 | p1e_phase2 | p1e_total, stats()) -> float();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
          (rs_expected, stats())        -> non_neg_integer();
@@ -148,7 +148,9 @@ get(p1e_phase2         , #rr_recon_stats{p1e_phase2          = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
 get(rs_expected        , #rr_recon_stats{rs_expected         = X}) -> X;
-get(status             , #rr_recon_stats{status              = X}) -> X.
+get(status             , #rr_recon_stats{status              = X}) -> X;
+get(p1e_total          , #rr_recon_stats{p1e_phase1 = P1E_p1, p1e_phase2 = P1E_p2}) ->
+    1 - (1 - P1E_p1) * (1 - P1E_p2).
 
 -spec print(stats()) -> [any()].
 print(Stats) ->

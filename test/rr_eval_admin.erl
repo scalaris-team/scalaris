@@ -1359,12 +1359,13 @@ get_measure_point(Id, Iter, Round, {Miss, Outd}, Trace, NodeList, SessionStats) 
     RCStats = rrepair:session_get(rc_stats, SessionStats),
     P1E_p1 = rr_recon_stats:get(p1e_phase1, RCStats),
     P1E_p2 = rr_recon_stats:get(p1e_phase2, RCStats),
+    P1E = rr_recon_stats:get(p1e_total, RCStats),
 %%     log:pal(" Stats: ~p", [rr_recon_stats:print(RCStats)]),
     
     {Id, Iter, Round,
      Miss, Miss - M,
      Outd, Outd - O,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, P1E_p1, P1E_p2}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, P1E_p1, P1E_p2, P1E}.
 
 -spec get_mp_round(rr_eval_point:point_id(), Iteration::non_neg_integer(),
                    Round::non_neg_integer(), init_mp(),
@@ -1376,7 +1377,7 @@ get_mp_round(Id, Iter, Round, {Miss, Outd}, Trace, NodeList) ->
     {Id, Iter, Round,
      ActLoad, ActLoad - Miss,
      ActOut, Outd - ActOut,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, '-', '-'}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, '-', '-', '-'}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions

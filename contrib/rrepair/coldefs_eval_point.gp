@@ -69,3 +69,7 @@ col_p1e_p2 = 68
 col_sd_p1e_p2 = 69
 col_min_p1e_p2 = 70
 col_max_p1e_p2 = 71
+col_p1e = 72
+col_sd_p1e = 73
+col_min_p1e = 74
+col_max_p1e = 75

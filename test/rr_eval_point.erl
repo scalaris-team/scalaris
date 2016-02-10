@@ -45,7 +45,8 @@
                           BW_RS_Msg   :: integer(),   % number of resolve messages
                           BW_RS_KVV   :: integer(),   % number of kvv-triple send
                           P1E_p1      :: float() | '-', % effective worst-case probability of phase 1
-                          P1E_p2      :: float() | '-'  % effective worst-case probability of phase 2
+                          P1E_p2      :: float() | '-', % effective worst-case probability of phase 2
+                          P1E         :: float() | '-'  % effective total worst-case probability
                           }.
 
 -type eval_point() :: {
@@ -126,7 +127,12 @@
                        MeanP1E_p2       :: float() | '-',
                        ErrP1E_p2        :: float() | '-',
                        MinP1E_p2        :: float() | '-',
-                       MaxP1E_p2        :: float() | '-'
+                       MaxP1E_p2        :: float() | '-',
+                       % AVG, STD, MIN, MAX total P1E
+                       MeanP1E          :: float() | '-',
+                       ErrP1E           :: float() | '-',
+                       MinP1E           :: float() | '-',
+                       MaxP1E           :: float() | '-'
                       }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -158,7 +164,8 @@ column_names() ->
      rc_method, ring_type, ddist, ftype, fdist, dtype, tprob, merkle_num_trees,
      % AVG, STD, MIN, MAX P1E of phase 1 and 2
      p1e_p1, sd_p1e_p1, min_p1e_p1, max_p1e_p1,
-     p1e_p2, sd_p1e_p2, min_p1e_p2, max_p1e_p2
+     p1e_p2, sd_p1e_p2, min_p1e_p2, max_p1e_p2,
+     p1e, sd_p1e, min_p1e, max_p1e
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -168,7 +175,7 @@ column_names() ->
 mp_column_names() ->
     [id, iteration, round, missing, regen, outdated, updated,
      bw_rc_size, bw_rc_msg, bw_rc2_size, bw_rc2_msg,
-     bw_rs_size, bw_rs_msg, bw_rs_kvv, p1E_p1, p1E_p2].
+     bw_rs_size, bw_rs_msg, bw_rs_kvv, p1E_p1, p1E_p2, p1E].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -220,6 +227,10 @@ generate_ep(ID,
         try mean_w_error(16, MP)
         catch _:_ -> {'-', '-', '-', '-'}
         end,
+    {MeanP1E, ErrP1E, MinP1E, MaxP1E} =
+        try mean_w_error(17, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
 
     {ID,
      NC, 4 * DC, FProb, element(3, hd(MP)),
@@ -234,7 +245,8 @@ generate_ep(ID,
      RCMethod, RingType, dist_to_name(DDist), FType, dist_to_name(FDist),
      DType, TProb, MNT,
      MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1,
-     MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2}.
+     MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2,
+     MeanP1E, ErrP1E, MinP1E, MaxP1E}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().
 dist_to_name({binomial, P}) ->
