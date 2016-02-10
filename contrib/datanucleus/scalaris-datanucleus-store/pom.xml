@@ -151,6 +151,7 @@
             <plugin>
                 <artifactId>exec-maven-plugin</artifactId>
                 <groupId>org.codehaus.mojo</groupId>
+                <version>1.4.0</version>
                 <executions>
                     <execution>
                         <id>Check out maven repository from git</id>
