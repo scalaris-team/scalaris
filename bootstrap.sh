@@ -36,7 +36,7 @@ sed -e "s/Version: .*-.*/Version: ${VERSION}-1/g" \
 sed -e "0,/(.*-.*)/s//(${VERSION}-1)/" \
     -i contrib/packages/*/debian.changelog
 sed -e "0,/<version>.*<\/version>/s//<version>${VERSION}<\/version>/" \
-    -i java-api/pom.xml
+    -i java-api/pom.xml contrib/datanucleus/scalaris-datanucleus-store/pom.xml
 sed -e "s/module scalaris .*;/module scalaris ${VERSION_NOPLUS};/g" \
     -i contrib/systemd/scalaris.te
 if [[ "$VERSION" == *git* ]]; then

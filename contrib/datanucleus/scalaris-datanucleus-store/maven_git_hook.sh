@@ -5,7 +5,7 @@
 # scalaris maven repo
 url="git@github.com:scalaris-team/scalaris.git"
 # maven repo checkout folder
-folder="../.maven"
+folder="../../../.maven"
 
 checkout () {
     # check out if maven folder doesn't exist
@@ -31,13 +31,6 @@ checkout () {
 }
 
 commit () {
-    # put latest erlang jinterface jar into the repository
-    file=$(ls lib/OtpErlang-*)
-    version=$(basename $file .jar | cut -d "-" -f2,3)
-    mvn deploy:deploy-file  -Dfile="$file" \
-        -Dversion="$version" -DgroupId="org.erlang.otp" -DartifactId="jinterface" \
-        -Dpackaging="jar" -DrepositoryId="scalaris" -Durl="file:$folder/maven"
-
     # update the remote maven repository
     echo -n "Do you want to update the remote maven repository? [y/N] "
     read -e answer

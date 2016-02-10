@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>de.zib.scalaris</groupId>
-    <version>4.1.99-SNAPSHOT</version>
+    <version>0.8.2+git</version>
     <artifactId>datanucleus-store</artifactId>
     <name>datanucleus.store.scalaris</name>
 
@@ -48,16 +48,11 @@
             <url>https://scalaris-team.github.io/scalaris/maven</url>
         </repository>
     </repositories>
+
     <distributionManagement>
-        <snapshotRepository>
-            <id>datanucleus-nightly</id>
-            <name>DataNucleus Nightly</name>
-            <url>file:/home/jpox/htdocs/downloads/maven2-nightly/</url>
-            <uniqueVersion>false</uniqueVersion>
-        </snapshotRepository>
         <repository>
-            <id>datanucleus</id>
-            <url>scpexe://www.datanucleus.org//home/jpox/htdocs/downloads/maven2/</url>
+            <id>scalaris</id>
+            <url>file:../../../.maven/maven</url>
         </repository>
     </distributionManagement>
 
@@ -127,8 +122,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.1</version>
                 <configuration>
-                    <source>1.5</source>
-                    <target>1.5</target>
+                    <source>1.6</source>
+                    <target>1.6</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -150,6 +145,42 @@
                         <goals>
                             <goal>jar</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>exec-maven-plugin</artifactId>
+                <groupId>org.codehaus.mojo</groupId>
+                <executions>
+                    <execution>
+                        <id>Check out maven repository from git</id>
+                        <!-- Execute before deploy phase -->
+                        <!-- http://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html -->
+                        <phase>install</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipGit}</skip>
+                            <executable>maven_git_hook.sh</executable>
+                            <arguments>
+                                <argument>checkout</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>Update the scalaris maven repository</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipGit}</skip>
+                            <executable>maven_git_hook.sh</executable>
+                            <arguments>
+                                <argument>commit</argument>
+                            </arguments>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
