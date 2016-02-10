@@ -283,7 +283,7 @@ java-%:
 
 datanucleus:
 	mvn -DskipGit -f java-api/pom.xml clean install
-	mvn -f contrib/datanucleus/scalaris-datanucleus-store/pom.xml clean install
+	mvn -DskipGit -f contrib/datanucleus/scalaris-datanucleus-store/pom.xml clean install
 	mvn -f contrib/datanucleus/scalaris-datanucleus-store-test/pom.xml test -DskipTests
 
 datanucleus-test: compile datanucleus
