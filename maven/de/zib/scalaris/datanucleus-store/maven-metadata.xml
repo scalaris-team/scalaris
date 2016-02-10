@@ -3,9 +3,10 @@
   <groupId>de.zib.scalaris</groupId>
   <artifactId>datanucleus-store</artifactId>
   <versioning>
+    <release>0.8.2+git</release>
     <versions>
-      <version>4.1.99-SNAPSHOT</version>
+      <version>0.8.2+git</version>
     </versions>
-    <lastUpdated>20160208132023</lastUpdated>
+    <lastUpdated>20160210115752</lastUpdated>
   </versioning>
 </metadata>
