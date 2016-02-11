@@ -103,7 +103,7 @@ send_trigger(Seconds, Msg) ->
     %%     same process.
     ?DBG_ASSERT2(erlang:get(trace_mpath) =:= undefined,
                  send_trigger_infected_with_trace_mpath_or_proto_sched),
-    send_local(Seconds, self(), Msg).
+    send_local(Seconds, self(), Msg, [{?quiet}]).
 
 %% userdevguide-begin gen_component:sample
 %% initialize: return initial state.
