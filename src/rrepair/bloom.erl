@@ -321,15 +321,24 @@ calc_HF_num_Size_opt(N, FP) ->
     K_Max = util:ceil(K0),
     M_Min = resize(calc_least_size(N, FP, K_Min), 8),
     M_Max = resize(calc_least_size(N, FP, K_Max), 8),
+    FPR_Min = calc_FPR(M_Min, N, K_Min),
+    FPR_Max = calc_FPR(M_Max, N, K_Max),
     % unfortunately, we can't ensure the following two conditions due to
     % floating point precision issues near 1 in both calc_least_size/3 and calc_FPR/3
-    %?DBG_ASSERT(calc_FPR(M_Min, N, K_Min) =< FP),
-    %?DBG_ASSERT(calc_FPR(M_Max, N, K_Max) =< FP),
+    % instead, use the best fitting option (see below)
+    %?DBG_ASSERT(FPR_Min =< FP),
+    %?DBG_ASSERT(FPR_Max =< FP),
 %%     log:pal("Bloom (~g): K=~B, M=~B (FP=~g) vs. K=~B, M=~B (FP=~g)",
-%%             [FP, K_Min, M_Min, calc_FPR(M_Min, N, K_Min),
-%%              K_Max, M_Max, calc_FPR(M_Max, N, K_Max)]),
-    if M_Min =< M_Max -> {K_Min, M_Min};
-       true           -> {K_Max, M_Max}
+%%             [FP, K_Min, M_Min, FPR_Min, K_Max, M_Max, FPR_Max]),
+    if FPR_Min =< FP andalso FPR_Max =< FP ->
+           if M_Min < M_Max -> {K_Min, M_Min};
+              M_Min =:= M_Max andalso FPR_Min < FPR_Max -> {K_Min, M_Min};
+              true -> {K_Max, M_Max}
+           end;
+       FPR_Min =< FP andalso FPR_Max > FP -> {K_Min, M_Min};
+       FPR_Min > FP andalso FPR_Max =< FP -> {K_Max, M_Max};
+       FPR_Min > FP andalso FPR_Max > FP andalso FPR_Max > FPR_Min -> {K_Min, M_Min};
+       FPR_Min > FP andalso FPR_Max > FP -> {K_Max, M_Max}
     end.
 
 %% @doc Calculates the number of bits needed by a bloom filter to have a false
