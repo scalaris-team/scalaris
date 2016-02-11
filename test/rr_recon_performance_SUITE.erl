@@ -83,8 +83,7 @@ comparison(_) ->
 
 -spec bloom_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), float()) -> measure_util:result().
 bloom_build_time(_, DB, DBSize, Iterations, Fpr) ->
-    Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(DBSize, Fpr)),
-    BaseBF = bloom:new_fpr(DBSize, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(DBSize, Fpr),
     measure_util:time_avg(
       fun() ->
               lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
@@ -186,8 +185,7 @@ bloom(_) ->
     ToAdd = 10000, % req: mod 2 = 0
     Fpr = 0.1,
 
-    Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
-    BaseBF = bloom:new_fpr(ToAdd, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(ToAdd, Fpr),
     List = random_list(ToAdd),
     TestBF = bloom:add_list(BaseBF, List),
 
@@ -238,8 +236,7 @@ bloom2(_) ->
     ToAdd = 1024*8, % req: mod 2 = 0
     Fpr = 0.1,
 
-    Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
-    BaseBF = bloom:new_fpr(ToAdd, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(ToAdd, Fpr),
     
     Hfs = bloom:get_property(BaseBF, hfs),
     BFSize = bloom:get_property(BaseBF, size),

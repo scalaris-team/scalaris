@@ -137,10 +137,10 @@ prop_fpr(ItemCount, ItemType) ->
     
     DestFpr = randoms:rand_uniform(1, 100) / 1000,
     DestFPRList = [DestFpr, DestFpr*0.8, DestFpr*0.5],
-    HFCount = ?BLOOM:calc_HF_numEx(ItemCount, DestFpr),
+    ExampleBF = ?BLOOM:new_fpr(ItemCount, DestFpr),
     
     FPs = [{util:repeat(
-              fun measure_fpr/3, [{Fpr, HFCount}, {InList, ItemCount}, ItemType],
+              fun measure_fpr/3, [Fpr, {InList, ItemCount}, ItemType],
               ?Fpr_Test_NumTests,
               [parallel, {accumulate, fun(X, Y) -> X + Y end, 0}])
                / ?Fpr_Test_NumTests,
@@ -151,13 +151,13 @@ prop_fpr(ItemCount, ItemType) ->
            || {M, D} <- FPs],
     ct:pal("ItemCount=~p ; ItemType=~p ; Tests=~p ; Functions=~p ; CompressionRate=~.2f~n"
                "DestFpr, Measured, Diff in %, Status~n~p",
-               [ItemCount, ItemType, ?Fpr_Test_NumTests, HFCount,
-                ?BLOOM:calc_least_size_opt(ItemCount, DestFpr) / ItemCount, FPs2]),
+               [ItemCount, ItemType, ?Fpr_Test_NumTests,
+                ?REP_HFS:size(bloom:get_property(ExampleBF, hfs)),
+                ?BLOOM:get_property(ExampleBF, size) / ItemCount, FPs2]),
     true.
 
-measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
-    Hfs = ?HFS:new(HFCount),
-    InitBF = ?BLOOM:new_fpr(ItemCount, DestFpr, Hfs),
+measure_fpr(DestFpr, {InList, ItemCount}, ListItemType) ->
+    InitBF = ?BLOOM:new_fpr(ItemCount, DestFpr),
     BF = ?BLOOM:add_list(InitBF, InList),
     
     Count = trunc(10 / ?BLOOM:get_property(BF, fpr)),
@@ -204,9 +204,7 @@ fprof(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 newBloom(ElementNum, Fpr) ->
-    HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),
-    Hfs = ?HFS:new(HFCount),
-    ?BLOOM:new_fpr(ElementNum, Fpr, Hfs).
+    ?BLOOM:new_fpr(ElementNum, Fpr).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
