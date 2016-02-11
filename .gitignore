@@ -42,3 +42,4 @@ Session.vim
 contrib/slurm/slurm-*.out
 /java-api/target
 /cpp-api/scalaris
+/.maven
