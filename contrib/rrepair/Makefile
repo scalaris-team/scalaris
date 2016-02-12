@@ -46,9 +46,9 @@ trivial_single-all/Makefile: Makefile.tmpl2 trivial_single-all/.gitignore
          -e 's|<dat1>|0.001/trivial.dat|g' \
          -e 's|<dat2>|0.01/trivial.dat|g' \
          -e 's|<dat3>|0.1/trivial.dat|g' \
-         -e 's|<title1>|trivial_{0.001}|g' \
-         -e 's|<title2>|trivial_{0.01}|g' \
-         -e 's|<title3>|trivial_{0.1}|g' \
+         -e 's|<title1>|trivial_{P_{1e}0.001}|g' \
+         -e 's|<title2>|trivial_{P_{1e}0.01}|g' \
+         -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
 
 trivial_single-all/%/trivial.dat: trivial_single-all/Makefile
@@ -92,9 +92,9 @@ shash_single-all/Makefile: Makefile.tmpl2 shash_single-all/.gitignore
          -e 's|<dat1>|0.001/shash.dat|g' \
          -e 's|<dat2>|0.01/shash.dat|g' \
          -e 's|<dat3>|0.1/shash.dat|g' \
-         -e 's|<title1>|shash_{0.001}|g' \
-         -e 's|<title2>|shash_{0.01}|g' \
-         -e 's|<title3>|shash_{0.1}|g' \
+         -e 's|<title1>|shash_{P_{1e}0.001}|g' \
+         -e 's|<title2>|shash_{P_{1e}0.01}|g' \
+         -e 's|<title3>|shash_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
 
 shash_single-all/%/shash.dat: shash_single-all/Makefile
@@ -138,9 +138,9 @@ bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
          -e 's|<dat1>|0.001/bloom.dat|g' \
          -e 's|<dat2>|0.01/bloom.dat|g' \
          -e 's|<dat3>|0.1/bloom.dat|g' \
-         -e 's|<title1>|bloom_{0.001}|g' \
-         -e 's|<title2>|bloom_{0.01}|g' \
-         -e 's|<title3>|bloom_{0.1}|g' \
+         -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
+         -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
+         -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|regenAccInPercent=1;absoluteRedundancy=1;|g' < $< > $@
 
 bloom_single-all/%/bloom.dat: bloom_single-all/Makefile
