@@ -349,7 +349,7 @@ calc_HF_num_Size_opt(N, FP) ->
 calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
-    util:ceil(1 / (1 - (math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))).
+    util:ceil(1 / (1 - math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N)))).
 
 %% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
 %%      and a maximum number of N elements.
