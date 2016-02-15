@@ -26,7 +26,7 @@
 -export_type([time_utc/0, us_timestamp/0]).
 
 -export([escape_quotes/1,
-         min/2, max/2, log/2, log2/1, ceil/1, floor/1,
+         min/2, max/2, log/2, log2/1, log1p/1, ceil/1, floor/1,
          logged_exec/1,
          randomelem/1, randomelem_and_length/1,
          pop_randomelem/1, pop_randomelem/2, pop_randomsubset/2,
@@ -235,6 +235,17 @@ log(X, B) -> math:log10(X) / math:log10(B).
 %% @doc Logarithm of X to the base of 2.
 -spec log2(X::number()) -> float().
 log2(X) -> math:log10(X) / 0.3010299956639812. % use hard-coded math:log10(2)
+
+%% @doc More precise version of ln(1+x) for small x.
+%% @reference David Goldberg. 1991. What every computer scientist should know
+%%            about floating-point arithmetic. ACM Comput. Surv. 23, 1
+%%            (March 1991), 5-48. DOI=http://dx.doi.org/10.1145/103162.103163
+-spec log1p(X::number()) -> number().
+log1p(X) ->
+    W = 1 + X,
+    if W == 1 -> X;
+       true   -> X * math:log(W) / (W-1)
+    end.
 
 %% @doc Returns the largest integer not larger than X.
 -spec floor(X::number()) -> integer().
