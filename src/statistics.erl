@@ -150,11 +150,12 @@ get_ring_details_neighbors(RecursionLvl, Ring, Nodes) ->
 %%      See compare_node_details/2 for a definition of the order.
 -spec get_ring_details(Nodes::[comm:mypid()]) -> ring().
 get_ring_details(Nodes) ->
+    UUID = uid:get_global_uid(),
     _ = [begin
-             SourcePid = comm:reply_as(comm:this(), 2, {ok, '_', Pid}),
+             SourcePid = comm:reply_as(comm:this(), 2, {ok, '_', Pid, UUID}),
              comm:send(Pid, {get_node_details, SourcePid})
          end || Pid <- Nodes],
-    get_node_details(Nodes, [], 0).
+    get_node_details(Nodes, UUID, [], 0).
 
 %% @doc Defines an order of ring_element() terms so that {failed, Pid} terms
 %%      are considered the smallest but sorted by their pids.
@@ -170,8 +171,9 @@ compare_node_details({failed, _}, {ok, _}) ->
 compare_node_details({ok, _}, {failed, _}) ->
     false.
 
--spec get_node_details(Pids::[comm:mypid()], ring(), TimeInMS::non_neg_integer()) -> ring().
-get_node_details([_|_] = Pids, Ring, TimeInMS) ->
+-spec get_node_details(Pids::[comm:mypid()], uid:global_uid(), ring(),
+                       TimeInMS::non_neg_integer()) -> ring().
+get_node_details([_|_] = Pids, UUID, Ring, TimeInMS) ->
     Continue =
         if
             TimeInMS =:= 2000 ->
@@ -187,19 +189,24 @@ get_node_details([_|_] = Pids, Ring, TimeInMS) ->
             trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
-                    {ok, {get_node_details_response, Details}, Pid}, %% ->
-                    get_node_details(lists:delete(Pid, Pids),
+                    {ok, {get_node_details_response, Details}, Pid, UUID}, %% ->
+                    get_node_details(lists:delete(Pid, Pids), UUID,
                                      [{ok, Details} | Ring],
                                      TimeInMS)
+                  );
+                % clean up old / unrelated messages
+                ?SCALARIS_RECV(
+                    {ok, {get_node_details_response, _Details}, _Pid, _OldUUID}, %% ->
+                    get_node_details(Pids, UUID, Ring, TimeInMS)
                   )
             after
                 10 ->
-                    get_node_details(Pids, Ring, TimeInMS + 10)
+                    get_node_details(Pids, UUID, Ring, TimeInMS + 10)
             end;
         _ -> Failed = [{failed, Pid} || Pid <- Pids],
              lists:append(Failed, Ring)
     end;
-get_node_details([], Ring, _TimeInMS) -> Ring.
+get_node_details([], _UUID, Ring, _TimeInMS) -> Ring.
 
 %%%-------------------------------RT----------------------------------
 
