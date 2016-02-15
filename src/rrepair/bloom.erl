@@ -349,7 +349,9 @@ calc_HF_num_Size_opt(N, FP) ->
 calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
-    util:ceil(1 / (1 - math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N)))).
+    % util:ceil(1 / (1 - math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))
+    % rr_recon:calc_n_subparts_p1e/2 uses a more precise Taylor expansion
+    util:ceil(1 / rr_recon:calc_n_subparts_p1e(K * N, math:pow(FP, 1 / K))).
 
 %% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
 %%      and a maximum number of N elements.
@@ -358,8 +360,15 @@ calc_least_size(N, FP, K) ->
         -> FP::float().
 calc_FPR(_M, 0, _K) ->
     0.0;
+calc_FPR(1, _N, _K) ->
+    1.0;
 calc_FPR(M, N, K) ->
-    math:pow(1 - math:pow(1 - 1/M, K * N), K).
+    %math:pow(1 - math:pow(1 - 1/M, K * N), K).
+    % more precise version taking floating point precision near 1 into acccount:
+    Inner = -math:exp(K * N * util:log1p(-1 / M)),
+    if Inner == -1.0 -> 0.0;
+       true -> math:exp(K * util:log1p(Inner))
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helper functions

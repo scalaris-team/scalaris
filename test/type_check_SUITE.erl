@@ -459,6 +459,9 @@ tester_type_check_rrepair(_Config) ->
              {pos_to_bitstring, 4}, % needs to fulfil certain preconditions
              {bitstring_to_k_list_k, 3}, % needs a special binary to correspond to a number of Key entries
              {bitstring_to_k_list_kv, 3}, % needs a special binary to correspond to a number of KV entries
+             {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
+             {calc_n_subparts_p1e, 3}, %% needs float > 0, < 1
+             {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
              {start_gen_component,5} %% unsupported types
            ],
            [
@@ -469,11 +472,8 @@ tester_type_check_rrepair(_Config) ->
              {shutdown, 2}, %% tries to send messages
              {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
-             {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
-             {calc_n_subparts_p1e, 3}, %% needs float > 0, < 1
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
              {shash_signature_sizes, 3}, %% needs float > 0, < 1
-             {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
