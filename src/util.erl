@@ -237,9 +237,10 @@ log(X, B) -> math:log10(X) / math:log10(B).
 log2(X) -> math:log10(X) / 0.3010299956639812. % use hard-coded math:log10(2)
 
 %% @doc More precise version of ln(1+x) for small x.
-%% @reference David Goldberg. 1991. What every computer scientist should know
-%%            about floating-point arithmetic. ACM Comput. Surv. 23, 1
-%%            (March 1991), 5-48. DOI=http://dx.doi.org/10.1145/103162.103163
+%%
+%% from: David Goldberg. 1991. What every computer scientist should know
+%%       about floating-point arithmetic. ACM Comput. Surv. 23, 1
+%%       (March 1991), 5-48. DOI=<a href="http://dx.doi.org/10.1145/103162.103163">10.1145/103162.103163</a>
 -spec log1p(X::number()) -> number().
 log1p(X) ->
     W = 1 + X,
