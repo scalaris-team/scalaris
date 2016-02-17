@@ -41,11 +41,21 @@ function cleanup() {
 }
 
 function test_foreign_beams() {
-    BEAM=$(pgrep beam)
+    BEAM=$(pgrep -a beam)
     if [[ -n $BEAM ]]; then
         USER=$(ps -e -o user,comm | grep beam | awk '{print $1}' | sort | uniq | xargs echo)
         echo "There are Erlang VMs from $USER still running, please contact $USER for cleanup:"
         echo "$(ps -e -o user,pid,start_time,comm | awk 'NR == 1 {print} /beam/ {print}')"
+        echo "pgrep -a beam output: $BEAM"
+        echo "sleeping for 30 seconds, then retrying..."
+        sleep 30
+    fi
+    BEAM=$(pgrep -a beam)
+    if [[ -n $BEAM ]]; then
+        USER=$(ps -e -o user,comm | grep beam | awk '{print $1}' | sort | uniq | xargs echo)
+        echo "There are Erlang VMs from $USER still running, please contact $USER for cleanup:"
+        echo "$(ps -e -o user,pid,start_time,comm | awk 'NR == 1 {print} /beam/ {print}')"
+        echo "pgrep -a beam output: $BEAM"
         return 1
     fi
     return 0
