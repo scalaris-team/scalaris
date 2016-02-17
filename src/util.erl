@@ -82,6 +82,7 @@
     ]).
 
 % feeder for tester
+-export([log_feeder/2, log2_feeder/1, log1p_feeder/1]).
 -export([readable_utc_time_feeder/1]).
 -export([map_with_nr_feeder/3]).
 -export([par_map_feeder/2, par_map_feeder/3]).
@@ -228,23 +229,51 @@ pow(X, Y) ->
     Half = pow(X, Y div 2),
     Half * Half * X.
 
+-spec log_feeder(X::number(), Base::number()) -> {number(), number()}.
+log_feeder(X0, B0) ->
+    X = case X0 of
+            0   -> 1; % not allowed
+            0.0 -> 1; % not allowed
+            X1  -> erlang:abs(X1)
+        end,
+    B = case erlang:abs(B0) of
+           1    -> 2;   % 1 not allowed
+           1.0  -> 2.0; % 1 not allowed
+           0    -> 2;   % 0 not allowed
+           0.0  -> 2.0; % 0 not allowed
+           B1   -> B1
+        end,
+    {X, B}.
+
 %% @doc Logarithm of X to the base of Base.
 -spec log(X::number(), Base::number()) -> float().
 log(X, B) -> math:log10(X) / math:log10(B).
 
+-spec log2_feeder(X::number()) -> {number()}.
+log2_feeder(0)   -> {1}; % 0 not allowed
+log2_feeder(0.0) -> {1.0}; % 0 not allowed
+log2_feeder(X) when X < 0 -> {-X};
+log2_feeder(X)   -> {X}.
+
 %% @doc Logarithm of X to the base of 2.
 -spec log2(X::number()) -> float().
 log2(X) -> math:log10(X) / 0.3010299956639812. % use hard-coded math:log10(2)
+
+-spec log1p_feeder(X::number()) -> {number()}.
+log1p_feeder(-1)   -> {0}; % -1 not allowed
+log1p_feeder(-1.0) -> {0.0}; % -1 not allowed
+log1p_feeder(X) when X < -1 -> {-X};
+log1p_feeder(X)    -> {X}.
 
 %% @doc More precise version of ln(1+x) for small x.
 %%
 %% from: David Goldberg. 1991. What every computer scientist should know
 %%       about floating-point arithmetic. ACM Comput. Surv. 23, 1
 %%       (March 1991), 5-48. DOI=<a href="http://dx.doi.org/10.1145/103162.103163">10.1145/103162.103163</a>
--spec log1p(X::number()) -> number().
+-spec log1p(X::number()) -> float().
 log1p(X) ->
     W = 1 + X,
-    if W == 1 -> X;
+    if W == 1 -> float(X);
        true   -> X * math:log(W) / (W-1)
     end.
 

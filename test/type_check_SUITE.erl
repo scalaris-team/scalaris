@@ -763,8 +763,9 @@ tester_type_check_util(_Config) ->
              {lists_keystore2, 5}, %% key id may not be larger than the tuple size in the list
              {lists_partition3, 2}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 2}, %% indices must exist in list
-             {log, 2}, %% floats become too large and raise badarith
-             {log2, 1}, %% floats become too large and raise badarith
+             {log, 2}, %% tested via feeder
+             {log2, 1}, %% tested via feeder
+             {log1p, 1}, %% tested via feeder
              {logged_exec, 1}, %% not execute random strings
              {map_with_nr, 3}, %% cannot create funs; tested via feeder
              {par_map, 2}, %% cannot create funs; tested via feeder
