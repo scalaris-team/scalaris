@@ -176,7 +176,7 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
                 if (conn == null) {
                     conn = connPool.getConnection(GET_CONNECTION_TIMEOUT);
                     if (conn == null) {
-                        throw new ConnectionException("Maximum number of connections reached");
+                        throw new ConnectionException("Timeout when waiting for a new connection ");
                     }
                 }
             } catch (ConnectionException e) {
