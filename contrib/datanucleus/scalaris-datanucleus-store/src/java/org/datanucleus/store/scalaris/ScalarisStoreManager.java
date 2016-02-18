@@ -28,6 +28,7 @@ import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
 import org.datanucleus.TransactionEventListener;
 import org.datanucleus.exceptions.NucleusDataStoreException;
+import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
 import org.datanucleus.store.connection.ManagedConnection;
@@ -127,5 +128,14 @@ public class ScalarisStoreManager extends AbstractStoreManager {
      */
     public Transaction getScalarisTransaction(ExecutionContext ec) {
         return transactionMap.get(ec.getTransaction());
+    }
+
+    /**
+     * Method defining which value strategy to use when the user specified native strategy 
+     * or no strategy.
+     */
+    @Override
+    public String getStrategyForNative(AbstractClassMetaData cmd, int absFiledNumber) {
+        return "uuid-hex";
     }
 }
