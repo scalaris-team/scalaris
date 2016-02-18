@@ -18,6 +18,8 @@
             <property name="scalaris.debug" value="true" />
             <property name="scalaris.client.appendUUID" value="true" />
             <property name="scalaris.client.name" value="java_client_datatnucleus" />
+            <property name="scalaris.connection.max" value="100" />
+            <property name="scalaris.connection.timeout" value="250" />
 
             <!-- Without this it is neccessary to detach an persistet object manually to be able
                to use it outside of an transaction -->
