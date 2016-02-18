@@ -29,20 +29,7 @@
         <name>Orange</name>
     </organization>
 
-    <scm>
-        <url>http://datanucleus.svn.sourceforge.net/viewvc/datanucleus/platform/store.json/trunk/</url>
-        <connection>scm:svn:https://datanucleus.svn.sourceforge.net/svnroot/datanucleus/platform/store.json/trunk</connection>
-    </scm>
-
-
     <repositories>
-        <repository>
-            <id>DN_M2_Repo</id>
-            <url>http://www.datanucleus.org/downloads/maven2/</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
         <repository>
             <id>scalaris-repo</id>
             <url>https://scalaris-team.github.io/scalaris/maven</url>
@@ -91,10 +78,6 @@
                 <includes>
                     <include>**/plugin.xml</include>
                     <include>**/*.properties</include>
-                    <include>**/*.dtd</include>
-                    <include>**/*.xsd</include>
-                    <include>**/*.jdo</include>
-                    <include>**/META-INF/services/*</include>
                 </includes>
             </resource>
             <resource>
@@ -112,7 +95,6 @@
                     <include>MANIFEST.MF</include>
                     <include>LICENSE.txt</include>
                     <include>NOTICE.txt</include>
-                    <include>README.txt</include>
                 </includes>
             </resource>
         </resources>
@@ -151,6 +133,7 @@
             <plugin>
                 <artifactId>exec-maven-plugin</artifactId>
                 <groupId>org.codehaus.mojo</groupId>
+                <version>1.4.0</version>
                 <executions>
                     <execution>
                         <id>Check out maven repository from git</id>
@@ -185,13 +168,5 @@
                 </executions>
             </plugin>
         </plugins>
-
-        <extensions>
-            <extension>
-                <groupId>org.apache.maven.wagon</groupId>
-                <artifactId>wagon-ssh-external</artifactId>
-                <version>2.2</version>
-            </extension>
-        </extensions>
     </build>
 </project>
