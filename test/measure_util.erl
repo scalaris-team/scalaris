@@ -22,7 +22,7 @@
 -vsn('$Id$').
 
 -export([time_avg/3, time_with_result/3]).
--export([print/1, print/2, get/3]).
+-export([print/1, print/2, get/2, get/3]).
 -export([add/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -33,14 +33,15 @@
 -type result() :: { Min::non_neg_integer(), 
                     Max::non_neg_integer(),
                     Med::non_neg_integer(), 
-                    Avg::non_neg_integer(),
+                    Avg::float(),
+                    Sum::non_neg_integer(),
                     Iterations::pos_integer()
                   }.
 
 -type options() :: skip_first_value.
 
 -type time_unit() :: us | ms | s.
--type mr_type() :: min | max | med | avg.
+-type mr_type() :: min | max | med | avg | sum.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -66,46 +67,54 @@ time_avg(Fun, Iterations, Options) ->
     Min = lists:min(Times),
     Max = lists:max(Times),
     Med = lists:nth(((Length + 1) div 2), lists:sort(Times)),
-    Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
-    {Min, Max, Med, Avg, Iterations}.
+    Sum = lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times),
+    Avg = Sum / Length,
+    {Min, Max, Med, Avg, Sum, Iterations}.
 
 -spec add(result(), result()) -> result().
-add({AMin, AMax, AMed, AAvg, AIt}, {BMin, BMax, BMed, BAvg, BIt}) ->
+add({AMin, AMax, AMed, AAvg, ASum, AIt}, {BMin, BMax, BMed, BAvg, BSum, BIt}) ->
     {AMin + BMin,
      AMax + BMax,
      AMed + BMed,
      AAvg + BAvg,
+     ASum + BSum,
      erlang:round((AIt + BIt) / 2)}.
 
 -spec print(result()) -> [{atom(), any()}].
-print({Min, Max, Med, Avg, _} = Values) ->
+print({Min, Max, Med, Avg, _Sum, _} = Values) ->
     MaxVal = lists:max([Min, Max, Med, Avg]),
     if
         MaxVal > 1000000 -> print(Values, s);
-        MaxVal > 1000 -> print(Values, ms);
-        true -> print(Values, us)
+        MaxVal > 1000    -> print(Values, ms);
+        true             -> print(Values, us)
     end.
         
 
 -spec print(result(), time_unit()) -> [{atom(), any()}].
-print({Min, Max, Med, Avg, Iter}, Unit) ->
+print({Min, Max, Med, Avg, Sum, Iter}, Unit) ->
     [{unit, Unit},
      {min, value_to_unit(Min, Unit)},
      {max, value_to_unit(Max, Unit)},
      {med, value_to_unit(Med, Unit)},
      {avg, value_to_unit(Avg, Unit)},
+     {sum, value_to_unit(Sum, Unit)},
      {iterations, Iter}].
 
--spec get(result(), mr_type(), time_unit()) -> float().
-get({Min, Max, Med, Avg, _}, Type, Unit) ->
+-spec get(result(), mr_type()) -> number().
+get({Min, Max, Med, Avg, Sum, _}, Type) ->
     case Type of
-        min -> value_to_unit(Min, Unit);
-        max -> value_to_unit(Max, Unit);
-        med -> value_to_unit(Med, Unit);
-        avg -> value_to_unit(Avg, Unit)
+        min -> Min;
+        max -> Max;
+        med -> Med;
+        avg -> Avg;
+        sum -> Sum
     end.
 
--spec value_to_unit(non_neg_integer(), time_unit()) -> float().
+-spec get(result(), mr_type(), time_unit()) -> float().
+get(Value, Type, Unit) ->
+    value_to_unit(get(Value, Type), Unit).
+
+-spec value_to_unit(number(), time_unit()) -> float().
 value_to_unit(Val, Unit) ->
     case Unit of
         us -> erlang:float(Val);
