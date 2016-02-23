@@ -10,11 +10,11 @@
 #SBATCH -t 00:03:00
 #SBATCH --exclusive
 
-source $(pwd)/env.sh
+source $(pwd)/config/env.sh
 
 #$BINDIR/scalarisctl checkinstallation
 check_compile
-$(pwd)/start-scalaris.sh
+$(pwd)/util/start-scalaris.sh
 
 #############################################
 #                                           #
@@ -31,4 +31,4 @@ sleep 15
 #                                           #
 #############################################
 
-$(pwd)/stop-scalaris.sh
+$(pwd)/util/stop-scalaris.sh
