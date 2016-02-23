@@ -44,7 +44,8 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # KIND='size'
 # NODES_SERIES="1 2 4 8 16 32"
 # VMS_PER_NODE_SERIES="1"
-# WORKERS_BASE=4
+# export ERL_SCHED_FLAGS="+S 32"
+# LOAD_LEVEL=5
 
 # vary value sizes
 # KIND='value'
@@ -93,7 +94,23 @@ main_value() {
 
 main_size(){
     for NODES in $NODES_SERIES; do
+        if ((NODES==1)); then
+            NODELIST=""
+        elif ((NODES==2)); then
+            NODELIST="cumu01-00,cumu02-00"
+        else
+            half=$((NODES/2-1))
+            NODELIST="cumu01-[00-$half],cumu02-[00-$half]"
+        fi
+
         for VMS_PER_NODE in $VMS_PER_NODE_SERIES; do
+            local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
+            WORKERS=$((ringsize*LOAD_LEVEL))
+            WORKERS_PER_LG=$((WORKERS/LOAD_GENERATORS))
+            log info "RINGSIZE=$ringsize"
+            log info "WORKERS=$WORKERS"
+            log info "WORKERS_PER_LG=$WORKERS_PER_LG"
+
             repeat_benchmark
         done
     done
@@ -101,6 +118,11 @@ main_size(){
 
 main_load(){
     for WORKERS_BASE in $BASES; do
+        WORKERS=$((WORKERS_BASE*LOAD_GENERATORS))
+        WORKERS_PER_LG=$WORKERS_BASE
+        log info "WORKERS=$WORKERS"
+        log info "WORKERS_PER_LG=$WORKERS_PER_LG"
+
         ll=$((WORKERS_BASE*LOAD_GENERATORS))
         ll=$(printf "%04i" $ll)
         PREFIX="workers$ll-"
@@ -199,7 +221,7 @@ print_env(){
     elif [[ $KIND == "size" ]]; then
         echo NODES_SERIES=$NODES_SERIES
         echo VMS_PER_NODE_SERIES=$VMS_PER_NODE_SERIES
-        echo WORKERS_BASE=$WORKERS_BASE
+        echo LOAD_LEVEL=$LOAD_LEVEL
     fi
     echo "ERL_SCHED_FLAGS=$ERL_SCHED_FLAGS"
     echo TIMEOUT=$TIMEOUT
@@ -421,7 +443,7 @@ write_config() {
 {rng_seed, $RANDOM_SEED}.
 {mode, $MODE}.
 {duration, $DURATION}.
-{concurrent, $WORKERS}.
+{concurrent, $WORKERS_PER_LG}.
 {operations, [{put,2}, {get, 8}]}.
 {driver, basho_bench_driver_scalaris}.
 {key_generator, {int_to_str, {uniform_int, $max_key}}}.
@@ -448,14 +470,6 @@ run_bbench() {
     for i in $(seq 1 $LOAD_GENERATORS); do
         PARALLEL_ID=$i
         RANDOM_SEED="{$((7*$i)), $((11*$i)), $((5*$i))}"
-        # for size scale worker/node
-        # for load scale total number of workers
-        if [[ $KIND == "size" ]]; then
-            local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
-            WORKERS=$((ringsize*WORKERS_BASE))
-        elif [[ $KIND == "load" ]]; then
-            WORKERS=$WORKERS_BASE
-        fi
         write_config
 
         # build args. The ${var:+...} expands only, if the variable is set and non-empty
