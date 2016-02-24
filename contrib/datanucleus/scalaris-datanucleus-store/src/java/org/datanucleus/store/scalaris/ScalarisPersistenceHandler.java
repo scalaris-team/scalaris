@@ -334,7 +334,11 @@ public class ScalarisPersistenceHandler extends AbstractPersistenceHandler {
                         .debug("GET " + result.toString());
             }
         } catch (NotFoundException e) {
-            throw new NucleusObjectNotFoundException(e.getMessage(), e);
+            // throwing the NeucleusExpection directly would cause the StateManagerImpl
+            // to print a warning. This is annoying because all that happened was that
+            // we couldn't find an object in the store
+            NucleusException ne = new NucleusObjectNotFoundException(e.getMessage(), e);
+            throw storeMgr.getApiAdapter().getApiExceptionForNucleusException(ne);
         } catch (ConnectionException e) {
             throw new NucleusDataStoreException(e.getMessage(), e);
         }
