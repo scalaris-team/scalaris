@@ -6,7 +6,8 @@
     <release>0.8.2+git</release>
     <versions>
       <version>0.8.2+git</version>
+      <version>0.8.2-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20160218151649</lastUpdated>
+    <lastUpdated>20160224123830</lastUpdated>
   </versioning>
 </metadata>
