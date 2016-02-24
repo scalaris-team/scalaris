@@ -350,22 +350,7 @@ calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
     % util:ceil(1 / (1 - math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))
-    P = math:pow(FP, 1 / K),
-    if P =< 0.01 ->
-           % rr_recon:calc_n_subparts_p1e/2 uses a more precise Taylor expansion
-           util:ceil(1 / rr_recon:calc_n_subparts_p1e(K * N, P));
-       true ->
-           % if P is not near 0, this is more precise (and vice versa):
-           % use the series representation of 1 - p^(1/x) for x=N*K, p = 1 - P
-           % 1-p^(1/x) = sum_(n=-1)^-infinity (-(log^(-n)(p))/((-n)!)) k^n
-           % http://www.wolframalpha.com/input/?i=series+1-p^%281%2Fx%29
-           LogP = math:log(1-P), LogP2 = LogP * LogP, LogP3 = LogP2 * LogP,
-           LogP4 = LogP3 * LogP, LogP5 = LogP4 * LogP,
-           X = K*N, X2 = X * X, X3 = X2 * X, X4 = X3 * X, X5 = X4 * X,
-           Series = -LogP / X - LogP2 / (2*X2) - LogP3 / (6*X3) - LogP4 / (24*X4)
-                        - LogP5 / (120*X5), % +O[P^6]
-           util:ceil(1 / Series)
-    end.
+    util:ceil(1 / util:pow1p(1 - math:pow(FP, 1 / K), 1 / (K * N))).
 
 %% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
 %%      and a maximum number of N elements.

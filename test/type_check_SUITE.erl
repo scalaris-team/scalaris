@@ -766,6 +766,7 @@ tester_type_check_util(_Config) ->
              {log, 2}, %% tested via feeder
              {log2, 1}, %% tested via feeder
              {log1p, 1}, %% tested via feeder
+             {pow1p, 2}, %% tested via feeder
              {logged_exec, 1}, %% not execute random strings
              {map_with_nr, 3}, %% cannot create funs; tested via feeder
              {par_map, 2}, %% cannot create funs; tested via feeder
@@ -811,6 +812,7 @@ tester_type_check_util(_Config) ->
              {par_map_recv, 2}, %% receives messages
              {par_map_recv2, 2}, %% receives messages
              {sublist_, 4}, %% tested via feeder
+             {pow1p_, 4}, %% already tested by root1p/2
              {wait_for1, 2}, %% cannot create funs
              {wait_for2, 2}, %% cannot create funs
              {collect_while,2}, %% needs fun
