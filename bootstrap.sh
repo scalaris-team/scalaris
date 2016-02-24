@@ -17,7 +17,18 @@
 
 VERSION=`cat VERSION`
 VERSION_NOPLUS=`echo "${VERSION}" | tr + _`
-VERSION_MAVEN="${VERSION/+git/-SNAPSHOT}"
+if [[ "$VERSION" == *git* ]]; then
+  ## maven snapshot versions must have revision incremented by 1 so that 
+  ## maven sees them as a newer version than the release
+  VERSION_NOGIT=${VERSION%+git*}
+  MAJOR_MINOR=${VERSION_NOGIT%.*}
+  REVISION=${VERSION_NOGIT##*.}
+  ((REVISION++))
+  VERSION_MAVEN="$MAJOR_MINOR.$REVISION-SNAPSHOT"
+else
+  VERSION_MAVEN=$VERSION
+fi
+
 
 echo "Setting Scalaris version to ${VERSION}..."
 sed -e "s/-define(SCALARIS_VERSION, \".*\")\\./-define(SCALARIS_VERSION, \"${VERSION}\")./g" \
