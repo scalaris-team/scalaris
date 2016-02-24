@@ -232,8 +232,8 @@ pow(X, Y) ->
 -spec log_feeder(X::number(), Base::number()) -> {number(), number()}.
 log_feeder(X0, B0) ->
     X = case X0 of
-            0   -> 1; % not allowed
-            0.0 -> 1; % not allowed
+            0   -> 1;   % not allowed
+            0.0 -> 1.0; % not allowed
             X1  -> erlang:abs(X1)
         end,
     B = case erlang:abs(B0) of
