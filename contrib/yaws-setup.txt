@@ -1,4 +1,4 @@
-1) download new version
+1) download the new version from http://yaws.hyber.org/
 2) extract somewhere else
 3) copy ebin/, include/, src/, LICENSE, vsn.mk to <scalaris>/contrib/yaws
 4) autoreconf -fi && ./configure --disable-pam && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
@@ -8,5 +8,7 @@
 5b) remove src/*.hrl.in
 5c) reverse yaws-2e86da12b3.patch in <scalaris>/contrib/yaws:
     patch -Rp1 < ../yaws-2e86da12b3.patch
-6) delete <scalaris>/contrib/yaws/ebin/Makefile.in, <scalaris>/contrib/yaws/include/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.in, <scalaris>/contrib/yaws/src/Makefile.am
+6) in <scalaris>/contrib/yaws:
+    rm ebin/Makefile.*, include/Makefile.*, src/Makefile.*
+    echo "/*.beam" > ebin/.gitignore
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
