@@ -17,7 +17,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
 BuildRequires:  screen
-Requires:       screen which net-tools
+Requires:       screen net-tools
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -25,6 +25,7 @@ Requires:       screen which net-tools
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
+Requires:       which
 %if 0%{?fedora_version} >= 19
 BuildRequires:  erlang-js
 Requires:       erlang-js
@@ -59,6 +60,11 @@ Requires:       sudo
 %if 0%{?suse_version}
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
+%if 0%{?suse_version} >= 1310
+Requires:       which
+%else
+Requires:       util-linux
+%endif
 %if 0%{?suse_version} >= 1110
 BuildRequires:  erlang-erlang_js
 Requires:       erlang-erlang_js
