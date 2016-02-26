@@ -194,6 +194,9 @@ Python3 bindings and Python3 command line client for Scalaris
 %build
 export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
 
+export CFLAGS="%{optflags}"
+export CXXFLAGS=$CFLAGS
+
 %if 0%{?fedora_version} >= 18
 export PATH="%{_bindir}:$PATH"
 %endif
