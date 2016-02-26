@@ -135,17 +135,7 @@ public class ScalarisVM {
          */
         public final int yawsPort;
 
-        /**
-         * @param scalarisVersion
-         * @param erlangVersion
-         * @param memTotal
-         * @param uptime
-         * @param erlangNode
-         * @param ip
-         * @param port
-         * @param yawsPort
-         */
-        public GetInfoResult(final String scalarisVersion, final String erlangVersion,
+        protected GetInfoResult(final String scalarisVersion, final String erlangVersion,
                 final int memTotal, final int uptime, final String erlangNode, final Inet4Address ip,
                 final int port, final int yawsPort) {
             super();
