@@ -128,6 +128,7 @@ implemented in Erlang.
 Summary:    Java-API and Java-Client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
+Requires:   which net-tools
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else

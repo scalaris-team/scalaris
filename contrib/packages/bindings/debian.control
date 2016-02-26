@@ -9,7 +9,7 @@ Standards-Version: 3.9.6
 Package: scalaris-java
 Section: java
 Architecture: all
-Depends: ${misc:Depends}, java6-runtime
+Depends: ${misc:Depends}, debianutils, hostname, java6-runtime
 Description: Java-API and Java-Client for Scalaris
  Java Bindings and command line client for Scalaris.
 

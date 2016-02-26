@@ -17,7 +17,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
 BuildRequires:  screen
-Requires:       screen
+Requires:       screen which net-tools
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
