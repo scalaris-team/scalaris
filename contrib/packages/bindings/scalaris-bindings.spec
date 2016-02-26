@@ -23,6 +23,10 @@ BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-comp
 BuildRequires:  pkgconfig
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 %define with_cpp 1
+# out cpp-api currently only provides a static library, for which
+# find-debuginfo.sh cannot find the debug infos, see
+# https://fedoraproject.org/wiki/Packaging:Debuginfo
+%global debug_package %{nil}
 BuildRequires:  ruby(release) >= 1.8
 %else
 %define with_cpp 0
