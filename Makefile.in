@@ -56,7 +56,7 @@ SYSTEMD_UNITDIR = $(DESTDIR)@SYSTEMD_UNITDIR@
 # /lib/scalaris/
 SCALARISDIR = $(DESTDIR)${prefix}/lib/scalaris
 # /lib/scalaris/ebin
-BEAMDIR = $(DESTDIR)${prefix}/lib/scalaris/ebin
+BEAMDIR = $(SCALARISDIR)/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$(SCALARISDIR)/docroot
 # /share/doc/scalaris

@@ -138,6 +138,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_systemd}
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+# setup SELinux policies
 cd contrib/systemd
 sed -e "s|/var/lib/scalaris|%{scalaris_home}|g" \
     -i scalaris.fc
@@ -245,8 +246,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_docdir}/scalaris/LICENSE
 %{_docdir}/scalaris/ChangeLog
 %{_bindir}/scalarisctl
-%{_prefix}/lib//scalaris
-%exclude %{_prefix}/lib//scalaris/docroot/doc
+%{_prefix}/lib/scalaris
+%exclude %{_prefix}/lib/scalaris/docroot/doc
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service

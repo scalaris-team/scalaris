@@ -25,11 +25,11 @@ BINDIR=@bindir@
 # /etc/scalaris/
 ETCDIR=@sysconfdir@/scalaris
 # /lib/scalaris/
-SCALARISDIR=@libdir@/scalaris
+SCALARISDIR=${prefix}/lib/scalaris/
 # /lib/scalaris/ebin
-BEAMDIR=@libdir@/scalaris/ebin
+BEAMDIR=${SCALARISDIR}/ebin
 # /lib/scalaris/docroot
-DOCROOTDIR=$SCALARISDIR/docroot
+DOCROOTDIR=${SCALARISDIR}/docroot
 # /share/doc/scalaris
 DOCDIR=@docdir@
 # /share/java
