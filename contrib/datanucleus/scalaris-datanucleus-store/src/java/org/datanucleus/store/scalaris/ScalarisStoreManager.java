@@ -60,7 +60,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
     }
 
     @Override
-    public void transactionStarted(ExecutionContext ec) {
+    public void transactionStarted(final ExecutionContext ec) {
         final org.datanucleus.Transaction dnTransaction = ec.getTransaction();
         final ManagedConnection mConn = getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
@@ -80,6 +80,8 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 
             public void transactionPreCommit() {
                 try {
+                    // ensure that all updates operations are executed before commit
+                    ec.flushInternal(true);
                     scalarisTransaction.commit();
                 } catch (ConnectionException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
