@@ -30,6 +30,10 @@ Requires:       which
 BuildRequires:  erlang-js
 Requires:       erlang-js
 %endif
+%if 0%{?fedora_version} >= 22
+BuildRequires:  hostname
+Requires:       hostname
+%endif
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
