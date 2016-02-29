@@ -38,3 +38,16 @@ You will need:
     `make`
 
 The database files are currently stored in the data sub-directory. Each node creates its own sub-directory and each scalaris node will have a different file. The path can be changed in scalaris.cfg with the db_directory option.
+
+
+{{ page.url }}
+
+{{ page.path }}
+
+x{{ base }}x
+
+x{{ depth }}x
+
+{{ page.url | split: '/' | size }}
+
+
