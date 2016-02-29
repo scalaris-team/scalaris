@@ -4,7 +4,7 @@
 
     <groupId>de.zib.scalaris</groupId>
     <artifactId>java-api</artifactId>
-    <version>0.9.1-SNAPSHOT</version>
+    <version>0.9.0</version>
     <packaging>jar</packaging>
 
     <name>Scalaris Java API</name>
