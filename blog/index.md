@@ -3,6 +3,13 @@ title: Scalaris - FAQ
 layout: default
 ---
 
+{{ page.url }}
+
+{{ page.path }}
+
+{{ page }}
+
+
 <p>
     <ul class="list-unstyled">
     {% for post in site.posts %}
