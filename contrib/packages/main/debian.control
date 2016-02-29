@@ -8,7 +8,7 @@ Standards-Version: 3.9.6
 
 Package: scalaris
 Architecture: all
-Depends: ${misc:Depends}, adduser, screen, debianutils, hostname, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Depends: ${misc:Depends}, adduser, sudo, screen, debianutils, hostname, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
 Suggests: scalaris-java, scalaris-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It
