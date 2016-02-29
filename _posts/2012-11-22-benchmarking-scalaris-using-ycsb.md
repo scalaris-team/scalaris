@@ -1,6 +1,7 @@
 ---
 title: Benchmark Scalaris using YCSB
 layout: default
+root: ..
 excerpt: This blog post shows you how to benchmark Scalaris using the YCSB benchmark.
 ---
 

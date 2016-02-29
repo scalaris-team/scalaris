@@ -1,6 +1,6 @@
 ---
 title: Scalaris &mdash; Maven Repository
-root: .
+root: ..
 layout: default
 ---
 
