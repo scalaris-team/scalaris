@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris-examples-wiki
-Version: 0.9.0-1
+Version: 0.9.0+git-1
 DEBTRANSFORM-RELEASE: 1
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all

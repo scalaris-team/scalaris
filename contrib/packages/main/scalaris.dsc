@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris
-Version: 0.9.0-1
+Version: 0.9.0+git-1
 DEBTRANSFORM-RELEASE: 1
 Binary: scalaris
 Maintainer: Nico Kruber <kruber@zib.de>

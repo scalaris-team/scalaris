@@ -19,7 +19,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.9.0").
+-define(SCALARIS_VERSION, "0.9.0+git").
 
 %% The RT macro is defined by the --with-rt configure parameter and determines
 %% which kind of routingtable is used.

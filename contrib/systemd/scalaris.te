@@ -1,4 +1,4 @@
-module scalaris 0.9.0;
+module scalaris 0.9.0_git;
 
 require {
         attribute port_type;
