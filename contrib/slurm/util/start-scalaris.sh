@@ -96,18 +96,18 @@ function start_servers() {
 function wait_for_servers_to_start {
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE\*$DHT_NODES_PER_VM
     for NODE in `scontrol show hostnames`; do
-        RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
+        RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 $EPMD -names | grep " at port " | wc -l`
         while [ $RUNNING_NODES -ne $VMS_PER_NODE ]
         do
-            RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
+            RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 $EPMD -names | grep " at port " | wc -l`
         done
     done
 
     # wait for the first VM to start
-    NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+    NR_OF_FIRSTS=`$EPMD -names | grep 'name first at port' | wc -l`
     while [ $NR_OF_FIRSTS -ne 1 ]
     do
-        NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+        NR_OF_FIRSTS=`$EPMD -names | grep 'name first at port' | wc -l`
     done
     # wait for the first VM to initialize
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', api_vm, wait_for_scalaris_to_start, []), io:format('waited for scalaris: ~p~n', [A]), halt(0)."

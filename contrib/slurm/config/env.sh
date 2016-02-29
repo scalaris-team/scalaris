@@ -1,5 +1,7 @@
 export SCALARIS_LOCAL=${SCALARIS_LOCAL:-false}
 export SCALARIS_SRC=${SCALARIS_SRC:-$HOME/scalaris}
+# exports EPMD=... with to the Erlang version set through ./configure
+export $(grep 'EPMD=' $SCALARIS_SRC/bin/scalarisctl)
 if [[ $SCALARIS_LOCAL = true ]]; then
     export SCALARIS_DIR="/local/$(whoami)/scalaris"
 else
