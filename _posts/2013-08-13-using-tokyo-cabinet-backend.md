@@ -2,7 +2,7 @@
 title: Tokyo Cabinet Backend
 excerpt: Using Tokyo Cabinet as the backend.
 layout: default
-root: ..
+root: ../..
 ---
 
 # {{ page.title }}
