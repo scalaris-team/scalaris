@@ -1,3 +1,5 @@
+exclude: [vendor]
+
 # for previewing
 # baseurl: http://mxm.github.io/scalaris
 
