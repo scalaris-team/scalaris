@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Feb 29 16:00:00 UTC 2016 - kruber@zib.de
+
+- Scalaris 0.9.0 (codename "Vriesea scalaris")
+  (partly supported by the EU project IES Cities http://iescities.eu/)
+
+-------------------------------------------------------------------
 Fri Jul 24 10:00:00 UTC 2015 - kruber@zib.de
 
 - Scalaris 0.8.2
@@ -13,7 +19,7 @@ Sun Jul 12 10:00:00 UTC 2015 - kruber@zib.de
 -------------------------------------------------------------------
 Fri Jul 10 10:00:00 UTC 2015 - kruber@zib.de
 
-- Scalaris 0.8.0
+- Scalaris 0.8.0 (codename "Picoides scalaris")
   (partly supported by the EU project IES Cities http://iescities.eu/
   and the EIT ICT Labs project MCData)
   * Infrastructure:
@@ -47,7 +53,7 @@ Mon Sep 29 15:00:00 UTC 2014 - kruber@zib.de
 -------------------------------------------------------------------
 Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
 
-- Scalaris 0.7.0
+- Scalaris 0.7.0 (codename "Stauroderus scalaris")
   * Demonstrator "Wiki on Scalaris"
     (supported by 4CaaSt http://www.4caast.eu/
      and Contrail http://contrail-project.eu):

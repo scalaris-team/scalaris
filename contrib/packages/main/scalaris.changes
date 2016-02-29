@@ -1,4 +1,68 @@
 -------------------------------------------------------------------
+Mon Feb 29 16:00:00 UTC 2016 - kruber@zib.de
+
+- Scalaris 0.9.0 (codename "Vriesea scalaris")
+  (partly supported by the EU project IES Cities http://iescities.eu/)
+  * Packaging:
+    - add a libscalaris-dev[el] package with the C++ API (rpm, deb)
+    - Maven: let Maven also create a source jar file for the Java-API
+    - Maven: allow proper snapshot versions for the maven repository at
+             https://scalaris-team.github.io/scalaris/maven
+  * API:
+    - CPP-API: provide a new C++ client library
+    - DataNucleus: provide a new storage back-end for Scalaris
+    - add a Scalaris adapter for YCSB
+    - new functions in all APIs for generic routing table operations
+  * Business Logic:
+    - rrepair: considerably improve the set reconciliation algorithms' performance
+               and run more processes in parallel
+    - rrepair: further reduce the reconciliation costs
+    - rrepair: re-use left-over failure probability from phase 1 for phase 2
+    - rrepair: increase accuracy in several formulaes of the set reconciliation
+               algorithms
+    - rrepair: support creating multiple Merkle trees for fewer message rounds
+               ('rr_merkle_num_trees' configuration variable)
+    - rrepair: remove support for aligning bit sizes (no improvements there)
+    - transactions: speed up write ops when the transaction log already contains
+                    a read op on the same key
+    - RM: optimise the traffic of state exchanges during ring maintenance
+    - RT: improve routing parallelism by handling more messages in the routing
+          process itself instead of inside the dht_node process
+    - RT: improve performance along the routing path
+    - support for dynamic replication factors given by the 'replication_factor'
+      configuration variable
+    - pid_groups: shuffle pids in find_a/1 for more better distributed (parallel)
+                  requests
+  * Infrastructure:
+    - pid_groups: group names are now atoms instead of strings
+                  (allows faster access)
+    - scalarisctl: do not set any default Erlang scheduler flags (allow changes
+                   through the ERL_SCHED_FLAGS environment variable)
+    - extend the example scripts for running Scalaris on a SLURM cluster
+    - add SLURM scripts for running Basho Bench
+    - use configure to select the routing table type (--with-rt=rt_chord)
+    - change hanoidb detection to "configure --enable-hanoidb=<dir>"
+    - change erlang_js detection to "configure --enable-erlang-js=<dir>"
+    - dht_node_monitor: switch messages on/off via configuration variable
+                        'dht_node_monitor'
+    - msg_delay: remove extraneous error messages for trigger messages of killed
+                 processes
+    - prbr: allow write_filter to return value to qwrite calling process
+    - update yaws to version 2.0.2
+    - support for Erlang R14B04 up to 18.2.3 and current otp master
+  * Tests:
+    - allow running single test groups via "make <test suite>:<group name>_GROUP"
+  * Tools:
+    - gen_component: allow processes to provide their own start functions
+    - trace_mpath: write whole message of log_info to the tex output
+  * Bugs:
+    - fix cleanup of some special cases with transactions
+    - fix several math issues and increase the math functions' performance
+    - fix some errors which occurred in large scale deployments
+    - fix several warnings reported by Coverity Scan
+    - fix numerous more bugs
+
+-------------------------------------------------------------------
 Fri Jul 24 10:00:00 UTC 2015 - kruber@zib.de
 
 - Scalaris 0.8.2
@@ -28,7 +92,7 @@ Sun Jul 12 10:00:00 UTC 2015 - kruber@zib.de
 -------------------------------------------------------------------
 Fri Jul 10 10:00:00 UTC 2015 - kruber@zib.de
 
-- Scalaris 0.8.0
+- Scalaris 0.8.0 (codename "Picoides scalaris")
   (partly supported by the EU project IES Cities http://iescities.eu/
   and the EIT ICT Labs project MCData)
   * Packaging:
@@ -158,7 +222,7 @@ Mon Sep 29 15:00:00 UTC 2014 - kruber@zib.de
 -------------------------------------------------------------------
 Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
 
-- Scalaris 0.7.0
+- Scalaris 0.7.0 (codename "Stauroderus scalaris")
   * API:
     - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
   * Demonstrator "Wiki on Scalaris"
