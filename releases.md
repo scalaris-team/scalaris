@@ -640,3 +640,15 @@ and the EIT ICT Labs project MCData)
 
  * fixed countless bugs
 
+
+{{ page.url }}
+
+{{ page.path }}
+
+x{{ base }}x
+
+x{{ depth }}x
+
+{{ page.url | split: '/' | size }}
+
+
