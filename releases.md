@@ -9,7 +9,7 @@ layout: default
 * auto-gen TOC:
 {:toc}
 
-## Scalaris 0.9.0 (codename "Vriesea scalaris") - February 29, 2016
+## Scalaris 0.9.0 (codename "Vriesea scalaris") - February 29, 2016 - [scalaris-0.9.0.tar.gz](http://sourceforge.net/projects/scalaris/files/scalaris-0.9.0.tar.gz/download)
 
 (partly supported by the EU project IES Cities [http://iescities.eu/](http://iescities.eu/))
 
