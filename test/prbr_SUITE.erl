@@ -358,7 +358,6 @@ tester_type_check_rbr(_Config) ->
            ]},
           {replication,
            [ {get_read_value, 2},     %% cannot create funs
-             {collect_read_value, 2}, %% needs client_value matching datatype
              {collect_read_value, 3}  %% needs client_value matching datatype
            ],
            []}

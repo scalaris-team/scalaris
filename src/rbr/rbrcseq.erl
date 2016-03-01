@@ -902,9 +902,9 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
         if SeenWriteRoundNoWTInfo > RLatestSeenNoWTInfo ->
                 T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
-                ReadVal = ?REDUNDANCY:collect_read_value(Val,
-                                             entry_datatype(Entry)),
-                entry_set_val(T2, ReadVal);
+                NewVal = ?REDUNDANCY:collect_newer_read_value(entry_val(T2),
+                                             Val, entry_datatype(Entry)),
+                entry_set_val(T2, NewVal);
            SeenWriteRoundNoWTInfo =:= RLatestSeenNoWTInfo ->
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
@@ -913,15 +913,14 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
-                CurrentVal = entry_val(Entry),
-                NewVal = ?REDUNDANCY:collect_read_value(CurrentVal, Val,
-                                                      entry_datatype(Entry)),
-                T1 = case CurrentVal =:= NewVal of
-                          true  -> Entry;
-                          _     -> entry_set_val(Entry, NewVal)
-                     end,
+                NewVal = ?REDUNDANCY:collect_read_value(entry_val(Entry),
+                                             Val, entry_datatype(Entry)),
+                T1 = entry_set_val(Entry, NewVal),
                 entry_inc_num_newest(T1);
-           true -> Entry
+           true ->
+               NewVal = ?REDUNDANCY:collect_older_read_value(entry_val(Entry),
+                                            Val, entry_datatype(Entry)),
+               entry_set_val(Entry, NewVal)
     end,
     MyRound = erlang:max(entry_my_round(E1), AssignedRound),
     E2 = entry_set_my_round(E1, MyRound),

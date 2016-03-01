@@ -26,7 +26,9 @@
 -export([get_keys/1]).
 -export([write_values_for_keys/2]).
 -export([quorum_accepted/2, quorum_denied/2]).
--export([collect_read_value/2, collect_read_value/3]).
+-export([collect_read_value/3]).
+-export([collect_newer_read_value/3]).
+-export([collect_older_read_value/3]).
 -export([get_read_value/2]).
 
 -spec get_keys(?RT:key()) -> [?RT:key()].
@@ -47,9 +49,13 @@ quorum_denied(_Key, DeniedCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_deny(R) =< DeniedCount.
 
--spec collect_read_value(client_value(), module()) -> client_value().
-collect_read_value(NewValue, _DataType) ->
+-spec collect_newer_read_value(client_value(), client_value(), module()) -> client_value().
+collect_newer_read_value(Collected, NewValue, _DataType) ->
     NewValue.
+
+-spec collect_older_read_value(client_value(), client_value(), module()) -> client_value().
+collect_older_read_value(Collected, NewValue, _DataType) ->
+    Collected.
 
 -spec collect_read_value(client_value(), client_value(), module()) -> client_value().
 collect_read_value(Collected, NewValue, DataType) ->
