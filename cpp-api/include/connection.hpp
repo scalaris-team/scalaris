@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015, 2016 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ namespace scalaris {
       std::array<Json::Value, sizeof...(Args)> arg_list = {{args... }};
 
       Json::Value params = Json::arrayValue;
-      for(int i = 0; i< sizeof...(Args); i++)
+      for(size_t i = 0; i< sizeof...(Args); i++)
         params.append(arg_list[i]);
       return exec_call(methodname, params);
     }
