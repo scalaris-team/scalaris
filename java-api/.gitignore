@@ -1,8 +1,6 @@
 /doc
 /doc-devel
 /doc-doxygen
-/.classpath
-/.project
 /scalaris
 /scalaris-examples.jar
 /chordsharp4j-examples.jar
@@ -22,7 +20,6 @@
 /scalaris.zip
 /scalaris.tar.gz
 /.ant-targets-build.xml
-/.settings
 /junit*.properties
 /junitvmwatcher*.properties
 /scalaris-java.conf

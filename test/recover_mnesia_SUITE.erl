@@ -190,6 +190,9 @@ remove_node(_Config) ->
     %% check data integrity
     ct:pal("check data integrity"),
     _ = check_data_integrity(),
+    %% "repair" replicas
+    ct:pal("repair replicas"),
+    _ = repair_replicas(),
     %% add node to reform ring_size() node ring
     ct:pal("add node"),
     _ = admin:add_nodes(1),
@@ -217,4 +220,16 @@ check_data_integrity() ->
         X ->
             ct:pal("found ~p of 100 elements", [X]),
             100 = X
+    end.
+
+repair_replicas() ->
+    case config:read(replication_factor) rem 2 =:= 1 of
+        true -> %% only repair for odd replication factors
+            io:format("show prbr statistics for the ring~n"),
+            lease_checker2:get_kv_db(),
+            _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+            io:format("show prbr statistics for the ring~n"),
+            lease_checker2:get_kv_db();
+        false ->
+            ok
     end.

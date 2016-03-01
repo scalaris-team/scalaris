@@ -31,10 +31,6 @@
          add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
--export([calc_HF_num/2, calc_HF_numEx/2,
-         calc_least_size_opt/2, calc_least_size/3,
-         calc_FPR/3]).
-
 % for tests:
 -export([get_property/2]).
 -export([p_add_list_v1/4, p_add_list_v2/4, resize/2]).
@@ -45,7 +41,7 @@
 
 -record(bloom, {
                 size          = ?required(bloom, size):: pos_integer(),    %bit-length of the bloom filter - requirement: size rem 8 = 0
-                filter        = <<>>                  :: binary(),         %length = size div 8
+                filter        = <<>>                  :: binary(),         %length = size div 8 (<<>> allowed when empty)
                 hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
                 items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
@@ -62,8 +58,8 @@
 %%      based on the given false positive rate.
 -spec new_fpr(MaxItems::non_neg_integer(), FPR::float()) -> bloom_filter().
 new_fpr(MaxItems, FPR) ->
-    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
-    new_fpr(MaxItems, FPR, Hfs).
+    {K, Size} = calc_HF_num_Size_opt(MaxItems, FPR),
+    new_(Size, ?REP_HFS:new(K)).
 
 %% @doc Creates a new bloom filter with the given hash function set
 %%      based on the given false positive rate.
@@ -85,7 +81,7 @@ new_bpi(MaxItems, BitPerItem, Hfs) ->
 -spec new_bin(Filter::binary(), ?REP_HFS:hfs(), ItemsCount::non_neg_integer())
         -> bloom_filter().
 new_bin(Filter, Hfs, ItemsCount) ->
-    BitSize = erlang:bit_size(Filter),
+    BitSize = erlang:max(erlang:bit_size(Filter), 8),
     ?ASSERT((BitSize rem 8) =:= 0),
     #bloom{size = BitSize, filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
@@ -314,35 +310,36 @@ check_Bits(_, []) ->
 %%       k  = number of hash functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Calculates the optimal number of hash functions for a bloom filter
-%%      with N elements and a false positive probability FP.
--spec calc_HF_numEx(N::non_neg_integer(), FP::float()) -> pos_integer().
-calc_HF_numEx(N, FP) ->
-    M = calc_least_size_opt(N, FP),
-    calc_HF_num(M, N).
-
-%% @doc Calculates optimal number of hash functions for
-%%      an M-bit large BloomFilter with a maximum of N Elements.
--spec calc_HF_num(M::pos_integer(), N::non_neg_integer()) -> K::pos_integer().
-calc_HF_num(M, N) ->
-    K = math:log(2) * M / erlang:max(N, 1),
-    K_Min = util:floor(K),
-    K_Max = util:ceil(K),
-    FP_Min = calc_FPR(M, N, K_Min),
-    FP_Max = calc_FPR(M, N, K_Max),
-    if FP_Min =< FP_Max -> K_Min;
-       true             -> K_Max
+%% @doc Calculates the optimal number of hash functions K and Bloom filter
+%%      size M when K = ln(2)*M/N and M = N * log_2(1/FP) / ln(2) (aligned to
+%%      full bytes) with N elements and a false positive probability FP.
+-spec calc_HF_num_Size_opt(N::non_neg_integer(), FP::float())
+        -> {K::pos_integer(), M::pos_integer()}.
+calc_HF_num_Size_opt(N, FP) ->
+    K0 = - util:log2(FP), % = log_2(1 / FP)
+    K_Min = util:floor(K0),
+    K_Max = util:ceil(K0),
+    M_Min = resize(calc_least_size(N, FP, K_Min), 8),
+    M_Max = resize(calc_least_size(N, FP, K_Max), 8),
+    FPR_Min = calc_FPR(M_Min, N, K_Min),
+    FPR_Max = calc_FPR(M_Max, N, K_Max),
+    % unfortunately, we can't ensure the following two conditions due to
+    % floating point precision issues near 1 in both calc_least_size/3 and calc_FPR/3
+    % instead, use the best fitting option (see below)
+    %?DBG_ASSERT(FPR_Min =< FP),
+    %?DBG_ASSERT(FPR_Max =< FP),
+%%     log:pal("Bloom (~g): K=~B, M=~B (FP=~g) vs. K=~B, M=~B (FP=~g)",
+%%             [FP, K_Min, M_Min, FPR_Min, K_Max, M_Max, FPR_Max]),
+    if FPR_Min =< FP andalso FPR_Max =< FP ->
+           if M_Min < M_Max -> {K_Min, M_Min};
+              M_Min =:= M_Max andalso FPR_Min < FPR_Max -> {K_Min, M_Min};
+              true -> {K_Max, M_Max}
+           end;
+       FPR_Min =< FP andalso FPR_Max > FP -> {K_Min, M_Min};
+       FPR_Min > FP andalso FPR_Max =< FP -> {K_Max, M_Max};
+       FPR_Min > FP andalso FPR_Max > FP andalso FPR_Max > FPR_Min -> {K_Min, M_Min};
+       FPR_Min > FP andalso FPR_Max > FP -> {K_Max, M_Max}
     end.
-
-%% @doc Calculates the number of bits needed by a bloom filter to have a false
-%%      positive probability of FP using up to N elements and the optimal
-%%      number of hash functions K = ln(2)*M/N.
-%%      M = N * log_2(1/FP) / ln(2) = - N * log_2(FP) / ln(2)
--spec calc_least_size_opt(N::non_neg_integer(), FP::float()) -> M::pos_integer().
-calc_least_size_opt(_N, FP) when FP == 0 -> 1;
-calc_least_size_opt(0, _FP) -> 1;
-calc_least_size_opt(N, FP) ->
-    util:ceil(- N * util:log2(FP) / math:log(2)).
 
 %% @doc Calculates the number of bits needed by a bloom filter to have a false
 %%      positive probability of FP using K hash functions and up to N-Elements.
@@ -352,15 +349,25 @@ calc_least_size_opt(N, FP) ->
 calc_least_size(_N, FP, _K) when FP == 0 -> 1;
 calc_least_size(0, _FP, _K) -> 1;
 calc_least_size(N, FP, K) ->
-    util:ceil(1 / (1 - (math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))).
+    % util:ceil(1 / (1 - math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))
+    util:ceil(1 / util:pow1p(1 - math:pow(FP, 1 / K), 1 / (K * N))).
 
 %% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
 %%      and a maximum number of N elements.
 %%      FP = (1-(1-1/M)^(K*N))^K
 -spec calc_FPR(M::pos_integer(), N::non_neg_integer(), K::pos_integer())
         -> FP::float().
+calc_FPR(_M, 0, _K) ->
+    0.0;
+calc_FPR(1, _N, _K) ->
+    1.0;
 calc_FPR(M, N, K) ->
-    math:pow(1 - math:pow(1 - 1/M, K * N), K).
+    %math:pow(1 - math:pow(1 - 1/M, K * N), K).
+    % more precise version taking floating point precision near 1 into acccount:
+    Inner = -math:exp(K * N * util:log1p(-1 / M)),
+    if Inner == -1.0 -> 0.0;
+       true -> math:exp(K * util:log1p(Inner))
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helper functions

@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.2+git
+%define pkg_version 0.9.0+git
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
@@ -17,7 +17,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
 BuildRequires:  screen
-Requires:       screen
+Requires:       screen net-tools
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -25,9 +25,14 @@ Requires:       screen
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
+Requires:       which
 %if 0%{?fedora_version} >= 19
 BuildRequires:  erlang-js
 Requires:       erlang-js
+%endif
+%if 0%{?fedora_version} >= 22
+BuildRequires:  hostname
+Requires:       hostname
 %endif
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
@@ -59,6 +64,11 @@ Requires:       sudo
 %if 0%{?suse_version}
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
+%if 0%{?suse_version} >= 1310
+Requires:       which
+%else
+Requires:       util-linux
+%endif
 %if 0%{?suse_version} >= 1110
 BuildRequires:  erlang-erlang_js
 Requires:       erlang-erlang_js
@@ -132,6 +142,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_systemd}
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+# setup SELinux policies
 cd contrib/systemd
 sed -e "s|/var/lib/scalaris|%{scalaris_home}|g" \
     -i scalaris.fc
@@ -239,8 +250,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_docdir}/scalaris/LICENSE
 %{_docdir}/scalaris/ChangeLog
 %{_bindir}/scalarisctl
-%{_prefix}/lib//scalaris
-%exclude %{_prefix}/lib//scalaris/docroot/doc
+%{_prefix}/lib/scalaris
+%exclude %{_prefix}/lib/scalaris/docroot/doc
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service

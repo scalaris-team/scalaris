@@ -1,4 +1,4 @@
-%  @copyright 2008-2014 Zuse Institute Berlin
+%  @copyright 2008-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.8.2+git").
+-define(SCALARIS_VERSION, "0.9.0+git").
 
 %% The RT macro is defined by the --with-rt configure parameter and determines
 %% which kind of routingtable is used.
@@ -124,7 +124,7 @@
                        trace_mpath:start(_ScalPState),
                        ok;
                    _ ->
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE})
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv})
                end,
                Y;
             X -> Y

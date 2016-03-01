@@ -5,7 +5,7 @@
 # scalaris maven repo
 url="git@github.com:scalaris-team/scalaris.git"
 # maven repo checkout folder
-folder=".maven"
+folder="../.maven"
 
 checkout () {
     # check out if maven folder doesn't exist
@@ -44,6 +44,7 @@ commit () {
     if [[ ${answer} == "y" ]]; then
         cd "${folder}"
         git add maven
+        git commit
         git push
         cd - >/dev/null
     fi

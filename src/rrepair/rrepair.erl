@@ -55,7 +55,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -export([start_link/1, init/1, on/2, check_config/0,
-         select_sync_node/2]).
+         select_sync_node/2,
+         session_get/2]).
 
 -export_type([session_id/0, session/0]).
 
@@ -105,7 +106,8 @@
     % internal
     {rr_trigger} |
     {rr_gc_trigger} |
-    {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
+    {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(),
+     {get_state_response, [{my_range, intervals:interval()} | {load, non_neg_integer()},...]}} |
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id(), ReqMsg::rr_recon:request()} |
     {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     % misc
@@ -181,10 +183,11 @@ on({rr_gc_trigger} = Msg, State = #rrepair_state{ open_sessions = Sessions }) ->
     msg_delay:send_trigger(Elapsed div 1000, Msg),
     State#rrepair_state{ open_sessions = NewSessions };
 
-on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}}, State) ->
+on({start_sync, get_range, SessionId, Method, DestKey,
+    {get_state_response, [{my_range, MyI}, {load, MyLoad}]}}, State) ->
     Msg = {?send_to_group_member, rrepair,
            {start_recon, comm:this(), SessionId,
-            {create_struct, Method, MyI}}},
+            {create_struct, Method, MyI, MyLoad}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI, true);
                _ -> DestKey
@@ -327,7 +330,7 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
     This0 = comm:this(),
     S = new_session(Round, This0, Method, Principal),
     This = comm:reply_as(This0, 6, {start_sync, get_range, S#session.id, Method, DestKey, '_'}),
-    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, my_range}),
+    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, [my_range, load]}),
     State#rrepair_state{ round = next_round(Round),
                          open_recon = OpenRecon + 1,
                          open_sessions = [S | Sessions] }.
@@ -434,6 +437,27 @@ init([]) ->
     end,
     msg_delay:send_trigger(get_gc_interval(), {rr_gc_trigger}),
     #rrepair_state{}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% API functions for the session record
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec session_get(id, session())          -> session_id();
+                 (principal, session())   -> principal_id();
+                 (rc_method, session())   -> rr_recon:method();
+                 (rc_stats, session())    -> rr_recon_stats:stats() | none;
+                 (rs_stats, session())    -> rr_resolve:stats() | none;
+                 (rs_expected, session()) -> non_neg_integer();
+                 (rs_finish, session())   -> non_neg_integer();
+                 (ttl, session())         -> pos_integer().
+session_get(id         , #session{id          = X}) -> X;
+session_get(principal  , #session{principal   = X}) -> X;
+session_get(rc_method  , #session{rc_method   = X}) -> X;
+session_get(rc_stats   , #session{rc_stats    = X}) -> X;
+session_get(rs_stats   , #session{rs_stats    = X}) -> X;
+session_get(rs_expected, #session{rs_expected = X}) -> X;
+session_get(rs_finish  , #session{rs_finish   = X}) -> X;
+session_get(ttl        , #session{ttl         = X}) -> X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling

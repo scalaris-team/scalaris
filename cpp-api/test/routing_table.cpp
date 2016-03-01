@@ -33,8 +33,8 @@ BOOST_AUTO_TEST_SUITE(RoutingTableSuite)
 
 BOOST_AUTO_TEST_CASE( get_replication_factor )
 {
-  Connection c("localhost", "8000");
-  RoutingTable rt(c);
+  Connection c = { "localhost" } ;
+  RoutingTable rt = { c };
   int r = rt.get_replication_factor();
   BOOST_CHECK(r > 0);
 }

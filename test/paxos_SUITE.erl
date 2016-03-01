@@ -1,4 +1,4 @@
-%  @copyright 2008-2015 Zuse Institute Berlin
+%  @copyright 2008-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -231,11 +231,11 @@ test_two_proposers(_Config) ->
     ok.
 
 %% userdevguide-begin paxos_SUITE:random_interleaving_test
--spec prop_rnd_interleave(1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()})
+-spec prop_rnd_interleave(1..4, 4..16)
         -> true.
-prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
-    ct:pal("Called with: paxos_SUITE:prop_rnd_interleave(~p, ~p, ~p).~n",
-           [NumProposers, NumAcceptors, Seed]),
+prop_rnd_interleave(NumProposers, NumAcceptors) ->
+    ct:pal("Called with: paxos_SUITE:prop_rnd_interleave(~p, ~p).~n",
+           [NumProposers, NumAcceptors]),
     Majority = NumAcceptors div 2 + 1,
     {Proposers, Acceptors, Learners} =
         make(NumProposers, NumAcceptors, 1, rnd_interleave),
@@ -256,13 +256,8 @@ prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
                                 comm:this(), cpaxidrndinterl)
             || X <- Learners],
     %% randomly step through protocol
-    OldSeed = random:seed(Seed),
     Steps = step_until_decide(Proposers ++ Acceptors ++ Learners, cpaxidrndinterl, 0),
     ct:pal("Needed ~p steps~n", [Steps]),
-    _ = case OldSeed of
-            undefined -> ok;
-            _ -> random:seed(OldSeed)
-        end,
     _ = [ gen_component:kill(comm:make_local(X))
           || X <- lists:flatten([Proposers, Acceptors, Learners])],
     true.
@@ -275,7 +270,7 @@ step_until_decide(Processes, PaxId, SumSteps) ->
             ct:pal("No runnable processes of ~p~n", [length(Processes)]),
             timer:sleep(5), step_until_decide(Processes, PaxId, SumSteps);
         _ ->
-            Num = random:uniform(length(Runnable)),
+            Num = randoms:uniform(length(Runnable)),
             _ = gen_component:bp_step(comm:make_local(lists:nth(Num, Runnable))),
             receive
                 {learner_decide, cpaxidrndinterl, _, _Res} = _Any ->
@@ -287,4 +282,4 @@ step_until_decide(Processes, PaxId, SumSteps) ->
 %% userdevguide-end paxos_SUITE:random_interleaving_test
 
 test_rnd_interleave(_Config) ->
-    tester:test(paxos_SUITE, prop_rnd_interleave, _Params = 3, _Iter = 100).
+    tester:test(paxos_SUITE, prop_rnd_interleave, _Params = 2, _Iter = 100).

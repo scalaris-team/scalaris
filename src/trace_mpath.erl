@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin
+% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@
 -export([log_info/2, log_info/3]).
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
+-export([get_msg_tag/1]).
 
 %% useful in e.g. filter funs
 -export([normalize_pidinfo/1]).
@@ -487,7 +488,7 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX0) ->
     file:close(File).
 
 term_to_latex_string(Term) ->
-    quote_latex(lists:flatten(io_lib:format("~p", [Term]))).
+    quote_latex(lists:flatten(io_lib:format("~0.0p", [Term]))).
 
 quote_latex([]) -> [];
 quote_latex([Char | Tail]) ->
@@ -496,8 +497,9 @@ quote_latex([Char | Tail]) ->
             $_ ->  "\\_";
             ${ ->  "\\{";
             $} ->  "\\}";
-            $[ ->  "\\[";
-            $] ->  "\\]";
+%%            $[ ->  "\\[";
+%%            $] ->  "\\]";
+            $# ->  "\\#";
             %% $< ->  lists:reverse("$\lt$");
             %% $> ->  lists:reverse("$\gt$");
             _ -> [Char]
@@ -677,8 +679,7 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
             EventTime = element(2, X),
             io:format(
               File, "\\draw [color=blue] (~fcm, -~f) ++(0, 0.1cm) node[rotate=60, anchor=west, inner sep=1pt] {\\tiny ~s}-- ++(0, -0.2cm);~n",
-              [EventTime/ScaleX, SrcNum/2, term_to_latex_string(get_msg_tag(element(5, X)))]),
-            %% not yet implemented
+              [EventTime/ScaleX, SrcNum/2, term_to_latex_string(element(5, X))]),
             DrawTrace
     end,
     draw_messages(File, Nodes, ScaleX, HaveRealTime, RemainingTrace).

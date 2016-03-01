@@ -25,9 +25,9 @@
 -record(scenario,
         {
          ring_type                  :: ring_type(),
-         data_distribution          :: data_distribution(),
-         data_failure_type          :: db_generator:failure_type(),
-         fail_distribution          :: fail_distribution(),
+         data_distribution          :: data_distribution() | undefined, % undefined only temporary!
+         data_failure_type          :: db_generator:failure_type() | undefined, % undefined only temporary!
+         fail_distribution          :: fail_distribution() | undefined, % undefined only temporary!
          data_type                  :: db_generator:db_type(),
          trigger_prob       = 100   :: 0..100
         }).
@@ -56,8 +56,7 @@
                     merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),
                     art_corr_factor = 2                                  :: non_neg_integer(),
                     art_leaf_fpr    = 0.1                                :: float(),
-                    art_inner_fpr   = 0.01                               :: float(),
-                    align_to_bytes  = true                               :: boolean()
+                    art_inner_fpr   = 0.01                               :: float()
                    }).
 -type rc_config() :: #rc_config{}.
 

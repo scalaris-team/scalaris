@@ -74,7 +74,7 @@ function start_servers() {
     VM_IDX=1
     JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
     # start first node on head node
-    $BINDIR/scalarisctl -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first start
+    $BINDIR/scalarisctl -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first  ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
     let VM_IDX+=1
 
     ## @todo use auto-binding
@@ -86,7 +86,7 @@ function start_servers() {
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
         JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining start
+        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
         let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1
@@ -96,18 +96,18 @@ function start_servers() {
 function wait_for_servers_to_start {
     let NR_OF_NODES=$SLURM_JOB_NUM_NODES\*$VMS_PER_NODE\*$DHT_NODES_PER_VM
     for NODE in `scontrol show hostnames`; do
-        RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
+        RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 $EPMD -names | grep " at port " | wc -l`
         while [ $RUNNING_NODES -ne $VMS_PER_NODE ]
         do
-            RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 epmd -names | grep " at port " | wc -l`
+            RUNNING_NODES=`srun --nodelist=$NODE -N1 --ntasks-per-node=1 $EPMD -names | grep " at port " | wc -l`
         done
     done
 
     # wait for the first VM to start
-    NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+    NR_OF_FIRSTS=`$EPMD -names | grep 'name first at port' | wc -l`
     while [ $NR_OF_FIRSTS -ne 1 ]
     do
-        NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
+        NR_OF_FIRSTS=`$EPMD -names | grep 'name first at port' | wc -l`
     done
     # wait for the first VM to initialize
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', api_vm, wait_for_scalaris_to_start, []), io:format('waited for scalaris: ~p~n', [A]), halt(0)."
@@ -130,7 +130,7 @@ function start_collectl(){
 
     # collectl will be started in a screen session which will be cleaned up by the watchdog
     srun -N$SLURM_NNODES screen -S "scalaris_collectl_SLURM_JOBID_${SLURM_JOBID}" -d -m \
-        bash -c "collectl -f $COLLECTL_DIR -i5 -F0; sleep 365d"
+        bash -c "collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $COLLECTL_DIR; sleep 365d"
 }
 
 fix_known_hosts

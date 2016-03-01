@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,7 +31,8 @@ all()   -> [
             tester_type_check_rbr,
             rbr_concurrency_kv,
             rbr_concurrency_leases,
-            rbr_consistency
+            rbr_consistency,
+            rbr_consistency_delete
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -140,11 +141,11 @@ rbr_concurrency_leases(_Config) ->
         end,
     New = l_on_cseq:unittest_create_lease(Key),
     DB = rbrcseq:get_db_for_id(lease_db, Key),
-    rbrcseq:qwrite(DB, self(), Key,
+    rbrcseq:qwrite(DB, self(), Key, l_on_cseq,
                    ContentCheck,
                    New),
     receive
-        {qwrite_done, _ReqId, _Round, _} -> ok
+        {qwrite_done, _ReqId, _Round, _, _} -> ok
     end,
 
     Parallel = randoms:rand_uniform(4, 11),
@@ -165,7 +166,7 @@ rbr_concurrency_leases(_Config) ->
                               F = fun(X) ->
                                           {ok, V} = l_on_cseq:read(Key),
                                           Update =
-                                              l_on_cseq:unittest_lease_update(
+                                              l_on_cseq:unittest_lease_update_unsafe(
                                                 V,
                                                 l_on_cseq:set_version(
                                                   V, l_on_cseq:get_version(V)+1), passive),
@@ -231,6 +232,53 @@ rbr_consistency(_Config) ->
 
     ok.
 
+rbr_consistency_delete(_Config) ->
+    %% create an rbr entry
+    %% update 1 to 3 of its replicas
+    %% perform read in all quorum permutations
+    %% (intercept read on a single dht node)
+    %% output must be the old value or the new value
+    %% if the new value was seen once, the old must not be readable again.
+
+    %% Nodes = pid_groups:find_all(dht_node),
+    Key = "a",
+
+    %% initialize key
+    {ok} = kv_on_cseq:write(Key, 1),
+
+    %% select a replica
+    Replicas = ?RT:get_replica_keys(?RT:hash_key(Key)),
+
+%%    print modified rbr entries
+%%    api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
+
+    ct:pal("Starting delete test~n"),
+
+
+    Res = [ begin
+                ct:pal("Read iteration: ~p~n", [R]),
+
+                {ok, Old} = kv_on_cseq:read(Key),
+
+                delete_rbr_entry_at_key(R),
+                Next = Old + 1,
+
+                ct:pal("Write in iteration: ~p~n", [R]),
+                _ = kv_on_cseq:write(Key, Next),
+
+                %% ct:pal("After modification:"),
+                %% print modified rbr entries
+                %% api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
+
+                ct:pal("Reread in iteration: ~p~n", [R]),
+                {ok, Next} = kv_on_cseq:read(Key)
+          end || R <- Replicas],
+
+    ct:pal("Result: ~p~n", [Res]),
+    ok.
+
+
+
 tester_type_check_rbr(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
@@ -252,6 +300,7 @@ tester_type_check_rbr(_Config) ->
           },
           {tx_tm,
            [{start_link, 2},       %% starts processes
+            {start_gen_component,5}, %% unsupported types
             {init, 1},             %% needs to be pid_group member
             {on, 2},               %% needs valid messages
             {on_init, 2},          %% needs valid messages
@@ -280,32 +329,39 @@ tester_type_check_rbr(_Config) ->
              {on, 2},               %% sends messages
              {get_load, 1},         %% needs valid ets:tid()
              {set_entry, 2},        %% needs valid ets:tid()
+             {get_entry, 2},        %% needs valid ets:tid()
+             {delete_entry, 2},     %% needs valid ets:tid()
              {tab2list, 1},         %% needs valid ets:tid()
              {tab2list_raw_unittest, 1} %% needs valid ets:tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
-             {msg_write_reply, 5}, %% sends messages
+             {msg_write_reply, 6}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
-             {get_entry, 2},       %% needs valid ets:tid()
              {tab2list_raw, 1}     %% needs valid ets:tid()
             ]},
           {rbrcseq,
            [ {on, 2},          %% sends messages
-             {qread, 3},       %% tries to create envelopes
-             {qread, 4},       %% needs fun as input
+             {qread, 4},       %% tries to create envelopes
+             {qread, 5},       %% needs fun as input
              {start_link, 3},  %% needs fun as input
-             {qwrite, 5},      %% needs funs as input
-             {qwrite, 7},      %% needs funs as input
-             {qwrite_fast, 7}, %% needs funs as input
-             {qwrite_fast, 9}  %% needs funs as input
+             {start_gen_component,5}, %% unsupported types
+             {qwrite, 6},      %% needs funs as input
+             {qwrite, 8},      %% needs funs as input
+             {qwrite_fast, 8}, %% needs funs as input
+             {qwrite_fast, 10}  %% needs funs as input
            ],
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid ets:tid()
              {set_entry, 2},     %% needs valid ets:tid()
              {add_read_reply, 6},%% needs client_value matching db_type
              {add_write_reply, 3}%% needs valid entry()
-           ]
-          }
+           ]},
+          {replication,
+           [ {get_read_value, 2},     %% cannot create funs
+             {collect_read_value, 2}, %% needs client_value matching datatype
+             {collect_read_value, 3}  %% needs client_value matching datatype
+           ],
+           []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
@@ -324,7 +380,7 @@ modify_rbr_at_key(R, N) ->
                    LookupReadEnvelope = dht_node_lookup:envelope(
                                           4,
                                           {prbr, read, kv_db, '_', comm:this(),
-                                           Repl, unittest_rbr_consistency1_id,
+                                           Repl, kv_on_cseq, unittest_rbr_consistency1_id,
                                            fun prbr:noop_read_filter/1}),
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
@@ -340,7 +396,7 @@ modify_rbr_at_key(R, N) ->
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
                             {prbr, write, kv_db, '_', comm:this(),
-                             R, HighestRound,
+                             R, kv_on_cseq, HighestRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
                              fun prbr:noop_write_filter/3}),
@@ -348,9 +404,15 @@ modify_rbr_at_key(R, N) ->
     comm:send_local(pid_groups:find_a(dht_node),
                     {?lookup_aux, R, 0, LookupWriteEnvelope}),
     receive
-        {write_reply, _, R, _, _NextRound} ->
+        {write_reply, _, R, _, _NextRound, _} ->
             ok
     end.
+
+delete_rbr_entry_at_key(R) ->
+    comm:send_local(pid_groups:find_a(dht_node),
+                    {?lookup_aux, R, 0,
+                    {prbr, delete_key, kv_db, self(), R}}),
+    receive {delete_key_reply, R} -> ok end.
 
 drop_prbr_read_request(Client, Tag) ->
     fun (Message, _State) ->

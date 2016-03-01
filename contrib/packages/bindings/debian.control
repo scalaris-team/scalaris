@@ -2,21 +2,21 @@ Source: scalaris-bindings
 Section: devel
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, openjdk-7-jdk | java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev, automake, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35)
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, openjdk-7-jdk | java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev, automake, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35), libboost-program-options-dev (>= 1.35)
 Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
 Package: scalaris-java
 Section: java
 Architecture: all
-Depends: ${misc:Depends}, java6-runtime
+Depends: ${misc:Depends}, debianutils, hostname, java6-runtime
 Description: Java-API and Java-Client for Scalaris
  Java Bindings and command line client for Scalaris.
 
 Package: libscalaris-dev
 Section: devel
 Architecture: any
-Depends: ${misc:Depends}, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35)
+Depends: ${misc:Depends}, libboost-dev (>= 1.35), libboost-regex-dev (>= 1.35), libboost-system-dev (>= 1.35), libboost-test-dev (>= 1.35), libboost-program-options-dev (>= 1.35)
 Description: C++-API for Scalaris
  C++ Bindings for Scalaris.
 

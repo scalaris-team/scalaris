@@ -25,11 +25,11 @@ BINDIR=@bindir@
 # /etc/scalaris/
 ETCDIR=@sysconfdir@/scalaris
 # /lib/scalaris/
-SCALARISDIR=@libdir@/scalaris
+SCALARISDIR=${prefix}/lib/scalaris/
 # /lib/scalaris/ebin
-BEAMDIR=@libdir@/scalaris/ebin
+BEAMDIR=${SCALARISDIR}/ebin
 # /lib/scalaris/docroot
-DOCROOTDIR=$SCALARISDIR/docroot
+DOCROOTDIR=${SCALARISDIR}/docroot
 # /share/doc/scalaris
 DOCDIR=@docdir@
 # /share/java
@@ -124,6 +124,7 @@ fix_paths() {
         SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris"
         SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris"
         SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris"
+        SCALARISCLIENT_CPP="$SCALARISDIR/cpp-api/scalaris"
     fi
 }
 
@@ -380,7 +381,7 @@ checkinstallation() {
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -sasl sasl_error_logger false -boot start_sasl \
-        -eval "ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0)." 2>&1`
+        -eval "ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0)."  > /dev/null 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
@@ -397,7 +398,7 @@ checkinstallation() {
     # test runtime
     if [ -z "$yaws_port" ]; then
         echo "  NOTE: yaws port not specified (you can specify it using -y <port> for $0)."
-        echo "        Python, Python3, Ruby API tests may fail if the port is different in"
+        echo "        Python, Python3, Ruby, C++ API tests may fail if the port is different in"
         echo "        one of the config files."
     else
         export SCALARIS_JSON_URL="http://localhost:$yaws_port" # for single operations
@@ -443,11 +444,6 @@ checkinstallation() {
       fi
     done
 
-    # bench parameters:
-    BENCH_NR_OPS=10
-    BENCH_TPN=1 # threads per node
-    BENCH_TESTS=all
-
     # testing Java:
     echo -n "  Java-API ... "
     if [ "$HAS_JAVACLIENT" -eq 1 ]; then
@@ -469,13 +465,7 @@ checkinstallation() {
         JAVAREAD2_FAILED=$?
         JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD2_OUTPUT"`
 
-        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        JAVABENCH_OUTPUT=`$SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        JAVABENCH_FAILED=$?
-        echo "$JAVABENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && JAVABENCH_FAILED=1
-        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVABENCH_OUTPUT"`
-
-        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
+        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 ]; then
             JAVA_FAILED=1
             JAVA_RESULT="$MSG_FAILED"
         else
@@ -512,13 +502,7 @@ checkinstallation() {
         PYTHONREAD2_FAILED=$?
         PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD2_OUTPUT"`
 
-        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        PYTHONBENCH_OUTPUT=`$SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        PYTHONBENCH_FAILED=$?
-        echo "$PYTHONBENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHONBENCH_FAILED=1
-        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONBENCH_OUTPUT"`
-
-        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
+        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 ]; then
             PYTHON_FAILED=1
             PYTHON_RESULT="$MSG_FAILED"
         else
@@ -555,13 +539,7 @@ checkinstallation() {
         PYTHON3READ2_FAILED=$?
         PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ2_OUTPUT"`
 
-        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
-        PYTHON3BENCH_OUTPUT=`$SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
-        PYTHON3BENCH_FAILED=$?
-        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHON3BENCH_FAILED=1
-        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3BENCH_OUTPUT"`
-
-        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
+        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 ]; then
             PYTHON3_FAILED=1
             PYTHON3_RESULT="$MSG_FAILED"
         else
@@ -625,10 +603,55 @@ checkinstallation() {
         echo "$RUBY_OUTPUT"
     fi
 
+    # testing C++:
+    echo -n "  C++ API ... "
+    if [ -f "$SCALARISCLIENT_CPP" ]; then
+        CPP_OUTPUT=`echo -e "> $SCALARISCLIENT_CPP --help"`
+        CPPHELP_OUTPUT=`$SCALARISCLIENT_CPP --help 2>&1`
+        CPPHELP_FAILED=$?
+        if [ $CPPHELP_FAILED -eq 0 ]; then
+            # simple read/write
+            KEY="checkinstallation-cpp-$RANDOM"
+            CPP_OUTPUT=`echo -e "> $SCALARISCLIENT_CPP --read ${KEY}"`
+            CPPREAD1_OUTPUT=`$SCALARISCLIENT_CPP --read ${KEY} 2>&1`
+            echo "$CPPREAD1_OUTPUT" | grep "ReadFailedError" > /dev/null 2>&1
+            CPPREAD1_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD1_OUTPUT"`
+
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --write ${KEY},1"`
+            CPPWRITE1_OUTPUT=`$SCALARISCLIENT_CPP --write ${KEY},1 2>&1`
+            CPPWRITE1_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPWRITE1_OUTPUT"`
+
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n> $SCALARISCLIENT_CPP --read ${KEY}"`
+            CPPREAD2_OUTPUT=`$SCALARISCLIENT_CPP --read ${KEY} 2>&1`
+            CPPREAD2_FAILED=$?
+            CPP_OUTPUT=`echo -e "$CPP_OUTPUT\n$CPPREAD2_OUTPUT"`
+
+            if [ $CPPREAD1_FAILED -ne 0 -o $CPPWRITE1_FAILED -ne 0 -o $CPPREAD2_FAILED -ne 0 ]; then
+                CPP_FAILED=1
+                CPP_RESULT="$MSG_FAILED"
+            else
+                CPP_FAILED=0
+                CPP_RESULT="$MSG_SUCCESS"
+            fi
+        else
+            CPP_FAILED=1
+            CPP_RESULT="$MSG_FAILED"
+        fi
+    else
+        CPP_FAILED=0
+        CPP_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$CPP_RESULT"
+    if [ "$verbose" -eq 1 -o "$CPP_FAILED" -ne 0 ]; then
+        echo "$CPP_OUTPUT"
+    fi
+
     $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
 
     if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
-         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
+         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 -o "$CPP_FAILED" -ne 0 ]; then
         exit 1
     fi
 

@@ -1,5 +1,7 @@
 export SCALARIS_LOCAL=${SCALARIS_LOCAL:-false}
 export SCALARIS_SRC=${SCALARIS_SRC:-$HOME/scalaris}
+# exports EPMD=... with to the Erlang version set through ./configure
+export $(grep 'EPMD=' $SCALARIS_SRC/bin/scalarisctl)
 if [[ $SCALARIS_LOCAL = true ]]; then
     export SCALARIS_DIR="/local/$(whoami)/scalaris"
 else
@@ -8,12 +10,19 @@ fi
 export VMS_PER_NODE=${VMS_PER_NODE:-1}
 export DHT_NODES_PER_VM=${DHT_NODES_PER_VM:-1}
 export ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS:-""}
+export SCALARISCTL_PARAMS=${SCALARISCTL_PARAMS:-""} # additional params for scalarisctl
+
 export COLLECTL=${COLLECTL:-"false"}
 
 export ETCDIR=$SCALARIS_DIR/bin
 export BINDIR=$SCALARIS_DIR/bin
 export BEAMDIR=$SCALARIS_DIR/ebin
 export COLLECTL_DIR=${COLLECTL_DIR:-"$(pwd)/collectl/"}
+
+# collectl arguments
+export COLLECTL_SUBSYSTEMS=${COLLECTL_SUBSYSTEMS:-"-s cmnd"}
+export COLLECTL_INTERVAL=${COLLECTL_INTERVAL:-"-i 10"}
+export COLLECTL_FLUSH=${COLLECTL_FLUSH:-"-F 0"}
 
 export SHUFFLE_NODE_IDS=1
 export WATCHDOG_INTERVAL=10
@@ -63,10 +72,9 @@ function print_env() {
 }
 
 check_compile(){
-    local curdir=$(pwd)
-    cd $SCALARIS_DIR
+    pushd $SCALARIS_DIR >/dev/null
     local res=$(erl -pa contrib/yaws -pa ebin -noinput +B -eval 'R=make:all([noexec]), halt(0).')
-    cd $curdir
+    popd >/dev/null
     if [[ -n $res ]]; then
         echo "Scalaris binaries do not match source version:"
         echo $res

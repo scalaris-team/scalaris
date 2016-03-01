@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.2+git
+%define pkg_version 0.9.0+git
 Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -23,6 +23,10 @@ BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-comp
 BuildRequires:  pkgconfig
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 %define with_cpp 1
+# our cpp-api currently only provides a static library for which
+# find-debuginfo.sh cannot find the debug infos, see
+# https://fedoraproject.org/wiki/Packaging:Debuginfo
+%global debug_package %{nil}
 BuildRequires:  ruby(release) >= 1.8
 %else
 %define with_cpp 0
@@ -124,6 +128,12 @@ implemented in Erlang.
 Summary:    Java-API and Java-Client for Scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
+Requires:   net-tools
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version} || 0%{?suse_version} >= 1310
+Requires:       which
+%else
+Requires:       util-linux
+%endif
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else
@@ -154,6 +164,9 @@ Requires:   ruby(abi) >= 1.8
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.1
+# Drag in the pure Ruby implementation too, so that jruby has something to
+# fall back to: https://bugzilla.redhat.com/show_bug.cgi?id=1219502
+Requires:   rubygem-json_pure >= 1.4.1
 
 %description -n ruby-scalaris
 Ruby bindings and Ruby command line client for Scalaris
@@ -193,6 +206,9 @@ Python3 bindings and Python3 command line client for Scalaris
 
 %build
 export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
+
+export CFLAGS="%{optflags}"
+export CXXFLAGS=$CFLAGS
 
 %if 0%{?fedora_version} >= 18
 export PATH="%{_bindir}:$PATH"

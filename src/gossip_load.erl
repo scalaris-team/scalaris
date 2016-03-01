@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  @copyright 2008-2014 Zuse Institute Berlin
+%  @copyright 2008-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1500,7 +1500,7 @@ tester_create_histogram(ListOfAvgs) ->
     Buckets = intervals:split(intervals:all(), no_of_buckets()),
     Histo1 = [ {BucketInterval, {}} || BucketInterval <- Buckets],
     Fun = fun ({BucketInterval, {}}) -> {BucketInterval,
-                lists:nth(random:uniform(length(ListOfAvgs)), ListOfAvgs)} end,
+                lists:nth(randoms:uniform(length(ListOfAvgs)), ListOfAvgs)} end,
     lists:map(Fun, Histo1).
 
 -spec tester_create_histogram_size(1..50) -> histogram_size().

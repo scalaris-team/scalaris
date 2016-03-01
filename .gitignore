@@ -41,3 +41,5 @@ Session.vim
 /contrib/erlang_js
 contrib/slurm/slurm-*.out
 /java-api/target
+/cpp-api/scalaris
+/.maven

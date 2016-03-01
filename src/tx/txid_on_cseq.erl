@@ -50,8 +50,6 @@
 
 -export_type([txid/0]).
 
--include("gen_component.hrl").
-
 -spec read(txid(), comm:erl_local_pid()) -> ok.
 read(Key, ReplyTo) ->
     %% decide which db is responsible, ie. if the key is from
@@ -59,14 +57,14 @@ read(Key, ReplyTo) ->
     %% quarter -> use lease_db2, ...
     DB = rbrcseq:get_db_for_id(tx_id, Key),
     %% perform qread
-    rbrcseq:qread(DB, ReplyTo, Key).
+    rbrcseq:qread(DB, ReplyTo, Key, ?MODULE).
 
 -spec new(txid(), [client_key()], comm:erl_local_pid()) -> ok.
 new(Key, InvolvedKeys, ReplyTo) ->
     DB = rbrcseq:get_db_for_id(tx_id, Key),
     Value = new_entry(Key, InvolvedKeys, comm:make_global(ReplyTo)),
     RBRCseqPid = comm:make_global(pid_groups:find_a(DB)),
-    rbrcseq:qwrite_fast(DB, ReplyTo, Key,
+    rbrcseq:qwrite_fast(DB, ReplyTo, Key, ?MODULE,
                         fun txid_on_cseq:is_valid_new/3, Value,
                         pr:smallest_round(RBRCseqPid), prbr_bottom).
 
@@ -74,14 +72,14 @@ new(Key, InvolvedKeys, ReplyTo) ->
              pr:pr(), any()) -> ok.
 decide(Key, Decision, ReplyTo, Round, OldVal) ->
     DB = rbrcseq:get_db_for_id(tx_id, Key),
-    rbrcseq:qwrite_fast(DB, ReplyTo, Key,
+    rbrcseq:qwrite_fast(DB, ReplyTo, Key, ?MODULE,
                         fun txid_on_cseq:is_valid_decide/3, Decision,
                         Round, OldVal).
 
 -spec delete(txid(), comm:erl_local_pid()) -> ok.
 delete(Key, ReplyTo) ->
     DB = rbrcseq:get_db_for_id(tx_id, Key),
-    rbrcseq:qwrite(DB, ReplyTo, Key,
+    rbrcseq:qwrite(DB, ReplyTo, Key, ?MODULE,
                    fun txid_on_cseq:is_valid_delete/3, prbr_bottom).
 
 %% content checks
@@ -127,10 +125,10 @@ is_valid_delete(ExistingEntry, _WriteFilter, prbr_bottom) ->
     end.
 
 %% write filters
-%% WF(old_dbdata(), UpdateInfo, value()) -> dbdata().
--spec wf_decide(txid_entry(), null, commit | abort) -> txid_entry().
+%% WF(old_dbdata(), UpdateInfo, value()) -> {dbdata(), val_passed_to_caller()}.
+-spec wf_decide(txid_entry(), null, commit | abort) -> {txid_entry(), none}.
 wf_decide(Old, null, Decision) ->
-    set_status(Old, Decision).
+    {set_status(Old, Decision), none}.
 
 %% abstract data type: txid_entry
 -spec new_entry(?RT:key(), [client_key()], comm:mypid()) -> txid_entry().

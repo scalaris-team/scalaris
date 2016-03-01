@@ -178,8 +178,6 @@ on({?lookup_aux, Key, Hops, Msg}=FullMsg, State) ->
     %% Forward msg to the routing_table (rt_loop).
     %% If possible, messages should be sent directly to routing_table (rt_loop).
     %% Only forward messages for which we aren't responsible (leases).
-    %% TODO: check efficients of pid_groups:get_my/1 vs. caching the PID
-    %%       (process dictionary for first evaluations but ultimately inside the State)
     %% log:pal("lookup_aux_leases in dht_node"),
     case config:read(leases) of
         true ->

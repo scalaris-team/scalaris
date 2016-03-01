@@ -28,6 +28,7 @@ import org.datanucleus.ExecutionContext;
 import org.datanucleus.PersistenceNucleusContext;
 import org.datanucleus.TransactionEventListener;
 import org.datanucleus.exceptions.NucleusDataStoreException;
+import org.datanucleus.metadata.AbstractClassMetaData;
 import org.datanucleus.store.AbstractStoreManager;
 import org.datanucleus.store.NucleusConnection;
 import org.datanucleus.store.connection.ManagedConnection;
@@ -59,7 +60,7 @@ public class ScalarisStoreManager extends AbstractStoreManager {
     }
 
     @Override
-    public void transactionStarted(ExecutionContext ec) {
+    public void transactionStarted(final ExecutionContext ec) {
         final org.datanucleus.Transaction dnTransaction = ec.getTransaction();
         final ManagedConnection mConn = getConnection(ec);
         de.zib.scalaris.Connection conn = (de.zib.scalaris.Connection) mConn
@@ -79,6 +80,8 @@ public class ScalarisStoreManager extends AbstractStoreManager {
 
             public void transactionPreCommit() {
                 try {
+                    // ensure that all updates operations are executed before commit
+                    ec.flushInternal(true);
                     scalarisTransaction.commit();
                 } catch (ConnectionException e) {
                     throw new NucleusDataStoreException(e.getMessage(), e);
@@ -127,5 +130,14 @@ public class ScalarisStoreManager extends AbstractStoreManager {
      */
     public Transaction getScalarisTransaction(ExecutionContext ec) {
         return transactionMap.get(ec.getTransaction());
+    }
+
+    /**
+     * Method defining which value strategy to use when the user specified native strategy 
+     * or no strategy.
+     */
+    @Override
+    public String getStrategyForNative(AbstractClassMetaData cmd, int absFiledNumber) {
+        return "uuid-hex";
     }
 }

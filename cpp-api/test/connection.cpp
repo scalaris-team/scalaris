@@ -32,14 +32,14 @@ BOOST_AUTO_TEST_SUITE(MasterSuite)
 
 BOOST_AUTO_TEST_CASE( create_connection )
 {
-  Connection c("localhost", "8000");
+  Connection c = { "localhost" };
 
   BOOST_CHECK(c.isOpen());
 }
 
 BOOST_AUTO_TEST_CASE( close_connection )
 {
-  Connection c("localhost", "8000");
+  Connection c = { "localhost" };
   BOOST_CHECK(c.isOpen());
   c.close();
   BOOST_CHECK(!c.isOpen());

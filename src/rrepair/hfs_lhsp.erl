@@ -69,8 +69,12 @@ new([H1, H2], HFCount) ->
 apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
-    HV2 = hash_value(ValBin, H2),
-    apply_val_helper(K - 1, HV2, [HV1]).
+    if K > 1 ->
+           HV2 = hash_value(ValBin, H2),
+           apply_val_helper(K - 1, HV2, [HV1]);
+       true ->
+           [HV1]
+    end.
 
 -compile({nowarn_unused_function, apply_val_helper_feeder/3}).
 
@@ -97,8 +101,12 @@ apply_val_helper(N, HV2, [H|_] = L) ->
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1) rem Rem,
-    HV2 = hash_value(ValBin, H2) rem Rem,
-    apply_val_rem_helper(K - 1, HV2, Rem, [HV1]).
+    if K > 1 ->
+           HV2 = hash_value(ValBin, H2) rem Rem,
+           apply_val_rem_helper(K - 1, HV2, Rem, [HV1]);
+       true ->
+           [HV1]
+    end.
 
 -compile({nowarn_unused_function, apply_val_rem_helper_feeder/4}).
 
@@ -132,8 +140,12 @@ apply_val_feeder({hfs_lhsp, K, H1, H2}, I, Val) ->
 apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
-    HV2 = hash_value(ValBin, H2),
-    HV1 + (I - 1) * HV2.
+    if I > 1 ->
+           HV2 = hash_value(ValBin, H2),
+           HV1 + (I - 1) * HV2;
+       true ->
+           HV1
+    end.
 
 %% @doc Returns number of hash functions in the container
 -spec size(hfs()) -> pos_integer().

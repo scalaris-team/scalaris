@@ -432,7 +432,7 @@ loop() ->
     end.
 
 % @doc contact mgmt server and list the known ip addresses
--spec(nodes/0 :: () -> list()).
+-spec(nodes() -> list()).
 nodes() ->
     mgmt_server:node_list(),
     Nodes = begin

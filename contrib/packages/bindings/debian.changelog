@@ -1,8 +1,21 @@
-scalaris-bindings (0.8.2+git-1) unstable; urgency=low
+scalaris-bindings (0.9.0+git-1) unstable; urgency=low
 
   * git snapshot from master
 
- -- Nico Kruber <kruber@zib.de>  Fri, 24 Jul 2015 12:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 29 Feb 2016 18:00:00 +0200
+
+scalaris-bindings (0.9.0-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+  * Packaging:
+    - add a libscalaris-dev[el] package with the C++ API (rpm, deb)
+  * API:
+    - CPP-API: provide a new C++ client library
+    - DataNucleus: provide a new storage back-end for Scalaris
+    - add a Scalaris adapter for YCSB
+    - new functions in all APIs for generic routing table operations
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 29 Feb 2016 18:00:00 +0200
 
 scalaris-bindings (0.8.2-1) stable; urgency=low
 

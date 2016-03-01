@@ -1,4 +1,4 @@
-%% @copyright 2013 Zuse Institute Berlin
+%% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -346,12 +346,7 @@ create_ring_100(Config) ->
                           fun(P1, P2) ->
                                   element(1, P1) =< element(1, P2)
                           end, fun(_P1, P2) -> P2 end),
-    case erlang:system_info(version) of
-        %% R18.1 and the current dev (8.0) have a memory leak"
-        "7.1" -> ?equals(length(OnlyNew), 100); %% R18.1
-        %% "8.0" -> ?equals(length(OnlyNew), 100); %% current dev
-        _     -> ?equals(OnlyNew, [])
-    end,
+    ?equals(OnlyNew, []),
     %%     ct:pal("~p~n", [erlang:memory()]),
     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0, true),
     ok.

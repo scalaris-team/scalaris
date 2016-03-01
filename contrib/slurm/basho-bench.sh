@@ -44,6 +44,13 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # LOAD_GENERATORS=2
 #
 # TIMEOUT=60
+# SCALARIS_LOCAL=true
+# SCALARISCTL_PARAMS="-l $HOME/bbench"
+
+# COLLECTL_SUBSYSTEMS="-s cCmMnNdD"
+# COLLECTL_INTERVAL="-i 10"
+# COLLECTL_FLUSH="-F 0"
+
 
 #=============================
 
@@ -150,10 +157,9 @@ print_env(){
 }
 
 check_compile(){
-    local curdir=$(pwd)
-    cd $SCALARIS_DIR
+    pushd $SCALARIS_DIR >/dev/null
     local res=$(erl -pa contrib/yaws -pa ebin -noinput +B -eval 'R=make:all([noexec]), halt(0).')
-    cd $curdir
+    popd >/dev/null
     if [[ -n $res ]]; then
         log error "Scalaris binaries do not match source version:"
         echo $res
@@ -173,13 +179,16 @@ tag(){
 }
 
 start_collectl() {
+    export COLLECTL_SUBSYSTEMS
+    export COLLECTL_INTERVAL
+    export COLLECTL_FLUSH
     # start collectl at the load generators
     for host in ${LG_HOSTS[@]}; do
         log info "starting collectl on $host"
         if [[ $(hostname -f) = $host ]]; then
-            collectl -f $WD/collectl/lg_$host -i5 2>/dev/null -F0 &
+            collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
         else
-            ssh $host collectl -f $WD/collectl/lg_$host -i5 2>/dev/null -F0 &
+            ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/collectl/lg_$host 2>/dev/null &
         fi
     done
 }
@@ -207,6 +216,8 @@ start_scalaris() {
     [[ -n $WD ]] && export WD
     [[ -n $COLLECTL ]] && export COLLECTL
     [[ -n $COLLECTL_DIR ]] && export COLLECTL_DIR
+    [[ -n $SCALARIS_LOCAL ]] && export SCALARIS_LOCAL
+    [[ -n $SCALARISCTL_PARAMS ]] && export SCALARISCTL_PARAMS
 
     # start sbatch command and capture output
     # the ${var:+...} expands only, if the variable is set and non-empty
@@ -318,6 +329,7 @@ write_config() {
 {operations, [{put,2}, {get, 8}]}.
 {driver, basho_bench_driver_scalaris}.
 {key_generator, {int_to_str, {uniform_int, 1114111}}}.
+%%{key_generator, {int_to_str, {uniform_int, 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}}}.
 %% size in Bytes
 {value_generator, {fixed_bin, 512}}.
 {scalarisclient_mynode, ['benchclient${PARALLEL_ID}']}.

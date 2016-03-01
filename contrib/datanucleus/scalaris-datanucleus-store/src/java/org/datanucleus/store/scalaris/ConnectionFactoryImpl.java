@@ -43,13 +43,17 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
     /**
      * Maximum number of open connections at the same time.
      */
-    private static final int MAX_NUMBER_CONNECTIONS = 50;
+    private static final int DEFAULT_MAX_CONNECTIONS = 50;
+    public static final String PROPERTY_MAX_CONNECTIONS = "scalaris.connection.max";
 
     /**
      * Period of time (in ms) which will be waited for a connection
-     * to get released if {@link #MAX_NUMBER_CONNECTIONS} is reached.
+     * to get released if maximum number of connections is reached.
      */
-    private static final int GET_CONNECTION_TIMEOUT = 200;
+    private static final int DEFAULT_CONNECTION_TIMEOUT = 200;
+    public static final String PROPERTY_CONNECTION_TIMEOUT = "scalaris.connection.timeout";
+    private static int newConnectionTimeout;
+
 
     /**
      * Symbolic Name of property used in persistence-unit configuration file.
@@ -108,9 +112,21 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
                         "scalaris.client.appendUUID", true);
                 ConnectionFactory connectionFactory = new ConnectionFactory(properties);
 
-                connPool = new ConnectionPool(connectionFactory, MAX_NUMBER_CONNECTIONS);
+                int maxConnectionNum = getIntProperty(PROPERTY_MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS);
+                newConnectionTimeout = getIntProperty(PROPERTY_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT);
+
+                connPool = new ConnectionPool(connectionFactory, maxConnectionNum);
             }
         }
+    }
+
+    /**
+     * Helper for reading a integer property with default value
+     * @return
+     */
+    int getIntProperty(String propertyName, int defaultValue) {
+        String stringVal = storeMgr.getStringProperty(propertyName);
+        return stringVal == null ? defaultValue : Integer.parseInt(stringVal);
     }
 
     /**
@@ -174,9 +190,9 @@ public class ConnectionFactoryImpl extends AbstractConnectionFactory {
         public synchronized Object getConnection() {
             try {
                 if (conn == null) {
-                    conn = connPool.getConnection(GET_CONNECTION_TIMEOUT);
+                    conn = connPool.getConnection(newConnectionTimeout);
                     if (conn == null) {
-                        throw new ConnectionException("Maximum number of connections reached");
+                        throw new ConnectionException("Timeout when waiting for a new connection ");
                     }
                 }
             } catch (ConnectionException e) {

@@ -42,10 +42,7 @@ groups() ->
      {repeater, [{repeat, 10}], [{group, slide_tests}, {group, leave_tests}]}
     ].
 
-all() -> [
-          {group, slide_tests},
-          {group, leave_tests}
-         ].
+all() -> [].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 

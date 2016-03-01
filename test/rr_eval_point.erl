@@ -43,7 +43,10 @@
                           BW_RC2_Msg  :: integer(),   % number of recon2 messages
                           BW_RS_Size  :: integer(),   % number of transmitted resolve bytes
                           BW_RS_Msg   :: integer(),   % number of resolve messages
-                          BW_RS_KVV   :: integer()    % number of kvv-triple send
+                          BW_RS_KVV   :: integer(),   % number of kvv-triple send
+                          P1E_p1      :: float() | '-', % effective worst-case probability of phase 1
+                          P1E_p2      :: float() | '-', % effective worst-case probability of phase 2
+                          P1E         :: float() | '-'  % effective total worst-case probability
                           }.
 
 -type eval_point() :: {
@@ -114,7 +117,22 @@
                        FDIST            :: fail_distribution(),
                        DTYPE            :: db_generator:db_type(),
                        TPROB            :: 0..100,
-                       Merkle_NumTrees  :: pos_integer()
+                       Merkle_NumTrees  :: pos_integer(),
+                       % AVG, STD, MIN, MAX P1E of phase 1
+                       MeanP1E_p1       :: float() | '-',
+                       ErrP1E_p1        :: float() | '-',
+                       MinP1E_p1        :: float() | '-',
+                       MaxP1E_p1        :: float() | '-',
+                       % AVG, STD, MIN, MAX P1E of phase 2
+                       MeanP1E_p2       :: float() | '-',
+                       ErrP1E_p2        :: float() | '-',
+                       MinP1E_p2        :: float() | '-',
+                       MaxP1E_p2        :: float() | '-',
+                       % AVG, STD, MIN, MAX total P1E
+                       MeanP1E          :: float() | '-',
+                       ErrP1E           :: float() | '-',
+                       MinP1E           :: float() | '-',
+                       MaxP1E           :: float() | '-'
                       }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -143,7 +161,11 @@ column_names() ->
      min_bw_rs_size, max_bw_rs_size, min_bw_rs_msg, max_bw_rs_msg,
      min_bw_rs_kvv, max_bw_rs_kvv,
      % additional parameters originally missing
-     rc_method, ring_type, ddist, ftype, fdist, dtype, tprob, merkle_num_trees
+     rc_method, ring_type, ddist, ftype, fdist, dtype, tprob, merkle_num_trees,
+     % AVG, STD, MIN, MAX P1E of phase 1 and 2
+     p1e_p1, sd_p1e_p1, min_p1e_p1, max_p1e_p1,
+     p1e_p2, sd_p1e_p2, min_p1e_p2, max_p1e_p2,
+     p1e, sd_p1e, min_p1e, max_p1e
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,7 +175,7 @@ column_names() ->
 mp_column_names() ->
     [id, iteration, round, missing, regen, outdated, updated,
      bw_rc_size, bw_rc_msg, bw_rc2_size, bw_rc2_msg,
-     bw_rs_size, bw_rs_msg, bw_rs_kvv].
+     bw_rs_size, bw_rs_msg, bw_rs_kvv, p1E_p1, p1E_p2, p1E].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -196,6 +218,19 @@ generate_ep(ID,
     {MeanRSS, ErrRSS, MinRSS, MaxRSS}   = mean_w_error(12, MP),
     {MeanRSM, ErrRSM, MinRSM, MaxRSM}   = mean_w_error(13, MP),
     {MeanRSK, ErrRSK, MinRSK, MaxRSK}   = mean_w_error(14, MP),
+    
+    {MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1} =
+        try mean_w_error(15, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
+    {MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2} =
+        try mean_w_error(16, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
+    {MeanP1E, ErrP1E, MinP1E, MaxP1E} =
+        try mean_w_error(17, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
 
     {ID,
      NC, 4 * DC, FProb, element(3, hd(MP)),
@@ -208,7 +243,10 @@ generate_ep(ID,
      MinRCS, MaxRCS, MinRCM, MaxRCM, MinRC2S, MaxRC2S, MinRC2M, MaxRC2M,
      MinRSS, MaxRSS, MinRSM, MaxRSM, MinRSK, MaxRSK,
      RCMethod, RingType, dist_to_name(DDist), FType, dist_to_name(FDist),
-     DType, TProb, MNT}.
+     DType, TProb, MNT,
+     MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1,
+     MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2,
+     MeanP1E, ErrP1E, MinP1E, MaxP1E}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().
 dist_to_name({binomial, P}) ->
@@ -222,17 +260,22 @@ dist_to_name(Dist) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec mean_w_error(integer(), [tuple()])
-        -> {Mean::float(), StdError::float(), Min::integer(), Max::integer()}.
+        -> {Mean::float(), StdError::float(), Min::X, Max::X}
+        when is_subtype(X, number()).
 mean_w_error(_ElementPos, []) ->
-    {0, 0, 0, 0};
+    {0.0, 0.0, 0, 0};
 mean_w_error(ElementPos, [H | TL]) ->
     HE = element(ElementPos, H),
-    {Len, Sum, Sum2, Min, Max} =
+    % Note: calculate the standard deviation via shifted values to be more
+    %       accurate with floating point values
+    %       -> https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Computing_shifted_data
+    {Len, Sum, SumStd1, SumStd2, Min, Max} =
         lists:foldl(
-          fun(T, {L, X1, X2, Min, Max}) ->
+          fun(T, {L, SummAcc, SumStd1Acc, SumStd2Acc, Min, Max}) ->
                   E = element(ElementPos, T),
-                  {L + 1, X1 + E, X2 + E * E,
+                  E2 = E - HE,
+                  {L + 1, SummAcc + E, SumStd1Acc + E2, SumStd2Acc + E2 * E2,
                    erlang:min(E, Min), erlang:max(E, Max)}
-          end, {1, HE, HE * HE, HE, HE}, TL),
+          end, {1, HE, 0, 0, HE, HE}, TL),
     % pay attention to possible loss of precision here:
-    {Sum / Len, math:sqrt((Len * Sum2 - Sum * Sum) / (Len * Len)), Min, Max}.
+    {Sum / Len, math:sqrt((Len * SumStd2 - SumStd1 * SumStd1) / (Len * Len)), Min, Max}.

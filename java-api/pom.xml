@@ -4,7 +4,7 @@
 
     <groupId>de.zib.scalaris</groupId>
     <artifactId>java-api</artifactId>
-    <version>0.8.2+git</version>
+    <version>0.9.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Scalaris Java API</name>
@@ -33,7 +33,7 @@
     <distributionManagement>
         <repository>
             <id>scalaris</id>
-            <url>file:.maven/maven</url>
+            <url>file:../.maven/maven</url>
         </repository>
     </distributionManagement>
 
@@ -43,15 +43,29 @@
             <plugin>
                 <!--- Use JDK 1.6 -->
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>3.1</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>2.2.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>exec-maven-plugin</artifactId>
                 <groupId>org.codehaus.mojo</groupId>
+                <version>1.4.0</version>
                 <executions>
                     <execution>
                         <id>Check out maven repository from git</id>

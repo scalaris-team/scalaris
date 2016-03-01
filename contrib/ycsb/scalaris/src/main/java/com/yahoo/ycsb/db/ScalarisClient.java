@@ -127,7 +127,7 @@ public class ScalarisClient extends DB {
 		HashMap<String, String> values2 = new HashMap<String, String>(
 				values.size());
 		for (Entry<String, ByteIterator> entry : values.entrySet()) {
-			values2.put(entry.getKey(), entry.getValue().toArray().toString());
+			values2.put(entry.getKey(), entry.getValue().toString());
 		}
 
 		// jsonValue() returns Map<String, Object> but we need

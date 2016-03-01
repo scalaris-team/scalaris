@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@
 -include("tester.hrl").
 -include("unittest.hrl").
 
--spec unittest_collect_module_info/2 :: (module(), tester_parse_state:state()) ->
-                                             tester_parse_state:state().
+-spec unittest_collect_module_info(module(), tester_parse_state:state()) ->
+                                          tester_parse_state:state().
 unittest_collect_module_info(Module, ParseState) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     erlang:put(module, Module),
@@ -38,8 +38,8 @@ unittest_collect_module_info(Module, ParseState) ->
                         parse_chunk_log(Chunk, Module, InnerParseState)
                 end, ParseState, AbstractCode).
 
--spec collect_fun_info/4 :: (module(), atom(), non_neg_integer(),
-                             tester_parse_state:state()) -> tester_parse_state:state().
+-spec collect_fun_info(module(), atom(), non_neg_integer(),
+                       tester_parse_state:state()) -> tester_parse_state:state().
 collect_fun_info(Module, Func, Arity, ParseState) ->
     erlang:put(module, Module),
     ParseState2 =
@@ -108,8 +108,8 @@ collect_type_info(Module, Type, Arity, ParseState) ->
             end
     end.
 
--spec parse_chunk_log/3 :: (any(), module(), tester_parse_state:state()) ->
-    tester_parse_state:state().
+-spec parse_chunk_log(any(), module(), tester_parse_state:state()) ->
+                             tester_parse_state:state().
 parse_chunk_log(Type, Module, State) ->
     try
         parse_chunk(Type, Module, State)
@@ -125,8 +125,8 @@ parse_chunk_log(Type, Module, State) ->
 %            exit(foobar)
     end.
 
--spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) ->
-    tester_parse_state:state().
+-spec parse_chunk(any(), module(), tester_parse_state:state()) ->
+                         tester_parse_state:state().
 parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, List}},
             Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type_log(ATypeSpec, Module, ParseState,
@@ -181,8 +181,8 @@ parse_chunk({function, _Line, _FunName, _FunArity, FunCode}, _Module, ParseState
 parse_chunk({eof, _Line}, _Module, ParseState) ->
     ParseState.
 
--spec parse_type_log/4 :: (any(), module(), tester_parse_state:state(), tuple()) ->
-                                  {type_spec() , tester_parse_state:state()}.
+-spec parse_type_log(any(), module(), tester_parse_state:state(), tuple()) ->
+                            {type_spec() , tester_parse_state:state()}.
 parse_type_log(Type, Module, ParseState, Info) ->
     try
         parse_type(Type, Module, ParseState)
@@ -195,8 +195,8 @@ parse_type_log(Type, Module, ParseState, Info) ->
 %%            exit(foobar)
     end.
 
--spec parse_type/3 :: (any(), module(), tester_parse_state:state()) ->
-    {type_spec() , tester_parse_state:state()}.
+-spec parse_type(any(), module(), tester_parse_state:state()) ->
+                        {type_spec() , tester_parse_state:state()}.
 parse_type({union_fun, FunSpecs}, Module, ParseState) ->
     {FunSpecs2, PS2} = lists:foldl(fun (FunType, {List, PS}) ->
                         {ParsedFunType, PS1 } = parse_type(FunType, Module, PS),
@@ -479,8 +479,8 @@ parse_type(TypeSpec, Module, ParseState) ->
     throw(unknown_type),
     {unknown, ParseState}.
 
--spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) ->
-    {list(type_spec()), tester_parse_state:state()}.
+-spec parse_type_list(list(type_spec()), module(), tester_parse_state:state()) ->
+                             {list(type_spec()), tester_parse_state:state()}.
 parse_type_list(List, Module, ParseState) ->
     case List of
         [] ->

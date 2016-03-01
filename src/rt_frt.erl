@@ -1,4 +1,4 @@
-% @copyright 2013-2014 Zuse Institute Berlin
+% @copyright 2013-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -389,7 +389,7 @@ check_config() ->
                                     SuccId::key()
                                    ) -> key().
 get_random_key_from_generator(SourceNodeId, PredId, SuccId) ->
-    Rand = random:uniform(),
+    Rand = randoms:uniform(),
     X = erlang:trunc(get_range(SourceNodeId, SuccId) *
                          math:pow(get_range(SourceNodeId, PredId) /
                                       get_range(SourceNodeId, SuccId),

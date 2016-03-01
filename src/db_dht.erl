@@ -145,7 +145,7 @@ close({KVStore, Subscribers, {SnapDB, _LLC, _SLC}} = State, CloseFn) ->
     end.
 
 %% @doc Returns the number of stored keys.
--spec get_load(DB::db()) -> Load::integer().
+-spec get_load(DB::db()) -> Load::non_neg_integer().
 get_load({DB, _Subscr, _SnapState}) ->
     ?DB:get_load(DB).
 

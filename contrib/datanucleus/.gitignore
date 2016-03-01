@@ -13,6 +13,4 @@ release.properties
 *.metadata
 *.tmp
 local.properties
-.settings/
 .loadpath
-.classpath

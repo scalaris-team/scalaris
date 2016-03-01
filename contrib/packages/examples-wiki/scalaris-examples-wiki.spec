@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.8.2+git
+%define pkg_version 0.9.0+git
 Name:           scalaris-examples-wiki
 Summary:        Wikipedia on Scalaris example
 Version:        %{pkg_version}
@@ -21,6 +21,8 @@ BuildRequires:  scalaris-java >= 0.8.0
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 # the wiki includes some libraries which are normally not allowed in noarch packages:
 %global _binaries_in_noarch_packages_terminate_build 0
+# we also do not need a debuginfo sub package
+%global debug_package %{nil}
 %if 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600 || 0%{?fedora_version} >= 17
 %define with_tomcat5 0
 %else

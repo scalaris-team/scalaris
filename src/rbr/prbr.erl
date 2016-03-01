@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,6 +39,12 @@
 -export([noop_write_filter/3]). %% See rbrcseq for explanation.
 -export([new/2]).
 -export([set_entry/2]).
+-export([get_entry/2]).
+-export([delete_entry/2]).
+-export([entry_key/1]).
+-export([entry_val/1]).
+-export([entry_set_val/2]).
+
 -export([tester_create_write_filter/1]).
 
 %% let fetch the number of DB entries
@@ -54,6 +60,7 @@
 -export_type([state/0]).
 -export_type([read_filter/0]).
 -export_type([write_filter/0]).
+-export_type([entry/0]).
 
 %% read_filter(custom_data() | no_value_yet) -> read_info()
 -type read_filter() :: fun((term()) -> term()).
@@ -61,20 +68,26 @@
 %% write_filter(OldLocalDBentry :: custom_data(),
 %%              InfosToUpdateOutdatedEntry :: info_passed_from_read_to_write(),
 %%              ValueForWriteOperation:: Value())
-%% -> custom_data()
--type write_filter() :: fun((term(), term(), term()) -> term()).
+%% -> {custom_data(), value_returned_to_caller()}
+-type write_filter() :: fun((term(), term(), term()) -> {term(), term()}).
 
 -type state() :: ?PDB:db().
 
 -type message() ::
         {prbr, read, DB :: dht_node_state:db_selector(),
          WasConsistentLookup :: boolean(),
-         Proposer :: comm:mypid(), ?RT:key(), InRound,
+         Proposer :: comm:mypid(), ?RT:key(), DataType :: module(),
+         InRound :: pr:pr(),
          read_filter()}
       | {prbr, write, DB :: dht_node_state:db_selector(),
          WasConsistentLookup :: boolean(),
-         Proposer :: comm:mypid(), ?RT:key(), InRound,
-         Value :: term(), PassedToUpdate :: term(), write_filter()}.
+         Proposer :: comm:mypid(), ?RT:key(), DataType :: module(),
+         InRound :: pr:pr(), Value :: term(), PassedToUpdate :: term(),
+         write_filter()}
+      | {prbr, delete_key, DB :: dht_node_state:db_selector(),
+         Client :: comm:mypid(), Key :: ?RT:key()}
+      | {prbr, tab2list_raw, DB :: dht_node_state:db_selector(),
+         Client :: comm:mypid()}.
 
 
 %% improvements to usual paxos:
@@ -106,9 +119,9 @@ msg_read_reply(Client, Cons, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, Cons, YourRound, Val, LastWriteRound}).
 
 -spec msg_write_reply(comm:mypid(), Consistency::boolean(),
-                      any(), pr:pr(), pr:pr()) -> ok.
-msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite) ->
-    comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite}).
+                      any(), pr:pr(), pr:pr(), any()) -> ok.
+msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet) ->
+    comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet}).
 
 -spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), pr:pr())
                     -> ok.
@@ -118,8 +131,8 @@ msg_write_deny(Client, Cons, Key, NewerRound) ->
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
 
--spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> term().
-noop_write_filter(_, _, X) -> X.
+-spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> {term(), none}.
+noop_write_filter(_, _, X) -> {X, none}.
 
 %% initialize: return initial state.
 -spec init(atom() | tuple()) -> state().
@@ -136,15 +149,24 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
-on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
+    ReadEntry = case erlang:function_exported(DataType, prbr_read_handler, 3) of
+                   true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
+                   _    -> KeyEntry
+               end,
+
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
-%%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
+    trace_mpath:log_info(self(), {'prbr:on(read)',
+                                  %% key, Key,
+                                  round, AssignedReadRound,
+                                  val, entry_val(KeyEntry),
+                                  read_filter, ReadFilter}),
     msg_read_reply(Proposer, Cons, AssignedReadRound,
-                   ReadFilter(entry_val(KeyEntry)),
+                   ReadFilter(entry_val(ReadEntry)),
                    entry_r_write(KeyEntry)),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
@@ -154,8 +176,9 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
+    trace_mpath:log_info(self(), {prbr_on_write}),
     KeyEntry = get_entry(Key, TableName),
     %% we store the writefilter to be able to reproduce the request in
     %% write_throughs. We modify the InRound here to avoid duplicate
@@ -169,8 +192,20 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
         end,
     _ = case writable(KeyEntry, RoundForWrite) of
             {ok, NewKeyEntry, NextWriteRound} ->
-                NewVal = WriteFilter(entry_val(NewKeyEntry),
-                                     PassedToUpdate, Value),
+                {NewVal, Ret} =
+                    case erlang:function_exported(DataType, prbr_write_handler, 5) of
+                        true -> DataType:prbr_write_handler(NewKeyEntry,
+                                     PassedToUpdate, Value, TableName, WriteFilter);
+                        _    -> WriteFilter(entry_val(NewKeyEntry),
+                                     PassedToUpdate, Value)
+                    end,
+                trace_mpath:log_info(self(), {'prbr:on(write)',
+                                  %% key, Key,
+                                  round, RoundForWrite,
+                                  passed_to_update, PassedToUpdate,
+                                  val, Value,
+                                  write_filter, WriteFilter,
+                                  newval, NewVal}),
 %%                case kvx =/= _DB of
 %%                    true ->
 %%                log:log("write ok~n"
@@ -179,7 +214,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
 %%                        "Val: ~p", [Key, KeyEntry, NewVal]);
 %%                    _ -> ok
 %%                end,
-                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound),
+                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound, Ret),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
 %%                case kvx =/= _DB of
@@ -189,9 +224,23 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
 %%                        "Val: ~p", [Key, KeyEntry]);
 %%                    _ -> ok
 %%                end,
+                trace_mpath:log_info(self(), {'prbr:on(write) denied',
+                                  %% key, Key,
+                                  round, RoundForWrite,
+                                  newer_round, NewerRound}),
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
+    TableName;
+
+on({prbr, delete_key, _DB, Client, Key}, TableName) ->
+    %% for normal delete we will have to have a special write operation taking
+    %% the Paxos round numbers into account...
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    ct:pal("R~p deleted~n", [?RT:get_key_segment(Key)]),
+    Entry = get_entry(Key, TableName),
+    _ = delete_entry(TableName, Entry),
+    comm:send_local(Client, {delete_key_reply, Key}),
     TableName;
 
 %% on({prbr, tab2list, DB, Client}, TableName) ->
@@ -213,6 +262,10 @@ get_entry(Id, TableName) ->
 set_entry(NewEntry, TableName) ->
     _ = ?PDB:set(TableName, NewEntry),
     TableName.
+
+-spec delete_entry(state(), entry()) -> db_prbr:db().
+delete_entry(TableName, Entry) ->
+    ?PDB:delete_entry(TableName, Entry).
 
 -spec get_load(state()) -> non_neg_integer().
 get_load(State) -> ?PDB:get_load(State).
@@ -249,8 +302,8 @@ new(Key, Val) ->
      _Value = Val}.
 
 
-%% -spec entry_key(entry()) -> any().
-%% entry_key(Entry) -> element(1, Entry).
+-spec entry_key(entry()) -> any().
+entry_key(Entry) -> element(1, Entry).
 %% -spec entry_set_key(entry(), any()) -> entry().
 %% entry_set_key(Entry, Key) -> setelement(2, Entry, Key).
 -spec entry_r_read(entry()) -> pr:pr().

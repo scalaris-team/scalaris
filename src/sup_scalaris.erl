@@ -264,10 +264,11 @@ start_first_services() ->
 
     %% for lb_stats
     _ = application:load(os_mon),
-    case config:read(lb_active) of
+    IsLbActive = config:read(lb_active) =:= true,
+    ExplicitOsMon = config:read(start_os_mon) =:= true,
+    case IsLbActive or ExplicitOsMon of
         true -> %% for lb_stats
             application:set_env(os_mon, start_os_sup, false),
-            application:set_env(os_mon, start_disksup, false),
             _ = application:start(os_mon),
             ok;
         _ -> ok

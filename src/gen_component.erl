@@ -1,4 +1,4 @@
-%% @copyright 2007-2015 Zuse Institute Berlin
+%% @copyright 2007-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -862,7 +862,9 @@ on_post_op(Msg, UState, GCState) ->
     end,
     case erlang:get(trace_mpath) of
         undefined -> on(Msg, UState, GCState);
-        Logger    -> trace_mpath:log_info(Logger, self(), Msg),
+        Logger    -> trace_mpath:log_info(
+                       Logger, self(),
+                       {gc_post_op, trace_mpath:get_msg_tag(Msg)}),
                      on_traced_msg(Msg, UState, GCState)
     end.
 

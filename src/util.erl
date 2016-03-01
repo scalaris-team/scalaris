@@ -26,7 +26,7 @@
 -export_type([time_utc/0, us_timestamp/0]).
 
 -export([escape_quotes/1,
-         min/2, max/2, log/2, log2/1, ceil/1, floor/1,
+         min/2, max/2, log/2, log2/1, log1p/1, ceil/1, floor/1, pow1p/2,
          logged_exec/1,
          randomelem/1, randomelem_and_length/1,
          pop_randomelem/1, pop_randomelem/2, pop_randomsubset/2,
@@ -82,6 +82,7 @@
     ]).
 
 % feeder for tester
+-export([log_feeder/2, log2_feeder/1, log1p_feeder/1, pow1p_feeder/2]).
 -export([readable_utc_time_feeder/1]).
 -export([map_with_nr_feeder/3]).
 -export([par_map_feeder/2, par_map_feeder/3]).
@@ -228,34 +229,104 @@ pow(X, Y) ->
     Half = pow(X, Y div 2),
     Half * Half * X.
 
+-spec log_feeder(X::number(), Base::number()) -> {number(), number()}.
+log_feeder(X0, B0) ->
+    X = case X0 of
+            0   -> 1;   % not allowed
+            0.0 -> 1.0; % not allowed
+            X1  -> erlang:abs(X1)
+        end,
+    B = case erlang:abs(B0) of
+           1    -> 2;   % 1 not allowed
+           1.0  -> 2.0; % 1 not allowed
+           0    -> 2;   % 0 not allowed
+           0.0  -> 2.0; % 0 not allowed
+           B1   -> B1
+        end,
+    {X, B}.
+
 %% @doc Logarithm of X to the base of Base.
 -spec log(X::number(), Base::number()) -> float().
 log(X, B) -> math:log10(X) / math:log10(B).
 
+-spec log2_feeder(X::number()) -> {number()}.
+log2_feeder(0)   -> {1}; % 0 not allowed
+log2_feeder(0.0) -> {1.0}; % 0 not allowed
+log2_feeder(X) when X < 0 -> {-X};
+log2_feeder(X)   -> {X}.
+
 %% @doc Logarithm of X to the base of 2.
 -spec log2(X::number()) -> float().
-log2(X) -> log(X, 2).
+log2(X) -> math:log10(X) / 0.3010299956639812. % use hard-coded math:log10(2)
+
+-spec log1p_feeder(X::number()) -> {number()}.
+log1p_feeder(-1)   -> {0}; % -1 not allowed
+log1p_feeder(-1.0) -> {0.0}; % -1 not allowed
+log1p_feeder(X) when X < -1 -> {-X};
+log1p_feeder(X)    -> {X}.
+
+%% @doc More precise version of ln(1+x) for small x.
+%%
+%% from: David Goldberg. 1991. What every computer scientist should know
+%%       about floating-point arithmetic. ACM Comput. Surv. 23, 1
+%%       (March 1991), 5-48. DOI=<a href="http://dx.doi.org/10.1145/103162.103163">10.1145/103162.103163</a>
+-spec log1p(X::number()) -> float().
+log1p(X) ->
+    W = 1 + X,
+    if W == 1 -> float(X);
+       true   -> X * math:log(W) / (W-1)
+    end.
+
+-spec pow1p_feeder(X0::float(), Y0::float()) -> {X::float(), Y::float()}.
+pow1p_feeder(X0, Y0) ->
+    X = if X0 < 0 -> -X0;
+           true   -> X0
+        end,
+    {X, Y0}.
+
+%% @doc Calculates (1 - X^Y) more exactly, especially for X^Y near 1
+%%      (only really usefull for 0 &lt; X &lt; 1 - for the rest, use math:pow/2).
+%%      Uses the series representation of 1 - X^Y
+%%      1-X^Y = sum_(i=1)^infinity (- Y^i * log^i(X) / (i!))
+%% from: <a href="http://www.wolframalpha.com/input/?i=series+x^y">Wolfram Alpha for x^y</a>
+-spec pow1p(X::float(), Y::float()) -> float().
+pow1p(X, Y) when X >= 0 andalso Y == 0 ->
+    0.0;
+pow1p(X, Y) when X == 0 andalso Y /= 0 ->
+    1.0;
+pow1p(X, Y) when X > 0 andalso Y /= 0 ->
+    % the difference between the terms for i and (i+1) is ln(X)/((i+1)*N)
+    YxLnX = Y * math:log(X),
+    pow1p_(-YxLnX, YxLnX, 2, -YxLnX).
+
+%% @doc Helper for pow1p/2.
+-spec pow1p_(Prev::float(), YxLnX::float(), I::pos_integer(), PrevSum::float())
+        -> float().
+pow1p_(Prev, YxLnX, CurI, Sum) ->
+    Cur = Prev * YxLnX / CurI,
+    NextSum = Sum + Cur,
+    if NextSum == Sum ->
+           % log:pal("end at ~B", [CurI]),
+           Sum; % + error?
+       true ->
+           % log:pal("cur ~p ~p", [Sum, NextSum]),
+           pow1p_(Cur, YxLnX, CurI + 1, Sum)
+    end.
 
 %% @doc Returns the largest integer not larger than X.
 -spec floor(X::number()) -> integer().
-floor(X) when X >= 0 ->
-    erlang:trunc(X);
 floor(X) ->
     T = erlang:trunc(X),
-    case T == X of
-        true -> T;
-        _    -> T - 1
+    if X < T -> T - 1;
+       true  -> T
     end.
 
 %% @doc Returns the smallest integer not smaller than X.
 -spec ceil(X::number()) -> integer().
-ceil(X) when X < 0 ->
-    erlang:trunc(X);
 ceil(X) ->
     T = erlang:trunc(X),
-    case T == X of
-        true -> T;
-        _    -> T + 1
+    if X > T -> T + 1;
+       true  -> T
     end.
 
 -spec logged_exec(Cmd::string() | atom()) -> ok.

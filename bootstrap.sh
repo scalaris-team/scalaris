@@ -17,6 +17,18 @@
 
 VERSION=`cat VERSION`
 VERSION_NOPLUS=`echo "${VERSION}" | tr + _`
+if [[ "$VERSION" == *git* ]]; then
+  ## maven snapshot versions must have revision incremented by 1 so that 
+  ## maven sees them as a newer version than the release
+  VERSION_NOGIT=${VERSION%+git*}
+  MAJOR_MINOR=${VERSION_NOGIT%.*}
+  REVISION=${VERSION_NOGIT##*.}
+  ((REVISION++))
+  VERSION_MAVEN="$MAJOR_MINOR.$REVISION-SNAPSHOT"
+else
+  VERSION_MAVEN=$VERSION
+fi
+
 
 echo "Setting Scalaris version to ${VERSION}..."
 sed -e "s/-define(SCALARIS_VERSION, \".*\")\\./-define(SCALARIS_VERSION, \"${VERSION}\")./g" \
@@ -35,8 +47,8 @@ sed -e "s/Version: .*-.*/Version: ${VERSION}-1/g" \
     -i contrib/packages/*/*.dsc
 sed -e "0,/(.*-.*)/s//(${VERSION}-1)/" \
     -i contrib/packages/*/debian.changelog
-sed -e "0,/<version>.*<\/version>/s//<version>${VERSION}<\/version>/" \
-    -i java-api/pom.xml
+sed -e "0,/<version>.*<\/version>/s//<version>${VERSION_MAVEN}<\/version>/" \
+    -i java-api/pom.xml contrib/datanucleus/scalaris-datanucleus-store/pom.xml
 sed -e "s/module scalaris .*;/module scalaris ${VERSION_NOPLUS};/g" \
     -i contrib/systemd/scalaris.te
 if [[ "$VERSION" == *git* ]]; then

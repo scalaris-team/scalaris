@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2015 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 -include("tester.hrl").
 %-include("unittest.hrl").
 
--spec check/3 :: (term(), type_spec(), tester_parse_state:state()) -> true | {false, term()}.
+-spec check(term(), type_spec(), tester_parse_state:state()) -> true | {false, term()}.
 check(true, {atom, true}, _ParseState) ->
     true;
 check(true, bool, _ParseState) ->

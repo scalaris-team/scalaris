@@ -69,6 +69,7 @@ get_kv_db() ->
     Bottoms = [Value || {_Key, Value} <- FlattenedData, Value =:= prbr_bottom],
     io:format("falses: ~p~n", [length(Empties)]),
     io:format("prbr_bottoms: ~p~n", [length(Bottoms)]),
+    %% io:format("data: ~p~n", [FlattenedData]),
     ok.
 
 -spec get_kv_db(term()) -> ok.
@@ -123,17 +124,33 @@ check_leases(OldState, TargetSize, First) ->
         case compare_node_lists(OldState#leases_state_t.node_infos,
                                 NewState#leases_state_t.node_infos) of
             true -> false;
-            false -> describe_lease_states_diff(OldState, NewState),
-                     true
+            false ->
+                io:format("begin diff~n"),
+                describe_lease_states_diff(OldState, NewState),
+                io:format("end diff~n"),
+                true
         end,
-    Res = check_state(NewState, First orelse not LastFailed orelse Changed, TargetSize),
+    Verbose = First orelse not LastFailed orelse Changed,
+    Res = check_state(NewState, Verbose, TargetSize),
+    io:format("check_state returned(verbose=~p) ~p~n", [Verbose, Res]),
     {Res, NewState#leases_state_t{last_failed=not Res}}.
 
 -spec check_state(State::leases_state(), Verbose::boolean(),
                   TargetSize::pos_integer()) -> boolean().
 check_state(State, Verbose, TargetSize) ->
-    check_leases_locally(State, Verbose) andalso
-        check_leases_globally(State, Verbose, TargetSize).
+    case check_leases_locally(State, Verbose) of
+        true ->
+            case check_leases_globally(State, Verbose, TargetSize) of
+                true ->
+                    true;
+                false -> io:format("check_leases_globally failed~n"),
+                         false
+            end;
+        false -> io:format("check_leases_locally failed~n"),
+                 false
+    end.
+    %% check_leases_locally(State, Verbose) andalso
+    %%     check_leases_globally(State, Verbose, TargetSize).
 
 -spec check_leases_locally(leases_state(), boolean()) -> boolean().
 check_leases_locally(#leases_state_t{node_infos=Nodes}, Verbose) ->

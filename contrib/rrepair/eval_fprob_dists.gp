@@ -85,7 +85,6 @@ largeRCdiff = (bw_max_abs >= 10) ? 1 : 0
 # Style
 set style data linespoint
 set xtics 0,step_size,5*step_size
-set format x "%g %%"
 set grid layerdefault   linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 
 set style line 100 lw 2 lc -1 pt 0 lt 1
@@ -199,7 +198,7 @@ set grid noy2tics
 set size all_width_l,bw_height
 set origin -0.002,0
 set xlabel "total δ, update" font ",16"
-set xtics 0,step_size,5*step_size format "%g %%" rotate by -30 offset -1,0
+set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
 set ylabel "RC costs (phase 1+2)" font ",16"
 set yrange [bw_min:bw_max]
 set y2range [bw_min:bw_max]

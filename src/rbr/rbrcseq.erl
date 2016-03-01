@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
+-define(REDUNDANCY, (config:read(redundancy_module))).
 
 %%-define(TRACE(X,Y), log:pal("~p" X,[self()|Y])).
 %%-define(TRACE(X,Y),
@@ -38,9 +39,9 @@
 -behaviour(gen_component).
 
 %% api:
--export([qread/3, qread/4]).
--export([qwrite/5, qwrite/7]).
--export([qwrite_fast/7, qwrite_fast/9]).
+-export([qread/4, qread/5]).
+-export([qwrite/6, qwrite/8]).
+-export([qwrite_fast/8, qwrite_fast/10]).
 -export([get_db_for_id/2]).
 
 -export([start_link/3]).
@@ -59,6 +60,7 @@
                   non_neg_integer(), %% period of last retriggering / starting
                   non_neg_integer(), %% period of next retriggering
                   ?RT:key(), %% key
+                  module(), %% data type
                   comm:erl_local_pid(), %% client
                   pr:pr(), %% my round
                   non_neg_integer(), %% number of acks
@@ -90,15 +92,15 @@
 %%     send newest to client.
 
 %% This variant works on whole dbentries without filtering.
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key()) -> ok.
-qread(CSeqPidName, Client, Key) ->
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module()) -> ok.
+qread(CSeqPidName, Client, Key, DataType) ->
     RF = fun prbr:noop_read_filter/1,
-    qread(CSeqPidName, Client, Key, RF).
+    qread(CSeqPidName, Client, Key, DataType, RF).
 
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), prbr:read_filter()) -> ok.
-qread(CSeqPidName, Client, Key, ReadFilter) ->
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), prbr:read_filter()) -> ok.
+qread(CSeqPidName, Client, Key, DataType, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qread, Client, Key, ReadFilter, _RetriggerAfter = 1})
+    comm:send_local(Pid, {qread, Client, Key, DataType, ReadFilter, _RetriggerAfter = 1})
     %% the process will reply to the client directly
     .
 
@@ -139,30 +141,33 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, CC, Value) ->
+qwrite(CSeqPidName, Client, Key, DataType, CC, Value) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite(CSeqPidName, Client, Key, RF, CC, WF, Value).
+    qwrite(CSeqPidName, Client, Key, DataType, RF, CC, WF, Value).
 
 -spec qwrite_fast(pid_groups:pidname(),
                   comm:erl_local_pid(),
                   ?RT:key(),
+                  module(),
                   fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
                   client_value(), pr:pr(),
                   client_value() | prbr_bottom) -> ok.
-qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
+qwrite_fast(CSeqPidName, Client, Key, DataType, CC, Value, Round, OldVal) ->
     RF = fun prbr:noop_read_filter/1,
     WF = fun prbr:noop_write_filter/3,
-    qwrite_fast(CSeqPidName, Client, Key, RF, CC, WF, Value, Round, OldVal).
+    qwrite_fast(CSeqPidName, Client, Key, DataType, RF, CC, WF, Value, Round, OldVal).
 
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
-             fun ((any(), any(), any()) -> any()), %% write filter
+             fun ((any(), any(), any()) -> {any(), any()}), %% write filter
 %%              %% select what you need to read for the operation
 %%              fun ((CustomData) -> ReadInfo),
 %%              %% is it an allowed follow up operation? and what info is
@@ -171,15 +176,16 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
 %%                    {fun ((ReadInfo, WriteValue) -> CustomData),
 %%                     WriteValue}) -> {boolean(), PassedInfo}),
 %%              %% update the db entry with the given infos, must
-%%              %% generate a valid custom datatype
-%%              fun ((PassedInfo, WriteValue) -> CustomData),
+%%              %% generate a valid custom datatype. ReturnValue is included
+%%              %% in qwrite_done message for the caller.
+%%              fun ((PassedInfo, WriteValue) -> {CustomData, ReturnValue}),
 %%              %%module(),
              client_value()) -> ok.
-qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
+qwrite(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qwrite, Client,
-                          Key, {ReadFilter, ContentCheck, WriteFilter},
+    comm:send_local(Pid, {qwrite, Client, Key,
+                          DataType, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 20}),
     %% the process will reply to the client directly
     ok.
@@ -187,16 +193,17 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
 -spec qwrite_fast(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
+             module(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
              client_value(), pr:pr(), client_value() | prbr_bottom)
             -> ok.
-qwrite_fast(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
+qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qwrite_fast, Client,
-                          Key, {ReadFilter, ContentCheck, WriteFilter},
+    comm:send_local(Pid, {qwrite_fast, Client, Key,
+                          DataType, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 20, Round, OldValue}),
     %% the process will reply to the client directly
     ok.
@@ -220,7 +227,7 @@ init(DBSelector) ->
 
 
 %% normal qread step 1: preparation and starting read-phase
-on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
+on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qread, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
@@ -247,18 +254,18 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
               LookupEnvelope =
                   dht_node_lookup:envelope(
                     4,
-                    {prbr, read, DB, '_', This, X, MyId, ReadFilter}),
+                    {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter}),
               comm:send_local(Dest,
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
           end
-          || X <- ?RT:get_replica_keys(Key) ],
+          || X <- ?REDUNDANCY:get_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
     %% {next_period, ...}
 
     %% create local state for the request id
-    Entry = entry_new_read(qread, ReqId, Key, Client, period(State),
+    Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
                            ReadFilter, RetriggerAfter),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
@@ -283,10 +290,14 @@ on({qread_collect,
         Entry ->
             case add_read_reply(Entry, db_selector(State), MyRwithId,
                                Val, SeenWriteRound, Cons) of
+                %% {decided?, Entry}
                 {false, NewEntry} ->
                     set_entry(NewEntry, tablename(State)),
                     State;
                 {true, NewEntry} ->
+                    trace_mpath:log_info(self(),
+                                         {qread_done,
+                                          readval, entry_val(NewEntry)}),
                     inform_client(qread_done, NewEntry),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
@@ -294,6 +305,7 @@ on({qread_collect,
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
+                    trace_mpath:log_info(self(), {qread_write_through_necessary}),
                     %% log:log("Write through necessary"),
                     case randoms:rand_uniform(1,4) of
                         1 ->
@@ -348,7 +360,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
                 case pr:get_wf(entry_latest_seen(ReadEntry)) of
                     none ->
-                        {fun prbr:noop_write_filter/3, null,
+                        {fun prbr:noop_write_filter/3, none,
                          entry_val(ReadEntry)};
                     WTInfos ->
                         %% WTInfo = write through infos
@@ -357,10 +369,11 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                         WTInfos
                  end,
             Filters = {fun prbr:noop_read_filter/1,
-                       fun(_,_,_) -> {true, null} end,
+                       fun(_,_,_) -> {true, none} end,
                        WTWF},
 
             Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
+                                    entry_datatype(ReadEntry),
                                     This,
                                     period(State),
                                     Filters, WTVal,
@@ -373,21 +386,24 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
 
             Dest = pid_groups:find_a(routing_table),
             DB = db_selector(State),
+            Keys = ?REDUNDANCY:get_keys(entry_key(Entry)),
+            WTVals = ?REDUNDANCY:write_values_for_keys(Keys,  WTVal),
             _ = [ begin
                       %% let fill in whether lookup was consistent
                       LookupEnvelope =
                           dht_node_lookup:envelope(
                             4,
-                            {prbr, write, DB, '_', Collector, X,
+                            {prbr, write, DB, '_', Collector, K,
+                             entry_datatype(ReadEntry),
                              entry_my_round(ReadEntry),
-                             WTVal,
+                             V,
                              WTUI,
                              WTWF}),
                       comm:send_local(Dest,
-                                      {?lookup_aux, X, 0,
+                                      {?lookup_aux, K, 0,
                                        LookupEnvelope})
                   end
-                  || X <- ?RT:get_replica_keys(entry_key(Entry)) ],
+                  || {K, V} <- lists:zip(Keys, WTVals) ],
             set_entry(Entry, tablename(State)),
             State;
         false ->
@@ -400,14 +416,14 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op({qread, This, entry_key(ReadEntry),
+            gen_component:post_op({qread, This, entry_key(ReadEntry), entry_datatype(ReadEntry),
                fun prbr:noop_read_filter/1,
                entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
               State)
     end;
 
 on({qread_write_through_collect, ReqId,
-    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound, WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -423,7 +439,7 @@ on({qread_write_through_collect, ReqId,
                 {true, NewEntry} ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
-                    inform_client(qwrite_done, ReplyEntry),
+                    inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -489,14 +505,14 @@ on({qread_write_through_collect, ReqId,
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op({qread, Client, Key, Filter,
+                    gen_component:post_op({qread, Client, Key, entry_datatype(Entry), Filter,
                        entry_retrigger(Entry) - entry_period(Entry)},
                       State)
             end
     end;
 
 on({qread_write_through_done, ReadEntry, _Filtering,
-    {qwrite_done, _ReqId, _Round, _Val}}, State) ->
+    {qwrite_done, _ReqId, _Round, _Val, _WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_done qwrite_done ~p ~p~n", [_ReqId, ReadEntry]),
     %% as we applied a write filter, the actual distributed consensus
     %% result may be different from the highest paxos version, that we
@@ -516,11 +532,12 @@ on({qread_write_through_done, ReadEntry, _Filtering,
 
     Client = entry_client(ReadEntry),
     Key = entry_key(ReadEntry),
+    DataType = entry_datatype(ReadEntry),
     ReadFilter = entry_filters(ReadEntry),
     RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
 
     gen_component:post_op(
-      {qread, Client, Key, ReadFilter, RetriggerAfter},
+      {qread, Client, Key, DataType, ReadFilter, RetriggerAfter},
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
@@ -539,19 +556,19 @@ on({qread_write_through_done, ReadEntry, Filtering,
     State;
 
 %% normal qwrite step 1: preparation and starting read-phase
-on({qwrite, Client, Key, Filters, Value, RetriggerAfter}, State) ->
+on({qwrite, Client, Key, DataType, Filters, Value, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qwrite~n", []),
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
                             Filters, Value, RetriggerAfter),
 
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     set_entry(Entry, tablename(State)),
-    gen_component:post_op({qread, This, Key, element(1, Filters), 1}, State);
+    gen_component:post_op({qread, This, Key, DataType, element(1, Filters), 1}, State);
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
@@ -560,7 +577,7 @@ on({qwrite_read_done, ReqId,
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
     gen_component:post_op({do_qwrite_fast, ReqId, Round, ReadValue}, State);
 
-on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
+on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
     WriteValue, RetriggerAfter, Round, ReadFilterResultValue}, State) ->
 
     %% create state and ReqId, store it and trigger 'do_qwrite_fast'
@@ -570,7 +587,7 @@ on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
                             Filters, WriteValue, RetriggerAfter),
 
     set_entry(Entry, tablename(State)),
@@ -593,6 +610,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
           ContentCheck = element(2, entry_filters(NewEntry)),
           WriteFilter = element(3, entry_filters(NewEntry)),
           WriteValue = entry_val(NewEntry),
+          DataType = entry_datatype(NewEntry),
 
           _ = case ContentCheck(OldRFResultValue,
                                 WriteFilter,
@@ -602,16 +620,18 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                 %% consens sequence
                 This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
                 DB = db_selector(State),
+                Keys = ?REDUNDANCY:get_keys(entry_key(NewEntry)),
+                WrVals = ?REDUNDANCY:write_values_for_keys(Keys,  WriteValue),
                 [ begin
                     %% let fill in whether lookup was consistent
                     LookupEnvelope =
                       dht_node_lookup:envelope(
                         4,
-                        {prbr, write, DB, '_', This, X, Round,
-                        WriteValue, PassedToUpdate, WriteFilter}),
-                    api_dht_raw:unreliable_lookup(X, LookupEnvelope)
+                        {prbr, write, DB, '_', This, K, DataType, Round,
+                        V, PassedToUpdate, WriteFilter}),
+                    api_dht_raw:unreliable_lookup(K, LookupEnvelope)
                   end
-                  || X <- ?RT:get_replica_keys(entry_key(NewEntry)) ];
+                  || {K, V} <- lists:zip(Keys, WrVals)];
                 {false, Reason} = _Err ->
                   %% own proposal not possible as of content check
                   comm:send_local(entry_client(NewEntry),
@@ -626,7 +646,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound, WriteRet}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_reply~n", []),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -639,7 +659,10 @@ on({qwrite_collect, ReqId,
                 {false, NewEntry} -> set_entry(NewEntry, tablename(State));
                 {true, NewEntry} ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
-                    inform_client(qwrite_done, ReplyEntry),
+                    trace_mpath:log_info(self(),
+                                         {qwrite_done,
+                                          value, entry_val(ReplyEntry)}),
+                    inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -743,7 +766,7 @@ on({next_period, NewPeriod}, State) ->
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             13 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+             14 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -753,11 +776,13 @@ on({next_period, NewPeriod}, State) ->
                                {qread,
                                 Client :: comm:erl_local_pid(),
                                 Key :: ?RT:key(),
+                                DataType :: module(),
                                 Filters :: any(),
                                 Delay :: non_neg_integer()}
                                | {qwrite,
                                 Client :: comm:erl_local_pid(),
                                 Key :: ?RT:key(),
+                                DataType :: module(),
                                 Filters :: any(),
                                 Val :: any(),
                                 Delay :: non_neg_integer()}.
@@ -766,15 +791,15 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 13),
-    if is_tuple(element(12, Entry)) -> %% write request
+    ?ASSERT(erlang:tuple_size(Entry) =:= 14),
+    if is_tuple(element(13, Entry)) -> %% write request
            {qwrite, entry_client(Entry),
-            entry_key(Entry), entry_filters(Entry),
-            entry_val(Entry),
+            entry_key(Entry), entry_datatype(Entry),
+            entry_filters(Entry), entry_val(Entry),
             RetriggerDelay};
        true -> %% read request
-           {qread, entry_client(Entry),
-            entry_key(Entry), entry_filters(Entry),
+           {qread, entry_client(Entry), entry_key(Entry),
+            entry_datatype(Entry), entry_filters(Entry),
             RetriggerDelay}
     end.
 
@@ -794,20 +819,20 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
 %% abstract data type to collect quorum read/write replies
--spec entry_new_read(any(), any(), ?RT:key(),
+-spec entry_new_read(any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer())
                     -> entry().
-entry_new_read(Debug, ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, Client,
+entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
      _MyRound = pr:new(0, 0), _NumAcked = 0,
-     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _AckVal = 0, Filter, 0}.
+     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _Val = empty_new_read_entry, Filter, 0}.
 
--spec entry_new_write(any(), any(), ?RT:key(), comm:erl_local_pid(),
+-spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
-entry_new_write(Debug, ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
+entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
      _MyRound = pr:new(0, 0), _NumAcked = 0, _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), Value, Filters, 0}.
 
 -spec entry_reqid(entry())        -> any().
@@ -818,46 +843,48 @@ entry_period(Entry)               -> element(3, Entry).
 entry_retrigger(Entry)            -> element(4, Entry).
 -spec entry_key(entry())          -> any().
 entry_key(Entry)                  -> element(5, Entry).
+-spec entry_datatype(entry())     -> module().
+entry_datatype(Entry)             -> element(6, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
-entry_client(Entry)               -> element(6, Entry).
+entry_client(Entry)               -> element(7, Entry).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(7, Entry).
+entry_my_round(Entry)             -> element(8, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(7, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(8, Entry, Round).
 -spec entry_num_acks(entry())     -> non_neg_integer().
-entry_num_acks(Entry)             -> element(8, Entry).
+entry_num_acks(Entry)             -> element(9, Entry).
 -spec entry_inc_num_acks(entry()) -> entry().
-entry_inc_num_acks(Entry) -> setelement(8, Entry, element(8, Entry) + 1).
+entry_inc_num_acks(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
 -spec entry_set_num_acks(entry(), non_neg_integer()) -> entry().
-entry_set_num_acks(Entry, Num)    -> setelement(8, Entry, Num).
+entry_set_num_acks(Entry, Num)    -> setelement(9, Entry, Num).
 -spec entry_num_denies(entry())   -> non_neg_integer().
-entry_num_denies(Entry)           -> element(9, Entry).
+entry_num_denies(Entry)           -> element(10, Entry).
 -spec entry_inc_num_denies(entry()) -> entry().
-entry_inc_num_denies(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
+entry_inc_num_denies(Entry) -> setelement(10, Entry, element(10, Entry) + 1).
 -spec entry_set_num_denies(entry(), non_neg_integer()) -> entry().
-entry_set_num_denies(Entry, Val) -> setelement(9, Entry, Val).
+entry_set_num_denies(Entry, Val) -> setelement(10, Entry, Val).
 -spec entry_latest_seen(entry())  -> pr:pr().
-entry_latest_seen(Entry)          -> element(10, Entry).
+entry_latest_seen(Entry)          -> element(11, Entry).
 -spec entry_set_latest_seen(entry(), pr:pr()) -> entry().
-entry_set_latest_seen(Entry, Round) -> setelement(10, Entry, Round).
+entry_set_latest_seen(Entry, Round) -> setelement(11, Entry, Round).
 -spec entry_val(entry())           -> any().
-entry_val(Entry)                   -> element(11, Entry).
+entry_val(Entry)                   -> element(12, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
-entry_set_val(Entry, Val)          -> setelement(11, Entry, Val).
+entry_set_val(Entry, Val)          -> setelement(12, Entry, Val).
 -spec entry_filters(entry())       -> any().
-entry_filters(Entry)               -> element(12, Entry).
+entry_filters(Entry)               -> element(13, Entry).
 -spec entry_set_num_newest(entry(), non_neg_integer())  -> entry().
-entry_set_num_newest(Entry, Val)        -> setelement(13, Entry, Val).
+entry_set_num_newest(Entry, Val)        -> setelement(14, Entry, Val).
 -spec entry_inc_num_newest(entry()) -> entry().
-entry_inc_num_newest(Entry)        -> setelement(13, Entry, 1 + element(13, Entry)).
+entry_inc_num_newest(Entry)        -> setelement(14, Entry, 1 + element(14, Entry)).
 -spec entry_num_newest(entry())    -> non_neg_integer().
-entry_num_newest(Entry)            -> element(13, Entry).
+entry_num_newest(Entry)            -> element(14, Entry).
 
 -spec add_read_reply(entry(), dht_node_state:db_selector(),
                      pr:pr(), client_value(),
                      pr:pr(), Consistency::boolean())
                     -> {Done::boolean() | write_through, entry()}.
-add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
+add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
@@ -866,52 +893,32 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     %% on the same version). We ensure this by write_through on odd
     %% cases.
     RLatestSeen = entry_latest_seen(Entry),
+    %% extract write through info for round comparisons since
+    %% they can be key-dependent if something different than
+    %% replication is used for redundancy
+    RLatestSeenNoWTInfo = pr:set_wf(RLatestSeen, none),
+    SeenWriteRoundNoWTInfo = pr:set_wf(SeenWriteRound, none),
     E1 =
-        if SeenWriteRound > RLatestSeen ->
+        if SeenWriteRoundNoWTInfo > RLatestSeenNoWTInfo ->
                 T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
-                entry_set_val(T2, Val);
-           SeenWriteRound =:= RLatestSeen ->
-                %% if this happens, consistency is probably broken by
-                %% too weak (wrong) content checks...?
-
-                %% unfortunately the following statement is not always
-                %% true: As we also update parts of the value (set
-                %% write lock) it can happen that the write lock is
-                %% set on a quorum inluding an outdated replica, which
-                %% can store a different value than the replicas
-                %% up-to-date. This is not a consistency issue, as the
-                %% tx write the new value to the entry.  But what in
-                %% case of rollback? We cannot safely restore the
-                %% latest value then by just removing the write_lock,
-                %% but would have to actively write the former value!
-
+                ReadVal = ?REDUNDANCY:collect_read_value(Val,
+                                             entry_datatype(Entry)),
+                entry_set_val(T2, ReadVal);
+           SeenWriteRoundNoWTInfo =:= RLatestSeenNoWTInfo ->
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
 
-                %% We use a user defined value selector to chose which
-                %% value is newer. If a data type (leases for example)
-                %% only allows consistent values at any time, this
-                %% callback can check for violation by checking
-                %% equality of all replicas. If a data type allows
-                %% partial write access (like kv_on_cseq for its
-                %% locks) we need an ordering of the values, as it
-                %% might be the case, that a writelock which was set
-                %% on an outdated replica had to be rolled back. Then
-                %% replicas with newest paxos time stamp may exist
-                %% with differing value and we have to chose that one
-                %% with the highest version number for a quorum read.
-
                 %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
                 %%    {collected_different_values_with_same_round,
                 %%     Val, entry_val(Entry), proto_sched:get_infos()}),
-                T1 = case entry_val(Entry) of
-                         Val -> Entry;
-                         DifferingVal ->
-                             DataType = get_data_type(DBSelector),
-                             NewVal = DataType:max(Val, DifferingVal),
-                             entry_set_val(Entry, NewVal)
+                CurrentVal = entry_val(Entry),
+                NewVal = ?REDUNDANCY:collect_read_value(CurrentVal, Val,
+                                                      entry_datatype(Entry)),
+                T1 = case CurrentVal =:= NewVal of
+                          true  -> Entry;
+                          _     -> entry_set_val(Entry, NewVal)
                      end,
                 entry_inc_num_newest(T1);
            true -> Entry
@@ -920,18 +927,41 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     E3NumAcks = entry_num_acks(E3),
-    R = config:read(replication_factor),
-    Done =
-        case (quorum:majority_for_accept(R) =< E3NumAcks) of
-            true ->
-                %% we have majority of acks
-                case entry_num_newest(E3) of
-                    E3NumAcks -> true; %% done
-                    _ -> write_through
-                end;
-            _ -> false
-        end,
-     {Done, E3}.
+    E3RF = case entry_filters(E3) of
+               {RF, _, _} -> RF;
+               RF         -> RF
+           end,
+    case ?REDUNDANCY:quorum_accepted(entry_key(E3), E3NumAcks) of
+        true ->
+            %% we have majority of acks
+
+            %% construct read value from replies
+            Collected = entry_val(E3),
+            Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
+            E4 = entry_set_val(E3, Constructed),
+            %% update write through value
+            E5 = case pr:get_wf(RLatestSeen) of
+                     none   -> E4;
+                     WTI    ->
+                        case entry_client(E4) of
+                            %% do not update WTI if this reply comes from
+                            %% a write through
+                            {_,_,_,{qread_write_through_done, _, _, _}} ->
+                                E4;
+                            _ ->
+                                NewWTI = setelement(3, WTI, Constructed),
+                                NewRLatest = pr:set_wf(RLatestSeen, NewWTI),
+                                entry_set_latest_seen(E4, NewRLatest)
+                        end
+                 end,
+            Done = case entry_num_newest(E5) of
+                     E3NumAcks -> true; %% done
+                     _ -> write_through
+                   end,
+            {Done, E5};
+        _ ->
+            {false, E3}
+    end.
 
 -spec add_write_reply(entry(), pr:pr(), Consistency::boolean())
                      -> {Done::boolean(), entry()}.
@@ -949,14 +979,12 @@ add_write_reply(Entry, Round, _Cons) ->
                 entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
-    R = config:read(replication_factor),
-    Done = (quorum:majority_for_accept(R) =< entry_num_acks(E2)),
+    Done = ?REDUNDANCY:quorum_accepted(entry_key(E2), entry_num_acks(E2)),
     {Done, E2}.
 
 -spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), entry()}.
 add_write_deny(Entry, Round, _Cons) ->
-    R = config:read(replication_factor),
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
@@ -969,17 +997,28 @@ add_write_deny(Entry, Round, _Cons) ->
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
         end,
     E2 = entry_inc_num_denies(E1),
-    Done = (quorum:majority_for_deny(R) =< entry_num_denies(E2)),
+    Done = ?REDUNDANCY:quorum_denied(entry_key(E2), entry_num_denies(E2)),
     {Done, E2}.
 
--spec inform_client(qread_done | qwrite_done, entry()) -> ok.
-inform_client(Tag, Entry) ->
+-spec inform_client(qread_done, entry()) -> ok.
+inform_client(qread_done, Entry) ->
     comm:send_local(
       entry_client(Entry),
-      {Tag,
+      {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
        entry_val(Entry)
+      }).
+
+-spec inform_client(qwrite_done, entry(), any()) -> ok.
+inform_client(qwrite_done, Entry, WriteRet) ->
+    comm:send_local(
+      entry_client(Entry),
+      {qwrite_done,
+       entry_reqid(Entry),
+       entry_my_round(Entry), %% here: round for client's next fast qwrite
+       entry_val(Entry),
+       WriteRet
       }).
 
 %% @doc needs to be unique for this process in the whole system
@@ -999,20 +1038,6 @@ db_selector(State) -> element(2, State).
 period(State) -> element(3, State).
 -spec set_period(state(), non_neg_integer()) -> state().
 set_period(State, Val) -> setelement(3, State, Val).
-
-%% @doc determine from which module M to call M:max(A,B) to compare values
--spec get_data_type(dht_node_state:db_selector())
-                   -> kv_on_cseq | l_on_cseq | tx_id_on_cseq
-                          | util. %% default max function
-get_data_type(kv_db) ->
-    kv_on_cseq;
-get_data_type(_) ->
-    %% in practice this decision only happens for the kv data type.
-    %% for the others we have to set it for the tester.  if no special
-    %% comparision needed, we can use the standard one (util)
-    %% leases_1-4 -> l_on_cseq
-    %% txid_1-4 -> tx_id_on_cseq
-    util.
 
 -spec get_db_for_id(atom(), ?RT:key()) -> {atom(), pos_integer()}.
 get_db_for_id(DBName, Key) ->
