@@ -70,27 +70,38 @@ int main(int argc, char **argv) {
   po::store(po::parse_command_line(argc, argv, desc), vm);
   po::notify(vm);
 
-  if (vm.count("help")) {
-    cout << desc << "\n";
-    return 0;
-  } else if (vm.count("read")) {
-    string key = vm["read"].as<string>();
-    auto p = [key](TransactionSingleOp& op) {
-      std::string value = op.read(key);
-      cout << value << endl;
-    };
-    exec_call(p);
-  } else if (vm.count("write")) {
-    pair<string,string> kv = vm["write"].as<pair<string,string>>();
-    string key = get<0>(kv);
-    string value = get<1>(kv);
-    auto p = [key,value](TransactionSingleOp& op) {
-      op.write(key,value);
-    };
-    exec_call(p);
-  } else {
-    cout << desc << "\n";
-    return 0;
+  try {
+    if (vm.count("help")) {
+      cout << desc << "\n";
+      return 0;
+    } else if (vm.count("read")) {
+      string key = vm["read"].as<string>();
+      auto p = [key](TransactionSingleOp& op) {
+        std::string value = op.read(key);
+        cout << value << endl;
+      };
+      exec_call(p);
+    } else if (vm.count("write")) {
+      try {
+        pair<string,string> kv = vm["write"].as<pair<string,string>>();
+        string key = get<0>(kv);
+        string value = get<1>(kv);
+        auto p = [key,value](TransactionSingleOp& op) {
+          op.write(key,value);
+        };
+        exec_call(p);
+      } catch(const boost::bad_any_cast& e) {
+        cout << "could not convert " << vm["write"].as<string>() << " to a pair of strings" << endl;
+        exit(EXIT_FAILURE);
+      }
+    } else {
+      cout << desc << "\n";
+      return 0;
+    }
+  } catch (const Json::LogicError& e) {
+    cout << "Json error: " << e.what() << endl;
+    exit(EXIT_FAILURE);
   }
+
   return 0;
 }

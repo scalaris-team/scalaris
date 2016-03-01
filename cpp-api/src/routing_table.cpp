@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015, 2016 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ namespace scalaris {
 
   RoutingTable::RoutingTable(Connection& _c) : c(_c) {}
 
-  int RoutingTable::get_replication_factor() throw (std::runtime_error) {
+  int RoutingTable::get_replication_factor() throw (std::runtime_error, Json::LogicError,
+                                                    Json::RuntimeError) {
     Json::Value result = c.rpc("get_replication_factor");
 
     if(!result.isObject()) {

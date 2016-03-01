@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015, 2016 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ namespace scalaris {
   public:
     RoutingTable(Connection& _c);
 
-    int get_replication_factor() throw (std::runtime_error);
+    int get_replication_factor() throw (std::runtime_error, Json::LogicError,
+                                        Json::RuntimeError);
   };
 }
 
