@@ -31,32 +31,41 @@
 -export([collect_older_read_value/3]).
 -export([get_read_value/2]).
 
+%% @doc Returns the replicas of the given key.
 -spec get_keys(?RT:key()) -> [?RT:key()].
 get_keys(Key) ->
     ?RT:get_replica_keys(Key).
 
+%% @doc Returns a list of values (based on WriteValue) wich should 
+%% be written to the Keys passed as argument 
 -spec write_values_for_keys([?RT:key()], client_value()) -> [client_value()].
 write_values_for_keys(Keys, WriteValue) ->
     [WriteValue || _K <- Keys].
 
+%% @doc Returns if enough acks for majority have been collected.
 -spec quorum_accepted(?RT:key(), integer()) -> boolean().
 quorum_accepted(_Key, AccCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_accept(R) =< AccCount.
 
+%% @doc Returns if enough denies for majority have been collected.
 -spec quorum_denied(?RT:key(), integer()) -> boolean().
 quorum_denied(_Key, DeniedCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_deny(R) =< DeniedCount.
 
+%% @doc Handles a new read reply of a round newer than the newest round
+%% seen in the past.
 -spec collect_newer_read_value(client_value(), client_value(), module()) -> client_value().
 collect_newer_read_value(Collected, NewValue, _DataType) ->
     NewValue.
 
+%% @doc Handles a new read reply of a previous round.
 -spec collect_older_read_value(client_value(), client_value(), module()) -> client_value().
 collect_older_read_value(Collected, NewValue, _DataType) ->
     Collected.
 
+%% @doc Handles a new read reply of the current round.
 -spec collect_read_value(client_value(), client_value(), module()) -> client_value().
 collect_read_value(Collected, NewValue, DataType) ->
     case NewValue of
@@ -98,5 +107,6 @@ collect_read_value(Collected, NewValue, DataType) ->
             MaxFunModule:max(Collected, DifferingVal)
     end.
 
+%% @doc Returns the read value base on all previously collected read replies
 -spec get_read_value(client_value(), prbr:read_filter()) -> client_value().
 get_read_value(ReadValue, _ReadFilter) -> ReadValue.
