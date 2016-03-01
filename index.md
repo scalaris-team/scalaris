@@ -5,7 +5,7 @@ overview: true
 layout: default
 ---
 
-#What is Scalaris?
+# What is Scalaris?
 
 Scalaris is a scalable, transactional, distributed key-value store. It
 was the first NoSQL database, that supported the ACID properties for
