@@ -90,8 +90,8 @@ int main(int argc, char **argv) {
           op.write(key,value);
         };
         exec_call(p);
-      } catch(const boost::bad_any_cast& e) {
-        cout << "could not convert " << vm["write"].as<string>() << " to a pair of strings" << endl;
+      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
+        cout << "could not convert write parameter to a pair of strings" << endl;
         exit(EXIT_FAILURE);
       }
     } else {
