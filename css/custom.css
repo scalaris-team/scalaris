@@ -1,22 +1,81 @@
+@font-face {
+    font-family:myFont;
+    src: url(/css/pt-serif.ttf);
+}
+
+@font-face {
+    font-family:myFontMono;
+    src: url(/css/pt-mono.ttf);
+}
+body {
+    font-family: myFont, "PT Serif", Tahoma;
+}
+code {
+        font-family: myFontMono, "PT Mono", Courier;
+}
+
 body {
     margin-top: 20px;
 }
 
-.navbar-brand {
-    padding: 0;
+.navbar {
+    background-color:#1F4980;
+    padding-left:15px;
+    border-radius: 2px;
 }
+
+.navbar-brand {
+    padding: 0px;
+    padding-top: 7px;
+    padding-left: 10px;
+    margin: 15px;
+    margin-left: 25px;
+    border-left: 15px;
+    background-color: #FFF;
+    border-radius:35px;
+    height:70px;
+    width:128px;
+    vertical-align: middle;
+}
+
+.navbar-default .navbar-brand:hover {
+    background-color: #8FB9F0;
+}
+
+.navbar .nav > li > a {
+    color: #FFF;
+}
+
+.navbar .nav > li > a:hover {
+    color: #8FB9F0;
+}
+
+.highlighter-rouge {
+    color: #1F4980; /* dark blue */;
+    background-color: #EEE;
+}
+
+a {
+    color: #1F4980; /* dark blue */;
+}
+
+h1 { font-size: 16pt; font-weight: bold; }
+h2 { font-size: 14pt; font-weight: bold; }
+h3 { font-size: 12pt; font-weight: bold; }
+h4 { font-size: 11pt; font-weight: bold; }
 
 .footer {
     position:relative;
     top:0;
     left:0;
-    background-color:#F6F6F6;
-    padding-top:20px;
+    background-color:#1F4980;
+    color: #FFF;
+    padding-top:0px;
     padding-bottom:20px;
     padding-left: 15px;
     height:auto;
     margin-top: 30px;
-    border-radius: 4px;
+    border-radius: 2px;
     overflow:hidden;
 }
 
@@ -25,6 +84,7 @@ body {
     float:left;
     padding-right:15px;
     border:1px;
+    margin-top:20px;
 }
 
 
@@ -38,7 +98,7 @@ body {
     line-height:80px;
     text-align:center;
     margin:9px;
-    margin-top:22px;
+    margin-top:4px;
 }
 
 .footerpic img {
