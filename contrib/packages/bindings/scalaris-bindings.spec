@@ -166,7 +166,7 @@ Requires:   rubygems
 Requires:   rubygem-json >= 1.4.1
 # Drag in the pure Ruby implementation too, so that jruby has something to
 # fall back to: https://bugzilla.redhat.com/show_bug.cgi?id=1219502
-Requires:   rubygem-json_pure >= 1.4.1
+Recommends: rubygem-json_pure >= 1.4.1
 
 %description -n ruby-scalaris
 Ruby bindings and Ruby command line client for Scalaris
