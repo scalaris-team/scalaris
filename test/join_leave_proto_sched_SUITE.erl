@@ -1,4 +1,4 @@
-% @copyright 2010-2014 Zuse Institute Berlin
+% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,19 +39,23 @@
 suite() -> [ {timetrap, {seconds, 60}} ].
 
 test_cases() ->
-    [
-     tester_join_at
-    ].
+    ReplicationFactor = config:read(replication_factor),
+    if
+        ReplicationFactor > 16 -> [];
+        true                   -> [ tester_join_at ]
+    end.
 
 groups() ->
+    ReplicationFactor = config:read(replication_factor),
+    AddRMGroup =
+        if
+            ReplicationFactor > 16 -> [ add_9, rm_5, add_9_rm_5               ];
+            true                   -> [ add_9, rm_5, add_9_rm_5, add_2x3_load ]
+        end,
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data_inc], [{add_3_rm_3_data_inc, [sequence, {repeat_until_any_fail, 20}]}]) ++
-    [{add_rm, [sequence, {repeat_until_any_fail, 5}], [add_9,
-                                                        rm_5,
-                                                        add_9_rm_5,
-                                                        add_2x3_load
-                                                       ]}] ++
+    [{add_rm, [sequence, {repeat_until_any_fail, 5}], AddRMGroup}] ++
     [{graceful_leave_load, [sequence, {repeat_until_any_fail, 5}], [make_4_add_1_rm_1_load, make_4_add_2_rm_2_load, make_4_add_3_rm_3_load]}].
 
 all() ->

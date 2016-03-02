@@ -47,10 +47,10 @@ namespace scalaris {
 
     template<typename... Args>
     Json::Value rpc(const std::string& methodname, Args... args) {
-      std::array<Json::Value, sizeof...(Args)> arg_list = {{args... }};
+      std::array<Json::Value, sizeof...(args)> arg_list = {{args... }};
 
       Json::Value params = Json::arrayValue;
-      for(size_t i = 0; i< sizeof...(Args); i++)
+      for(size_t i = 0; i< sizeof...(args); i++)
         params.append(arg_list[i]);
       return exec_call(methodname, params);
     }
