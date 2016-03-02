@@ -75,12 +75,17 @@ int main(int argc, char **argv) {
       cout << desc << "\n";
       return 0;
     } else if (vm.count("read")) {
-      string key = vm["read"].as<string>();
-      auto p = [key](TransactionSingleOp& op) {
-        std::string value = op.read(key);
-        cout << value << endl;
-      };
-      exec_call(p);
+      try {
+        string key = vm["read"].as<string>();
+        auto p = [key](TransactionSingleOp& op) {
+          std::string value = op.read(key);
+          cout << value << endl;
+        };
+        exec_call(p);
+      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
+        cout << "could not convert read parameter to a string" << endl;
+        exit(EXIT_FAILURE);
+      }
     } else if (vm.count("write")) {
       try {
         pair<string,string> kv = vm["write"].as<pair<string,string>>();
