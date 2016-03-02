@@ -307,10 +307,10 @@ pow1p_(Prev, YxLnX, CurI, Sum) ->
     NextSum = Sum + Cur,
     if NextSum == Sum ->
            % log:pal("end at ~B", [CurI]),
-           Sum; % + error?
+           Sum;
        true ->
            % log:pal("cur ~p ~p", [Sum, NextSum]),
-           pow1p_(Cur, YxLnX, CurI + 1, Sum)
+           pow1p_(Cur, YxLnX, CurI + 1, NextSum)
     end.
 
 %% @doc Returns the largest integer not larger than X.
