@@ -161,8 +161,11 @@ repeat_benchmark() {
         setup_directories
         create_result_dir
 
-        SCALARISCTL_PARAMS="-l $WD/$NAME/logs"
+        # setup Scalaris log path
+        SLOGPATH=${SLOGPATH/?NAME/$NAME}  # replace "?NAME" with "$NAME"
+        SCALARISCTL_PARAMS="$SLOGPATH $SCTL_PARAMS"  # Prepend log path
         echo ${!SCALARISCTL_PARAMS@}=$SCALARISCTL_PARAMS
+
         COLLECTL_DIR=$WD/$NAME/collectl
         echo ${!COLLECTL_DIR@}=$COLLECTL_DIR
 
