@@ -58,7 +58,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # KIND='load'
 # NODES=32
 # VMS_PER_NODE=1
-# BASES="1 2 4 8 16 32 64 128 256 512 1024 2048"
+# WORKERS_PER_LG_SERIES="1 2 4 8 16 32 64 128 256 512 1024 2048"
 
 
 #=============================
@@ -111,22 +111,24 @@ main_size(){
             log info "WORKERS=$WORKERS"
             log info "WORKERS_PER_LG=$WORKERS_PER_LG"
 
+            ringsize=$(printf "%04i" $ringsize)
+            PREFIX="size$ringsize"
+
             repeat_benchmark
         done
     done
 }
 
 main_load(){
-    for WORKERS_BASE in $BASES; do
-        WORKERS=$((WORKERS_BASE*LOAD_GENERATORS))
-        WORKERS_PER_LG=$WORKERS_BASE
+    for WORKERS_PER_LG in $WORKERS_PER_LG_SERIES; do
+        WORKERS=$((WORKERS_PER_LG*LOAD_GENERATORS))
         log info "WORKERS=$WORKERS"
         log info "WORKERS_PER_LG=$WORKERS_PER_LG"
 
-        ll=$((WORKERS_BASE*LOAD_GENERATORS))
-        ll=$(printf "%04i" $ll)
-        PREFIX="workers$ll-"
-        log info "starting load benchmark with $ll ($WORKERS_BASE*$LOAD_GENERATORS)"
+        WORKERS=$(printf "%04i" $WORKERS)
+        PREFIX="load$WORKERS"
+        log info "starting load benchmark with $WORKERS ($WORKERS_PER_LG*$LOAD_GENERATORS)"
+
         repeat_benchmark
     done
 }
@@ -134,7 +136,7 @@ main_load(){
 repeat_benchmark() {
     for run in $(seq 1 $REPETITIONS); do
 
-        NAME="${PREFIX}$NODES-$VMS_PER_NODE-r$run"
+        NAME="${PREFIX}-r$run"
         mkdir ${WD}/${NAME}
         setup_directories
         create_result_dir
@@ -215,13 +217,18 @@ setup_directories(){
 print_env(){
     echo KIND=$KIND
     if [[ $KIND == "load" ]]; then
+        echo RINGSIZE=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
         echo NODES=$NODES
         echo VMS_PER_NODE=$VMS_PER_NODE
-        echo BASES=$BASES
+        echo WORKERS_PER_LG_SERIES=$WORKERS_PER_LG_SERIES
     elif [[ $KIND == "size" ]]; then
         echo NODES_SERIES=$NODES_SERIES
         echo VMS_PER_NODE_SERIES=$VMS_PER_NODE_SERIES
         echo LOAD_LEVEL=$LOAD_LEVEL
+    elif [[ $KIND == "value" ]]; then
+        echo RINGSIZE=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
+        echo WORKERS_PER_LG=$WORKERS_PER_LG
+        echo VALUE_SIZES=$VALUE_SIZES
     fi
     echo "ERL_SCHED_FLAGS=$ERL_SCHED_FLAGS"
     echo TIMEOUT=$TIMEOUT
