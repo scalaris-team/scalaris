@@ -127,7 +127,7 @@ SCALARIS_JTEST_NAME ?= jtest_boot
 NIFS_SRC_CPP=$(wildcard src/nifs/*.cpp)
 NIFS_SO=$(subst src/nifs,bin,$(NIFS_SRC_CPP:.cpp=.so))
 
-all: Makefile @NIFS@ compile tags
+all: Makefile nifs compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
@@ -610,7 +610,7 @@ rrd-init:
 nifs: $(NIFS_SO)
 
 bin/%.so: src/nifs/%.cpp Makefile
-	@CXX@ -shared -I@ERLANG_LIB_DIR_erts@/include/ @CXXFLAGS@ -fPIC -o $@ $<
+	@CXX@ @NIFFLAGS@ -I@ERLANG_ROOT_DIR@/erts-@ERLANG_LIB_VER_erts@/include @CXXFLAGS@ -fPIC -o $@ $<
 
 install-doc: doc
 	install -d $(DOCDIR)

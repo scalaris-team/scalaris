@@ -44,4 +44,4 @@ contrib/slurm/slurm-*.out
 /cpp-api/scalaris
 /.maven
 /bin/*.so
-/src/nifs/*.o
+/bin/*.so.dSYM/

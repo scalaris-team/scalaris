@@ -599,27 +599,28 @@ AC_SUBST(ENABLEPYTHON3INSTALL)
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
-NIFS=""
 case `uname -s` in
  linux*)
-     NIFS="nifs"
+     NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      ;;
  Linux*)
-     NIFS="nifs"
+     NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      ;;
  Darwin*)
+     NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      ;;
  darwin*)
+     NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      ;;
 esac
 
 echo "detected OS is: '$DRIVER_OS'"
 AC_SUBST(DRIVER_OS)
-AC_SUBST(NIFS)
+AC_SUBST(NIFFLAGS)
 
 mkdir -p ~/.yaws 2> /dev/null
 

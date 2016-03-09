@@ -586,7 +586,7 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-NIFS
+NIFFLAGS
 DRIVER_OS
 ENABLEPYTHON3INSTALL
 ENABLEPYTHON3
@@ -7586,20 +7586,21 @@ fi
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
-NIFS=""
 case `uname -s` in
  linux*)
-     NIFS="nifs"
+     NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      ;;
  Linux*)
-     NIFS="nifs"
+     NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      ;;
  Darwin*)
+     NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      ;;
  darwin*)
+     NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      ;;
 esac
