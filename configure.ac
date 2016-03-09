@@ -1,4 +1,4 @@
-#   Copyright 2007-2015 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2016 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -599,11 +599,14 @@ AC_SUBST(ENABLEPYTHON3INSTALL)
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
+NIFS=""
 case `uname -s` in
  linux*)
+     NIFS="nifs"
      DRIVER_OS=LINUX
      ;;
  Linux*)
+     NIFS="nifs"
      DRIVER_OS=LINUX
      ;;
  Darwin*)
@@ -616,6 +619,7 @@ esac
 
 echo "detected OS is: '$DRIVER_OS'"
 AC_SUBST(DRIVER_OS)
+AC_SUBST(NIFS)
 
 mkdir -p ~/.yaws 2> /dev/null
 

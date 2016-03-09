@@ -1,4 +1,4 @@
-# Copyright 2007-2015 Zuse Institute Berlin
+# Copyright 2007-2016 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.6.1
 COMMONS_CLI_VERSION=1.2
 
-.PHONY: all compile test test-vts cpp cpp-clean cpp-test java java-test java-bench java-* datanucleus datanucleus-test ycsb coverity python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE
+.PHONY: all compile test test-vts cpp cpp-clean cpp-test java java-test java-bench java-* datanucleus datanucleus-test ycsb coverity python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean nifs %_SUITE
 
 APP_NAME = @PACKAGE_TARNAME@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
@@ -124,7 +124,10 @@ SCALARIS_UNITTEST_PORT ?= 14194
 SCALARIS_UNITTEST_YAWS_PORT ?= 8000
 SCALARIS_JTEST_NAME ?= jtest_boot
 
-all: Makefile compile tags
+NIFS_SRC_CPP=$(wildcard src/nifs/*.cpp)
+NIFS_SO=$(subst src/nifs,bin,$(NIFS_SRC_CPP:.cpp=.so))
+
+all: Makefile @NIFS@ compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
@@ -603,6 +606,11 @@ plt: compile
 
 rrd-init:
 	@echo This target is deprecated
+
+nifs: $(NIFS_SO)
+
+bin/%.so: src/nifs/%.cpp Makefile
+	@CXX@ -shared -I@ERLANG_LIB_DIR_erts@/include/ @CXXFLAGS@ -fPIC -o $@ $<
 
 install-doc: doc
 	install -d $(DOCDIR)

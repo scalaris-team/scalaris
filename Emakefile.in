@@ -34,6 +34,7 @@
   "src/rbr/*",
   "src/rrepair/*",
   "src/simulation/*",
+  "src/time/*",
   "src/transactions/*",
   "src/tx/*"],
  [debug_info,

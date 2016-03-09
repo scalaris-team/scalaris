@@ -586,6 +586,7 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+NIFS
 DRIVER_OS
 ENABLEPYTHON3INSTALL
 ENABLEPYTHON3
@@ -7585,11 +7586,14 @@ fi
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
+NIFS=""
 case `uname -s` in
  linux*)
+     NIFS="nifs"
      DRIVER_OS=LINUX
      ;;
  Linux*)
+     NIFS="nifs"
      DRIVER_OS=LINUX
      ;;
  Darwin*)
@@ -7601,6 +7605,7 @@ case `uname -s` in
 esac
 
 echo "detected OS is: '$DRIVER_OS'"
+
 
 
 mkdir -p ~/.yaws 2> /dev/null
