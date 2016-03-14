@@ -931,7 +931,7 @@ for_to_fold(I, N, Fun, AccFun, AccIn) when I =< N ->
 for_to_fold(_I, _N, _Fun, _AccFun, AccIn) ->
     AccIn.
 
-%% for(i; I<=n; i++) { fun(i) }
+%% @doc for(i; i &lt;= n; i++) { fun(i) }
 -spec for_to(integer(), integer(), fun((integer()) -> any())) -> ok.
 for_to(I, N, Fun) when I =< N ->
     Fun(I),
@@ -939,11 +939,14 @@ for_to(I, N, Fun) when I =< N ->
 for_to(_I, _N, _Fun) ->
     ok.
 
-%% for(i; i<=n; i++) { Acc = [fun(i)|Acc] }
+%% @doc for(i; i &lt;= n; i++) { Acc = [fun(i) | Acc] }
+%%      (equal to <tt>lists:map(Fun, lists:seq(N,I,-1)) ++ Acc</tt>).
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T), [T]) -> [T].
 for_to_ex(I, N, Fun, Acc) ->
     for_to_fold(I, N, Fun, fun(X, XAcc) -> [X | XAcc] end, Acc).
 
+%% @doc for(i; i &lt;= n; i++) { Acc = [fun(i) | Acc] }
+%%      (equal to <tt>lists:map(Fun, lists:seq(N,I,-1))</tt>).
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T)) -> [T].
 for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
