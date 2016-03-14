@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc    variable substitutions for tester
 %% @end
-%% @version $Id: tester_value_creator.erl 6796 2014-06-10 13:30:13Z schuett $
 -module(tester_variable_substitutions).
 -author('schuett@zib.de').
--vsn('$Id: tester_value_creator.erl 6796 2014-06-10 13:30:13Z schuett $').
 
 -include("unittest.hrl").
 -include("tester.hrl").
@@ -49,6 +47,9 @@ substitute({type, Line,TypeType, Types}, Substitutions) ->
 
 substitute({tuple, Types}, Substitutions) ->
     {tuple, substitute(Types, Substitutions)};
+
+substitute({builtin_type, Type}, _Substitutions) ->
+    {builtin_type, Type};
 
 substitute({union, _Line, Types}, Substitutions) ->
     {union, substitute(Types, Substitutions)};
@@ -100,7 +101,7 @@ substitute(Unknown, Substitutions) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec substitutions_from_list(list({var, integer(), atom()}), list(term())) 
+-spec substitutions_from_list(list({var, integer(), atom()}), list(term()))
                              -> gb_trees:tree({var, atom()}, term()).
 substitutions_from_list(VarList, TypeList) ->
     Tree = gb_trees:empty(),
