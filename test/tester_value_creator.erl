@@ -106,6 +106,8 @@ create_value_({builtin_type, gb_sets_set, ValueType}, Size, ParseState) ->
 create_value_({builtin_type, set_set, ValueType}, Size, ParseState) ->
     L = create_value({list, ValueType}, Size, ParseState),
     sets:from_list(L);
+create_value_({builtin_type, map}, _Size, ParseState) ->
+    create_map(ParseState);
 create_value_({builtin_type, maybe_improper_list}, Size, ParseState) ->
     create_value_({list, {typedef, tester, test_any, []}}, Size, ParseState);
 create_value_({builtin_type, module}, _Size, _ParseState) ->
@@ -266,6 +268,19 @@ create_val_50rand_50coll(ParseState, Getter, RandValFun) ->
         1 ->
             RandValFun()
     end.
+
+-ifdef(with_maps).
+-spec create_map(ParseState::tester_parse_state:state()) -> map().
+create_map(ParseState) ->
+    L = create_value({list, {tuple,
+                             [{typedef, tester, test_any, []},
+                              {typedef, tester, test_any, []}]}}, 0, ParseState),
+    maps:from_list(L).
+-else.
+-spec create_map(ParseState::tester_parse_state:state()) -> no_return().
+create_map(ParseState) ->
+    erlang:error('maps_not_available').
+-endif.
 
 -spec custom_value_creator({module(), atom(), non_neg_integer()}, any(),
                            non_neg_integer(), tester_parse_state:state()) -> failed | {value, any()}.

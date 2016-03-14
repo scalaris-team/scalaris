@@ -53,6 +53,7 @@
     | identifier
     | iodata
     | maybe_improper_list
+    | map
     | module
     | set
     | timeout).

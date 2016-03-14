@@ -131,6 +131,11 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, gb_sets_functions_thrown} | CheckStack]}
             end;
+        {builtin_type, map} ->
+            % there is no is_map/1, so try some functions on the map to check
+            try check_map(Value, CheckStack)
+            catch _:_ -> {false, [{Value, map_functions_thrown} | CheckStack]}
+            end;
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_float/1, no_float);
@@ -385,6 +390,17 @@ check_union(Value, {union, Union}, CheckStack, ParseState) ->
             {false, [{Value, no_union_variant_matched,
                       {union, Union}, UnionStack} | CheckStack]}
     end.
+
+-ifdef(with_maps).
+check_map(Value, _CheckStack) ->
+    _ = maps:size(Value),
+    _ = maps:find('$non_existing_key', Value),
+    _ = maps:put('$non_existing_key', '$value', Value),
+    true.
+-else.
+check_map(Value, CheckStack) ->
+    {false, [{Value, no_map_support} | CheckStack]}.
+-endif.
 
 check_fun(Value, {'fun', {product, ParamTypes} = Type, _ResultType},
           CheckStack, _ParseState) ->
