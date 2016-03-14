@@ -87,7 +87,7 @@
          fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
          fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
-         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), client_version()),
+         other_kv_tree  = mymaps:new()                            :: MyIOtherKvTree::mymaps:mymap(), % ?RT:key() => client_version()
          stats          = ?required(rr_resolve_state, stats)      :: stats(),
          from_my_node   = 1                                       :: 0 | 1
          }).
@@ -148,7 +148,7 @@ on({get_state_response, MyI}, State =
     send_local(pid_groups:get_my(dht_node), {get_entries, self(), RepKeyInt}),
 
     % send entries in sender interval but not in sent KvvList
-    % convert keys KvvList to a gb_tree for faster access checks
+    % convert keys KvvList to a map for faster access checks
     MyIOtherKvTree = make_other_kv_tree(MyIOtherKvvList),
 
     % allow the garbage collection to clean up the ReqKeys here:
@@ -258,11 +258,11 @@ on({get_entries_response, EntryList}, State =
            [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate]),
 
     % Send entries in sender interval but not in sent KvvList
-    % convert keys KvvList to a gb_tree for faster access checks
+    % convert keys KvvList to a map for faster access checks
     MyIOtherKvTree = make_other_kv_tree(MyIOtherKvvList),
     % note: EntryList may not be unique! - it is made unique in shutdown/2 though
     MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
-                                         not gb_trees:is_defined(db_entry:get_key(X), MyIOtherKvTree)],
+                                         not mymaps:is_key(db_entry:get_key(X), MyIOtherKvTree)],
 
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
@@ -397,7 +397,7 @@ start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
         [{Entry::db_entry:entry_ex(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
-        FBItems::kvv_list(), OtherKvTree::gb_trees:tree(?RT:key(), client_version()), FBOn::boolean())
+        FBItems::kvv_list(), OtherKvTree::mymaps:mymap(), FBOn::boolean())
         -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
             RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
             FBItems::kvv_list()}.
@@ -435,14 +435,14 @@ integrate_update_key_entries_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
     end.
 
 %% @doc Tries to find any key from a list in the tree.
--spec any_replica_in_tree(RKeys::[Key], Tree::gb_trees:tree(Key, Val))
+-spec any_replica_in_tree(RKeys::[Key], Tree::mymaps:mymap())
         -> none | {value, Val} when is_subtype(Key, any()), is_subtype(Val, any()).
 any_replica_in_tree([], _Tree) ->
     none;
 any_replica_in_tree([Key | Rest], Tree) ->
-    case gb_trees:lookup(Key, Tree) of
-        none -> any_replica_in_tree(Rest, Tree);
-        X -> X
+    case mymaps:find(Key, Tree) of
+        error -> any_replica_in_tree(Rest, Tree);
+        {ok, X} -> {value, X}
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
@@ -509,11 +509,9 @@ make_unique_kvv([_|_] = KVV) ->
 %%      Note: Assumes, KVs at the same node have the same version and sets
 %%            an (arbitrary) version from these for each replica group.
 -spec make_other_kv_tree([{?RT:key(), Val::term(), client_version()}])
-        -> gb_trees:tree(?RT:key(), client_version()).
+        -> mymaps:mymap().
 make_other_kv_tree(KVV) ->
-    gb_trees:from_orddict(
-          orddict:from_list(
-            [{KeyX, VersionX} || {KeyX, _ValX, VersionX} <- KVV])).
+    mymaps:from_list([{KeyX, VersionX} || {KeyX, _ValX, VersionX} <- KVV]).
 
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,
