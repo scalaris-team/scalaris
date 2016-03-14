@@ -287,8 +287,11 @@ tester_type_check_math(_Config) ->
           {randoms,
            [ {start, 0},
              {stop, 0},
-             {rand_uniform, 2} % tested via feeder
-           ], []}
+             {rand_uniform, 2}, % tested via feeder
+             {rand_uniform, 3}  % tested via feeder
+           ],
+           [ {rand_uniform_, 3}  % internal helper for rand_uniform/3
+           ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],

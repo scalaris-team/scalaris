@@ -189,17 +189,17 @@ get_random_in_interval({LBr, L, R, RBr}, Count) ->
 get_random_in_interval2('(', L, R, ']', Count) ->
     L2 = L + 1,
     R2 = R + 1,
-    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L2, R2) end);
+    randoms:rand_uniform(L2, R2, Count);
 get_random_in_interval2('[', L, R, ')', Count) ->
-    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L, R) end);
+    randoms:rand_uniform(L, R, Count);
 get_random_in_interval2('[', X, X, ']', Count) ->
     lists:duplicate(Count, X);
 get_random_in_interval2('[', L, R, ']', Count) ->
     R2 = R + 1,
-    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L, R2) end);
+    randoms:rand_uniform(L, R2, Count);
 get_random_in_interval2('(', L, R, ')', Count) ->
     L2 = L + 1,
-    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L2, R) end).
+    randoms:rand_uniform(L2, R, Count).
 
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.

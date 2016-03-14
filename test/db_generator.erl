@@ -435,7 +435,9 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
-    {GoodKeys, FKeys} = util:pop_randomsubset(FCount, Keys),
+    KeysWithVersions =
+        lists:zip(Keys, randoms:rand_uniform(?VersionMin, ?VersionMax, KeyCount)),
+    {GoodKeys, FKeys} = util:pop_randomsubset(FCount, KeysWithVersions),
     GoodDB = lists:flatmap(fun get_rep_group/1, GoodKeys),
     {DB, O} = lists:foldl(fun(FKey, {AccAll, Out}) ->
                                   {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
@@ -448,16 +450,21 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     ?DBG_ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
+    KeysWithVersions =
+        lists:zip(Keys, randoms:rand_uniform(?VersionMin, ?VersionMax, KeyCount)),
     FProbList = get_non_uniform_probs(RanGen),
     % note: don't use RanGen any more - we don't get the new state in the last call!
     CellLength = case length(FProbList) of
                    0 -> KeyCount + 1;
                    FProbL -> erlang:round(KeyCount / FProbL)
                end,
-    FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, CellLength, []))),
+    FCells = lists:reverse(
+               lists:keysort(1, build_failure_cells(FProbList, KeysWithVersions,
+                                                    CellLength, []))),
     {DB, _, Out} =
         lists:foldl(fun({_P, Cell}, {DB, RestF, ROut}) ->
-                            {NewEntry, NewOut, NewF} = add_failures_to_cell(Cell, RestF, FType, FDest, {[], ROut}),
+                            {NewEntry, NewOut, NewF} =
+                                add_failures_to_cell(Cell, RestF, FType, FDest, {[], ROut}),
                             {lists:append(NewEntry, DB), NewF, NewOut}
                     end,
                     {[], FCount, 0}, FCells),
@@ -466,6 +473,8 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
+    KeysWithVersions =
+        lists:zip(Keys, randoms:rand_uniform(?VersionMin, ?VersionMax, KeyCount)),
     FRate = case FCount of
                 0 -> KeyCount + 1;
                 _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
@@ -481,14 +490,14 @@ p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
                       end,
                   {lists:append(RList, AccDb), Out + AddOut, Count + 1, FCNew}
           end,
-          {[], 0, 1, FCount}, Keys),
+          {[], 0, 1, FCount}, KeysWithVersions),
     Insert = length(DB),
     DBSize = KeyCount * config:read(replication_factor),
     {DB, {DBSize, Insert, DBSize - Insert, O}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec add_failures_to_cell([?RT:key()], non_neg_integer(), failure_type(), failure_dest(),
+-spec add_failures_to_cell([{?RT:key(), Version::db_dht:version()}], non_neg_integer(), failure_type(), failure_dest(),
                            Acc::{[db_entry:entry()], Outdated::non_neg_integer()})
         -> Result::{[db_entry:entry()], Outdated::non_neg_integer(), RestFCount::non_neg_integer()}.
 add_failures_to_cell([], FCount, _FType, _FDest, {AccE, AccO}) ->
@@ -503,9 +512,10 @@ add_failures_to_cell([H | T], FCount, FType, FDest, {AccEntry, AccOut}) ->
 
 %% @doc Groups Keys into cells of equal size with failure probabilities
 %%      assigned from FProbs.
--spec build_failure_cells(FProbs::[float()], Keys::[?RT:key()], CellLength::pos_integer(),
-                          Acc::[{float(), [?RT:key()]}])
-        -> Result::[{float(), [?RT:key()]}].
+-spec build_failure_cells(FProbs::[float()], Keys::[{?RT:key(), Version::db_dht:version()}],
+                          CellLength::pos_integer(),
+                          Acc::[{float(), [{?RT:key(), Version::db_dht:version()}]}])
+        -> Result::[{float(), [{?RT:key(), Version::db_dht:version()}]}].
 build_failure_cells([], [], _CellLength, Acc) ->
     Acc;
 build_failure_cells([], T, _CellLength, []) ->
@@ -540,18 +550,17 @@ get_synthetic_value(old) ->
 is_old_value(old) -> true;
 is_old_value(_) -> false.
 
--spec get_rep_group(?RT:key()) -> [db_entry:entry()].
-get_rep_group(Key) ->
-    Version = randoms:rand_uniform(?VersionMin, ?VersionMax),
+-spec get_rep_group({?RT:key(), Version::db_dht:version()}) -> [db_entry:entry()].
+get_rep_group({Key, Version}) ->
     Value = get_synthetic_value(new),
     [db_entry:new(K, Value, Version) || K <- ?RT:get_replica_keys(Key)].
 
--spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) ->
+-spec get_failure_rep_group({?RT:key(), Version::db_dht:version()},
+                            failure_type(), failure_dest()) ->
           {[db_entry:entry()], Outdated::0 | 1}.
-get_failure_rep_group(Key, FType, FDest) ->
+get_failure_rep_group({Key, VersionNew}, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
     EKey = get_error_key(RepKeys, FDest),
-    VersionNew = randoms:rand_uniform(?VersionMin, ?VersionMax),
     ValueNew = get_synthetic_value(new),
     RGrp = [db_entry:new(K, ValueNew, VersionNew) || K <- RepKeys, K =/= EKey],
     case get_failure_type(FType) of
