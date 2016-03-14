@@ -413,6 +413,15 @@ AC_RUN_IFELSE(
         AC_MSG_NOTICE([-callback is available])],
        [AC_MSG_NOTICE([-callback is not available])])
 
+maps_module=`"${ERL}" -noshell -eval 'code:load_file(maps), io:format("~p~n", [[erlang:function_exported(maps,new,0)]]), erlang:halt().' | tail -1`
+AS_IF([test "${maps_module}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_maps}"
+       EDOCMACROS="${EDOCMACROS}, {with_maps, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_maps"
+       AC_MSG_NOTICE([maps are available and seem to be usable])],
+      [AC_MSG_NOTICE([maps are not available or not usable, falling back to gb_trees])])
+
+
 ###########################################################
 #
 # check for file:send_file/5 for yaws

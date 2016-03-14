@@ -718,6 +718,10 @@ tester_type_check_util(_Config) ->
            ]},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
+          {mymaps,
+           [ {get, 2}, % throws if the value does not exist
+             {update, 3} % throws if the value does not exist
+           ], []},
           {msg_queue, [], []},
           {pdb, [], []},
           {pid_groups,
