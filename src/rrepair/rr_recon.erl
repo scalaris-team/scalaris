@@ -364,7 +364,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            NewStats = send_resolve_request(Stats, ToSend1, OwnerL, DestRRPid,
                                            true, true),
            % let the non-initiator's rr_recon process identify the remaining keys
-           ReqIdx = lists:usort([Idx || {_Version, Idx} <- maps:values(OtherDBChunk1)]
+           ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]
                                     ++ ToReqIdx1),
            ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
            NewStats2 =
