@@ -344,6 +344,12 @@ parse_type({remote_type, _Line, [{atom, _Line2, gb_trees},
     {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
     {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
     {{builtin_type, gb_trees_tree, Key2, Value2}, ParseState3};
+% gb_trees:tree()
+parse_type({remote_type, _Line, [{atom, _Line2, gb_trees},
+                                 {atom, _Line3, tree}, []]},
+           _Module, ParseState) ->
+    {{builtin_type, gb_trees_tree, {typedef, tester, test_any, []},
+      {typedef, tester, test_any, []}}, ParseState};
 % gb_trees:iter(Key,Value)
 parse_type({remote_type, _Line, [{atom, _Line2, gb_trees},
                                  {atom, _Line3, iter}, [KeyType, ValueType]]},
