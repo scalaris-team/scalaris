@@ -57,12 +57,12 @@ quorum_denied(_Key, DeniedCount) ->
 %% @doc Handles a new read reply of a round newer than the newest round
 %% seen in the past.
 -spec collect_newer_read_value(client_value(), client_value(), module()) -> client_value().
-collect_newer_read_value(Collected, NewValue, _DataType) ->
+collect_newer_read_value(_Collected, NewValue, _DataType) ->
     NewValue.
 
 %% @doc Handles a new read reply of a previous round.
 -spec collect_older_read_value(client_value(), client_value(), module()) -> client_value().
-collect_older_read_value(Collected, NewValue, _DataType) ->
+collect_older_read_value(Collected, _NewValue, _DataType) ->
     Collected.
 
 %% @doc Handles a new read reply of the current round.
