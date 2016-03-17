@@ -39,43 +39,43 @@ init() ->
 
 -spec get_monotonic_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_monotonic_clock() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_monotonic_clock_res() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_monotonic_clock_res() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_realtime_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_realtime_clock() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_realtime_clock_res() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_realtime_clock_res() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp0_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp0_clock() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp0_clock_res() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp0_clock_res() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp1_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp1_clock() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp1_clock_res() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp1_clock_res() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp2_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp2_clock() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec get_ptp2_clock_res() -> failed | {non_neg_integer(), non_neg_integer()}.
 get_ptp2_clock_res() ->
-    "NIF library not loaded".
+    erlang:nif_error(undef).
 
 -spec test() -> ok.
 test() ->
