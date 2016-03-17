@@ -208,13 +208,6 @@ create_value_({tuple, {typedef, tester, test_any, []}}, Size, ParseState) ->
     erlang:list_to_tuple(Values);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
-create_value_({typedef, gb_trees, tree, [{var, _Line, '_'},{var, _Line2, '_'}]}, Size, ParseState) ->
-    KeyType = {typedef, tester, test_any, []},
-    ValueType = {typedef, tester, test_any, []},
-    L = create_value({list,
-                      {tuple,
-                       [KeyType, ValueType]}}, Size, ParseState),
-    gb_trees:from_orddict(orddict:from_list(L));
 create_value_({typedef, orddict, orddict, []}, Size, ParseState) ->
     KVs = create_value({list,
                         {tuple,
