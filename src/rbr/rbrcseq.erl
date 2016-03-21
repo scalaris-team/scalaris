@@ -363,10 +363,22 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                         {fun prbr:noop_write_filter/3, none,
                          entry_val(ReadEntry)};
                     WTInfos ->
-                        %% WTInfo = write through infos
+                        DataType = entry_datatype(ReadEntry),
+                        %% Depending on the datatype the write through value might
+                        %% not equal the read value e.g due to additionally
+                        %% generated information or custom read/write handler
+                        WTI = case erlang:function_exported(DataType,
+                                                            get_write_through_value, 1) of
+                                  true ->
+                                        setelement(3, WTInfos,
+                                                   DataType:get_write_through_value(
+                                                     entry_val(ReadEntry)));
+                                  _    -> WTInfos
+                              end,
+                        % WTInfo = write through infos
                         ?TRACE("Setting write through write filter ~p",
-                               [WTInfos]),
-                        WTInfos
+                               [WTI]),
+                        WTI
                  end,
             Filters = {fun prbr:noop_read_filter/1,
                        fun(_,_,_) -> {true, none} end,
@@ -938,26 +950,12 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
             Collected = entry_val(E3),
             Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
             E4 = entry_set_val(E3, Constructed),
-            %% update write through value
-            E5 = case pr:get_wf(RLatestSeen) of
-                     none   -> E4;
-                     WTI    ->
-                        case entry_client(E4) of
-                            %% do not update WTI if this reply comes from
-                            %% a write through
-                            {_,_,_,{qread_write_through_done, _, _, _}} ->
-                                E4;
-                            _ ->
-                                NewWTI = setelement(3, WTI, Constructed),
-                                NewRLatest = pr:set_wf(RLatestSeen, NewWTI),
-                                entry_set_latest_seen(E4, NewRLatest)
-                        end
-                 end,
-            Done = case entry_num_newest(E5) of
+
+            Done = case entry_num_newest(E4) of
                      E3NumAcks -> true; %% done
                      _ -> write_through
                    end,
-            {Done, E5};
+            {Done, E4};
         _ ->
             {false, E3}
     end.
