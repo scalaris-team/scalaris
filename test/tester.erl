@@ -326,6 +326,10 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
     end,
 
     %% perform the actual tests
+    %% >= R15 generates behaviour_info without a type spec so
+    %% tester cannot find it. Erlang < R15 checks behaviour_info
+    %% itself, so no own tests necessary here.
+    %% Silently drop it for modules that export it.
     ResList = type_check_module_funs(
                 Module, ExpFuncs, [{behaviour_info, 1} | ExcludeList], Count),
 
@@ -359,11 +363,6 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
               not lists:member(X, ExcludeList)],
     [ begin
           %% test all non excluded funs with std. settings
-          %%
-          %% >= R15 generates behaviour_info without a type spec so
-          %% tester cannot find it. Erlang < R15 checks behaviour_info
-          %% itself, so no own tests necessary here.
-          %% Silently drop it for modules that export it.
           Res1 = case lists:member(FA, FunsToTestNormally) of
                      true ->
                          ct:pal("Testing ~p:~p/~p", [Module, Fun, Arity]),
