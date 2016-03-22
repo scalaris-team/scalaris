@@ -354,57 +354,62 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
 
     ok.
 
--spec type_check_module_funs(module(),
-                             FunList::[{Fun::atom(), Arity::non_neg_integer()}],
-                             ExcludeList::[{Fun::atom(), Arity::non_neg_integer()}],
-                             Count::pos_integer()) -> [ok | skipped | [ok | skipped]].
+-spec type_check_module_funs(
+        module(), FunList::[{Fun::atom(), Arity::non_neg_integer()}],
+        ExcludeList::[{Fun::atom(), Arity::non_neg_integer()}],
+        Count::pos_integer()) -> [Status | [Status]]
+        when is_subtype(Status, ok | skipped ).
 type_check_module_funs(Module, FunList, ExcludeList, Count) ->
-    [ begin
-          %% test all non excluded funs with std. settings
-          Res1 = case lists:member(FA, ExcludeList) of
-                     false ->
-                         ct:pal("Testing ~p:~p/~p", [Module, Fun, Arity]),
-                         test(Module, Fun, Arity, Count, [{threads, 1}]);
-                     false -> skipped
-                 end,
+    Dict = erlang:get(),
+    util:par_map(
+      fun({Fun, Arity} = FA) ->
+              _ = [ erlang:put(K, V) || {K, V} <- Dict ],
+              %% test all non excluded funs with std. settings
+              Res1 = case lists:member(FA, ExcludeList) of
+                         false ->
+                             ct:pal("Testing ~p:~p/~p", [Module, Fun, Arity]),
+                             test(Module, Fun, Arity, Count, [{threads, 2}]);
+                         true  -> skipped
+                     end,
 
-          %% if Fun is a feeder, crosscheck existence of tested fun,
-          %% but do not trigger tests for that.
-          FunString = atom_to_list(Fun),
-          case lists:suffix("_feeder", FunString) of
-              true ->
-                  TestedFunString = lists:sublist(FunString,
-                                                  length(FunString) - 7),
-                  try lists:member({list_to_existing_atom(TestedFunString), Arity}, FunList) of
-                      true -> ok;
-                      false ->
-                          ct:pal("Found feeder, but no target fun ~p:~s/~p",
-                                 [Module, TestedFunString, Arity]),
-                          throw(error)
-                  catch _:_ ->
-                          ct:pal("Found feeder, but no target fun ~p:~s/~p",
-                                 [Module, TestedFunString, Arity]),
-                          throw(error)
-                  end;
-              false -> ok
-          end,
+              %% if Fun is a feeder, crosscheck existence of tested fun,
+              %% but do not trigger tests for that.
+              FunString = atom_to_list(Fun),
+              case lists:suffix("_feeder", FunString) of
+                  true ->
+                      TestedFunString = lists:sublist(FunString,
+                                                      length(FunString) - 7),
+                      try lists:member({list_to_existing_atom(TestedFunString), Arity}, FunList) of
+                          true -> ok;
+                          false ->
+                              ct:pal("Found feeder, but no target fun ~p:~s/~p",
+                                     [Module, TestedFunString, Arity]),
+                              throw(error)
+                      catch _:_ ->
+                                ct:pal("Found feeder, but no target fun ~p:~s/~p",
+                                       [Module, TestedFunString, Arity]),
+                                throw(error)
+                      end;
+                  false -> ok
+              end,
 
-          %% if a feeder is found, test with feeder and ignore the
-          %% exclude list, as a feeder is expected to feed the
-          %% tested fun appropriately (will type check feeder
-          %% results for required input types anyhow).
-          FeederFun = list_to_atom(FunString ++ "_feeder"),
-          case lists:member({FeederFun, Arity}, FunList) of
-              true ->
-                  ct:pal("Testing with feeder ~p:~p/~p",
-                         [Module, Fun, Arity]),
-                  [Res1 , test(Module, Fun, Arity, Count, [{threads, 1}, with_feeder])];
-              false -> Res1
-          end
-      end
-      || {Fun, Arity} = FA <- FunList].
+              %% if a feeder is found, test with feeder and ignore the
+              %% exclude list, as a feeder is expected to feed the
+              %% tested fun appropriately (will type check feeder
+              %% results for required input types anyhow).
+              FeederFun = list_to_atom(FunString ++ "_feeder"),
+              case lists:member({FeederFun, Arity}, FunList) of
+                  true ->
+                      ct:pal("Testing with feeder ~p:~p/~p",
+                             [Module, Fun, Arity]),
+                      [Res1, test(Module, Fun, Arity, Count, [{threads, 2}, with_feeder])];
+                  false -> Res1
+              end
+      end, FunList, 2).
 
-
+-spec type_check_private_funs(
+        module(), ExcludePrivate::[{Fun::atom(), Arity::non_neg_integer()}],
+        Count::pos_integer()) -> ok.
 type_check_private_funs(Module, ExcludePrivate, Count) ->
     ExportedFuns = Module:module_info(exports),
 
