@@ -358,13 +358,10 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
     ok.
 
 type_check_module_funs(Module, FunList, ExcludeList, Count) ->
-    FunsToTestNormally =
-        [X || X <- FunList,
-              not lists:member(X, ExcludeList)],
     [ begin
           %% test all non excluded funs with std. settings
-          Res1 = case lists:member(FA, FunsToTestNormally) of
-                     true ->
+          Res1 = case lists:member(FA, ExcludeList) of
+                     false ->
                          ct:pal("Testing ~p:~p/~p", [Module, Fun, Arity]),
                          test(Module, Fun, Arity, Count, [{threads, 1}]);
                      false -> skipped
