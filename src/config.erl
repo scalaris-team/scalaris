@@ -361,8 +361,12 @@ cfg_is_in_range(Key, Min, Max) ->
 
 -spec cfg_is_greater_than(Key::atom(), Min::number() | atom()) -> boolean().
 cfg_is_greater_than(_Key, failed) -> false; %% stop endless loop
-cfg_is_greater_than(Key, Min) when erlang:is_atom(Min) ->
-    cfg_is_greater_than(Key, read(Min));
+cfg_is_greater_than(Key, Min0) when erlang:is_atom(Min0) ->
+    Min = read(Min0),
+    %% stop endless loop (do not recurse!)
+    IsGreaterThan = fun(Value) -> (Value > Min) end,
+    Msg = io_lib:format("is not larger than ~p", [Min]),
+    cfg_test_and_error(Key, IsGreaterThan, Msg);
 cfg_is_greater_than(Key, Min) ->
     IsGreaterThan = fun(Value) -> (Value > Min) end,
     Msg = io_lib:format("is not larger than ~p", [Min]),
