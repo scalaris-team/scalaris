@@ -305,24 +305,21 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec type_check_module(module(),
-                        [{atom(), non_neg_integer()}], %% fun, arity
-                        [{atom(), non_neg_integer()}], %% fun, arity
-                       pos_integer()) -> ok.
+                        ExcludeExported::[{Fun::atom(), Arity::non_neg_integer()}],
+                        ExcludePrivate::[{Fun::atom(), Arity::non_neg_integer()}],
+                       Count::pos_integer()) -> ok.
 type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
     ExpFuncs = Module:module_info(exports),
-    ExcludeList = [{module_info, 0}, {module_info, 1}] ++ ExcludeExported,
+    ExcludeList = [{module_info, 0}, {module_info, 1} | ExcludeExported],
 
     %% only excluded exported functions?
-    ErrList = [ case lists:member(X, ExpFuncs) of
-                    true -> true;
-                    false ->
-                        ct:pal("Excluded non exported function ~p:~p", [Module,X]),
-                        false
-                end ||
-                  X <- ExcludeList ],
-    case lists:all(fun(X) -> X end, ErrList) of
-        true -> ok;
-        false -> throw(error)
+    ErrList = [ {Module, X} || X <- ExcludeList,
+                               not lists:member(X, ExpFuncs) ],
+    case ErrList of
+        [] -> ok;
+        [_|_] ->
+            ct:pal("Excluded non-existing or non-exported functions: ~p~n", [ErrList]),
+            throw(error)
     end,
 
     %% perform the actual tests
@@ -342,7 +339,7 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
             ct:pal("*** Detected cover analysis, have to skip tests of private funs."),
             ok
     end,
-    %% remained there anything to test?
+    %% Was there even anything left to test?
     case [] =:= ExcludeExported orelse
         lists:any(fun(X) -> skipped =/= X end,
                   lists:flatten(ResList)) of
@@ -357,6 +354,10 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
 
     ok.
 
+-spec type_check_module_funs(module(),
+                             FunList::[{Fun::atom(), Arity::non_neg_integer()}],
+                             ExcludeList::[{Fun::atom(), Arity::non_neg_integer()}],
+                             Count::pos_integer()) -> [ok | skipped | [ok | skipped]].
 type_check_module_funs(Module, FunList, ExcludeList, Count) ->
     [ begin
           %% test all non excluded funs with std. settings
@@ -415,16 +416,13 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
     ct:pal("*** Private funs of ~p:~n~.0p", [Module, PrivateFuns]),
 
     %% only excluded existing functions?
-    ErrList = [ case lists:member(X, PrivateFuns) of
-                    true -> true;
-                    false ->
-                        ct:pal("Excluded non existing private function ~p:~p~n", [Module,X]),
-                        false
-                end ||
-                  X <- ExcludePrivate ],
-    case lists:all(fun(X) -> X end, ErrList) of
-        true -> ok;
-        false -> throw(error)
+    ErrList = [ {Module, X} || X <- ExcludePrivate,
+                               not lists:member(X, PrivateFuns) ],
+    case ErrList of
+        [] -> ok;
+        [_|_] ->
+            ct:pal("Excluded non-existing private functions: ~p~n", [ErrList]),
+            throw(error)
     end,
 
     _ = type_check_module_funs(Module, PrivateFuns, ExcludePrivate, Count),
