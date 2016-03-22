@@ -374,12 +374,15 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
               true ->
                   TestedFunString = lists:sublist(FunString,
                                                   length(FunString) - 7),
-                  TestedFun = list_to_existing_atom(TestedFunString),
-                  case lists:member({TestedFun, Arity}, FunList) of
+                  try lists:member({list_to_existing_atom(TestedFunString), Arity}, FunList) of
                       true -> ok;
                       false ->
-                          ct:pal("Found feeder, but no target fun ~p:~p/~p",
-                                 [Module, TestedFun, Arity]),
+                          ct:pal("Found feeder, but no target fun ~p:~s/~p",
+                                 [Module, TestedFunString, Arity]),
+                          throw(error)
+                  catch _:_ ->
+                          ct:pal("Found feeder, but no target fun ~p:~s/~p",
+                                 [Module, TestedFunString, Arity]),
                           throw(error)
                   end;
               false -> ok
