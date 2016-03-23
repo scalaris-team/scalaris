@@ -50,11 +50,11 @@
 -define(TRACE_SEND(Pid, Msg), ?TRACE("to ~p:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
 -define(TRACE1(Msg, State),
         ?TRACE("~n  Msg: ~.0p~n"
-               "  State: method: ~.0p;  stage: ~.0p;  initiator: ~.0p~n"
-               "          destI: ~.0p~n"
-               "         params: ~.0p~n",
+                 "State: method: ~.0p;  stage: ~.0p;  initiator: ~.0p~n"
+                 "      syncI@I: ~.0p~n"
+                 "       params: ~.0p~n",
                [Msg, State#rr_recon_state.method, State#rr_recon_state.stage,
-                State#rr_recon_state.initiator, State#rr_recon_state.dest_interval,
+                State#rr_recon_state.initiator, State#rr_recon_state.'sync_interval@I',
                 ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
 -define(MERKLE_DEBUG(X,Y), ok).
 %-define(MERKLE_DEBUG(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X, [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
