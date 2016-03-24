@@ -934,16 +934,16 @@ build_struct(DBList, RestI,
            Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
            NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats2,
                                            kv_list = NewKVList},
-           begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
+           begin_sync(Params, NewState#rr_recon_state{stage = reconciliation});
        true ->
            % keep stage (at initiator: reconciliation, at other: build_struct)
            State#rr_recon_state{kv_list = NewKVList}
     end.
 
--spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters() | {},
-                 state()) -> state() | kill.
-begin_sync(MySyncStruct, _OtherSyncStruct = {},
+-spec begin_sync(OtherSyncStruct::parameters() | {}, state()) -> state() | kill.
+begin_sync(_OtherSyncStruct = {},
            State = #rr_recon_state{method = trivial, initiator = false,
+                                   struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
@@ -952,8 +952,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
                      {start_recon, trivial, MySyncStruct}}),
     State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
                          k_list = [element(1, KV) || KV <- KVList]};
-begin_sync(MySyncStruct, _OtherSyncStruct = {},
+begin_sync(_OtherSyncStruct = {},
            State = #rr_recon_state{method = shash, initiator = false,
+                                   struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = KVList}) ->
     ?TRACE("BEGIN SYNC", []),
@@ -964,8 +965,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
         <<>> -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = KVList}
     end;
-begin_sync(MySyncStruct, _OtherSyncStruct = {},
+begin_sync(_OtherSyncStruct = {},
            State = #rr_recon_state{method = bloom, initiator = false,
+                                   struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
@@ -977,8 +979,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{struct = {}, stage = resolve}
     end;
-begin_sync(MySyncStruct, _OtherSyncStruct,
+begin_sync(_OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
+                                   struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    params = Params,
                                    dest_recon_pid = DestReconPid,
@@ -1070,8 +1073,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                          {icount, ItemCount}],
                                  kv_list = []}
     end;
-begin_sync(MySyncStruct, OtherSyncStruct,
+begin_sync(OtherSyncStruct,
            State = #rr_recon_state{method = art, initiator = Initiator,
+                                   struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
@@ -2436,7 +2440,7 @@ build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
                      {bucket_size, get_merkle_bucket_size()}],
             % do not build the real tree here - build during begin_sync so that
             % the initiator can start creating its struct earlier and in parallel
-            % the actual build process is executed in begin_sync/3
+            % the actual build process is executed in begin_sync/2
             {merkle_tree:new(I, [{keep_bucket, true} | MOpts]), P1E_p1};
         #merkle_params{branch_factor = BranchFactor,
                        bucket_size = BucketSize,
