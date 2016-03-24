@@ -218,6 +218,15 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
+    case code:is_loaded(?REDUNDANCY) of
+        false -> code:load_file(?REDUNDANCY);
+        _ -> ok
+    end,
+    case erlang:function_exported(?REDUNDANCY, init, 0) of
+        true ->
+            ?REDUNDANCY:init();
+        _ -> ok
+    end,
     msg_delay:send_trigger(1, {next_period, 1}),
     {?PDB:new(?MODULE, [set]), DBSelector, 0}.
 
