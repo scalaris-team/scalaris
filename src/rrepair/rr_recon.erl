@@ -91,9 +91,9 @@
         {
          interval = intervals:empty()                         :: intervals:interval(),
          reconPid = undefined                                 :: comm:mypid() | undefined,
-         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring(),
-         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
-         p1e_p2   = ?required(trivial_recon_struct, p1e_p2)   :: float()
+         db_chunk = ?required(shash_recon_struct, db_chunk)   :: bitstring(),
+         sig_size = ?required(shash_recon_struct, sig_size)   :: signature_size(),
+         p1e_p2   = ?required(shash_recon_struct, p1e_p2)     :: float()
         }).
 
 -record(bloom_recon_struct,
