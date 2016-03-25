@@ -1459,8 +1459,8 @@ bitstring_to_k_list_kv(RestBits, [], Acc) ->
                              SigSize::signature_size())
         -> {KeyDiff::Bin, ResortedKVOrigList::db_chunk_kv()}
     when is_subtype(Bin, bitstring()).
-shash_compress_kv_list([_ | _], AccBin, 0) ->
-    AccBin;
+shash_compress_kv_list([_ | _] = KVList, AccBin, 0) ->
+    {AccBin, KVList};
 shash_compress_kv_list([_ | _] = KVList, AccBin, SigSize) ->
     SortedKList = lists:sort([begin
                                    <<CurKey:SigSize/integer-unit:1>> =
