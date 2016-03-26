@@ -1386,7 +1386,7 @@ decompress_idx_to_k_list_(Bin, KList, SigSize) ->
 decompress_idx_to_kv_list(<<>>, _KVList) ->
     [];
 decompress_idx_to_kv_list(Bin, KVList) ->
-    IdxBitsSize = bits_for_number(bits_for_number(length(KVList))),
+    IdxBitsSize = bits_for_number(bits_for_number(length(KVList) - 1)),
     <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     decompress_idx_to_kv_list_(Bin2, KVList, SigSize).
 
