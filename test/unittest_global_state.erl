@@ -21,6 +21,7 @@
 
 -export([lookup/1, insert/2, delete/1,
          delete/0]).
+-export([register_thread/1, take_registered_threads/0]).
 
 -include("unittest.hrl").
 
@@ -45,6 +46,28 @@ insert(Key, Value) ->
               % probably the table does not exist
               create_table(),
               ets:insert(?MODULE, {Key, Value})
+    end.
+
+%% @doc Registers the calling process as a unit test thread.
+-spec register_thread(ThreadNr::pos_integer()) -> ok.
+register_thread(ThreadNr) ->
+    try ets:insert(?MODULE, {{thread, ThreadNr, self()}})
+    catch error:badarg ->
+              % probably the table does not exist
+              create_table(),
+              ets:insert(?MODULE, {{thread, ThreadNr, self()}})
+    end.
+
+-spec take_registered_threads() -> [{ThreadNr::pos_integer(), ThreadPid::pid()}].
+take_registered_threads() ->
+    try begin
+            Matches = ets:match(?MODULE, {{thread, '$1', '$2'}}),
+            [begin
+                 delete({thread, ThreadNr, ThreadPid}),
+                 {ThreadNr, ThreadPid}
+             end || [ThreadNr, ThreadPid] <- Matches]
+        end
+    catch error:badarg -> failed
     end.
 
 -spec delete(Key::term()) -> true | ok.

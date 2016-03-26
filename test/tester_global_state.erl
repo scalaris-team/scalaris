@@ -26,7 +26,7 @@
 -export([register_value_creator/4,
          unregister_value_creator/1,
          get_value_creator/1]).
--export([set_last_call/4, get_last_call/1, reset_last_call/1]).
+-export([set_last_call/4, reset_last_call/1]).
 -export([log_last_calls/0]).
 
 -include("tester.hrl").
@@ -64,28 +64,25 @@ get_value_creator(Type) ->
 
 -spec set_last_call(Thread::pos_integer(), module(), Fun::atom(), Args::list()) -> true.
 set_last_call(Thread, Module, Function, Args) ->
-    unittest_global_state:insert({last_call, Thread}, {Module, Function, Args}).
+    unittest_global_state:insert({last_call, Thread, self()}, {Module, Function, Args}).
 
 -spec reset_last_call(Thread::pos_integer()) -> true | ok.
 reset_last_call(Thread) ->
-    case unittest_global_state:lookup({last_call, Thread}) of
+    case unittest_global_state:lookup({last_call, Thread, self()}) of
         failed -> ok;
-        _ ->  unittest_global_state:delete({last_call, Thread})
-    end.
-
--spec get_last_call(Thread::pos_integer()) -> failed | {module(), Fun::atom(), Args::list()}.
-get_last_call(Thread) ->
-    unittest_global_state:lookup({last_call, Thread}).
+        _ ->  unittest_global_state:delete({last_call, Thread, self()})
+    end,
+    unittest_global_state:delete({thread, Thread, self()}).
 
 -spec log_last_calls() -> ok.
 log_last_calls() ->
     _ = [begin
-             case get_last_call(Thread) of
+             case unittest_global_state:lookup({last_call, ThreadNr, ThreadPid}) of
                  failed -> ok;
                  {Module, Function, Args} ->
-                     ct:pal("Last call by tester (thread ~B):~n"
+                     ct:pal("Last call by tester (thread ~B-~p):~n"
                             "~.0p:~.0p(~.0p).",
-                            [Thread, Module, Function, Args])
+                            [ThreadNr, ThreadPid, Module, Function, Args])
              end
-         end || Thread <- lists:seq(1, 8)],
+         end || {ThreadNr, ThreadPid} <- unittest_global_state:take_registered_threads()],
     ok.

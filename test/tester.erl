@@ -79,7 +79,7 @@ start_pseudo_proc() ->
 
 -spec run(module(), atom(), non_neg_integer(), non_neg_integer(),
           tester_parse_state:state(), test_options(),
-          Thread::non_neg_integer()) -> any().
+          Thread::non_neg_integer()) -> ok | any().
 run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
     FeederFun = list_to_atom(atom_to_list(Func) ++ "_feeder"),
     case proplists:get_bool(with_feeder, Options) of
@@ -119,7 +119,7 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
                  Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
                  FeederFun::{var_type, [], {union_fun, [test_fun_type()]}},
                  tester_parse_state:state(), test_options(),
-                 Thread::non_neg_integer()) -> any().
+                 Thread::non_neg_integer()) -> ok | any().
 run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options, _Thread) ->
     ok;
 run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options, Thread) ->
@@ -266,11 +266,15 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                        %% to worker threads (allows to join a pid_group if
                        %% necessary for a test
                        _ = [ erlang:put(K, V) || {K, V} <- Dict ],
+                       unittest_global_state:register_thread(Thread),
                        Result = run(Module, Func, Arity,
                                     Iterations div Threads, ParseState, Options,
                                     Thread),
                        Master ! {result, Result, self()},
-                       tester_global_state:reset_last_call(Thread)
+                       case Result of
+                           ok -> tester_global_state:reset_last_call(Thread);
+                           _  -> ok
+                       end
                end) || Thread <- lists:seq(1, Threads)],
     Results = [receive {result, Result, ThreadPid} -> {Result, ThreadPid} end || _ <- lists:seq(1, Threads)],
     _ = [fun ({Result, ThreadPid}) ->
