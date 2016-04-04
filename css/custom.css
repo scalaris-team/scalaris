@@ -44,6 +44,7 @@ body {
 
 .navbar .nav > li > a {
     color: #FFF;
+    font-size: 14pt;
 }
 
 .navbar .nav > li > a:hover {
