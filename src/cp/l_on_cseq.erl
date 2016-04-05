@@ -159,14 +159,14 @@ lease_handover(Lease, NewOwner, ReplyTo) ->
 
 -spec lease_takeover(lease_t(), comm:erl_local_pid()) -> ok.
 lease_takeover(Lease, ReplyTo) ->
-    % @todo precondition: Lease has timeouted
+    % @todo precondition: Lease has timed out
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, takeover, Lease, ReplyTo}),
     ok.
 
 -spec lease_takeover_after(non_neg_integer(), lease_t(), comm:erl_local_pid()) -> ok.
 lease_takeover_after(Delay, Lease, ReplyTo) ->
-    % @todo precondition: Lease has timeouted
+    % @todo precondition: Lease has timed eout
     msg_delay:send_local(Delay, pid_groups:get_my(dht_node),
                          {l_on_cseq, takeover, Lease, ReplyTo}),
     ok.
@@ -300,8 +300,8 @@ on({l_on_cseq, renew, Old = #lease{owner=Owner,epoch=OldEpoch,version=OldVersion
                                 {Old#lease{version=OldVersion+1, timeout=new_timeout()}, renew};
                             _ ->
                                 % we are trying to recover
-                                log:log("~p: trying to recover: owner=~p id=~p, self=~p",
-                                        [pid_groups:my_groupname(), Owner, get_id(Old), comm:this()]),
+                                log:log("trying to recover: owner=~p id=~p, self=~p",
+                                        [Owner, get_id(Old), comm:this()]),
                                 {Old#lease{owner = comm:this(), epoch = OldEpoch+1, version=0,
                                            aux=empty, timeout=new_timeout()}, renew_recover}
                         end
@@ -375,7 +375,7 @@ on({l_on_cseq, renew_reply,
         unexpected_version ->
             renew_and_update_round(Value, Round, Mode, State);
         timeout_is_not_newer_than_current_lease ->
-                    renew_and_update_round(Value, Round, Mode, State)
+            renew_and_update_round(Value, Round, Mode, State)
     end;
 
 on({l_on_cseq, send_lease_to_node, Lease, Mode}, State) ->
@@ -530,7 +530,7 @@ on({l_on_cseq, merge, _L1 = #lease{}, _L2 = empty, _ReplyTo}, State) ->
     State;
 
 on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
-    New = L1#lease{epoch    = OldEpoch + 1,
+    New = L1#lease{epoch   = OldEpoch + 1,
                    version = 0,
                    aux     = {invalid, merge, get_range(L1), get_range(L2)},
                    timeout = new_timeout()},
@@ -1046,7 +1046,7 @@ on({l_on_cseq, post_recover_takeover, Result}, State) ->
     case Result of
         {takeover, success, Value} ->
             %% merge the new lease with the active lease
-            log:log("recover: the takeover of ~p was a success", [Value]),
+            log:log("recover(~p): the takeover of ~p was a success", [self(), Value]),
             LeaseList = dht_node_state:get(State, lease_list),
             ActiveLease = lease_list:get_active_lease(LeaseList),
             case intervals:is_adjacent(l_on_cseq:get_range(Value),
@@ -1063,7 +1063,7 @@ on({l_on_cseq, post_recover_takeover, Result}, State) ->
             end;
         {takeover, failed, Value, Reason} ->
             %% remove from passive list just in case
-            log:log("recover: the takeover of ~p failed: ~p", [Value, Reason]),
+            log:log("recover(~p): the takeover of ~p failed: ~p", [self(), Value, Reason]),
             ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
             case Reason of
                 lease_does_not_exist ->
@@ -1170,7 +1170,8 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                        % and version are correctly guessed, but the
                        % owner is wrong. in addition, we require that
                        % this is a renew.
-                    ?TRACE("loncq: this has to be a renew after a recovery", []),
+                    %% log:log("loncq(~p): this has to be a renew after a recovery(~p)",
+                    %%         [self(), OldId]),
                     {true, null};
                 % check that epoch and version match with Old
                 % we only warn/fail if the remaining fields do not match
