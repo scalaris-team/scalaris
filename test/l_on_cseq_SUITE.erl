@@ -906,11 +906,11 @@ get_active_lease(Pid) ->
 wait_for_simple_update(Id, Old) ->
     OldVersion = l_on_cseq:get_version(Old),
     OldEpoch   = l_on_cseq:get_epoch(Old),
-    wait_for_lease_version(Id, OldEpoch, OldVersion+2).
+    wait_for_lease_version(Id, OldEpoch, OldVersion+1).
 
 wait_for_epoch_update(Id, Old) ->
     OldEpoch   = l_on_cseq:get_epoch(Old),
-    wait_for_lease_version(Id, OldEpoch+1, 1).
+    wait_for_lease_version(Id, OldEpoch+1, 0).
 
 wait_for_delete(Id, _Old) ->
     DHTNode = pid_groups:find_a(dht_node),
