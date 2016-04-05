@@ -1594,6 +1594,6 @@ update_lease(ReplyTo, ContentCheck, Old, New, State) ->
 % triggers renew of lease and updates known round number for the lease
 -spec renew_and_update_round(lease_t(), pr:pr(), active | passive, dht_node_state:state()) ->
                                     dht_node_state:state().
-renew_and_update_round(Lease, Round, Mode, State) ->
-    lease_renew(self(), Lease, Mode),
+renew_and_update_round(Lease, Round, _Mode, State) ->
+    %lease_renew(self(), Lease, Mode),
     lease_list:update_next_round(l_on_cseq:get_id(Lease), Round, State).
