@@ -49,7 +49,7 @@ insert(Key, Value) ->
     end.
 
 %% @doc Registers the calling process as a unit test thread.
--spec register_thread(ThreadNr::pos_integer()) -> ok.
+-spec register_thread(ThreadNr::pos_integer()) -> true.
 register_thread(ThreadNr) ->
     try ets:insert(?MODULE, {{thread, ThreadNr, self()}})
     catch error:badarg ->
