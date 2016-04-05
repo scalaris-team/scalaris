@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin
+% @copyright 2007-2016 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -119,6 +119,7 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
         {qread_done, _ReqId, _Round, Lease} ->
             LeaseId = l_on_cseq:get_id(Lease),
             Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
+            %% log:log("rm_leases(~p): going to take over ~p~n", [self(), Lease]),
             l_on_cseq:lease_takeover(Lease, Pid),
             add_takeover(State, Lease);
         _ ->
@@ -178,6 +179,7 @@ on({takeover_after_rm_change, LeaseId, _Lease, Result}, State) ->
 on({takeover_success, get_state, L2, LeaseId, {get_state_response, LeaseList}}, State) ->
     ActiveLease = lease_list:get_active_lease(LeaseList),
     Pid = comm:reply_as(self(), 4, {merge_after_rm_change, L2, ActiveLease, '_'}),
+    %% log:log("rm_leases: merging ~p and ~p~n", [L2, ActiveLease]),
     l_on_cseq:lease_merge(L2, ActiveLease, Pid),
     remove_takeover(State, LeaseId, L2);
 
@@ -186,7 +188,7 @@ on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     case Result of
         {merge, success, __L2, _L1} ->
             State;
-        {merge, fail, _Reason, __L1, __L2} ->
+        {merge, fail, _Reason, _Step, __L1, __L2, _Current, _Next} ->
             %% @todo
             State
     end;
@@ -203,8 +205,8 @@ on({get_takeovers, Pid}, #state{takeovers=Takeovers} = State) ->
     comm:send(Pid, {get_takeovers_response, Takeovers}),
     State.
 
--spec compare_and_fix_rm_with_leases(state(), intervals:interval(), intervals:interval(), 
-                                     lease_list:lease_list(), intervals:interval()) 
+-spec compare_and_fix_rm_with_leases(state(), intervals:interval(), intervals:interval(),
+                                     lease_list:lease_list(), intervals:interval())
                                      -> state().
 compare_and_fix_rm_with_leases(State, OldRange, NewRange, LeaseList, MyRange) ->
     ?TRACE("lease list ~w", [LeaseList]),
@@ -215,13 +217,13 @@ compare_and_fix_rm_with_leases(State, OldRange, NewRange, LeaseList, MyRange) ->
             State;
         false ->
             case intervals:is_subset(OldRange, NewRange) of
-                true -> 
+                true ->
                     % NewRange > OldRange
                     % my range became larger -> do takeover
                     prepare_takeover(State, MyRange, ActiveRange);
                 false ->
                     case intervals:is_subset(NewRange, OldRange) of
-                        true -> 
+                        true ->
                             % OldRange > NewRange
                             % my range became smaller -> ignore
                             State;
