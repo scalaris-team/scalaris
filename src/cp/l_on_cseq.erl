@@ -542,30 +542,35 @@ on({l_on_cseq, merge, L1 = #lease{epoch=OldEpoch}, L2, ReplyTo}, State) ->
 
 on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed,
-                                      {Reason, _Current, _Next}}}}, State) ->
+                                      {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step1 failed~n~w~n~w~n~w~n~w:~w~n", [Reason, L1, L2, _ReqId, Round]),
     % retry?
     case Reason of
         lease_does_not_exist ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, step1,
+                                      L1, L2, Current, Next}),
             State;
         unexpected_id ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, step1, L1, L2,
+                                      Current, Next}),
             State;
         unexpected_owner ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, step1, L1, L2,
+                                     Current, Next}),
             State;
         unexpected_aux ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, step1, L1, L2,
+                                      Current, Next}),
             State;
         unexpected_range ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, step1, L1, L2,
+                                     Current, Next}),
             State;
         unexpected_timeout ->
             %% retry
@@ -613,29 +618,29 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{epoch=OldEpoch}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2,
-     {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
+     {content_check_failed, {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
-    ?TRACE_ERROR("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, _Current, _Next]),
+    ?TRACE_ERROR("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
     case Reason of
         lease_does_not_exist ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, step2, L1, L2, Current, Next}),
             State;
         unexpected_id ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, step2, L1, L2, Current, Next}),
             State;
         unexpected_owner ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, step2, L1, L2, Current, Next}),
             State;
         unexpected_aux ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, step2, L1, L2, Current, Next}),
             State;
         unexpected_range ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, step2, L1, L2, Current, Next}),
             State;
         unexpected_timeout ->
             % retry
@@ -676,29 +681,29 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{epoch=_OldEpoch}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, {content_check_failed,
-                                      {Reason, _Current, _Next}}}}, State) ->
+                                      {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
         lease_does_not_exist ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, lease_does_not_exist, step3, L1, L2, Current, Next}),
           State;
         unexpected_id ->
             %% cannot happen
-            comm:send_local(ReplyTo, {merge, fail, unexpected_id, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_id, step3, L1, L2, Current, Next}),
             State;
         unexpected_owner ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, step3, L1, L2, Current, Next}),
             State;
         unexpected_aux ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_aux, step3, L1, L2, Current, Next}),
             State;
         unexpected_range ->
             %% give up, there was probably a concurrent merge
-            comm:send_local(ReplyTo, {merge, fail, unexpected_range, L1, L2}),
+            comm:send_local(ReplyTo, {merge, fail, unexpected_range, step3, L1, L2, Current, Next}),
             State;
         unexpected_timeout ->
             %% retry
@@ -753,11 +758,15 @@ on({l_on_cseq, merge_reply_step4, {_L1Id, L1}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step4, {L1Id, L1}, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2, {content_check_failed,
-                                      {Reason, _Current, _Next}}}}, State) ->
+                                      {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
     ?TRACE_ERROR("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     case Reason of
+        unexpected_owner ->
+            %% give up, there was probably a concurrent merge
+            comm:send_local(ReplyTo, {merge, fail, unexpected_owner, step4, L1, L2, Current, Next}),
+            State;
         unexpected_timeout ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step3, {L1Id, L2}, ReplyTo,
@@ -1087,10 +1096,12 @@ on({l_on_cseq, post_recover_takeover, Result}, State) ->
 on({l_on_cseq, post_recover_merge, Result}, State) ->
     case Result of
         {merge, success, L2, L1} ->
-            log:log("recover: the merge of ~p and ~p was a success", [L2, L1]),
-            State;
-        _ ->
-            log:log("recover: the merge failed: ~p", [Result]),
+            log:log("recover(~p): the merge of ~p and ~p was a success", [self(), L2, L1]),
+            %% check for more passive leases
+            gen_component:post_op({l_on_cseq, wait_for_recover}, State);
+        {merge, fail, Reason, Step, _L1, _L2, Current, Next} ->
+            log:log("recover(~p): the merge failed in step ~p with ~p~nL1: ~p~nL2: ~p~nCurrent: ~p~nNext: ~p~n",
+                    [self(), Step, Reason, _L1, _L2, Current, Next]),
             State
     end.
 
