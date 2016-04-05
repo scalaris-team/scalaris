@@ -1163,7 +1163,9 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                 % special case for renew after crash-recovery
                 #lease{epoch = E0, owner = O0, version = V0}
                   when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =:= OldOwner
-                       andalso NewOwner =/= OldOwner andalso Writer =:= renew_recover ->
+                       andalso NewOwner =/= OldOwner
+                       andalso (E0+1) =:= NewEpoch andalso NewVersion =:= 0
+                       andalso Writer =:= renew_recover ->
                        % after a crash the logical owner should not
                        % have changed. however its pid will have
                        % changed. this special case checks that epoch
