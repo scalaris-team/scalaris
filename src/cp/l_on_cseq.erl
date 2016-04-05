@@ -1042,6 +1042,30 @@ on({l_on_cseq, renew_leases}, State) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+on({l_on_cseq, wait_for_recover}, State) ->
+    LeaseList = dht_node_state:get(State, lease_list),
+    ActiveLease = lease_list:get_active_lease(LeaseList),
+    case get_owner(ActiveLease) =:= comm:this() of
+        true ->
+            %% the active lease has been recovered
+            PassiveLeaseList = lease_list:get_passive_leases(LeaseList),
+            %% find the passive lease next to the active lease
+            Candidates = [ L || L <- PassiveLeaseList,
+                                intervals:is_left_of(get_range(L),
+                                                     get_range(ActiveLease))],
+            %% there should be 0 or 1 candidates
+            case Candidates of
+                [] -> ok;
+                [Passive| _] ->
+                    Me = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
+                    lease_takeover(Passive, Me)
+            end;
+        false ->
+            %% the active lease has not been recovered
+            msg_delay:send_trigger(delta() div 2, {l_on_cseq, wait_for_recover})
+    end,
+    State;
+
 on({l_on_cseq, post_recover_takeover, Result}, State) ->
     case Result of
         {takeover, success, Value} ->

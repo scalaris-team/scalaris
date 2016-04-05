@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin
+% @copyright 2007-2016 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -48,8 +48,7 @@ recover(LeaseDBs) ->
             %% could be an ongoing split: finish operation
             wait_for_leases_to_timeout(LocalLeases),
             {Active, Passive} = get_active_passive(LocalLeases),
-            Me = comm:reply_as(self(), 3, {l_on_cseq, post_recover_takeover, '_'}),
-            l_on_cseq:lease_takeover(Passive, Me),
+            msg_delay:send_trigger(10, {l_on_cseq, wait_for_recover}),
             lease_list:make_lease_list(Active, [Passive], []);
         _ ->
             %% could be an ongoing split or an ongoing merge: finish operation
