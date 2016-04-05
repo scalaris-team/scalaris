@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2014, 2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -248,8 +248,13 @@ update_passive_lease(Lease, LeaseList = #lease_list_t{passive=Passive}) ->
     NewPassive = case lists:keyfind(Id, 2, Passive) of
                      false ->
                          [Lease|Passive];
-                     _OldLease ->
-                         lists:keyreplace(Id, 2, Passive, Lease)
+                     OldLease ->
+                         case is_newer(Lease, OldLease) of
+                             true ->
+                                 lists:keyreplace(Id, 2, Passive, Lease);
+                             false ->
+                                 Passive
+                         end
                  end,
     LeaseList#lease_list_t{passive=NewPassive}.
 
@@ -276,5 +281,20 @@ update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
             end,
             ?DBG_ASSERT(l_on_cseq:get_id(Lease) =:= l_on_cseq:get_id(Active)),
             % @todo new lease should be newer than the old lease !!!
-            LeaseList#lease_list_t{active=Lease}
+            case is_newer(Lease, Active) of
+                true ->
+                    LeaseList#lease_list_t{active=Lease};
+                false ->
+                    LeaseList
+            end
     end.
+
+-spec is_newer(New::l_on_cseq:lease_t(), Old::l_on_cseq:lease_t()) -> boolean().
+is_newer(New, Old) ->
+    NewEpoch = l_on_cseq:get_epoch(New),
+    NewVersion = l_on_cseq:get_version(New),
+    OldEpoch = l_on_cseq:get_epoch(Old),
+    OldVersion = l_on_cseq:get_version(Old),
+    ((NewEpoch =:= OldEpoch) andalso (NewVersion > OldVersion))
+        orelse
+          (NewEpoch > OldEpoch).
