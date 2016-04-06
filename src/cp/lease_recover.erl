@@ -44,17 +44,11 @@ recover(LeaseDBs) ->
             Lease = hd(LocalLeases),
             %% one potentially active lease: set active lease
             lease_list:make_lease_list(Lease, [], []);
-        2 ->
+        _ ->
             %% could be an ongoing split: finish operation
             wait_for_leases_to_timeout(LocalLeases),
-            {Active, Passive} = get_active_passive(LocalLeases),
             msg_delay:send_trigger(10, {l_on_cseq, wait_for_recover}),
-            lease_list:make_lease_list(Active, [Passive], []);
-        _ ->
-            %% could be an ongoing split or an ongoing merge: finish operation
-            wait_for_leases_to_timeout(LocalLeases),
-            ts = nyi, % ts: not yet implemented
-            lease_list:empty()
+            get_lease_list(LocalLeases)
     end.
 
 -spec wait_for_leases_to_timeout([l_on_cseq:lease_t()]) -> ok.
@@ -70,23 +64,25 @@ wait_for_leases_to_timeout(LocalLeases) ->
     ?DBG_ASSERT(lists:all(fun l_on_cseq:has_timed_out/1, LocalLeases)),
     ok.
 
-% @doc take the left one
--spec get_active_passive([l_on_cseq:lease_t()]) ->
-                                {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
-get_active_passive(LocalLeases) ->
-    [First, Second] = LocalLeases,
-    case intervals:is_all(intervals:union(l_on_cseq:get_range(First),
-                                          l_on_cseq:get_range(Second))) of
+-spec get_lease_list([l_on_cseq:lease_t()]) ->
+                            lease_list:lease_list().
+get_lease_list(LocalLeases) ->
+    Ranges = [l_on_cseq:get_range(L) || L <- LocalLeases],
+    case intervals:is_all(intervals:union(Ranges)) of
         true ->
-            {Second, First};
+            %% any lease is ok
+            lease_list:make_lease_list(hd(LocalLeases), tl(LocalLeases), []);
         false ->
-            case intervals:is_left_of(l_on_cseq:get_range(First),
-                                      l_on_cseq:get_range(Second)) of
-                true ->
-                    {Second, First};
-                false ->
-                    {First, Second}
-            end
+            %% With high probability, the leases are adjacent, because they were
+            %% created by splits. If the leases are not adjacent, the result is garbage
+            %% @todo: handle non-adjacent case
+            %% bring adjacent leases in order by sorting
+            SortedLeases = lists:reverse(
+                             lists:sort(fun (First, Second) ->
+                                                intervals:is_left_of(l_on_cseq:get_range(First),
+                                                                     l_on_cseq:get_range(Second))
+                                        end, LocalLeases)),
+            lease_list:make_lease_list(hd(SortedLeases), tl(SortedLeases), [])
     end.
 
 -spec restart_node() -> no_return().
