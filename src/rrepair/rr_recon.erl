@@ -1347,7 +1347,8 @@ decompress_idx_list(<<>>, _PrevIdx, _MaxPosBound) ->
     [];
 decompress_idx_list(Bin, PrevIdx, MaxPosBound) ->
     IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
-    <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    SigSize = erlang:max(1, SigSize0),
     decompress_idx_list_(Bin2, PrevIdx, SigSize).
 
 %% @doc Helper for decompress_idx_list/3.
@@ -1368,7 +1369,8 @@ decompress_idx_to_k_list(<<>>, _KList) ->
     [];
 decompress_idx_to_k_list(Bin, KList) ->
     IdxBitsSize = bits_for_number(bits_for_number(length(KList))),
-    <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    SigSize = erlang:max(1, SigSize0),
     decompress_idx_to_k_list_(Bin2, KList, SigSize).
 
 %% @doc Helper for decompress_idx_to_k_list/2.
@@ -1385,13 +1387,15 @@ decompress_idx_to_k_list_(Bin, KList, SigSize) ->
 %%      into a list of keys from the original KV list.
 %%      NOTE: This is essentially the same as decompress_idx_to_k_list/2 but we
 %%            need the separation because of the opaque RT keys.
+%% @see decompress_idx_to_k_list/2
 -spec decompress_idx_to_kv_list(CompressedBin::bitstring(), KVList::db_chunk_kv())
         -> ResKeys::db_chunk_kv().
 decompress_idx_to_kv_list(<<>>, _KVList) ->
     [];
 decompress_idx_to_kv_list(Bin, KVList) ->
     IdxBitsSize = bits_for_number(bits_for_number(length(KVList) - 1)),
-    <<SigSize:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
+    SigSize = erlang:max(1, SigSize0),
     decompress_idx_to_kv_list_(Bin2, KVList, SigSize).
 
 %% @doc Helper for decompress_idx_to_kv_list/2.
@@ -1400,7 +1404,7 @@ decompress_idx_to_kv_list(Bin, KVList) ->
 decompress_idx_to_kv_list_(<<>>, _, _SigSize) ->
     [];
 decompress_idx_to_kv_list_(Bin, KVList, SigSize) ->
-     <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
     [X | KVList2] = lists:nthtail(KeyPosInc, KVList),
     [X | decompress_idx_to_kv_list_(T, KVList2, SigSize)].
 
