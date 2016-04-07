@@ -34,7 +34,7 @@ all()    ->
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
--define(EPSILON, 1.0e-8 * ?RT:n()).
+-define(EPSILON, 1.0e-7 * ?RT:n()).
 
 init_per_suite(Config) ->
     rt_SUITE:register_value_creator(),
