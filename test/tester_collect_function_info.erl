@@ -32,11 +32,15 @@ unittest_collect_module_info(Module, ParseState) ->
     ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     erlang:put(module, Module),
     ModuleFile = code:where_is_file(atom_to_list(Module) ++ ".beam"),
-    {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
-        = beam_lib:chunks(ModuleFile, [abstract_code]),
-    lists:foldl(fun(Chunk, InnerParseState) ->
-                        parse_chunk_log(Chunk, Module, InnerParseState)
-                end, ParseState, AbstractCode).
+    case beam_lib:chunks(ModuleFile, [abstract_code]) of
+        {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}} ->
+            lists:foldl(fun(Chunk, InnerParseState) ->
+                                parse_chunk_log(Chunk, Module, InnerParseState)
+                        end, ParseState, AbstractCode);
+        {ok, {Module, [{abstract_code, no_abstract_code}]}} ->
+            % ignore modules with no abstract code
+            ParseState
+    end.
 
 -spec collect_fun_info(module(), atom(), non_neg_integer(),
                        tester_parse_state:state()) -> tester_parse_state:state().
