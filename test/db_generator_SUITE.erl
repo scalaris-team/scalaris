@@ -43,6 +43,7 @@ init_per_suite(Config) ->
                                   random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
+    rt_SUITE:register_value_creator(),
     unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
@@ -51,6 +52,7 @@ end_per_suite(Config) ->
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    rt_SUITE:unregister_value_creator(),
     unittest_helper:stop_minimal_procs(Config),
     ok.
 

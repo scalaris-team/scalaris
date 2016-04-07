@@ -45,9 +45,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    rt_SUITE:register_value_creator(),
     unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
+    rt_SUITE:unregister_value_creator(),
     unittest_helper:stop_minimal_procs(Config),
     ok.
 

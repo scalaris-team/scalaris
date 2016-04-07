@@ -37,19 +37,25 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
-init_per_suite(Config) ->
+register_value_creator() ->
     case lists:member(?RT, [rt_chord, rt_frt, rt_gfrt, rt_simple]) of
         true -> ok;
         false -> tester:register_value_creator({typedef, ?RT, key, []},
                                                ?RT, create_key, 2)
-    end,
-    unittest_helper:start_minimal_procs(Config, [], true).
+    end.
 
-end_per_suite(Config) ->
+unregister_value_creator() ->
     case lists:member(?RT, [rt_chord, rt_frt, rt_gfrt, rt_simple]) of
         true -> ok;
         false -> tester:unregister_value_creator({typedef, ?RT, key, []})
-    end,
+    end.
+
+init_per_suite(Config) ->
+    register_value_creator(),
+    unittest_helper:start_minimal_procs(Config, [], true).
+
+end_per_suite(Config) ->
+    unregister_value_creator(),
     unittest_helper:stop_minimal_procs(Config),
     ok.
 

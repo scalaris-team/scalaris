@@ -60,6 +60,7 @@ init_per_suite(Config) ->
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
     tester:register_value_creator({typedef, intervals, non_empty_interval, []}, intervals, tester_create_non_empty_interval, 2),
+    rt_SUITE:register_value_creator(),
     Config.
 
 end_per_suite(_Config) ->
@@ -69,6 +70,7 @@ end_per_suite(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     tester:unregister_value_creator({typedef, intervals, non_empty_interval, []}),
+    rt_SUITE:unregister_value_creator(),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
