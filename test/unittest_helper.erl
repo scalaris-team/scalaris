@@ -149,7 +149,12 @@ make_symmetric_ring(Options) ->
                  | [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
         end,
     Pid = make_ring_generic(Options, NodeAddFun),
-    Size = config:read(replication_factor),
+    Size = case lists:keyfind(scale_ring_size_by, 1, Options) of
+               {scale_ring_size_by, Scale} ->
+                   Scale * config:read(replication_factor);
+               false ->
+                   config:read(replication_factor)
+           end,
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
