@@ -1434,7 +1434,8 @@ shash_compress_k_list(KVSet, OtherDBChunkOrig, OtherDBChunkOrigLen) ->
                                 true  -> {[CurPosX | AccX], CurPosX + 1}
                             end
                     end, {[], 0}, OtherDBChunkOrig),
-    compress_idx_list(lists:reverse(Pos_rev), OtherDBChunkOrigLen - 1, [], 0, 0).
+    compress_idx_list(lists:reverse(Pos_rev),
+                      erlang:max(0, OtherDBChunkOrigLen - 1), [], 0, 0).
 
 %% @doc Part of the resolve_req message processing of the SHash and Bloom RC
 %%      processes in phase 2 (trivial RC) at the non-initiator.
