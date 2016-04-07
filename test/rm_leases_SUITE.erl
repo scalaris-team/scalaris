@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -83,10 +83,10 @@ init_per_testcase(TestCase, Config) ->
     case TestCase of
         test_network_partition ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Ids = api_rt:get_evenly_spaced_keys(8),
-            unittest_helper:make_ring_with_ids(Ids, [{scale_ring_size_by, 2},
-                                                     {config, [{log_path, PrivDir},
-                                                               {leases, true}]}]),
+            %% this test case requires an even number of nodes
+            unittest_helper:make_symmetric_ring([{scale_ring_size_by, 2}, {config,
+                                                                           [{log_path, PrivDir},
+                                                                            {leases, true}]}]),
             ok;
         _ ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -213,10 +213,10 @@ propose_new_neighbor(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_network_partition(_Config) ->
-    % we create a ring with 8 nodes. For the odd nodes, we stop lease
-    % renewal and wait for the leases to time out. After that, we
-    % propose to the first (even) node to takeover the last (odd)
-    % node.
+    %% We create a ring with an even number of nodes. For the odd
+    %% nodes, we stop lease renewal and wait for the leases to time
+    %% out. After that, we propose to the first (even) node to
+    %% takeover the last (odd) node.
 
     DHTNodes = pid_groups:find_all(dht_node),
     IdsAndNodes = lists:sort(
@@ -240,19 +240,19 @@ test_network_partition(_Config) ->
                                 end),
     DHTNodePid = hd(DHTNodes),
 
-    % stop odd nodes
+    %% stop odd nodes
     _ = [lease_helper:intercept_lease_renew(Node) || {_Id, Node} <- OddNodes],
-    lease_helper:wait_for_number_of_valid_active_leases(4),
+    lease_helper:wait_for_number_of_valid_active_leases(length(DHTNodes) div 2),
 
     RMLeasesPid = pid_groups:pid_of(pid_groups:group_of(DHTNodePid), rm_leases),
 
-    % propose takeover
+    %% propose takeover
     {_Pred, PredRange, Lease} = get_pred_info(DHTNodePid),
     Result = {qread_done, fake_reqid, fake_round, Lease},
     Msg = {read_after_rm_change, PredRange, Result},
     %comm:send_local(RMLeasesPid, Msg),
 
-    % what do we expect to happen? takeover and merge should succeed
+    %% what do we expect to happen? takeover and merge should succeed
     wait_for_messages_after(RMLeasesPid, [merge_after_rm_change],
                             fun () ->
                                     comm:send_local(RMLeasesPid, Msg)
