@@ -390,11 +390,9 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            method = shash,
                            params = #shash_recon_struct{sig_size = SigSize,
                                                         p1e_p2 = P1E_p2} = Params,
-                           stats = Stats,             kv_list = KVList,
+                           kv_list = KVList,
                            misc = [{db_chunk, OtherDBChunk},
-                                   {oicount, OtherItemCount}],
-                           dest_recon_pid = DestReconPid,
-                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
+                                   {oicount, OtherItemCount}]}) ->
     ?TRACE1(_Msg, State),
     % this is similar to the trivial sync above and the bloom sync below
 
@@ -412,57 +410,12 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                           RestI, get_max_items()),
            NewState;
        true ->
-           CKVSize = length(NewKVList), CKidxSize = gb_sets:size(OtherDBChunk1),
-           StartResolve = CKVSize + CKidxSize > 0,
-           ?TRACE("Reconcile SHash Session=~p ; Diff=~B+~B",
-                  [rr_recon_stats:get(session_id, Stats), CKVSize, CKidxSize]),
-           if StartResolve andalso OtherItemCount > 0 ->
-                  % send idx of non-matching other items & KV-List of my diff items
-                  % start resolve similar to a trivial recon but using the full diff!
-                  % (as if non-initiator in trivial recon)
-                  {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, VSizeT}} =
-                      util:tc(fun() ->
-                                      compress_kv_list_p1e(
-                                        NewKVList, CKVSize, CKidxSize, P1E_p2)
-                              end),
-                  MyDiff = {MyDiffK, MyDiffV},
-                  P1E_p2_real = trivial_worst_case_failprob(
-                                  SigSizeT, CKVSize, CKidxSize),
-                  OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
-                  Params1 = Params#shash_recon_struct{db_chunk = []},
-                  OtherDiffIdx = shash_compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
-                                                       OtherItemCount),
-
-                  send(DestReconPid,
-                       {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()}),
-                  % the non-initiator will use key_upd_send and we must thus increase
-                  % the number of resolve processes here!
-                  NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
-                                                  {build_time, BuildTime}], Stats),
-                  NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
-                  ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
-                  NewState#rr_recon_state{stats = NewStats, stage = resolve,
-                                          params = Params1,
-                                          kv_list = [],
-                                          k_list = [K || {K, _V} <- ResortedKVOrigList],
-                                          misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
-              StartResolve -> % andalso OtherItemCount =:= 0 ->
-                  ?DBG_ASSERT(OtherItemCount =:= 0),
-                  % no need to send resolve_req message - the non-initiator already shut down
-                  % the other node does not have any items but there is a diff at our node!
-                  % start a resolve here:
-                  KList = [element(1, KV) || KV <- NewKVList],
-                  NewStats = send_resolve_request(
-                               Stats, KList, OwnerL, DestRRPid, true, false),
-                  NewState2 = NewState#rr_recon_state{stats = NewStats, stage = resolve},
-                  shutdown(sync_finished, NewState2);
-              OtherItemCount =:= 0 ->
-                  shutdown(sync_finished, NewState);
-              true -> % OtherItemCount > 0
-                  % must send resolve_req message for the non-initiator to shut down
-                  send(DestReconPid, {resolve_req, shutdown}),
-                  shutdown(sync_finished, NewState)
-           end
+           OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
+           Params1 = Params#shash_recon_struct{db_chunk = []},
+           phase2_run_trivial_on_diff(
+             NewKVList, OtherDBChunk1, OtherDBChunkOrig,
+             OtherItemCount, P1E_p2, gb_sets:size(OtherDBChunk1),
+             NewState#rr_recon_state{params = Params1})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
@@ -470,9 +423,7 @@ on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E, bf = BF},
                            stats = Stats,             kv_list = KVList,
-                           misc = [{item_count, MyPrevItemCount}],
-                           dest_recon_pid = DestReconPid,
-                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL}) ->
+                           misc = [{item_count, MyPrevItemCount}]}) ->
     ?TRACE1(_Msg, State),
     MyItemCount = MyPrevItemCount + length(DBList0),
     % no need to map keys since the other node's bloom filter was created with
@@ -491,60 +442,16 @@ on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            State#rr_recon_state{kv_list = NewKVList,
                                 misc = [{item_count, MyItemCount}]};
        true ->
-           FullDiffSize = length(NewKVList),
            % here, the failure probability is correct (in contrast to the
            % non-initiator) since we know how many item checks we perform with the BF
            P1E_p1 = bloom_worst_case_failprob(BF, MyItemCount),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
-           ?TRACE("Reconcile Bloom Session=~p ; Diff=~p",
-                  [rr_recon_stats:get(session_id, Stats1), FullDiffSize]),
-           if FullDiffSize > 0 andalso BFCount > 0 ->
-                  % start resolve similar to a trivial recon but using the full diff!
-                  % (as if non-initiator in trivial recon)
-                  % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-                  P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
-                  {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSize, VSize}} =
-                      util:tc(fun() ->
-                                      compress_kv_list_p1e(
-                                        NewKVList, FullDiffSize,
-                                        BFCount, P1E_p2)
-                              end),
-                  ?DBG_ASSERT(MyDiffK =/= <<>>), ?DBG_ASSERT(MyDiffV =/= <<>>),
-                  MyDiff = {MyDiffK, MyDiffV},
-                  P1E_p2_real = trivial_worst_case_failprob(
-                                  SigSize, FullDiffSize, BFCount),
-                  
-                  send(DestReconPid,
-                       {resolve_req, MyDiff, SigSize, VSize, comm:this()}),
-                  % the non-initiator will use key_upd_send and we must thus increase
-                  % the number of resolve processes here!
-                  NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
-                                                  {build_time, BuildTime}], Stats1),
-                  NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
-                  State#rr_recon_state{stats = NewStats, stage = resolve,
-                                       kv_list = [],
-                                       k_list = [K || {K, _V} <- ResortedKVOrigList],
-                                       misc = [{my_bin_diff_empty, false}]};
-              FullDiffSize > 0 -> % andalso BFCount =:= 0 ->
-                  ?DBG_ASSERT(BFCount =:= 0),
-                  % no need to send resolve_req message - the non-initiator already shut down
-                  % empty BF with diff at our node -> the other node does not have any items!
-                  % start a resolve here:
-                  NewStats = send_resolve_request(
-                               Stats1, [element(1, KV) || KV <- NewKVList], OwnerL,
-                               DestRRPid, true, false),
-                  NewState = State#rr_recon_state{stats = NewStats, stage = resolve,
-                                                  kv_list = NewKVList},
-                  shutdown(sync_finished, NewState);
-              BFCount =:= 0 -> % andalso FullDiffSize =:= 0 ->
-                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
-                                                               kv_list = NewKVList});
-              true -> % BFCount > 0, FullDiffSize =:= 0
-                  % must send resolve_req message for the non-initiator to shut down
-                  send(DestReconPid, {resolve_req, shutdown}),
-                  % note: kv_list has not changed, we can thus use the old State here:
-                  shutdown(sync_finished, State#rr_recon_state{stats = Stats1})
-           end
+           % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
+           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+           phase2_run_trivial_on_diff(
+             NewKVList, none, [], BFCount, P1E_p2, BFCount,
+             State#rr_recon_state{kv_list = NewKVList,
+                                  stats = Stats1})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -1561,6 +1468,80 @@ shash_bloom_perform_resolve(
     if ReqIdx =/= [] ->
            rr_recon_stats:inc([{rs_expected, 1}], NewStats1);
        true -> NewStats1
+    end.
+
+%% @doc Sets up a phase2 trivial synchronisation on the identified differences
+%%      where the mapping of the differences is not clear yet and only the
+%%      current node knows them.
+-spec phase2_run_trivial_on_diff(
+  UnidentifiedDiff::db_chunk_kv(), ReqKVSet::shash_kv_set() | none,
+  OtherDBChunkOrig::[HKey::non_neg_integer()], OtherItemCount::non_neg_integer(),
+  P1E_p2::float(), OtherCmpItemCount::non_neg_integer(), State::state())
+        -> NewState::state().
+phase2_run_trivial_on_diff(
+  UnidentifiedDiff, ReqKVSet, OtherDBChunkOrig, OtherItemCount, P1E_p2,
+  OtherCmpItemCount, % number of items the other nodes compares CKV entries with
+  State = #rr_recon_state{stats = Stats, dest_recon_pid = DestReconPid,
+                          dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
+    CKVSize = length(UnidentifiedDiff),
+    CKidxSize = case gb_sets:is_set(ReqKVSet) of
+                    true  -> gb_sets:size(ReqKVSet);
+                    false -> 0
+                end,
+    StartResolve = CKVSize + CKidxSize > 0,
+    ?TRACE("Reconcile SHash/Bloom Session=~p ; Diff=~B+~B",
+           [rr_recon_stats:get(session_id, Stats), CKVSize, CKidxSize]),
+    if StartResolve andalso OtherItemCount > 0 ->
+           % send idx of non-matching other items & KV-List of my diff items
+           % start resolve similar to a trivial recon but using the full diff!
+           % (as if non-initiator in trivial recon)
+           {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, VSizeT}} =
+               util:tc(fun() ->
+                               compress_kv_list_p1e(
+                                 UnidentifiedDiff, CKVSize, OtherCmpItemCount, P1E_p2)
+                       end),
+           ?DBG_ASSERT(?implies(not gb_sets:is_set(ReqKVSet), MyDiffK =/= <<>>)), % if no items to request
+           ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
+           MyDiff = {MyDiffK, MyDiffV},
+           P1E_p2_real = trivial_worst_case_failprob(
+                           SigSizeT, CKVSize, OtherCmpItemCount),
+
+           case gb_sets:is_set(ReqKVSet) of
+               true ->
+                   OtherDiffIdx = shash_compress_k_list(ReqKVSet, OtherDBChunkOrig,
+                                                        OtherItemCount),
+                   send(DestReconPid,
+                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()});
+               false ->
+                   send(DestReconPid,
+                        {resolve_req, MyDiff, SigSizeT, VSizeT, comm:this()})
+           end,
+           % the non-initiator will use key_upd_send and we must thus increase
+           % the number of resolve processes here!
+           NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
+                                           {build_time, BuildTime}], Stats),
+           NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
+           KList = [element(1, KV) || KV <- ResortedKVOrigList],
+           State#rr_recon_state{stats = NewStats, stage = resolve,
+                                kv_list = [],
+                                k_list = KList,
+                                misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
+       StartResolve -> % andalso OtherItemCount =:= 0 ->
+           ?DBG_ASSERT(OtherItemCount =:= 0),
+           % no need to send resolve_req message - the non-initiator already shut down
+           % the other node does not have any items but there is a diff at our node!
+           % start a resolve here:
+           KList = [element(1, KV) || KV <- UnidentifiedDiff],
+           NewStats = send_resolve_request(
+                        Stats, KList, OwnerL, DestRRPid, true, false),
+           NewState = State#rr_recon_state{stats = NewStats, stage = resolve},
+           shutdown(sync_finished, NewState);
+       OtherItemCount =:= 0 ->
+           shutdown(sync_finished, State);
+       true -> % OtherItemCount > 0, CKVSize =:= 0
+           % must send resolve_req message for the non-initiator to shut down
+           send(DestReconPid, {resolve_req, shutdown}),
+           shutdown(sync_finished, State)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
