@@ -1,4 +1,4 @@
-%% @copyright 2010-2014 Zuse Institute Berlin
+%% @copyright 2010-2014, 2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
                                        {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)}
                                end,
                     NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
-                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, second, NewOwner, ReplyPid),
+                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
                     {ok, State, OldSlideOp};
                 true ->
                     log:log("only change owner instead of split and change owner", []),

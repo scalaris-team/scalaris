@@ -139,10 +139,10 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_handover, 3}, %% sends messages
              {lease_takeover, 2}, %% sends messages
              {lease_takeover_after, 3}, %% sends messages
-             {lease_split, 5}, %% sends messages
+             {lease_split, 4}, %% sends messages
              {lease_merge, 3}, %% sends messages
              {lease_send_lease_to_node, 3}, %% sends messages
-             {lease_split_and_change_owner, 6}, %% sends messages
+             {lease_split_and_change_owner, 5}, %% sends messages
              {id, 1}, %% todo
              {split_range, 1}, %% todo
              {unittest_lease_update, 4}, %% only for unittests
@@ -681,15 +681,15 @@ test_split_prepare(DHTNode) ->
 
     % step1
     log:log("starting the split under test"),
-    l_on_cseq:lease_split(L, R1, R2, second, self()),            % trigger step
+    l_on_cseq:lease_split(L, R1, R2, self()),                    % trigger step
     ct:pal("intercepting msg"),
     StartMsg = receive                                           % intercept msg
-                   M = {l_on_cseq, split, _Lease, __R1, __R2, __Keep,
+                   M = {l_on_cseq, split, _Lease, __R1, __R2,
                         __ReplyTo, __PostAux} ->
                        M
                end,
     ct:pal("intercepted msg"),
-    {l_on_cseq, split, Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux} = StartMsg,
+    {l_on_cseq, split, Lease, _R1, _R2, _ReplyTo, _PostAux} = StartMsg,
     {Lease, LeftId, RightId, StartMsg}.
 
 
@@ -788,7 +788,7 @@ test_split_helper_for_4_steps(_Config,
 split_helper_do_step(DHTNode, StepTag, ModifyBeforeStep, Id) ->
     log:pal("doing ~p", [StepTag]),
     ReplyMsg = receive
-                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux, _Resp} ->
+                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
                        M
                end,
     ModifyBeforeStep(Id, Lease, DHTNode),
@@ -798,7 +798,7 @@ split_helper_do_step(DHTNode, StepTag, ModifyBeforeStep, Id) ->
 wait_for_split_message(DHTNode, StepTag) ->
     log:pal("waiting for ~p", [StepTag]),
     receive
-        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux, _Resp} ->
+        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
             %log:pal("got ~p", [M]),
             gen_component:bp_del(DHTNode, StepTag),
             watch_message(DHTNode, M)
@@ -983,7 +983,7 @@ block_message(Pid, WatchedMessage) ->
 block_split_request(Pid) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, split, _Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux} ->
+                {l_on_cseq, split, _Lease, _R1, _R2, _ReplyTo, _PostAux} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
@@ -994,7 +994,7 @@ block_split_request(Pid) ->
 block_split_reply(Pid, StepTag) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, StepTag, _Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux, _Resp} ->
+                {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
