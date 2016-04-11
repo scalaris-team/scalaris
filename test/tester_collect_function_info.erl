@@ -38,8 +38,8 @@ unittest_collect_module_info(Module, ParseState) ->
                                 parse_chunk_log(Chunk, Module, InnerParseState)
                         end, ParseState, AbstractCode);
         {ok, {Module, [{abstract_code, no_abstract_code}]}} ->
-            % ignore modules with no abstract code
-            ParseState
+            ?ct_fail("the module ~s was not compiled with debug_info~n~p",
+                     [Module, util:get_stacktrace()])
     end.
 
 -spec collect_fun_info(module(), atom(), non_neg_integer(),
