@@ -1,4 +1,4 @@
-% @copyright 2015 Zuse Institute Berlin
+% @copyright 2015-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ end_per_suite(_Config) ->
 test_collect_function_info(_Config) ->
     Modules = get_modules(code:get_path()),
     ParseState = tester_parse_state:new_parse_state(),
-    CollectorFun = 
+    CollectorFun =
         fun (Module, InnerParseState) ->
                 tester_collect_function_info:unittest_collect_module_info(Module, InnerParseState)
         end,
@@ -55,6 +55,17 @@ get_modules(Paths) ->
 
 get_modules_intern(Path) ->
     {ok, Files} = file:list_dir(Path),
-    [erlang:list_to_atom(string:left(File, length(File) - 5)) || File <- Files, 
-                                            length(File) > 5, 
-                                            string:right(File, 5) =:= ".beam"].
+    [erlang:list_to_atom(string:left(File, length(File) - 5)) || File <- Files,
+                                                                 length(File) > 5,
+                                                                 string:right(File, 5) =:= ".beam",
+                                                                 has_abstract_code(File)].
+
+-spec has_abstract_code(string()) -> boolean().
+has_abstract_code(FileName) ->
+    ModuleFile = code:where_is_file(FileName),
+    case beam_lib:chunks(ModuleFile, [abstract_code]) of
+        {ok, {_Module, [{abstract_code, {_AbstVersion, _AbstractCode}}]}} ->
+            true;
+        {ok, {_Module, [{abstract_code, no_abstract_code}]}} ->
+            false
+    end.
