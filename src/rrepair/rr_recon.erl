@@ -120,6 +120,7 @@
 -record(art_recon_struct,
         {
          art            = ?required(art_recon_struct, art)            :: art:art(),
+         reconPid       = undefined                                   :: comm:mypid() | undefined,
          branch_factor  = ?required(art_recon_struct, branch_factor)  :: pos_integer(),
          bucket_size    = ?required(art_recon_struct, bucket_size)    :: pos_integer()
         }).
@@ -317,9 +318,10 @@ on({start_recon, RMethod, Params} = _Msg,
             P1E_p1 = 0.0, % needs to be set at the end of phase 1!
             Misc1 = Misc;
         art ->
-            MySyncI = art:get_interval(Params#art_recon_struct.art),
+            #art_recon_struct{art = ART, reconPid = DestReconPid} = Params,
+            MySyncI = art:get_interval(ART),
             Params1 = Params,
-            DestReconPid = undefined,
+            ?DBG_ASSERT(DestReconPid =/= undefined),
             P1E_p1 = 0.0, % TODO
             Misc1 = Misc
     end,
@@ -477,8 +479,14 @@ on({'DOWN', MonitorRef, process, _Owner, _Info}, _State) ->
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% trivial/shash/bloom reconciliation sync messages
+%% trivial/shash/bloom/art reconciliation sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({resolve_req, shutdown} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = RMethod})
+  when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) ->
+    shutdown(sync_finished, State);
 
 on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
@@ -490,12 +498,6 @@ on({resolve_req, BinReqIdxPos} = _Msg,
         send_resolve_request(Stats, decompress_idx_to_k_list(BinReqIdxPos, KList),
                              OwnerL, DestRRPid, _Initiator = false, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
-
-on({resolve_req, shutdown} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = RMethod})
-  when (RMethod =:= bloom orelse RMethod =:= shash) ->
-    shutdown(sync_finished, State);
 
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
@@ -521,7 +523,8 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 
 on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = bloom}) ->
+                           method = RMethod})
+  when (RMethod =:= bloom orelse RMethod =:= art) ->
     ?TRACE1(_Msg, State),
     
     {DBChunkTree, _LastKey} =
@@ -537,7 +540,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            k_list = KList,            stats = Stats,
                            misc = [{my_bin_diff_empty, MyBinDiffEmpty}]})
-  when (RMethod =:= bloom orelse RMethod =:= shash) ->
+  when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) ->
     ?TRACE1(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx2: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(BinReqIdxPos),
@@ -995,18 +998,61 @@ begin_sync(OtherSyncStruct,
            State = #rr_recon_state{method = art, initiator = Initiator,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
+                                   dest_recon_pid = DestReconPid,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
     case Initiator of
         true ->
-            Stats1 = art_recon(MySyncStruct, OtherSyncStruct#art_recon_struct.art, State),
-            shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
-                                                         kv_list = []});
+            ART = OtherSyncStruct#art_recon_struct.art,
+            Stats1 = rr_recon_stats:set(
+                       [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
+            OtherItemCount = art:get_property(ART, items_count),
+            case merkle_tree:get_interval(MySyncStruct) =:= art:get_interval(ART) of
+                true ->
+                    {ASyncLeafs, NComp, NSkip, NLSync} =
+                        art_get_sync_leaves([merkle_tree:get_root(MySyncStruct)], ART,
+                                            [], 0, 0, 0),
+                    Diff = lists:append([merkle_tree:get_bucket(N) || N <- ASyncLeafs]),
+                    MyItemCount = merkle_tree:get_item_count(MySyncStruct),
+                    P1E = get_p1e(),
+                    % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
+                    P1E_p1_0 = bloom_worst_case_failprob(
+                                 art:get_property(ART, leaf_bf), MyItemCount),
+                    P1E_p1 = if P1E_p1_0 == 1 ->
+                                    log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
+                                            " - continuing with smallest possible failure probability",
+                                            [?MODULE, pid_groups:my_groupname(), self()]),
+                                    1 - 1.0e-16;
+                                true -> P1E_p1_0
+                             end,
+                    Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
+                    % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
+                    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+                    
+                    Stats3 = rr_recon_stats:inc([{tree_nodesCompared, NComp},
+                                                 {tree_compareSkipped, NSkip},
+                                                 {tree_leavesSynced, NLSync}], Stats2),
+                    
+                    phase2_run_trivial_on_diff(Diff, none, [], OtherItemCount,
+                                               P1E_p2, OtherItemCount,
+                                               State#rr_recon_state{stats = Stats3});
+                false when OtherItemCount =/= 0 ->
+                    % must send resolve_req message for the non-initiator to shut down
+                    send(DestReconPid, {resolve_req, shutdown}),
+                    shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
+                                                                 kv_list = []});
+                false ->
+                    shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
+                                                                 kv_list = []})
+            end;
         false ->
             SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                              {start_recon, art, MySyncStruct}}),
-            shutdown(sync_finished, State#rr_recon_state{kv_list = []})
+            case art:get_property(MySyncStruct#art_recon_struct.art, items_count) of
+                0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
+                _ -> State#rr_recon_state{struct = {}, stage = resolve}
+            end
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
@@ -1493,7 +1539,7 @@ phase2_run_trivial_on_diff(
                     false -> 0
                 end,
     StartResolve = CKVSize + CKidxSize > 0,
-    ?TRACE("Reconcile SHash/Bloom Session=~p ; Diff=~B+~B",
+    ?TRACE("Reconcile SHash/Bloom/ART Session=~p ; Diff=~B+~B",
            [rr_recon_stats:get(session_id, Stats), CKVSize, CKidxSize]),
     if StartResolve andalso OtherItemCount > 0 ->
            % send idx of non-matching other items & KV-List of my diff items
@@ -2138,69 +2184,6 @@ merkle_resolve_leaves_ckidx([], <<>>, DestRRPid, Stats, OwnerL, _Params,
 %% art recon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Starts a single resolve request for all given leaf nodes by joining
-%%      their intervals.
-%%      Returns the number of resolve requests (requests with feedback count 2).
--spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
-                     rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
-        -> ResolveExp::0..2.
-resolve_leaves([_|_] = Nodes, Dest, SID, OwnerL) ->
-    resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0);
-resolve_leaves([], _Dest, _SID, _OwnerL) ->
-    0.
-
-%% @doc Helper for resolve_leaves/4.
--spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
-                     rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
-                     Interval::intervals:interval(), Items::non_neg_integer())
-        -> ResolveExp::0..2.
-resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
-    ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
-    LeafInterval = merkle_tree:get_interval(Node),
-    IntervalNew = intervals:union(Interval, LeafInterval),
-    ItemsNew = Items + merkle_tree:get_item_count(Node),
-    resolve_leaves(Rest, Dest, SID, OwnerL, IntervalNew, ItemsNew);
-resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
-    Options = [{feedback_request, comm:make_global(OwnerL)}],
-    case intervals:is_empty(Interval) of
-        true -> 0;
-        _ ->
-            if Items > 0 ->
-                   send_local(OwnerL, {request_resolve, SID,
-                                       {interval_upd_send, Interval, Dest},
-                                       [{from_my_node, 1} | Options]}),
-                   2;
-               true ->
-                   % we know that we don't have data in this range, so we must
-                   % regenerate it from the other node
-                   % -> send him this request directly!
-                   send(Dest, {request_resolve, SID, {?interval_upd, Interval, []},
-                               [{from_my_node, 0} | Options]}),
-                   1
-            end
-    end.
-
--spec art_recon(MyTree::merkle_tree:merkle_tree(), art:art(), state())
-        -> rr_recon_stats:stats().
-art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
-                                      ownerPid = OwnerL,
-                                      stats = Stats }) ->
-    SID = rr_recon_stats:get(session_id, Stats),
-    NStats =
-        case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
-            true ->
-                {ASyncLeafs, NComp, NSkip, NLSync} =
-                    art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
-                                        [], 0, 0, 0),
-                ResolveExp = resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
-                rr_recon_stats:inc([{tree_nodesCompared, NComp},
-                                    {tree_compareSkipped, NSkip},
-                                    {tree_leavesSynced, NLSync},
-                                    {rs_expected, ResolveExp}], Stats);
-            false -> Stats
-        end,
-    rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
-
 %% @doc Gets all leaves in the merkle node list (recursively) which are not
 %%      present in the art structure.
 -spec art_get_sync_leaves(Nodes::NodeL, art:art(), ToSyncAcc::NodeL,
@@ -2572,6 +2555,7 @@ build_recon_struct(art, I, DBItems, _InitiatorMaxItems, _Params = {}) ->
                                         {keep_bucket, true}]),
     % create art struct:
     {#art_recon_struct{art = art:new(Tree, get_art_config()),
+                       reconPid = comm:this(),
                        branch_factor = BranchFactor,
                        bucket_size = BucketSize},
      _P1E_p1 = 0.0 % TODO
