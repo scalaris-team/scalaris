@@ -1215,8 +1215,8 @@ msg_size(_Msg, false) ->
 %%      bw_filter_fun/1.
 %% Recon:   start_recon (inside continue_recon) will be mapped,
 %%          ?check_nodes and ?check_nodes_response (merkle_tree) will also be mapped
-%% Resolve: ?key_upd and ?interval_upd will be mapped
-%%          key_upd_send and interval_upd_send are node-internal messages and will be ommited
+%% Resolve: ?key_upd will be mapped
+%%          key_upd_send is a node-internal message and will be ommited
 -spec bw_map_fun(comm:message(), Source::pid() | comm:mypid(),
                  Dest::pid() | comm:mypid())
         -> {unmapped, Msg::comm:message()} |
@@ -1233,8 +1233,6 @@ bw_map_fun(MsgI, Source, Dest) ->
            {recon_map | recon_map2, ExtSize::pos_integer()} |
            {resolve_map, ExtSize::pos_integer(), KVVLen::non_neg_integer()}.
 bw_map_fun({?key_upd, KVV, _ReqKeys} = Msg, _Source, _Dest, CalcMsgSize) ->
-    {resolve_map, msg_size(Msg, CalcMsgSize), length(KVV)};
-bw_map_fun({?interval_upd, _I, KVV} = Msg, _Source, _Dest, CalcMsgSize) ->
     {resolve_map, msg_size(Msg, CalcMsgSize), length(KVV)};
 
 bw_map_fun({X, MsgI, _Options} = Msg, Source, Dest, CalcMsgSize)

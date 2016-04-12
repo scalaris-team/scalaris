@@ -176,5 +176,6 @@
 -define(key_upd_atom, key_upd).
 -define(key_upd, ?int_or_atom(103, ?key_upd_atom)).
 
--define(interval_upd_atom, interval_upd).
--define(interval_upd, ?int_or_atom(104, ?interval_upd_atom)).
+% used in the past - do not re-use this integer for now!
+%% -define(interval_upd_atom, interval_upd).
+%% -define(interval_upd, ?int_or_atom(104, ?interval_upd_atom)).

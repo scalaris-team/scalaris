@@ -18,11 +18,7 @@
 %%         Modes:
 %%           1) key_upd: updates local db entries with received kvv-list, if received kv is newer
 %%           2) key_upd_send: creates kvv-list out of a given key-list and sends it to dest
-%%           3) interval_upd: works like key_upd +
-%%                            sends all own db entries which are not in received kvv-list
-%%                            to the feedback pid (if given)
-%%           4) interval_upd_send: creates kvv-list from given interval and sends it to dest
-%%           5) interval_upd_my: tries to resolve items from the given interval by
+%%           3) interval_upd_my: tries to resolve items from the given interval by
 %%                               requesting data from replica nodes
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
@@ -74,8 +70,6 @@
 -type operation() ::
     {?key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
     {key_upd_send, DestPid::comm:mypid(), SendKeys::[?RT:key()], ReqKeys::[?RT:key()]} |
-    {?interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
-    {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
     {interval_upd_my, intervals:interval()}.
 
 -record(rr_resolve_state,
@@ -211,87 +205,6 @@ on({get_entries_response, EntryList}, State =
     shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MODE: interval_upd
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = Op, stats = _Stats })
-  when element(1, Op) =:= ?interval_upd;
-       element(1, Op) =:= interval_upd_send ->
-    % map the given interval into MyI
-    % (rr_recon:map_interval/2 only works on quadrant sub-intervals):
-    OpSIs = intervals:get_simple_intervals(element(2, Op)),
-    ISec = lists:foldl(
-             fun(Q, AccJ) ->
-                     lists:foldl(
-                       fun(OpSI, AccI) ->
-                               OpI = intervals:simple_interval_to_interval(OpSI),
-                               I = intervals:intersection(OpI, Q),
-                               case intervals:is_empty(I) of
-                                   true  -> AccI;
-                                   false -> MI = rr_recon:map_interval(MyI, I),
-                                            intervals:union(AccI, MI)
-                               end
-                       end, AccJ, OpSIs)
-             end, intervals:empty(), rr_recon:quadrant_intervals()),
-    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p~n IntersecBounds=~p",
-           [util:extint2atom(element(1, Op)), _Stats#resolve_stats.session_id,
-            intervals:get_bounds(element(2, Op)),
-            MyI, intervals:get_bounds(ISec)]),
-    NewState = State#rr_resolve_state{ my_range = MyI },
-    case intervals:is_empty(ISec) of
-        false ->
-            send_local(pid_groups:get_my(dht_node), {get_entries, self(), ISec}),
-            NewState;
-        true ->
-            shutdown(resolve_abort, NewState)
-    end;
-
-on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {?interval_upd, I, KvvList},
-                          my_range = MyI,
-                          stats = Stats }) ->
-    MyIOtherKvvList = map_kvv_list(KvvList, MyI),
-    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(),
-                                        pid_groups:get_my(dht_node)),
-    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
-           [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate]),
-
-    % Send entries in sender interval but not in sent KvvList
-    % convert keys KvvList to a map for faster access checks
-    MyIOtherKvTree = make_other_kv_tree(MyIOtherKvvList),
-    % note: EntryList may not be unique! - it is made unique in shutdown/2 though
-    MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
-                                         not mymaps:is_key(db_entry:get_key(X), MyIOtherKvTree)],
-
-    % allow the garbage collection to clean up the KvvList here:
-    NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
-                                      stats = Stats#resolve_stats{diff_size = ToUpdate},
-                                      fb_send_kvv = MissingOnOther,
-                                      other_kv_tree = MyIOtherKvTree},
-    if ToUpdate =:= 0 ->
-           shutdown(resolve_ok, NewState);
-       true ->
-           % note: shutdown and feedback handled by update_key_entries_ack
-           NewState
-    end;
-
-on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
-                          fb_dest_pid = FBDest, from_my_node = FromMyNode,
-                          stats = Stats }) ->
-    SID = Stats#resolve_stats.session_id,
-    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [interval_upd_send, SID, length(EntryList)]),
-
-    % note: EntryList may not be unique!
-    KvvList = make_unique_kvv([entry_to_kvv(E) || E <- EntryList]),
-    send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
-                         FromMyNode, FBDest, []),
-    NewState = State#rr_resolve_state{fb_dest_pid = undefined},
-    shutdown(resolve_ok, NewState);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd_my
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -335,8 +248,7 @@ on({update_key_entries_ack, NewEntryList}, State =
                           fb_dest_pid = FBDest, fb_send_kvv = MissingOnOther,
                           other_kv_tree = MyIOtherKvTree
                         })
-  when element(1, Op) =:= ?key_upd;
-       element(1, Op) =:= ?interval_upd ->
+  when element(1, Op) =:= ?key_upd ->
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
            [util:extint2atom(element(1, Op)), Stats#resolve_stats.session_id,
             length(NewEntryList)]),
