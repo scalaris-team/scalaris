@@ -2452,6 +2452,7 @@ bloom_worst_case_failprob(_BF, 0) ->
     0.0;
 bloom_worst_case_failprob(BF, ItemCount) ->
     Fpr = bloom:get_property(BF, fpr),
+    ?DBG_ASSERT2(Fpr >= 0 andalso Fpr =< 1, Fpr),
     % 1 - math:pow(1 - Fpr, ItemCount).
     % more precise:
     if Fpr == 0.0 -> 0.0;
