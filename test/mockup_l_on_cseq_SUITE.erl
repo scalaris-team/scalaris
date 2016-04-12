@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2013, 2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -135,11 +135,10 @@ test_split(_Config) ->
     L = mockup_l_on_cseq:create_lease(rt_SUITE:number_to_key(0),
                                       rt_SUITE:number_to_key(16), comm:make_global(Pid)),
     % do split
-    Keep = second,
     Range = l_on_cseq:get_range(L),
     [R1, R2] = intervals:split(Range, 2),
     % evil, but l_on_cseq:lease_merge sends to a real dht_node
-    comm:send_local(Pid, {l_on_cseq, split, L, R1, R2, Keep, self(), empty}),
+    comm:send_local(Pid, {l_on_cseq, split, L, R1, R2, self(), empty}),
     {L1, L2} = receive
                    {split, success, NewL1, NewL2} ->
                        {NewL1, NewL2}
