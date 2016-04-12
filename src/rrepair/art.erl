@@ -30,7 +30,8 @@
 -include("scalaris.hrl").
 
 -export([new/1, new/2, default_config/0,
-         get_interval/1, get_correction_factor/1, get_config/1,
+         get_interval/1, get_config/1,
+         get_property/2,
          lookup/2]).
 -export([merkle_leaf_hf/2]).
 
@@ -94,11 +95,18 @@ new(Tree, Config0) ->
 get_interval({art, _CorFac, _IBfFpr, _LBfFpr, Interval, _IBF, _LBF}) -> Interval.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
--spec get_correction_factor(art()) -> non_neg_integer().
-get_correction_factor({art, CorFac, _IBfFpr, _LBfFpr,
-                       _Interval, _IBF, _LBF}) ->
-    CorFac.
+
+-spec get_property(art(), correction_factor) -> non_neg_integer();
+                  (art(), items_count) -> non_neg_integer();
+                  (art(), inner_bf | leaf_bf) -> bloom:bloom_filter().
+get_property({art, CorFac, _IBfFpr, _LBfFpr, _Interval, _IBF, _LBF}, correction_factor) ->
+    CorFac;
+get_property({art, _CorFac, _IBfFpr, _LBfFpr, _Interval, _IBF, LBF}, items_count) ->
+    bloom:get_property(LBF, items_count);
+get_property({art, _CorFac, _IBfFpr, _LBfFpr, _Interval, IBF, _LBF}, inner_bf) ->
+    IBF;
+get_property({art, _CorFac, _IBfFpr, _LBfFpr, _Interval, _IBF, LBF}, leaf_bf) ->
+    LBF.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
