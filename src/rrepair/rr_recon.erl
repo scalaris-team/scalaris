@@ -301,9 +301,11 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             ?DBG_ASSERT(Misc =:= []),
-            BF = bloom:new_bin(BFBin, ?REP_HFS:new(HfCount), BFCount),
+            Hfs = ?REP_HFS:new(HfCount),
+            BF = bloom:new_bin(BFBin, Hfs, BFCount),
             Params1 = Params#bloom_recon_struct{bf = BF},
-            Misc1 = [{item_count, 0}];
+            Misc1 = [{item_count, 0},
+                     {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), Hfs)}];
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             Params1 = Params,
@@ -413,11 +415,20 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
            Params1 = Params#shash_recon_struct{db_chunk = []},
+           CKidxSize = gb_sets:size(OtherDBChunk1),
+           StartResolve = NewKVList =/= [] orelse CKidxSize > 0,
+           OtherDiffIdx =
+               if StartResolve andalso OrigDBChunkLen > 0 ->
+                      shash_compress_k_list(OtherDBChunk1, OtherDBChunkOrig,
+                                            OrigDBChunkLen);
+                  true ->
+                      % no need to create a real OtherDiffIdx if phase2_run_trivial_on_diff/7 is not using it
+                      <<>>
+               end,
            phase2_run_trivial_on_diff(
-             NewKVList, OtherDBChunk1, OtherDBChunkOrig,
-             OrigDBChunkLen, P1E_p2, gb_sets:size(OtherDBChunk1),
-             NewState#rr_recon_state{params = Params1,
-                                     stats = Stats1})
+             NewKVList, OtherDiffIdx, CKidxSize, OrigDBChunkLen, P1E_p2,
+             CKidxSize, NewState#rr_recon_state{params = Params1,
+                                                stats = Stats1})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -425,9 +436,10 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E, bf = BF},
                            stats = Stats,             kv_list = KVList,
-                           misc = [{item_count, MyDBSize}]}) ->
+                           misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
     ?TRACE1(_Msg, State),
     MyDBSize1 = MyDBSize + length(DBList),
+    MyBF1 = bloom:add_list(MyBF, DBList),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
@@ -442,16 +454,25 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
-                                misc = [{item_count, MyDBSize1}]};
+                                misc = [{item_count, MyDBSize1}, {my_bf, MyBF1}]};
        true ->
            % here, the failure probability is correct (in contrast to the
-           % non-initiator) since we know how many item checks we perform with the BF
-           P1E_p1 = bloom_worst_case_failprob(BF, MyDBSize1),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
+           % non-initiator) since we know how many item checks we perform with
+           % the BF and how many checks the non-initiator will perform on MyBF1
+           P1E_p1_bf1_real = bloom_worst_case_failprob(BF, MyDBSize1),
+           P1E_p1_bf2_real = bloom_worst_case_failprob(MyBF1, BFCount),
+           P1E_p1_real = 1 - (1 - P1E_p1_bf1_real) * (1 - P1E_p1_bf2_real),
+           ?DBG_ASSERT(P1E_p1_real =< (_P1E_p1 = calc_n_subparts_p1e(2, P1E))),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
+           DiffBF = util:bin_xor(bloom:get_property(BF, filter),
+                                 bloom:get_property(MyBF1, filter)),
            % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
            phase2_run_trivial_on_diff(
-             NewKVList, none, [], BFCount, P1E_p2, BFCount,
+             NewKVList, DiffBF,
+             % note: this is not the number of (unmatched) elements but the binary size:
+             erlang:byte_size(erlang:term_to_binary(DiffBF, [compressed])),
+             BFCount, P1E_p2, BFCount,
              State#rr_recon_state{params = {}, kv_list = NewKVList,
                                   stats = Stats1})
     end;
@@ -521,10 +542,31 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
+on({resolve_req, DBChunk, DiffBF, SigSize, VSize, DestReconPid} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = bloom,            kv_list = KVList,
+                           struct = #bloom_recon_struct{bf = MyBFBin,
+                                                        hf_count = MyHfCount}}) ->
+    ?TRACE1(_Msg, State),
+    
+    {DBChunkTree, _LastKey} =
+        decompress_kv_list(DBChunk, [], SigSize, VSize, 0, 0),
+    
+    Hfs = ?REP_HFS:new(MyHfCount),
+    OtherBF = bloom:new_bin(util:bin_xor(MyBFBin, DiffBF),
+                            Hfs, 0), % fake item count (this is not used here!)
+    FBItems = [Key || X = {Key, _Version} <- KVList,
+                      not mymaps:is_key(compress_key(Key, SigSize),
+                                        DBChunkTree),
+                      not bloom:is_element(OtherBF, X)],
+
+    NewStats2 = shash_bloom_perform_resolve(
+                  State, DBChunkTree, SigSize, VSize, DestReconPid, FBItems),
+    shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
+
 on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = RMethod})
-  when (RMethod =:= bloom orelse RMethod =:= art) ->
+                           method = art}) ->
     ?TRACE1(_Msg, State),
     
     {DBChunkTree, _LastKey} =
@@ -889,11 +931,12 @@ begin_sync(_OtherSyncStruct = {},
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     BFBin = bloom:get_property(MySyncStruct#bloom_recon_struct.bf, filter),
+    MySyncStruct1 = MySyncStruct#bloom_recon_struct{bf = BFBin},
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                     {start_recon, bloom, MySyncStruct#bloom_recon_struct{bf = BFBin}}}),
+                     {start_recon, bloom, MySyncStruct1}}),
     case MySyncStruct#bloom_recon_struct.item_count of
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
-        _ -> State#rr_recon_state{struct = {}, stage = resolve}
+        _ -> State#rr_recon_state{struct = MySyncStruct1, stage = resolve}
     end;
 begin_sync(_OtherSyncStruct = {},
            State = #rr_recon_state{method = merkle_tree, initiator = false,
@@ -1037,7 +1080,7 @@ begin_sync(OtherSyncStruct,
                                          {tree_compareSkipped, NSkip},
                                          {tree_leavesSynced, NLSync}], Stats2),
             
-            phase2_run_trivial_on_diff(Diff, none, [], OtherItemCount,
+            phase2_run_trivial_on_diff(Diff, none, 0, OtherItemCount,
                                        P1E_p2, OtherItemCount,
                                        State#rr_recon_state{stats = Stats3});
         false when OtherItemCount =/= 0 ->
@@ -1519,23 +1562,19 @@ shash_bloom_perform_resolve(
 %%      where the mapping of the differences is not clear yet and only the
 %%      current node knows them.
 -spec phase2_run_trivial_on_diff(
-  UnidentifiedDiff::db_chunk_kv(), ReqKVSet::shash_kv_set() | none,
-  OtherDBChunkOrig::[HKey::non_neg_integer()], OtherItemCount::non_neg_integer(),
+  UnidentifiedDiff::db_chunk_kv(), OtherDiffIdx::bitstring() | none,
+  OtherDiffIdxSize::non_neg_integer(), OtherItemCount::non_neg_integer(),
   P1E_p2::float(), OtherCmpItemCount::non_neg_integer(), State::state())
         -> NewState::state().
 phase2_run_trivial_on_diff(
-  UnidentifiedDiff, ReqKVSet, OtherDBChunkOrig, OtherItemCount, P1E_p2,
+  UnidentifiedDiff, OtherDiffIdx, OtherDiffIdxSize, OtherItemCount, P1E_p2,
   OtherCmpItemCount, % number of items the other nodes compares CKV entries with
   State = #rr_recon_state{stats = Stats, dest_recon_pid = DestReconPid,
                           dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
     CKVSize = length(UnidentifiedDiff),
-    CKidxSize = case gb_sets:is_set(ReqKVSet) of
-                    true  -> gb_sets:size(ReqKVSet);
-                    false -> 0
-                end,
-    StartResolve = CKVSize + CKidxSize > 0,
+    StartResolve = CKVSize + OtherDiffIdxSize > 0,
     ?TRACE("Reconcile SHash/Bloom/ART Session=~p ; Diff=~B+~B",
-           [rr_recon_stats:get(session_id, Stats), CKVSize, CKidxSize]),
+           [rr_recon_stats:get(session_id, Stats), CKVSize, OtherDiffIdxSize]),
     if StartResolve andalso OtherItemCount > 0 ->
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
@@ -1545,21 +1584,17 @@ phase2_run_trivial_on_diff(
                                compress_kv_list_p1e(
                                  UnidentifiedDiff, CKVSize, OtherCmpItemCount, P1E_p2)
                        end),
-           ?DBG_ASSERT(?implies(not gb_sets:is_set(ReqKVSet), MyDiffK =/= <<>>)), % if no items to request
+           ?DBG_ASSERT(?implies(OtherDiffIdx =:= none, MyDiffK =/= <<>>)), % if no items to request
            ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
            MyDiff = {MyDiffK, MyDiffV},
            P1E_p2_real = trivial_worst_case_failprob(
                            SigSizeT, CKVSize, OtherCmpItemCount),
 
-           case gb_sets:is_set(ReqKVSet) of
-               true ->
-                   OtherDiffIdx = shash_compress_k_list(ReqKVSet, OtherDBChunkOrig,
-                                                        OtherItemCount),
-                   send(DestReconPid,
-                        {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()});
-               false ->
-                   send(DestReconPid,
-                        {resolve_req, MyDiff, SigSizeT, VSizeT, comm:this()})
+           case OtherDiffIdx of
+               none -> send(DestReconPid,
+                            {resolve_req, MyDiff, SigSizeT, VSizeT, comm:this()});
+               _    -> send(DestReconPid,
+                            {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()})
            end,
            % the non-initiator will use key_upd_send and we must thus increase
            % the number of resolve processes here!
@@ -1568,8 +1603,7 @@ phase2_run_trivial_on_diff(
            NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
            KList = [element(1, KV) || KV <- ResortedKVOrigList],
            State#rr_recon_state{stats = NewStats, stage = resolve,
-                                kv_list = [],
-                                k_list = KList,
+                                kv_list = [], k_list = KList,
                                 misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
        StartResolve -> % andalso OtherItemCount =:= 0 ->
            ?DBG_ASSERT(OtherItemCount =:= 0),
@@ -2430,13 +2464,11 @@ shash_compress_k_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
 %%      * the other node executes NrChecks number of checks
 %%      * the worst case, e.g. the other node has only items not in BF and
 %%        we need to account for the false positive probability
-%%      NOTE: reduces P1E for the two parts here (bloom and trivial RC)
 -spec bloom_fp(NrChecks::non_neg_integer(), P1E::float()) -> float().
 bloom_fp(NrChecks, P1E) ->
-    P1E_sub = calc_n_subparts_p1e(2, P1E),
-    % 1 - math:pow(1 - P1E_sub, 1 / erlang:max(NrChecks, 1)).
+    % 1 - math:pow(1 - P1E, 1 / erlang:max(NrChecks, 1)).
     % more precise:
-    calc_n_subparts_p1e(erlang:max(NrChecks, 1), P1E_sub).
+    calc_n_subparts_p1e(erlang:max(NrChecks, 1), P1E).
 
 %% @doc Calculates the worst-case failure probability of the bloom algorithm
 %%      with the Bloom filter and number of items to check inside the filter.
@@ -2447,6 +2479,15 @@ bloom_worst_case_failprob(_BF, 0) ->
     0.0;
 bloom_worst_case_failprob(BF, ItemCount) ->
     Fpr = bloom:get_property(BF, fpr),
+    bloom_worst_case_failprob_(Fpr, ItemCount).
+
+%% @doc Helper for bloom_worst_case_failprob/2.
+%% @see bloom_worst_case_failprob/2
+-spec bloom_worst_case_failprob_(
+        Fpr::float(), ItemCount::non_neg_integer()) -> float().
+bloom_worst_case_failprob_(_Fpr, 0) ->
+    0.0;
+bloom_worst_case_failprob_(Fpr, ItemCount) ->
     ?DBG_ASSERT2(Fpr >= 0 andalso Fpr =< 1, Fpr),
     % 1 - math:pow(1 - Fpr, ItemCount).
     % more precise:
@@ -2490,17 +2531,46 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
-    MaxItems = length(DBItems),
+    MyMaxItems = length(DBItems),
     P1E = get_p1e(),
-    FP = bloom_fp(InitiatorMaxItems, P1E),
-    BF0 = bloom:new_fpr(MaxItems, FP),
+    P1E_p1 = calc_n_subparts_p1e(2, P1E),
+    P1E_p1_bf = calc_n_subparts_p1e(2, P1E_p1), % one bloom filter on each side!
+    % decide for a common Bloom filter size (and number of hash functions)
+    % for an efficient diff BF - use a combination where both Bloom filters
+    % are below the targeted P1E_p1_bf (we may thus not reach P1E_p1 exactly):
+    FP1 = bloom_fp(InitiatorMaxItems, P1E_p1_bf),
+    FP2 = bloom_fp(MyMaxItems, P1E_p1_bf),
+    {K1, M1} = bloom:calc_HF_num_Size_opt(MyMaxItems, FP1),
+    {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FP2),
+%%     log:pal("My: ~B OtherMax: ~B~nbloom1: ~p~nbloom2: ~p",
+%%             [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
+    FP1_ok =
+        bloom_worst_case_failprob_(
+          bloom:calc_FPR(M1, MyMaxItems, K1), InitiatorMaxItems) =< P1E_p1_bf andalso
+        bloom_worst_case_failprob_(
+          bloom:calc_FPR(M1, InitiatorMaxItems, K1), MyMaxItems) =< P1E_p1_bf,
+    FP2_ok =
+        bloom_worst_case_failprob_(
+          bloom:calc_FPR(M2, MyMaxItems, K2), InitiatorMaxItems) =< P1E_p1_bf andalso
+        bloom_worst_case_failprob_(
+          bloom:calc_FPR(M2, InitiatorMaxItems, K2), MyMaxItems) =< P1E_p1_bf,
+    BF0 = if FP1_ok andalso FP2_ok andalso M1 =< M2 ->
+                 bloom:new(M1, ?REP_HFS:new(K1));
+             FP1_ok andalso FP2_ok andalso M1 > M2 ->
+                 bloom:new(M2, ?REP_HFS:new(K2));
+             FP1_ok ->
+                 bloom:new(M1, ?REP_HFS:new(K1));
+             FP2_ok ->
+                 bloom:new(M2, ?REP_HFS:new(K2))
+          end,
     HfCount = ?REP_HFS:size(bloom:get_property(BF0, hfs)),
     BF = bloom:add_list(BF0, DBItems),
     {#bloom_recon_struct{interval = I, reconPid = comm:this(),
-                         bf = BF, item_count = MaxItems,
+                         bf = BF, item_count = MyMaxItems,
                          hf_count = HfCount, p1e = P1E},
     % Note: we can only guess the number of items of the initiator here, so
     %       this is not exactly the P1E of phase 1!
+    %       (also we miss the returned BF's probability here)
      _P1E_p1 = bloom_worst_case_failprob(BF, InitiatorMaxItems)};
 build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),

@@ -479,6 +479,7 @@ tester_type_check_rrepair(_Config) ->
              {shash_signature_sizes, 3}, %% needs float > 0, < 1
              {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
              {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
+             {bloom_worst_case_failprob_, 2}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
              {calc_items_in_chunk, 2}, %% needs special input
