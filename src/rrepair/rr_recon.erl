@@ -93,7 +93,7 @@
          reconPid = undefined                                 :: comm:mypid() | undefined,
          db_chunk = ?required(shash_recon_struct, db_chunk)   :: bitstring() | {bitstring(), db_chunk_kv()} | [HKey::non_neg_integer()], % binary for transfer, the pair only temporarily (locally), a list of (hashed) keys on the initiator
          sig_size = ?required(shash_recon_struct, sig_size)   :: signature_size(),
-         p1e_p2   = ?required(shash_recon_struct, p1e_p2)     :: float()
+         p1e      = ?required(shash_recon_struct, p1e)        :: float()
         }).
 
 -record(bloom_recon_struct,
@@ -260,7 +260,7 @@ on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     build_struct(DBList, RestI, State);
 
 on({start_recon, RMethod, Params} = _Msg,
-   State = #rr_recon_state{dest_rr_pid = DestRRPid, stats = Stats, misc = Misc}) ->
+   State = #rr_recon_state{dest_rr_pid = DestRRPid, misc = Misc}) ->
     ?TRACE1(_Msg, State),
     % initiator got other node's sync struct or parameters over sync interval
     % (mapped to the initiator's range)
@@ -280,10 +280,8 @@ on({start_recon, RMethod, Params} = _Msg,
             OrigDBChunkLen = calc_items_in_chunk(element(2, DBChunk), VSize),
             {DBChunkTree, _LastKey} =
                 decompress_kv_list(DBChunk, [], SigSize, VSize, 0, 0),
-            % calculate P1E(phase1) from the point of view of the non-initiator:
-            P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen}}];
+            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}}];
         shash ->
             #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                 db_chunk = DBChunk, sig_size = SigSize} = Params,
@@ -294,11 +292,8 @@ on({start_recon, RMethod, Params} = _Msg,
             OrigDBChunkLen = length(DBChunkList),
             DBChunkSet = gb_sets:from_list(DBChunkList),
             Params1 = Params#shash_recon_struct{db_chunk = DBChunkList},
-            % calculate P1E(phase1) from the point of view of the non-initiator:
-            P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, OrigDBChunkLen),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, DBChunkSet},
-                     {oicount, OrigDBChunkLen}];
+            Misc1 = [{db_chunk, {DBChunkSet, OrigDBChunkLen, _MyDBSize = 0}}];
         bloom ->
             #bloom_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                 bf = BFBin, item_count = BFCount,
@@ -307,7 +302,6 @@ on({start_recon, RMethod, Params} = _Msg,
             fd:subscribe(self(), [DestRRPid]),
             ?DBG_ASSERT(Misc =:= []),
             BF = bloom:new_bin(BFBin, ?REP_HFS:new(HfCount), BFCount),
-            P1E_p1 = 0.0, % needs to be set when we know the number of chunks on this node!
             Params1 = Params#bloom_recon_struct{bf = BF},
             Misc1 = [{item_count, 0}];
         merkle_tree ->
@@ -315,14 +309,12 @@ on({start_recon, RMethod, Params} = _Msg,
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
-            P1E_p1 = 0.0, % needs to be set at the end of phase 1!
             Misc1 = Misc;
         art ->
             #art_recon_struct{art = ART, reconPid = DestReconPid} = Params,
             MySyncI = art:get_interval(ART),
             Params1 = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
-            P1E_p1 = 0.0, % TODO
             Misc1 = Misc
     end,
     % client only sends non-empty sync intervals or exits
@@ -330,12 +322,11 @@ on({start_recon, RMethod, Params} = _Msg,
     
     send_chunk_req(pid_groups:get_my(dht_node), self(),
                    MySyncI, get_max_items()),
-    NStats  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
     State#rr_recon_state{stage = reconciliation, params = Params1,
                          method = RMethod, initiator = true,
                          'sync_interval@I' = MySyncI,
                          dest_recon_pid = DestReconPid,
-                         stats = NStats, misc = Misc1};
+                         misc = Misc1};
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
@@ -344,10 +335,11 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                                           ver_size = VSize},
                            dest_rr_pid = DestRRPid,    stats = Stats,
                            ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
-                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen}}],
+                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}],
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
 
+    MyDBSize1 = MyDBSize + length(DBList),
     % identify items to send, request and the remaining (non-matched) DBChunk:
     {ToSend1, ToReqIdx1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize, VSize),
@@ -360,9 +352,12 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
-                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen}}]};
+                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]};
        true ->
-           NewStats = send_resolve_request(Stats, ToSend1, OwnerL, DestRRPid,
+           % note: the actual P1E(phase1) may be different from what the non-initiator expected
+           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
+           NewStats = send_resolve_request(Stats1, ToSend1, OwnerL, DestRRPid,
                                            true, true),
            % let the non-initiator's rr_recon process identify the remaining keys
            ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]
@@ -377,7 +372,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                end,
 
            ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
-                  [rr_recon_stats:get(session_id, Stats), length(ReqIdx),
+                  [rr_recon_stats:get(session_id, Stats1), length(ReqIdx),
                    erlang:bit_size(ToReq2)]),
            comm:send(DestReconPid, {resolve_req, ToReq2}),
            
@@ -389,21 +384,21 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
-                           method = shash,
+                           method = shash,            stats = Stats,
                            params = #shash_recon_struct{sig_size = SigSize,
-                                                        p1e_p2 = P1E_p2} = Params,
+                                                        p1e = P1E} = Params,
                            kv_list = KVList,
-                           misc = [{db_chunk, OtherDBChunk},
-                                   {oicount, OtherItemCount}]}) ->
+                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}]}) ->
     ?TRACE1(_Msg, State),
     % this is similar to the trivial sync above and the bloom sync below
 
+    MyDBSize1 = MyDBSize + length(DBList),
     % identify differing items and the remaining (non-matched) DBChunk:
     {NewKVList, OtherDBChunk1} =
         shash_get_full_diff(DBList, OtherDBChunk, KVList, SigSize),
-    NewState = State#rr_recon_state{kv_list = NewKVList,
-                                    misc = [{db_chunk, OtherDBChunk1},
-                                            {oicount, OtherItemCount}]},
+    NewState =
+        State#rr_recon_state{kv_list = NewKVList,
+                             misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]},
 
     %if rest interval is non empty start another sync
     SyncFinished = intervals:is_empty(RestI),
@@ -412,27 +407,32 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                           RestI, get_max_items()),
            NewState;
        true ->
+           % note: the actual P1E(phase1) may be different from what the non-initiator expected
+           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1),
+           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            OtherDBChunkOrig = Params#shash_recon_struct.db_chunk,
            Params1 = Params#shash_recon_struct{db_chunk = []},
            phase2_run_trivial_on_diff(
              NewKVList, OtherDBChunk1, OtherDBChunkOrig,
-             OtherItemCount, P1E_p2, gb_sets:size(OtherDBChunk1),
-             NewState#rr_recon_state{params = Params1})
+             OrigDBChunkLen, P1E_p2, gb_sets:size(OtherDBChunk1),
+             NewState#rr_recon_state{params = Params1,
+                                     stats = Stats1})
     end;
 
-on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
+on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E, bf = BF},
                            stats = Stats,             kv_list = KVList,
-                           misc = [{item_count, MyPrevItemCount}]}) ->
+                           misc = [{item_count, MyDBSize}]}) ->
     ?TRACE1(_Msg, State),
-    MyItemCount = MyPrevItemCount + length(DBList0),
+    MyDBSize1 = MyDBSize + length(DBList),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
-    Diff = if BFCount =:= 0 -> DBList0;
-              true -> [X || X <- DBList0, not bloom:is_element(BF, X)]
+    Diff = if BFCount =:= 0 -> DBList;
+              true -> [X || X <- DBList, not bloom:is_element(BF, X)]
            end,
     NewKVList = lists:append(KVList, Diff),
 
@@ -442,11 +442,11 @@ on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
-                                misc = [{item_count, MyItemCount}]};
+                                misc = [{item_count, MyDBSize1}]};
        true ->
            % here, the failure probability is correct (in contrast to the
            % non-initiator) since we know how many item checks we perform with the BF
-           P1E_p1 = bloom_worst_case_failprob(BF, MyItemCount),
+           P1E_p1 = bloom_worst_case_failprob(BF, MyDBSize1),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
@@ -2474,7 +2474,7 @@ build_recon_struct(trivial, I, DBItems, InitiatorMaxItems, _Params) ->
     {#trivial_recon_struct{interval = I, reconPid = comm:this(),
                            db_chunk = {MyDiffK, MyDiffV, ResortedKVOrigList},
                            sig_size = SigSize, ver_size = VSize},
-     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount)};
+     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems)};
 build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
@@ -2483,13 +2483,12 @@ build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
     P1E = get_p1e(),
     {DBChunkBin, SigSize} =
         shash_compress_k_list_p1e(DBItems, ItemCount, InitiatorMaxItems, P1E),
-    % NOTE: use left-over P1E after phase 1 (SHash) for phase 2 (trivial RC)
-    P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, ItemCount),
-    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
     {#shash_recon_struct{interval = I, reconPid = comm:this(),
                          db_chunk = DBChunkBin, sig_size = SigSize,
-                         p1e_p2 = P1E_p2},
-     P1E_p1};
+                         p1e = P1E},
+    % Note: we can only guess the number of items of the initiator here, so
+    %       this is not exactly the P1E of phase 1!
+     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems)};
 build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
@@ -2507,7 +2506,7 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
                          hf_count = HfCount, p1e = P1E},
     % Note: we can only guess the number of items of the initiator here, so
     %       this is not exactly the P1E of phase 1!
-     _P1E_p1 = bloom_worst_case_failprob(BF, MaxItems)};
+     _P1E_p1 = bloom_worst_case_failprob(BF, InitiatorMaxItems)};
 build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     P1E_p1 = 0.0, % needs to be set at the end of phase 1!
