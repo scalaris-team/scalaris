@@ -829,14 +829,7 @@ build_struct(DBList, RestI,
     ?DBG_ASSERT(?implies(RMethod =/= merkle_tree andalso RMethod =/= art,
                          not Initiator)),
     % note: RestI already is a sub-interval of the sync interval
-    BeginSync =
-        case intervals:is_empty(RestI) of
-            false ->
-                send_chunk_req(pid_groups:get_my(dht_node), self(),
-                               RestI, get_max_items()),
-                false;
-            true -> true
-        end,
+    BeginSync = intervals:is_empty(RestI),
     NewKVList = lists:append(KVList, DBList),
     if BeginSync ->
            ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
@@ -853,6 +846,8 @@ build_struct(DBList, RestI,
                                            kv_list = NewKVList},
            begin_sync(Params, NewState#rr_recon_state{stage = reconciliation});
        true ->
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, get_max_items()),
            % keep stage (at initiator: reconciliation, at other: build_struct)
            State#rr_recon_state{kv_list = NewKVList}
     end.
@@ -900,159 +895,159 @@ begin_sync(_OtherSyncStruct = {},
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{struct = {}, stage = resolve}
     end;
-begin_sync(_OtherSyncStruct,
-           State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
+begin_sync(_OtherSyncStruct = {},
+           State = #rr_recon_state{method = merkle_tree, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
-                                   params = Params,
-                                   dest_recon_pid = DestReconPid,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
-    case Initiator of
-        true ->
-            MTSize = merkle_tree:size_detail(MySyncStruct),
-            Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
-            #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
-                           ni_item_count = OtherItemsCount} = Params,
-            MyItemCount = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
-            ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~n"
-                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-                          [length(MySyncStruct), MTSize,
-                           length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-                                         merkle_tree:is_empty(L)])]),
-            P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
-            P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
-
-            {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
-                merkle_next_signature_sizes(Params, P1ETotal3, MyItemCount,
-                                            OtherItemsCount),
-
-            Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
-            send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount}),
-            State#rr_recon_state{stats = Stats1,
-                                 misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
-                                         {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
-                                         {p1e_phase_x, P1ETotal2},
-                                         {icount, MyItemCount},
-                                         {oicount, OtherItemsCount}],
-                                 kv_list = []};
-        false ->
-            % tell the initiator to create its struct first, and then build ours
-            % (at this stage, we do not have any data in the merkle tree yet!)
-            DBItems = State#rr_recon_state.kv_list,
-            MerkleI = merkle_tree:get_interval(MySyncStruct),
-            MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
-            MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
-            NumTrees = get_merkle_num_trees(),
-            P1ETotal = get_p1e(),
-            P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
-            
-            % split interval first and create NumTrees merkle trees later
-            {BuildTime1, ICBList} =
-                util:tc(fun() ->
-                                merkle_tree:keys_to_intervals(
-                                  DBItems, intervals:split(MerkleI, NumTrees))
-                        end),
-            ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
-            P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
-
-            MySyncParams = #merkle_params{interval = MerkleI,
-                                          branch_factor = MerkleV,
-                                          bucket_size = MerkleB,
-                                          num_trees = NumTrees,
-                                          p1e = P1ETotal,
-                                          ni_item_count = ItemCount},
-            SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
-            SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                             {start_recon, merkle_tree, SyncParams}}),
-            
-            % finally create the real merkle tree containing data
-            % -> this way, the initiator can create its struct in parallel!
-            {BuildTime2, SyncStruct} =
-                util:tc(fun() ->
-                                [merkle_tree:get_root(
-                                   merkle_tree:new(SubI, Bucket,
-                                                   [{keep_bucket, true},
-                                                    {branch_factor, MerkleV},
-                                                    {bucket_size, MerkleB}]))
-                                   || {SubI, _Count, Bucket} <- ICBList]
-                        end),
-            MTSize = merkle_tree:size_detail(SyncStruct),
-            Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
-            Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
-            ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
-                          "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-                          [length(SyncStruct), MTSize,
-                           length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-                                         merkle_tree:is_empty(L)])]),
-            
-            State#rr_recon_state{struct = SyncStruct,
-                                 stats = Stats2, params = MySyncParams,
-                                 misc = [{p1e, P1ETotal3},
-                                         {p1e_phase_x, P1ETotal2},
-                                         {icount, ItemCount}],
-                                 kv_list = []}
+    % tell the initiator to create its struct first, and then build ours
+    % (at this stage, we do not have any data in the merkle tree yet!)
+    DBItems = State#rr_recon_state.kv_list,
+    MerkleI = merkle_tree:get_interval(MySyncStruct),
+    MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
+    MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
+    NumTrees = get_merkle_num_trees(),
+    P1ETotal = get_p1e(),
+    P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
+    
+    % split interval first and create NumTrees merkle trees later
+    {BuildTime1, ICBList} =
+        util:tc(fun() ->
+                        merkle_tree:keys_to_intervals(
+                          DBItems, intervals:split(MerkleI, NumTrees))
+                end),
+    ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
+    P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+    
+    MySyncParams = #merkle_params{interval = MerkleI,
+                                  branch_factor = MerkleV,
+                                  bucket_size = MerkleB,
+                                  num_trees = NumTrees,
+                                  p1e = P1ETotal,
+                                  ni_item_count = ItemCount},
+    SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
+    SID = rr_recon_stats:get(session_id, Stats),
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+                     {start_recon, merkle_tree, SyncParams}}),
+    
+    % finally create the real merkle tree containing data
+    % -> this way, the initiator can create its struct in parallel!
+    {BuildTime2, SyncStruct} =
+        util:tc(fun() ->
+                        [merkle_tree:get_root(
+                           merkle_tree:new(SubI, Bucket,
+                                           [{keep_bucket, true},
+                                            {branch_factor, MerkleV},
+                                            {bucket_size, MerkleB}]))
+                           || {SubI, _Count, Bucket} <- ICBList]
+                end),
+    MTSize = merkle_tree:size_detail(SyncStruct),
+    Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
+    Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
+    ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
+                  "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                  [length(SyncStruct), MTSize,
+                   length([ok || L <- merkle_tree:get_leaves(SyncStruct),
+                                 merkle_tree:is_empty(L)])]),
+    
+    State#rr_recon_state{struct = SyncStruct,
+                         stats = Stats2, params = MySyncParams,
+                         misc = [{p1e, P1ETotal3},
+                                 {p1e_phase_x, P1ETotal2},
+                                 {icount, ItemCount}],
+                         kv_list = []};
+begin_sync(OtherSyncStruct,
+           State = #rr_recon_state{method = merkle_tree, initiator = true,
+                                   struct = MySyncStruct, stats = Stats,
+                                   dest_recon_pid = DestReconPid}) ->
+    ?TRACE("BEGIN SYNC", []),
+    MTSize = merkle_tree:size_detail(MySyncStruct),
+    Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
+    #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
+                   ni_item_count = OtherItemsCount} = OtherSyncStruct,
+    MyItemCount =
+        lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
+    ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~n"
+                  "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+                  [length(MySyncStruct), MTSize,
+                   length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
+                                 merkle_tree:is_empty(L)])]),
+    P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
+    P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+    
+    {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
+        merkle_next_signature_sizes(OtherSyncStruct, P1ETotal3, MyItemCount,
+                                    OtherItemsCount),
+    
+    Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
+    send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount}),
+    State#rr_recon_state{stats = Stats1,
+                         misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
+                                 {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
+                                 {p1e_phase_x, P1ETotal2},
+                                 {icount, MyItemCount},
+                                 {oicount, OtherItemsCount}],
+                         kv_list = []};
+begin_sync(_OtherSyncStruct = {},
+           State = #rr_recon_state{method = art, initiator = false,
+                                   struct = MySyncStruct,
+                                   ownerPid = OwnerL, stats = Stats,
+                                   dest_rr_pid = DestRRPid}) ->
+    ?TRACE("BEGIN SYNC", []),
+    SID = rr_recon_stats:get(session_id, Stats),
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+                     {start_recon, art, MySyncStruct}}),
+    case art:get_property(MySyncStruct#art_recon_struct.art, items_count) of
+        0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
+        _ -> State#rr_recon_state{struct = {}, stage = resolve}
     end;
 begin_sync(OtherSyncStruct,
-           State = #rr_recon_state{method = art, initiator = Initiator,
-                                   struct = MySyncStruct,
-                                   ownerPid = OwnerL, stats = Stats,
-                                   dest_recon_pid = DestReconPid,
-                                   dest_rr_pid = DestRRPid}) ->
+           State = #rr_recon_state{method = art, initiator = true,
+                                   struct = MySyncStruct, stats = Stats,
+                                   dest_recon_pid = DestReconPid}) ->
     ?TRACE("BEGIN SYNC", []),
-    case Initiator of
+    ART = OtherSyncStruct#art_recon_struct.art,
+    Stats1 = rr_recon_stats:set(
+               [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
+    OtherItemCount = art:get_property(ART, items_count),
+    case merkle_tree:get_interval(MySyncStruct) =:= art:get_interval(ART) of
         true ->
-            ART = OtherSyncStruct#art_recon_struct.art,
-            Stats1 = rr_recon_stats:set(
-                       [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
-            OtherItemCount = art:get_property(ART, items_count),
-            case merkle_tree:get_interval(MySyncStruct) =:= art:get_interval(ART) of
-                true ->
-                    {ASyncLeafs, NComp, NSkip, NLSync} =
-                        art_get_sync_leaves([merkle_tree:get_root(MySyncStruct)], ART,
-                                            [], 0, 0, 0),
-                    Diff = lists:append([merkle_tree:get_bucket(N) || N <- ASyncLeafs]),
-                    MyItemCount = merkle_tree:get_item_count(MySyncStruct),
-                    P1E = get_p1e(),
-                    % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
-                    P1E_p1_0 = bloom_worst_case_failprob(
-                                 art:get_property(ART, leaf_bf), MyItemCount),
-                    P1E_p1 = if P1E_p1_0 == 1 ->
-                                    log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
-                                            " - continuing with smallest possible failure probability",
-                                            [?MODULE, pid_groups:my_groupname(), self()]),
-                                    1 - 1.0e-16;
-                                true -> P1E_p1_0
-                             end,
-                    Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
-                    % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
-                    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
-                    
-                    Stats3 = rr_recon_stats:inc([{tree_nodesCompared, NComp},
-                                                 {tree_compareSkipped, NSkip},
-                                                 {tree_leavesSynced, NLSync}], Stats2),
-                    
-                    phase2_run_trivial_on_diff(Diff, none, [], OtherItemCount,
-                                               P1E_p2, OtherItemCount,
-                                               State#rr_recon_state{stats = Stats3});
-                false when OtherItemCount =/= 0 ->
-                    % must send resolve_req message for the non-initiator to shut down
-                    send(DestReconPid, {resolve_req, shutdown}),
-                    shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
-                                                                 kv_list = []});
-                false ->
-                    shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
-                                                                 kv_list = []})
-            end;
+            {ASyncLeafs, NComp, NSkip, NLSync} =
+                art_get_sync_leaves([merkle_tree:get_root(MySyncStruct)], ART,
+                                    [], 0, 0, 0),
+            Diff = lists:append([merkle_tree:get_bucket(N) || N <- ASyncLeafs]),
+            MyItemCount = merkle_tree:get_item_count(MySyncStruct),
+            P1E = get_p1e(),
+            % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
+            P1E_p1_0 = bloom_worst_case_failprob(
+                         art:get_property(ART, leaf_bf), MyItemCount),
+            P1E_p1 = if P1E_p1_0 == 1 ->
+                            log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
+                                    " - continuing with smallest possible failure probability",
+                                    [?MODULE, pid_groups:my_groupname(), self()]),
+                            1 - 1.0e-16;
+                        true -> P1E_p1_0
+                     end,
+            Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
+            % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
+            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+            
+            Stats3 = rr_recon_stats:inc([{tree_nodesCompared, NComp},
+                                         {tree_compareSkipped, NSkip},
+                                         {tree_leavesSynced, NLSync}], Stats2),
+            
+            phase2_run_trivial_on_diff(Diff, none, [], OtherItemCount,
+                                       P1E_p2, OtherItemCount,
+                                       State#rr_recon_state{stats = Stats3});
+        false when OtherItemCount =/= 0 ->
+            % must send resolve_req message for the non-initiator to shut down
+            send(DestReconPid, {resolve_req, shutdown}),
+            shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
+                                                         kv_list = []});
         false ->
-            SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                             {start_recon, art, MySyncStruct}}),
-            case art:get_property(MySyncStruct#art_recon_struct.art, items_count) of
-                0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
-                _ -> State#rr_recon_state{struct = {}, stage = resolve}
-            end
+            shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
+                                                         kv_list = []})
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
