@@ -71,7 +71,7 @@ new_fpr(MaxItems, FPR, Hfs) ->
 
 %% @doc Creates a new bloom filter with the given hash function set and a fixed
 %%      number of bits per item.
--spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::float(), ?REP_HFS:hfs())
+-spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::number(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
     new_(util:ceil(BitPerItem * MaxItems), Hfs).
