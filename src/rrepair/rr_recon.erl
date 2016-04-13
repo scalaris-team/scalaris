@@ -452,7 +452,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
            phase2_run_trivial_on_diff(
              NewKVList, none, [], BFCount, P1E_p2, BFCount,
-             State#rr_recon_state{kv_list = NewKVList,
+             State#rr_recon_state{params = {}, kv_list = NewKVList,
                                   stats = Stats1})
     end;
 
