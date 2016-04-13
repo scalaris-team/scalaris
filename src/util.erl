@@ -1396,11 +1396,11 @@ if_verbose(String, Fmt) ->
 bin_xor(Binary1, Binary2) ->
     BitSize1 = erlang:bit_size(Binary1),
     BitSize2 = erlang:bit_size(Binary2),
-    <<BinNr1:BitSize1>> = Binary1,
-    <<BinNr2:BitSize2>> = Binary2,
+    <<BinNr1:BitSize1/little>> = Binary1,
+    <<BinNr2:BitSize2/little>> = Binary2,
     ResNr = BinNr1 bxor BinNr2,
     ResSize = erlang:max(BitSize1, BitSize2),
-    <<ResNr:ResSize>>.
+    <<ResNr:ResSize/little>>.
 
 -ifdef(enable_debug).
 -spec extint2atom(atom()) -> atom().
