@@ -27,8 +27,9 @@
 
 -include("scalaris.hrl").
 
--export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3,
-         add/2, add_list/2, is_element/2, item_count/1]).
+-export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
+         add/2, add_list/2, is_element/2, item_count/1,
+         calc_HF_num_Size_opt/2, calc_FPR/3]).
 -export([equals/2, join/2, print/1]).
 
 % for tests:
@@ -59,7 +60,7 @@
 -spec new_fpr(MaxItems::non_neg_integer(), FPR::float()) -> bloom_filter().
 new_fpr(MaxItems, FPR) ->
     {K, Size} = calc_HF_num_Size_opt(MaxItems, FPR),
-    new_(Size, ?REP_HFS:new(K)).
+    new(Size, ?REP_HFS:new(K)).
 
 %% @doc Creates a new bloom filter with the given hash function set
 %%      based on the given false positive rate.
@@ -67,14 +68,14 @@ new_fpr(MaxItems, FPR) ->
         -> bloom_filter().
 new_fpr(MaxItems, FPR, Hfs) ->
     Size = calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)),
-    new_(Size, Hfs).
+    new(Size, Hfs).
 
 %% @doc Creates a new bloom filter with the given hash function set and a fixed
 %%      number of bits per item.
 -spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::number(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
-    new_(util:ceil(BitPerItem * MaxItems), Hfs).
+    new(util:ceil(BitPerItem * MaxItems), Hfs).
 
 %% @doc Creates a new bloom filter with the given binary, hash function set and
 %%      item count.
@@ -86,8 +87,8 @@ new_bin(Filter, Hfs, ItemsCount) ->
     #bloom{size = BitSize, filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
 %% @doc Creates a new bloom filter.
--spec new_(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
-new_(BitSize, Hfs) ->
+-spec new(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
+new(BitSize, Hfs) ->
     NewSize = resize(BitSize, 8),
     ?DBG_ASSERT((NewSize rem 8) =:= 0),
     #bloom{size = NewSize, hfs = Hfs, items_count = 0}.
