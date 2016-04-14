@@ -236,17 +236,6 @@ start_first_services() ->
     util:if_verbose("~p start first services...~n", [?MODULE]),
     util:if_verbose("~p start randoms...~n", [?MODULE]),
     randoms:start(),
-    util:if_verbose("~p start config...~n", [?MODULE]),
-    ErrorLoggerFile = filename:join(config:read(log_path),
-                                    config:read(log_file_name_errorlogger)),
-    ok = filelib:ensure_dir(ErrorLoggerFile),
-    util:if_verbose("~p error logger file ~p.~n", [?MODULE, ErrorLoggerFile]),
-    case error_logger:logfile({open, ErrorLoggerFile}) of
-        ok -> ok;
-        {error, Reason} ->
-            error_logger:error_msg("cannot open logfile ~.0p: ~.0p",
-                                   [ErrorLoggerFile, Reason])
-    end,
     util:if_verbose("~p start inets~n", [?MODULE]),
     _ = inets:start(),
 
@@ -299,10 +288,6 @@ start_mnesia() ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_string(log_path) and
-    config:cfg_is_string(log_file_name_errorlogger) and
-    config:cfg_test_and_error(log_path, fun(X) -> X =/= config:read(log_file_name_errorlogger) end,
-                          "is not different from log_file_name_errorlogger") and
     config:cfg_is_integer(nodes_per_vm) and
     config:cfg_is_port(yaws_port) and
     config:cfg_is_string(docroot) and
