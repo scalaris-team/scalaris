@@ -276,9 +276,8 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a map for faster access checks
-            OrigDBChunkLen = calc_items_in_chunk(element(2, DBChunk), VSize),
-            {DBChunkTree, _LastKey} =
-                decompress_kv_list(DBChunk, [], SigSize, VSize, 0, 0),
+            {DBChunkTree, _LastKey, OrigDBChunkLen} =
+                decompress_kv_list(DBChunk, SigSize, VSize, 0),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}}];
         shash ->
@@ -287,9 +286,8 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_set for faster access checks
-            {DBChunkSet, _LastKey} =
-                decompress_kv_list({DBChunk, <<>>}, [], SigSize, 0, 0, 0),
-            OrigDBChunkLen = mymaps:size(DBChunkSet), % TODO: use real item count!
+            {DBChunkSet, _LastKey, OrigDBChunkLen} =
+                decompress_kv_list({DBChunk, <<>>}, SigSize, 0, 0),
             %DBChunkSet = mymaps:from_list(DBChunkList),
             Params1 = Params#shash_recon_struct{db_chunk = <<>>},
             ?DBG_ASSERT(Misc =:= []),
@@ -536,8 +534,8 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 %%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
     ?DBG_ASSERT(SigSize >= 0 andalso VSize >= 0),
 
-    {DBChunkTree, _LastKey} =
-        decompress_kv_list(OtherDBChunk, [], SigSize, VSize, 0, 0),
+    {DBChunkTree, _LastKey, _OrigDBChunkLen} =
+        decompress_kv_list(OtherDBChunk, SigSize, VSize, 0),
     MyDiffKV = decompress_idx_to_kv_list(MyDiffIdx, KVList),
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
     FBItems = [Key || {Key, _Version} <- MyDiffKV,
@@ -556,8 +554,8 @@ on({resolve_req, DBChunk, DiffBF, SigSize, VSize, DestReconPid} = _Msg,
                                                         hf_count = MyHfCount}}) ->
     ?TRACE1(_Msg, State),
     
-    {DBChunkTree, _LastKey} =
-        decompress_kv_list(DBChunk, [], SigSize, VSize, 0, 0),
+    {DBChunkTree, _LastKey, _OrigDBChunkLen} =
+        decompress_kv_list(DBChunk, SigSize, VSize, 0),
     
     Hfs = ?REP_HFS:new(MyHfCount),
     OtherBF = bloom:new_bin(util:bin_xor(MyBFBin, DiffBF),
@@ -576,8 +574,8 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                            method = art}) ->
     ?TRACE1(_Msg, State),
     
-    {DBChunkTree, _LastKey} =
-        decompress_kv_list(DBChunk, [], SigSize, VSize, 0, 0),
+    {DBChunkTree, _LastKey, _OrigDBChunkLen} =
+        decompress_kv_list(DBChunk, SigSize, VSize, 0),
 
     NewStats2 = shash_bloom_perform_resolve(
                   State, DBChunkTree, SigSize, VSize, DestReconPid, []),
@@ -1193,21 +1191,20 @@ compress_kv_list([], {AccDiff, AccV}, _SigSize, _VSize, PrevKey, _KeyComprFun) -
 %% @doc De-compresses the binary from compress_kv_list/6 into a map with a
 %%      binary key representation and the integer of the (shortened) version.
 -spec decompress_kv_list(CompressedBin::{KeyDiff::bitstring(), VBin::bitstring()},
-                         AccList::[{KeyBin::bitstring(), {VersionShort::non_neg_integer(), Idx::non_neg_integer()}}],
                          SigSize::signature_size(), VSize::signature_size(),
-                         CurPos::non_neg_integer(), PrevKey::non_neg_integer())
-        -> {ResTree::kvi_tree(), LastKey::non_neg_integer()}.
-decompress_kv_list({<<>>, <<>>}, AccList, _SigSize, _VSize, _CurPos, PrevKey) ->
-    {mymaps:from_list(AccList), PrevKey};
-decompress_kv_list({KeyDiff, VBin}, AccList, SigSize, VSize, CurPos, PrevKey) ->
-    KList = decompress_idx_list(KeyDiff, PrevKey, util:pow(2, SigSize) - 1),
+                         PrevKey::non_neg_integer())
+        -> {ResTree::kvi_tree(), LastKey::non_neg_integer(), NumKeys::non_neg_integer()}.
+decompress_kv_list({<<>>, <<>>}, _SigSize, _VSize, PrevKey) ->
+    {mymaps:new(), PrevKey, 0};
+decompress_kv_list({KeyDiff, VBin}, SigSize, VSize, PrevKey) ->
+    {KList, KListLen} = decompress_idx_list(KeyDiff, PrevKey, util:pow(2, SigSize) - 1),
     {<<>>, Res, _} =
         lists:foldl(
           fun(CurKeyX, {<<Version:VSize, T/bitstring>>, AccX, CurPosX}) ->
                   {T, [{CurKeyX, {Version, CurPosX}} | AccX], CurPosX + 1}
-          end, {VBin, AccList, CurPos}, KList),
+          end, {VBin, [], 0}, KList),
     % TODO: deal with duplicates!
-    {mymaps:from_list(Res), lists:last(KList)}.
+    {mymaps:from_list(Res), lists:last(KList), KListLen}.
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
@@ -1355,14 +1352,18 @@ compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5
 %%      into a list of indices encoded by that function.
 -spec decompress_idx_list(CompressedBin::bitstring(), PrevIdx::non_neg_integer(),
-                          MaxPosBound::non_neg_integer()) -> [non_neg_integer()].
+                          MaxPosBound::non_neg_integer())
+        -> {[non_neg_integer()], Count::non_neg_integer()}.
 decompress_idx_list(<<>>, _PrevIdx, _MaxPosBound) ->
-    [];
+    {[], 0};
 decompress_idx_list(Bin, PrevIdx, MaxPosBound) ->
     IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     SigSize = erlang:max(1, SigSize0),
-    decompress_idx_list_(Bin2, PrevIdx, SigSize).
+    Count = calc_items_in_chunk(Bin2, SigSize),
+    IdxList = decompress_idx_list_(Bin2, PrevIdx, SigSize),
+    ?DBG_ASSERT(Count =:= length(IdxList)),
+    {IdxList, Count}.
 
 %% @doc Helper for decompress_idx_list/3.
 -spec decompress_idx_list_(CompressedBin::bitstring(), LastPos::non_neg_integer(),
@@ -2055,8 +2056,8 @@ merkle_resolve_retrieve_leaf_hashes(
     OBucketVBinSize = BucketSize * VSize,
     <<OBucketKBin:OBucketKBinSize/bitstring, NHashesK/bitstring>> = HashesKT,
     <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
-    {OBucketTree, MyLastKey} =
-        decompress_kv_list({OBucketKBin, OBucketVBin}, [], SigSize, VSize, 0, PrevKey),
+    {OBucketTree, MyLastKey, _OrigDBChunkLen} =
+        decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize, VSize, PrevKey),
     {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize, NextP0E, MyLastKey}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
