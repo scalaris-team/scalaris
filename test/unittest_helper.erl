@@ -56,15 +56,6 @@
 
 -type kv_opts() :: [{Key::atom(), Value::term()}].
 
-%% @doc Sets the app environment to point to the correct config file paths
-%%      assuming that the current working directory is a sub-dir of
-%%      our top-level, e.g. "test". This is needed in order for the config
-%%      process to find its (default) config files.
--spec set_config_file_paths() -> ok.
-set_config_file_paths() ->
-    application:set_env(scalaris, config, "../bin/scalaris.cfg"),
-    application:set_env(scalaris, local_config, "../bin/scalaris.local.cfg").
-
 -spec get_port(EnvName::string(), Default::pos_integer()) -> pos_integer().
 get_port(EnvName, Default) ->
     case os:getenv(EnvName) of
@@ -228,7 +219,6 @@ make_ring(Size, Options) ->
                         NodeAddFun::fun(() -> [pid_groups:groupname() | {error, term()}]))
         -> pid().
 make_ring_generic(Options, NodeAddFun) ->
-    set_config_file_paths(),
     error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
@@ -404,7 +394,6 @@ start_subprocess(StartFun, RunFun) ->
 -spec start_minimal_procs(CTConfig, ConfigOptions::[{atom(), term()}],
                           StartCommServer::boolean()) -> CTConfig when is_subtype(CTConfig, list()).
 start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
-    set_config_file_paths(),
     {Pid, _} =
         start_process(
           fun() ->

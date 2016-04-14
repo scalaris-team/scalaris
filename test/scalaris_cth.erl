@@ -59,6 +59,7 @@ pre_init_per_suite(Suite, Config, {ok, State}) ->
     pre_init_per_suite(Suite, Config, State);
 pre_init_per_suite(Suite, Config, State) when is_record(State, state) ->
     Processes = unittest_helper:get_processes(),
+    set_config_file_paths(),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     % note: on R14B02, post_end_per_testcase was also called for init_per_suite
@@ -244,3 +245,12 @@ terminate({ok, State}) ->
     terminate(State);
 terminate(State) when is_record(State, state) ->
     ok.
+
+%% @doc Sets the app environment to point to the correct config file paths
+%%      assuming that the current working directory is a sub-dir of
+%%      our top-level, e.g. "test". This is needed in order for the config
+%%      process to find its (default) config files.
+-spec set_config_file_paths() -> ok.
+set_config_file_paths() ->
+    application:set_env(scalaris, config, "../bin/scalaris.cfg"),
+    application:set_env(scalaris, local_config, "../bin/scalaris.local.cfg").
