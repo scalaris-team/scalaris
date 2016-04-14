@@ -164,7 +164,6 @@ childs(Options) ->
                   true -> sup:worker_desc(ganglia_server, ganglia, start_link, [ServiceGroup]);
                   _ -> []
               end,
-    Logger = sup:worker_desc(logger, log, start_link),
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [ServiceGroup]),
     MonitorPerf =
@@ -197,7 +196,6 @@ childs(Options) ->
         end,
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
-                    Logger,
                     ClientsDelayer,
                     BasicServicesDelayer,
                     ProtoSched,

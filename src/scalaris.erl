@@ -81,7 +81,8 @@ start(normal, []) ->
         util:if_verbose("~nAlready registered: ~p.~n", [erlang:registered()]),
         util:if_verbose("Running with node name ~p.~n", [node()]),
         config:init([]),
-        _ = pid_groups:start_link(),
+        {ok, _PidGroupsPid} = pid_groups:start_link(),
+        {ok, _LogPid} = log:start_link(),
         case sup_scalaris:start_link() of
             %% ignore -> {error, ignore}; % no longer needed as dialyzer states
             X = {ok, Pid} when is_pid(Pid) ->

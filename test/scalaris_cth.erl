@@ -60,6 +60,16 @@ pre_init_per_suite(Suite, Config, {ok, State}) ->
 pre_init_per_suite(Suite, Config, State) when is_record(State, state) ->
     Processes = unittest_helper:get_processes(),
     set_config_file_paths(),
+    % initiate the logging process (which needs the config)
+    {TempPid, _} = unittest_helper:start_process(
+          fun() ->
+                  {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+                  ConfOptions = unittest_helper:prepare_config(
+                                  [{config, [{log_path, PrivDir}]}]),
+                  config:init(ConfOptions)
+          end),
+    {ok, _LogPid} = log:start_link(),
+    exit(TempPid, kill),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     % note: on R14B02, post_end_per_testcase was also called for init_per_suite
