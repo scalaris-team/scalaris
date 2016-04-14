@@ -477,16 +477,14 @@ tester_type_check_rrepair(_Config) ->
              {min_max, 3}, %% tested via feeder
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
              {shash_signature_sizes, 3}, %% needs float > 0, < 1
-             {compress_kv_list_p1e, 4}, %% needs float > 0, < 1
-             {shash_compress_k_list_p1e, 4}, %% needs float > 0, < 1
+             {compress_kv_list, 6}, %% needs a fun
+             {compress_kv_list_p1e, 6}, %% needs float > 0, < 1 and a fun
              {bloom_worst_case_failprob_, 2}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
              {calc_items_in_chunk, 2}, %% needs special input
              {decompress_kv_list, 6}, %% needs a special binary to correspond to a number of bits
-             {shash_decompress_kv_list, 2}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
-             {shash_compress_k_list, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_list, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_list_, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list, 2}, %% needs a special binary to correspond to a number of bits
