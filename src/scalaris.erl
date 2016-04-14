@@ -83,6 +83,7 @@ start(normal, []) ->
         config:init([]),
         {ok, _PidGroupsPid} = pid_groups:start_link(),
         {ok, _LogPid} = log:start_link(),
+        {ok, _YawsPid} = sup_yaws:start_link(),
         case sup_scalaris:start_link() of
             %% ignore -> {error, ignore}; % no longer needed as dialyzer states
             X = {ok, Pid} when is_pid(Pid) ->

@@ -177,8 +177,6 @@ childs(Options) ->
     ProtoSched =
         sup:worker_desc(proto_sched, proto_sched, start_link,
                              [ServiceGroup]),
-    YAWS =
-        sup:supervisor_desc(yaws, sup_yaws, start_link, []),
 
     Top =
         sup:worker_desc(top, top, start_link,
@@ -208,7 +206,7 @@ childs(Options) ->
                     AdminServer,
                     ServicePaxosGroup,
                     AutoscaleServer],
-    Servers = [YAWS, BenchServer],
+    Servers = [BenchServer],
     MgmtServers =
         case StartMgmtServer orelse util:is_unittest() of
             true -> [MgmtServerDNCache, MgmtServer];
