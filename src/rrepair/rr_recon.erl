@@ -462,7 +462,16 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            P1E_p1_bf1_real = bloom_worst_case_failprob(BF, MyDBSize1),
            P1E_p1_bf2_real = bloom_worst_case_failprob(MyBF1, BFCount),
            P1E_p1_real = 1 - (1 - P1E_p1_bf1_real) * (1 - P1E_p1_bf2_real),
-           ?DBG_ASSERT(P1E_p1_real =< (_P1E_p1 = calc_n_subparts_p1e(2, P1E))),
+%%            log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p~n"
+%%                    " Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
+%%                    " Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p",
+%%                    [?MODULE, pid_groups:my_groupname(), self(),
+%%                     State#rr_recon_state.dest_recon_pid,
+%%                     calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
+%%                     bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
+%%                     BFCount, MyDBSize1, P1E_p1_bf1_real,
+%%                     bloom:get_property(MyBF1, size), ?REP_HFS:size(bloom:get_property(MyBF1, hfs)),
+%%                     bloom:item_count(MyBF1), BFCount, P1E_p1_bf2_real]),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            DiffBF = util:bin_xor(bloom:get_property(BF, filter),
                                  bloom:get_property(MyBF1, filter)),
@@ -2324,8 +2333,8 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1.0e-8 andalso
     if VP > 0 andalso VP < 1 ->
            VP;
        VP =< 0 ->
-           log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
-                   " - continuing with smallest possible failure probability"
+           log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
+                   " continuing with smallest possible failure probability"
                    " (instead of ~g)",
                    [?MODULE, pid_groups:my_groupname(), self(), VP]),
            1.0e-16 % do not go below this so that the opposite probability is possible as a float!
@@ -2563,6 +2572,21 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
              FP2_ok ->
                  bloom:new(M2, ?REP_HFS:new(K2))
           end,
+%%     log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p "
+%%             " m=~B k=~B NICount=~B ICount=~B~n"
+%%             " P1E_bf1=~p P1E_bf2=~p",
+%%             [?MODULE, pid_groups:my_groupname(), self(),
+%%              comm:this(), bloom:get_property(BF0, size),
+%%              ?REP_HFS:size(bloom:get_property(BF0, hfs)),
+%%              MyMaxItems, InitiatorMaxItems, P1E_p1_bf,
+%%              bloom_worst_case_failprob_(
+%%                bloom:calc_FPR(
+%%                  bloom:get_property(BF0, size), MyMaxItems,
+%%                  ?REP_HFS:size(bloom:get_property(BF0, hfs))), InitiatorMaxItems),
+%%              bloom_worst_case_failprob_(
+%%                bloom:calc_FPR(
+%%                  bloom:get_property(BF0, size), InitiatorMaxItems,
+%%                  ?REP_HFS:size(bloom:get_property(BF0, hfs))), MyMaxItems)]),
     HfCount = ?REP_HFS:size(bloom:get_property(BF0, hfs)),
     BF = bloom:add_list(BF0, DBItems),
     {#bloom_recon_struct{interval = I, reconPid = comm:this(),
