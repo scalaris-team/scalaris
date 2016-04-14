@@ -2422,11 +2422,15 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {HashesKNew, HashesVNew, ResortedBucket, _MyLastKey} =
         compress_kv_list(DBItems, {<<>>, <<>>}, SigSize, VSize, 0),
     % debug compressed and uncompressed sizes:
-    ?TRACE("~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~p / ~p bits",
+    ?TRACE("~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
             [ItemCount, OtherItemCount, SigSize, VSize,
-             erlang:bit_size(erlang:term_to_binary(DBChunkBin)),
+             erlang:bit_size(erlang:term_to_binary(HashesKNew)),
+             erlang:bit_size(erlang:term_to_binary(HashesVNew)),
              erlang:bit_size(
-                 erlang:term_to_binary(DBChunkBin,
+                 erlang:term_to_binary(HashesKNew,
+                                       [{minor_version, 1}, {compressed, 2}])),
+             erlang:bit_size(
+                 erlang:term_to_binary(HashesVNew,
                                        [{minor_version, 1}, {compressed, 2}]))]),
     {HashesKNew, HashesVNew, ResortedBucket, SigSize, VSize}.
 
@@ -2462,9 +2466,9 @@ shash_compress_k_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     % debug compressed and uncompressed sizes:
     ?TRACE("~B vs. ~B items, SigSize: ~B, ChunkSize: ~p / ~p bits",
             [ItemCount, OtherItemCount, SigSize,
-             erlang:bit_size(erlang:term_to_binary(DBChunkBin)),
+             erlang:bit_size(erlang:term_to_binary(element(1, DBChunkBin))),
              erlang:bit_size(
-                 erlang:term_to_binary(DBChunkBin,
+                 erlang:term_to_binary(element(1, DBChunkBin),
                                        [{minor_version, 1}, {compressed, 2}]))]),
     {DBChunkBin, SigSize}.
 
