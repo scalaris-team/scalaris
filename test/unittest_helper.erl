@@ -402,7 +402,6 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                   ConfigOptions2 = prepare_config(
                                      [{config, [{log_path, PrivDir} | ConfigOptions]}]),
                   config:init(ConfigOptions2),
-                  {ok, _LogPid} = log:start_link(),
                   tester:start_pseudo_proc(),
                   case StartCommServer of
                       true ->
