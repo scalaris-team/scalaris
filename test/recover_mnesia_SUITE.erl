@@ -86,14 +86,14 @@ init_per_group(Group, Config) ->
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     _ = file:delete(WorkingDir ++ "schema.DAT"),
-    unittest_helper:stop_minimal_procs(Config2),
+    Config3 = unittest_helper:stop_minimal_procs(Config2),
 
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
     unittest_helper:make_ring(ring_size(), [{config, [{log_path, PrivDir},
                                                       {leases, true},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
-    unittest_helper:init_per_group(Group, Config).
+    unittest_helper:init_per_group(Group, Config3).
 
 end_per_group(recover_data_group = Group, Config) ->
     unittest_helper:end_per_group(Group, Config);

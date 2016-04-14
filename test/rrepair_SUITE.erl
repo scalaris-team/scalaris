@@ -86,11 +86,9 @@ init_per_group_special(_, Config) ->
 end_per_group_special(tester_tests, Config) ->
     tester:unregister_value_creator({typedef, rt_beh, segment, []}),
     tester:unregister_type_checker({typedef, rt_beh, segment, []}),
-    unittest_helper:stop_minimal_procs(Config),
-    Config;
+    unittest_helper:stop_minimal_procs(Config);
 end_per_group_special(basic, Config) ->
-    unittest_helper:stop_minimal_procs(Config),
-    Config;
+    unittest_helper:stop_minimal_procs(Config);
 end_per_group_special(_, Config) ->
     Config.
 

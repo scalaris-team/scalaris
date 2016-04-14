@@ -105,7 +105,7 @@ init_per_testcase(TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
     RingSize = config:read(replication_factor),
-    unittest_helper:stop_minimal_procs(Config2),
+    Config3 = unittest_helper:stop_minimal_procs(Config2),
 
     case TestCase of
         test_garbage_collector ->
@@ -119,7 +119,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(RingSize),
             ok
     end,
-    [{stop_ring, true} | Config].
+    [{stop_ring, true} | Config3].
 
 end_per_testcase(_TestCase, _Config) ->
     ok.

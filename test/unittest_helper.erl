@@ -429,16 +429,17 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
 
 %% @doc Stops the processes started by start_minimal_procs/3 given the
 %%      ct config term.
--spec stop_minimal_procs(term()) -> ok.
+-spec stop_minimal_procs(CTConfig) -> CTConfig when is_subtype(CTConfig, list()).
 stop_minimal_procs(CTConfig)  ->
-    case lists:keyfind(wrapper_pid, 1, CTConfig) of
-        {wrapper_pid, Pid} ->
+    case lists:keytake(wrapper_pid, 1, CTConfig) of
+        {value, {wrapper_pid, Pid}, CTConfig1} ->
             error_logger:tty(false),
             log:set_log_level(none),
             exit(Pid, kill),
             stop_pid_groups(),
-            error_logger:tty(true);
-        false -> ok
+            error_logger:tty(true),
+            CTConfig1;
+        false -> CTConfig
     end.
 
 -type process_info() ::

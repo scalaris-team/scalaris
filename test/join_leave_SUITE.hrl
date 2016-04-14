@@ -61,9 +61,9 @@ join_parameters_list() ->
 join_lookup(Config) ->
     %% need config to get random node id
     Config2 = unittest_helper:start_minimal_procs(Config, [], false),
-    unittest_helper:stop_minimal_procs(Config2),
+    Config3 = unittest_helper:stop_minimal_procs(Config2),
 
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
                                             {rrepair_after_crash, false}]
                                        ++ additional_ring_config()}]),
