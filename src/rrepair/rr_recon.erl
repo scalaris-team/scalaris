@@ -1203,8 +1203,31 @@ decompress_kv_list({KeyDiff, VBin}, SigSize, VSize, PrevKey) ->
           fun(CurKeyX, {<<Version:VSize, T/bitstring>>, AccX, CurPosX}) ->
                   {T, [{CurKeyX, {Version, CurPosX}} | AccX], CurPosX + 1}
           end, {VBin, [], 0}, KList),
-    % TODO: deal with duplicates!
-    {mymaps:from_list(Res), lists:last(KList), KListLen}.
+    KVMap = mymaps:from_list(Res),
+    % deal with duplicates:
+    KVMap1 =
+        case mymaps:size(KVMap) of
+            KListLen -> KVMap;
+            KVMapSize ->
+                log:log("~w: [ ~p:~.0p ] hash collision detected (redundant item transfers expected)",
+                        [?MODULE, pid_groups:my_groupname(), self()]),
+                % there are duplicates! (items were mapped to the same key)
+                % -> remove them from the map so we send these items to the other node
+                % since every key must be in the map, we remove them one by one
+                % and check whether something was removed (ok) or not (duplicate)
+                element(3, lists:foldl(
+                          fun(CurKeyX, {UnprocessedX, OldSize, NewMapX}) ->
+                                  UnprocessedX1 = mymaps:remove(CurKeyX, UnprocessedX),
+                                  case mymaps:size(UnprocessedX1) of
+                                      OldSize -> % already removed -> duplicate
+                                          {UnprocessedX1, OldSize,
+                                           mymaps:remove(CurKeyX, NewMapX)};
+                                      NewSize -> % first occurence
+                                          {UnprocessedX1, NewSize, NewMapX}
+                                  end
+                          end, {KVMap, KVMapSize, KVMap}, KList))
+        end,
+    {KVMap1, lists:last(KList), KListLen}.
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
