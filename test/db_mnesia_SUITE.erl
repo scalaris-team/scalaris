@@ -61,7 +61,7 @@ end_per_suite(Config) ->
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     _ = file:delete(WorkingDir ++ "schema.DAT"),
 
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 rw_suite_runs(N) ->

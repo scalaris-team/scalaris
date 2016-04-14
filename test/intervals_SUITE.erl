@@ -86,7 +86,7 @@ end_per_suite(Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     rt_SUITE:unregister_value_creator(),
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).

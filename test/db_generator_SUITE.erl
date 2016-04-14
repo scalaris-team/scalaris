@@ -53,7 +53,7 @@ end_per_suite(Config) ->
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
     rt_SUITE:unregister_value_creator(),
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

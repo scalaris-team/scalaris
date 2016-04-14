@@ -564,7 +564,7 @@ build_ring(NodeCount0, Config, RRConfig) ->
             % Build ring with NodeCount arbitrary nodes
             Config2 = unittest_helper:start_minimal_procs(Config, [], false),
             NodeKeys0 = util:for_to_ex(1, NodeCount, fun(_) -> ?RT:get_random_node_id() end),
-            unittest_helper:stop_minimal_procs(Config2),
+            _ = unittest_helper:stop_minimal_procs(Config2),
             unittest_helper:make_ring_with_ids(
               NodeKeys0,
               [{config, lists:flatten([{log_path, PrivDir}, RRConfig])}])

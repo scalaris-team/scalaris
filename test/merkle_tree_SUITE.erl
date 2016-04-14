@@ -50,7 +50,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     rt_SUITE:unregister_value_creator(),
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

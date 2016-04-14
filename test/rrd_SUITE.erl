@@ -49,7 +49,7 @@ init_per_suite(Config) ->
     unittest_helper:start_minimal_procs(Config, [{rrd_timing_hist_size, 0}], false).
 
 end_per_suite(Config) ->
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 init_per_group(Group, Config) ->

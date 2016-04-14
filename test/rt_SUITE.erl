@@ -56,7 +56,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unregister_value_creator(),
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 %% @doc Returns whether the default routing table from ?RT has chord-like keys.

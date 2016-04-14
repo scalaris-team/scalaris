@@ -38,7 +38,7 @@ init_per_suite(Config) ->
     unittest_helper:start_minimal_procs(Config, [], true).
 
 end_per_suite(Config) ->
-    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_minimal_procs(Config),
     ok.
 
 dn_detection(Config) ->

@@ -153,7 +153,7 @@ tester_update_id2_1(Config) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     RandomSubset = util:random_subset(1, ?RT:get_replica_keys(?RT:hash_key("0"))),
-    unittest_helper:stop_minimal_procs(Config2),
+    _ = unittest_helper:stop_minimal_procs(Config2),
     Ring = unittest_helper:make_ring_with_ids(
              RandomSubset,
              [{config, [{log_path, PrivDir}]}]),
@@ -164,7 +164,7 @@ tester_update_id2_2(Config) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     RandomSubset = util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key("0"))),
-    unittest_helper:stop_minimal_procs(Config2),
+    _ = unittest_helper:stop_minimal_procs(Config2),
     Ring = unittest_helper:make_ring_with_ids(
              RandomSubset,
              [{config, [{log_path, PrivDir}]}]),
@@ -175,7 +175,7 @@ tester_update_id2_3(Config) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     RandomSubset = util:random_subset(3, ?RT:get_replica_keys(?RT:hash_key("0"))),
-    unittest_helper:stop_minimal_procs(Config2),
+    _ = unittest_helper:stop_minimal_procs(Config2),
     Ring = unittest_helper:make_ring_with_ids(
              RandomSubset,
              [{config, [{log_path, PrivDir}]}]),
@@ -186,7 +186,7 @@ tester_update_id2_4(Config) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     RandomSubset = util:random_subset(4, ?RT:get_replica_keys(?RT:hash_key("0"))),
-    unittest_helper:stop_minimal_procs(Config2),
+    _ = unittest_helper:stop_minimal_procs(Config2),
     Ring = unittest_helper:make_ring_with_ids(
              RandomSubset,
              [{config, [{log_path, PrivDir}]}]),

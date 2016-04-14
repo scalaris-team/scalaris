@@ -73,7 +73,7 @@ end_per_testcase(_TestCase, Config) ->
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     _ = file:delete(WorkingDir ++ "schema.DAT"),
-    unittest_helper:stop_minimal_procs(Config2),
+    _ = unittest_helper:stop_minimal_procs(Config2),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
