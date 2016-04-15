@@ -491,6 +491,10 @@ tester_type_check_rrepair(_Config) ->
              {decompress_idx_to_k_list_, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_kv_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_kv_list_, 3}, %% needs a special binary to correspond to a number of bits
+             {get_full_diff, 6}, %% needs a suitable map (cannot be specified in the type def)
+             {get_full_diff_, 6}, %% needs a suitable map (cannot be specified in the type def)
+             {get_part_diff, 6}, %% needs a suitable map (cannot be specified in the type def)
+             {get_part_diff_, 6}, %% needs a suitable map (cannot be specified in the type def)
              {shash_bloom_perform_resolve, 6}, %% needs a special binary to correspond to a number of bits
              {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
              {merkle_check_node, 20}, %% needs merkle_tree/nodes with hashes

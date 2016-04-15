@@ -75,7 +75,7 @@
 -type db_chunk_kv()    :: [{?RT:key(), client_version()}].
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
--type kvi_tree()       :: mymaps:mymap(). % KeyBin::bitstring() => {VersionShort::non_neg_integer(), Idx::non_neg_integer()}
+-type kvi_tree()       :: mymaps:mymap(). % KeyShort::non_neg_integer()() => {VersionShort::non_neg_integer(), Idx::non_neg_integer()}
 
 -record(trivial_recon_struct,
         {
