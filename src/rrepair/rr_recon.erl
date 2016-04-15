@@ -417,7 +417,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                if StartResolve andalso OrigDBChunkLen > 0 ->
                       % let the non-initiator's rr_recon process identify the remaining keys
                       ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]),
-                      compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0);
+                      compress_idx_list(ReqIdx, OrigDBChunkLen - 1, [], 0, 0);
                   true ->
                       % no need to create a real OtherDiffIdx if phase2_run_trivial_on_diff/7 is not using it
                       <<>>
