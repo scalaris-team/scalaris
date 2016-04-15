@@ -361,7 +361,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            % let the non-initiator's rr_recon process identify the remaining keys
            ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]
                                     ++ ToReqIdx1),
-           ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen, [], 0, 0),
+           ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen - 1, [], 0, 0),
            NewStats2 =
                if ReqIdx =/= [] ->
                       % the non-initiator will use key_upd_send and we must thus increase
@@ -1381,7 +1381,7 @@ decompress_idx_list_(Bin, LastPos, SigSize) ->
 decompress_idx_to_k_list(<<>>, _KList) ->
     [];
 decompress_idx_to_k_list(Bin, KList) ->
-    IdxBitsSize = bits_for_number(bits_for_number(length(KList))),
+    IdxBitsSize = bits_for_number(bits_for_number(length(KList) - 1)),
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     SigSize = erlang:max(1, SigSize0),
     decompress_idx_to_k_list_(Bin2, KList, SigSize).
