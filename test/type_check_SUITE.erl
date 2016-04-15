@@ -477,15 +477,15 @@ tester_type_check_rrepair(_Config) ->
              {min_max, 3}, %% tested via feeder
              {trivial_signature_sizes, 3}, %% needs float > 0, < 1
              {shash_signature_sizes, 3}, %% needs float > 0, < 1
-             {compress_kv_list, 6}, %% needs a fun
+             {compress_kv_list, 5}, %% needs a fun
              {compress_kv_list_p1e, 6}, %% needs float > 0, < 1 and a fun
              {bloom_worst_case_failprob_, 2}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
              {calc_items_in_chunk, 2}, %% needs special input
-             {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
+             {decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
-             {decompress_idx_list, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_list_, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_k_list_, 3}, %% needs a special binary to correspond to a number of bits
@@ -499,8 +499,8 @@ tester_type_check_rrepair(_Config) ->
              {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
              {merkle_check_node, 20}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 19}, %% needs matching result and merkle nodes
-             {merkle_resolve_add_leaf_hash, 10}, %% needs KV-List merkle buckets
-             {merkle_resolve_retrieve_leaf_hashes, 8}, %% needs special bitstring
+             {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
+             {merkle_resolve_retrieve_leaf_hashes, 7}, %% needs special bitstring
              {merkle_resolve_leaves_send, 5}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_receive, 9}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists
