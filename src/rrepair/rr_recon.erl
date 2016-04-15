@@ -2268,7 +2268,7 @@ send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator,
                      (0) -> 0.
 bits_for_number(0) -> 0;
 bits_for_number(Number) ->
-    erlang:max(1, util:ceil(util:log2(Number + 1))).
+    util:ceil(util:log2(Number + 1)).
 
 %% @doc Splits P1E into N equal independent sub-processes and returns the P1E
 %%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
