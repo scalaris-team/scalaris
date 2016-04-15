@@ -520,7 +520,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                            k_list = KList,            stats = Stats}) ->
     ?TRACE1(_Msg, State),
     NewStats =
-        send_resolve_request(Stats, decompress_idx_to_k_list(BinReqIdxPos, KList),
+        send_resolve_request(Stats, decompress_idx_to_list(BinReqIdxPos, KList),
                              OwnerL, DestRRPid, _Initiator = false, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
@@ -534,7 +534,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
     ?DBG_ASSERT(SigSize >= 0 andalso VSize >= 0),
 
     DBChunkTree = decompress_kv_list(OtherDBChunk, SigSize, VSize),
-    MyDiffKV = decompress_idx_to_kv_list(MyDiffIdx, KVList),
+    MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
     FBItems = [Key || {Key, _Version} <- MyDiffKV,
                       not mymaps:is_key(compress_key(Key, SigSize),
@@ -1375,51 +1375,25 @@ decompress_idx_list_(Bin, LastPos, SigSize) ->
     [CurPos | decompress_idx_list_(T, CurPos + 1, SigSize)].
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5
-%%      into a list of keys from the original key list.
--spec decompress_idx_to_k_list(CompressedBin::bitstring(), KList::[?RT:key()])
-        -> ResKeys::[?RT:key()].
-decompress_idx_to_k_list(<<>>, _KList) ->
+%%      into the encoded sub-list of the original list.
+-spec decompress_idx_to_list(CompressedBin::bitstring(), [X]) -> [X].
+decompress_idx_to_list(<<>>, _List) ->
     [];
-decompress_idx_to_k_list(Bin, KList) ->
-    IdxBitsSize = bits_for_number(bits_for_number(length(KList) - 1)),
+decompress_idx_to_list(Bin, List) ->
+    IdxBitsSize = bits_for_number(bits_for_number(length(List) - 1)),
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     SigSize = erlang:max(1, SigSize0),
-    decompress_idx_to_k_list_(Bin2, KList, SigSize).
+    decompress_idx_to_list_(Bin2, List, SigSize).
 
-%% @doc Helper for decompress_idx_to_k_list/2.
--spec decompress_idx_to_k_list_(CompressedBin::bitstring(), KList::[?RT:key()],
-                                SigSize::signature_size()) -> ResKeys::[?RT:key()].
-decompress_idx_to_k_list_(<<>>, _, _SigSize) ->
+%% @doc Helper for decompress_idx_to_list/2.
+-spec decompress_idx_to_list_(CompressedBin::bitstring(), [X],
+                              SigSize::signature_size()) -> [X].
+decompress_idx_to_list_(<<>>, _, _SigSize) ->
     [];
-decompress_idx_to_k_list_(Bin, KList, SigSize) ->
+decompress_idx_to_list_(Bin, List, SigSize) ->
     <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    [Key | KList2] = lists:nthtail(KeyPosInc, KList),
-    [Key | decompress_idx_to_k_list_(T, KList2, SigSize)].
-
-%% @doc De-compresses a bitstring with indices from compress_idx_list/5
-%%      into a list of keys from the original KV list.
-%%      NOTE: This is essentially the same as decompress_idx_to_k_list/2 but we
-%%            need the separation because of the opaque RT keys.
-%% @see decompress_idx_to_k_list/2
--spec decompress_idx_to_kv_list(CompressedBin::bitstring(), KVList::db_chunk_kv())
-        -> ResKeys::db_chunk_kv().
-decompress_idx_to_kv_list(<<>>, _KVList) ->
-    [];
-decompress_idx_to_kv_list(Bin, KVList) ->
-    IdxBitsSize = bits_for_number(bits_for_number(length(KVList) - 1)),
-    <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
-    SigSize = erlang:max(1, SigSize0),
-    decompress_idx_to_kv_list_(Bin2, KVList, SigSize).
-
-%% @doc Helper for decompress_idx_to_kv_list/2.
--spec decompress_idx_to_kv_list_(CompressedBin::bitstring(), KVList::db_chunk_kv(),
-                                 SigSize::signature_size()) -> ResKeys::db_chunk_kv().
-decompress_idx_to_kv_list_(<<>>, _, _SigSize) ->
-    [];
-decompress_idx_to_kv_list_(Bin, KVList, SigSize) ->
-    <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    [X | KVList2] = lists:nthtail(KeyPosInc, KVList),
-    [X | decompress_idx_to_kv_list_(T, KVList2, SigSize)].
+    [X | List2] = lists:nthtail(KeyPosInc, List),
+    [X | decompress_idx_to_list_(T, List2, SigSize)].
 
 %% @doc Converts a list of positions to a bitstring where the x'th bit is set
 %%      if the x'th position is in the list. The final bitstring may be
