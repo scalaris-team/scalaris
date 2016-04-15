@@ -218,7 +218,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
-    case code:is_loaded(?REDUNDANCY) of
+    _ = case code:is_loaded(?REDUNDANCY) of
         false -> code:load_file(?REDUNDANCY);
         _ -> ok
     end,
