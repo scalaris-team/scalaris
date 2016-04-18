@@ -31,6 +31,7 @@
 
 -record(state, { processes = [] :: [unittest_helper:process_info()] | undefined,
                  suite          :: atom() | undefined,
+                 logger_pid     :: pid() | undefined,
                  tc_start = []  :: [{comm:erl_local_pid(), erlang_timestamp()}] | []
                }).
 -type state() :: #state{} | {ok, #state{}}. % the latter for erlang =< R14B03
@@ -68,13 +69,19 @@ pre_init_per_suite(Suite, Config, State) when is_record(State, state) ->
                                   [{config, [{log_path, PrivDir}]}]),
                   config:init(ConfOptions)
           end),
-    {ok, _LogPid} = log:start_link(),
-    exit(TempPid, kill),
+    % need to start the logger from a non-linked process so that it is
+    % available until the end of the suite
+    {LoggerPid, _} = unittest_helper:start_process(
+                       fun() -> {ok, _LogPid} = log:start_link(),
+                                exit(TempPid, kill)
+                       end),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     % note: on R14B02, post_end_per_testcase was also called for init_per_suite
     % -> we thus need a valid time
-    {Config, State#state{processes = Processes, suite = Suite, tc_start = [{self(), os:timestamp()}]}}.
+    {Config, State#state{processes = Processes, suite = Suite,
+                         logger_pid = LoggerPid,
+                         tc_start = [{self(), os:timestamp()}]}}.
 
 %% @doc Called after init_per_suite.
 -spec post_init_per_suite(SuiteName::atom(), Config::unittest_helper:kv_opts(), Return, CTHState::state())
@@ -104,6 +111,9 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
+    error_logger:delete_report_handler(error_logger_log4erl_h),
+    log:set_log_level(none),
+    exit(State#state.logger_pid, kill),
     randoms:stop(),
     _ = inets:stop(),
     unittest_global_state:delete(),
