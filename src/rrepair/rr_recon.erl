@@ -609,7 +609,7 @@ on({?check_nodes, SenderPid, ToCheck, OtherMaxItemsCount}, State) ->
 
 on({?check_nodes, ToCheck0, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
-                           method = merkle_tree,      merkle_sync = MerkleSync,
+                           method = merkle_tree,      merkle_sync = Sync,
                            params = #merkle_params{} = Params,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            struct = TreeNodes,        stats = Stats,
@@ -623,11 +623,11 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                     OtherMaxItemsCount),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
     PrevP0E = 1 - rr_recon_stats:get(p1e_phase1, Stats),
-    {FlagsBin, RTree, MerkleSyncNew, NStats0, MyMaxItemsCount,
+    {FlagsBin, RTree, SyncNew, NStats0, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_check_node(ToCheck, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                          <<>>, [], [], [], [], 0, MerkleSync, 0, 0, 0,
+                          <<>>, [], [], [], [], 0, Sync, 0, 0, 0,
                           0, 0),
     ?IIF((EffectiveP1E_I > 0 andalso (1 - EffectiveP1E_I >= 1)) orelse
              (1 - EffectiveP1E_L >= 1), % EffectiveP1E_L is always greater than 0
@@ -639,11 +639,11 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
     NextP0E = PrevP0E * math:pow(1 - EffectiveP1E_I, HashCmpI)
                   * math:pow(1 - EffectiveP1E_L, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
-    NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
+    NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~nP1E: ~g -> ~g",
                   [length(RTree), 1 - PrevP0E, 1 - NextP0E]),
     
-    case MerkleSyncNew of
+    case SyncNew of
         {[], [], {SyncDRK, SyncDRLCount}} when RTree =:= [] ->
             send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
             % resolve the leaf-leaf comparisons's items with empty leaves on the initiator as key_upd:
@@ -651,54 +651,18 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
             NStats2 = rr_recon_stats:inc([{tree_leavesSynced, SyncDRLCount}], NStats1),
             shutdown(sync_finished,
                      NewState#rr_recon_state{stats = NStats2, misc = []});
-        {MerkleSyncNewSend, MerkleSyncNewRcv, {SyncDRK, SyncDRLCount}} when RTree =:= [] ->
-            % start resolve
-            ?TRACE("Sync (NI):~nsend:~.2p~n rcv:~.2p",
-                   [MerkleSyncNewSend, MerkleSyncNewRcv]),
+        {SyncNewSend, SyncNewRcv, {SyncDRK, SyncDRLCount}} when RTree =:= [] ->
+            % start a (parallel) resolve
+            ?TRACE("Sync (NI):~nsend:~.2p~n rcv:~.2p", [SyncNewSend, SyncNewRcv]),
             send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
             % resolve the leaf-leaf comparisons's items with empty leaves on the initiator as key_upd:
             NStats1 = send_resolve_request(NStats, SyncDRK, OwnerL, DestRRPid, false, true),
             NStats2 = rr_recon_stats:inc([{tree_leavesSynced, SyncDRLCount}], NStats1),
             % allow the garbage collector to free the SyncDRK list here
-            MerkleSyncNew1 = {MerkleSyncNewSend, MerkleSyncNewRcv, {[], SyncDRLCount}},
-            
-            MerkleSyncNewSendL = length(MerkleSyncNewSend),
-            MerkleSyncNewRcvL = length(MerkleSyncNewRcv),
-            TrivialProcs = MerkleSyncNewSendL + MerkleSyncNewRcvL,
-            ?DBG_ASSERT(TrivialProcs > 0), % should always be true in this case!
-            P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP0E),
-            ?MERKLE_DEBUG("merkle (NI) - LeafSync~n~B/~B (send), ~B (receive)\tP1EAllLeaves: ~g\t"
-                          "ItemsToSend: ~B+~B (~g per leaf)",
-                          [SyncDRLCount, MerkleSyncNewSendL, MerkleSyncNewRcvL,
-                           P1EAllLeaves, length(SyncDRK),
-                           lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]),
-                           ?IIF(MerkleSyncNewSend =/=[],
-                                lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]) /
-                                    MerkleSyncNewSendL, 0.0)]),
-            if MerkleSyncNewSend =/= [] ->
-                   {Hashes, MerkleSyncNewSend1, NStats3} =
-                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats2,
-                                                  Params, P1EAllLeaves, TrivialProcs),
-                   MerkleSyncNew2 = {MerkleSyncNewSend1, MerkleSyncNewRcv, {[], SyncDRLCount}},
-                   ?MERKLE_DEBUG("merkle (NI) - HashesSize: ~B (~B compressed)",
-                                 [erlang:byte_size(
-                                    erlang:term_to_binary(Hashes)),
-                                  erlang:byte_size(
-                                    erlang:term_to_binary(Hashes, [compressed]))]),
-                   ?DBG_ASSERT(Hashes =/= {<<>>, <<>>}),
-                   % (leaf-leaf mismatches with empty leaves on the other node)
-                   send(DestReconPid, {resolve_req, Hashes}),
-                   NewState#rr_recon_state{stage = resolve, stats = NStats3,
-                                           merkle_sync = MerkleSyncNew2,
-                                           misc = [{all_leaf_p1e, P1EAllLeaves},
-                                                   {trivial_procs, TrivialProcs}]};
-               true ->
-                   % only wait for the other node's resolve_req
-                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
-                                           merkle_sync = MerkleSyncNew1,
-                                           misc = [{all_leaf_p1e, P1EAllLeaves},
-                                                   {trivial_procs, TrivialProcs}]}
-            end;
+            SyncNew1 = {SyncNewSend, SyncNewRcv, {[], SyncDRLCount}},
+            merkle_resolve_leaves_send(
+              NewState#rr_recon_state{stats = NStats2,
+                                      merkle_sync = SyncNew1}, NextP0E);
         _ ->
             ?DBG_ASSERT(NextLvlNodesAct >= 0),
             send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
@@ -713,7 +677,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
 
 on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
-                           method = merkle_tree,          merkle_sync = MerkleSync,
+                           method = merkle_tree,          merkle_sync = Sync,
                            params = #merkle_params{} = Params,
                            struct = TreeNodes,            stats = Stats,
                            dest_recon_pid = DestReconPid,
@@ -723,11 +687,11 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
     PrevP0E = 1 - rr_recon_stats:get(p1e_phase1, Stats),
-    {RTree, MerkleSyncNew, NStats0, MyMaxItemsCount,
+    {RTree, SyncNew, NStats0, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_cmp_result(FlagsBin, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherLastMaxItemsCount,
-                          MerkleSync, Params, Stats, [], [], [], [], 0, 0, 0, 0,
+                          Sync, Params, Stats, [], [], [], [], 0, 0, 0, 0,
                           0, 0),
     ?IIF((1 - EffectiveP1ETotal_I >= 1) orelse (1 - EffectiveP1ETotal_L >= 1),
          log:log("~w: [ ~p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
@@ -738,59 +702,26 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
     NextP0E = PrevP0E * math:pow(1 - EffectiveP1ETotal_I, HashCmpI)
                   * math:pow(1 - EffectiveP1ETotal_L, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
-    NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
+    NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~nP1E: ~g -> ~g",
                   [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
 
-    case MerkleSyncNew of
+    case SyncNew of
         {[], [], {_SyncDRK, SyncDRLCount}} when RTree =:= [] ->
             NStats1 = rr_recon_stats:inc(
                         [{tree_leavesSynced, SyncDRLCount},
                          {rs_expected, ?IIF(SyncDRLCount > 0, 1, 0)}], NStats),
             shutdown(sync_finished,
                      NewState#rr_recon_state{stats = NStats1, misc = []});
-        {MerkleSyncNewSend, MerkleSyncNewRcv, {SyncDRK = [], SyncDRLCount}} when RTree =:= [] ->
+        {_SyncNewSend, _SyncNewRcv, {_SyncDRK = [], SyncDRLCount}} when RTree =:= [] ->
             NStats1 = rr_recon_stats:inc(
                         [{tree_leavesSynced, SyncDRLCount},
                          {rs_expected, ?IIF(SyncDRLCount > 0, 1, 0)}], NStats),
             % start a (parallel) resolve
-            ?TRACE("Sync (I):~nsend:~.2p~n rcv:~.2p",
-                   [MerkleSyncNewSend, MerkleSyncNewRcv]),
-            MerkleSyncNewSendL = length(MerkleSyncNewSend),
-            MerkleSyncNewRcvL = length(MerkleSyncNewRcv),
-            TrivialProcs = MerkleSyncNewSendL + MerkleSyncNewRcvL,
-            ?DBG_ASSERT(TrivialProcs > 0), % should always be true in this case!
-            P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP0E),
-            ?MERKLE_DEBUG("merkle (I) - LeafSync~n~B (send), ~B/~B (receive)\tP1EAllLeaves: ~g\t"
-                          "ItemsToSend: ~B (~g per leaf)",
-                          [MerkleSyncNewSendL, SyncDRLCount, MerkleSyncNewRcvL,
-                           P1EAllLeaves,
-                           lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]),
-                           ?IIF(MerkleSyncNewSend =/=[],
-                                lists:sum([MyItemCount || {_, _, MyItemCount} <- MerkleSyncNewSend]) /
-                                    MerkleSyncNewSendL, 0.0)]),
-            if MerkleSyncNewSend =/= [] ->
-                   {Hashes, MerkleSyncNewSend1, NStats2} =
-                       merkle_resolve_leaves_send(MerkleSyncNewSend, NStats1,
-                                                  Params, P1EAllLeaves, TrivialProcs),
-                   MerkleSyncNew1 = {MerkleSyncNewSend1, MerkleSyncNewRcv, {SyncDRK, SyncDRLCount}},
-                   ?MERKLE_DEBUG("merkle (I) - HashesSize: ~B (~B compressed)",
-                                 [erlang:byte_size(
-                                    erlang:term_to_binary(Hashes)),
-                                  erlang:byte_size(
-                                    erlang:term_to_binary(Hashes, [compressed]))]),
-                   ?DBG_ASSERT(Hashes =/= {<<>>, <<>>}),
-                   send(DestReconPid, {resolve_req, Hashes}),
-                   NewState#rr_recon_state{stage = resolve, stats = NStats2,
-                                           merkle_sync = MerkleSyncNew1,
-                                           misc = [{all_leaf_p1e, P1EAllLeaves},
-                                                   {trivial_procs, TrivialProcs}]};
-               true ->
-                   % only wait for the other node's resolve_req
-                   NewState#rr_recon_state{stage = resolve, stats = NStats1,
-                                           misc = [{all_leaf_p1e, P1EAllLeaves},
-                                                   {trivial_procs, TrivialProcs}]}
-            end;
+            ?TRACE("Sync (I):~nsend:~.2p~n rcv:~.2p", [SyncNewSend, SyncNewRcv]),
+            merkle_resolve_leaves_send(
+              NewState#rr_recon_state{stats = NStats1,
+                                      merkle_sync = SyncNew}, NextP0E);
         _ ->
             ?DBG_ASSERT(NextLvlNodesAct >= 0),
             % calculate the remaining trees' failure prob based on the already
@@ -819,7 +750,7 @@ on({resolve_req, Hashes} = _Msg,
                            misc = [{all_leaf_p1e, P1EAllLeaves},
                                    {trivial_procs, TrivialProcs}]}) ->
     ?TRACE1(_Msg, State),
-    ?DBG_ASSERT(?implies(not IsInitiator, Hashes =/= {<<>>, <<>>})),
+    ?DBG_ASSERT(Hashes =/= {<<>>, <<>>}),
     {BinIdxList, NStats} =
         merkle_resolve_leaves_receive(SyncRcv, Hashes, DestRRPid, Stats,
                                       OwnerL, Params, P1EAllLeaves, TrivialProcs,
@@ -2067,35 +1998,68 @@ merkle_resolve_retrieve_leaf_hashes(
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
--spec merkle_resolve_leaves_send(
-        Sync, Stats, Params::#merkle_params{},
-        P1EAllLeaves::float(), TrivialProcs::pos_integer())
-        -> {{HashesK::Bin, HashesV::Bin}, NewSync::Sync, NewStats::Stats}
-    when is_subtype(Stats, rr_recon_stats:stats()),
-         is_subtype(Sync, [merkle_sync_send(),...]),
-         is_subtype(Bin, bitstring()).
-merkle_resolve_leaves_send([_|_] = Sync, Stats, Params, P1EAllLeaves, TrivialProcs) ->
-    BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
-    % note: 1 trivial proc contains 1 leaf
-    {HashesK, HashesV, NewSync_rev, ThisP0E, LeafCount} =
-        lists:foldl(
-          fun({OtherMaxItemsCount, MyKVItems, MyItemCount},
-              {HashesKAcc, HashesVAcc, SyncAcc, PrevP0E, LeafNAcc}) ->
-                  {HashesKAcc1, HashesVAcc1, CurP0E, MyKVItems1} =
-                      merkle_resolve_add_leaf_hash(
-                        MyKVItems, MyItemCount, P1EAllLeaves, TrivialProcs - LeafNAcc,
-                        OtherMaxItemsCount, BucketSizeBits, HashesKAcc, HashesVAcc,
-                        PrevP0E),
-                  {HashesKAcc1, HashesVAcc1,
-                   [{OtherMaxItemsCount, MyKVItems1, MyItemCount} | SyncAcc],
-                   CurP0E, LeafNAcc + 1}
-          end, {<<>>, <<>>, [], 1.0, 0}, Sync),
-    % the other node will send its items from this CKV list - increase rs_expected, too
-    NStats1 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
-                                  {rs_expected, 1}], Stats),
-    ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, NStats1) =:= 0.0),
-    NStats  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E}], NStats1),
-    {{HashesK, HashesV}, lists:reverse(NewSync_rev), NStats}.
+-spec merkle_resolve_leaves_send(State::state(), NextP0E::float()) -> NewState::state().
+merkle_resolve_leaves_send(
+  State = #rr_recon_state{params = Params, initiator = _IsInitiator,
+                          stats = Stats, dest_recon_pid = DestReconPid,
+                          merkle_sync = {SyncSend, SyncRcv, {[], SyncDRLCount}}},
+  NextP0E) ->
+    SyncSendL = length(SyncSend),
+    SyncRcvL = length(SyncRcv),
+    TrivialProcs = SyncSendL + SyncRcvL,
+    ?DBG_ASSERT(TrivialProcs > 0), % should always be true in this case!
+    P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP0E),
+    ?MERKLE_DEBUG("merkle (~s) - LeafSync~n~B (send), ~B (receive), ~B direct (~s)\tP1EAllLeaves: ~g\t"
+                  "ItemsToSend: ~B (~g per leaf)",
+                  [?IIF(_IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
+                   SyncDRLCount, ?IIF(_IsInitiator, "in", "out"),
+                   P1EAllLeaves,
+                   lists:sum([MyItemCount || {_, _, MyItemCount} <- SyncSend]),
+                   ?IIF(SyncSend =/= [],
+                        lists:sum([MyItemCount || {_, _, MyItemCount} <- SyncSend]) /
+                            SyncSendL, 0.0)]),
+    if SyncSend =/= [] ->
+           BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
+           % note: 1 trivial proc contains 1 leaf
+           {HashesK, HashesV, NewSyncSend_rev, ThisP0E, LeafCount} =
+               lists:foldl(
+                 fun({OtherMaxItemsCount, MyKVItems, MyItemCount},
+                     {HashesKAcc, HashesVAcc, SyncAcc, PrevP0E, LeafNAcc}) ->
+                         {HashesKAcc1, HashesVAcc1, CurP0E, MyKVItems1} =
+                             merkle_resolve_add_leaf_hash(
+                               MyKVItems, MyItemCount, P1EAllLeaves, TrivialProcs - LeafNAcc,
+                               OtherMaxItemsCount, BucketSizeBits, HashesKAcc, HashesVAcc,
+                               PrevP0E),
+                         {HashesKAcc1, HashesVAcc1,
+                          [{OtherMaxItemsCount, MyKVItems1, MyItemCount} | SyncAcc],
+                          CurP0E, LeafNAcc + 1}
+                 end, {<<>>, <<>>, [], 1.0, 0}, SyncSend),
+           % the other node will send its items from this CKV list - increase rs_expected, too
+           NStats1 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
+                                         {rs_expected, 1}], Stats),
+           ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, NStats1) =:= 0.0),
+           
+           NStats2  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E}], NStats1),
+           Hashes = {HashesK, HashesV},
+           MerkleSyncNew1 = {lists:reverse(NewSyncSend_rev), SyncRcv, {[], SyncDRLCount}},
+           ?MERKLE_DEBUG("merkle (~s) - HashesSize: ~B (~B compressed)",
+                         [?IIF(_IsInitiator, "I", "NI"),
+                          erlang:byte_size(
+                            erlang:term_to_binary(Hashes)),
+                          erlang:byte_size(
+                            erlang:term_to_binary(Hashes, [compressed]))]),
+           ?DBG_ASSERT(Hashes =/= {<<>>, <<>>}),
+           send(DestReconPid, {resolve_req, Hashes}),
+           State#rr_recon_state{stage = resolve, stats = NStats2,
+                                merkle_sync = MerkleSyncNew1,
+                                misc = [{all_leaf_p1e, P1EAllLeaves},
+                                        {trivial_procs, TrivialProcs}]};
+       true ->
+           % only wait for the other node's resolve_req
+           State#rr_recon_state{stage = resolve,
+                                misc = [{all_leaf_p1e, P1EAllLeaves},
+                                        {trivial_procs, TrivialProcs}]}
+    end.
 
 %% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/5
 %%      and resolves them returning a compressed idx list each with keys to
