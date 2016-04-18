@@ -276,8 +276,8 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a map for faster access checks
-            DBChunkTree = decompress_kv_list(DBChunk, SigSize, VSize),
-            OrigDBChunkLen = mymaps:size(DBChunkTree),
+            {DBChunkTree, OrigDBChunkLen} =
+                decompress_kv_list(DBChunk, SigSize, VSize),
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}}];
         shash ->
@@ -286,8 +286,9 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_set for faster access checks
-            DBChunkSet = decompress_kv_list({DBChunk, <<>>}, SigSize, 0),
-            OrigDBChunkLen = mymaps:size(DBChunkSet),
+            {DBChunkSet, OrigDBChunkLen} =
+                decompress_kv_list({DBChunk, <<>>}, SigSize, 0),
+            %DBChunkSet = mymaps:from_list(DBChunkList),
             Params1 = Params#shash_recon_struct{db_chunk = <<>>},
             ?DBG_ASSERT(Misc =:= []),
             Misc1 = [{db_chunk, {DBChunkSet, OrigDBChunkLen, _MyDBSize = 0}}];
@@ -533,7 +534,8 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 %%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
     ?DBG_ASSERT(SigSize >= 0 andalso VSize >= 0),
 
-    DBChunkTree = decompress_kv_list(OtherDBChunk, SigSize, VSize),
+    {DBChunkTree, _OrigDBChunkLen} =
+        decompress_kv_list(OtherDBChunk, SigSize, VSize),
     MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
     FBItems = [Key || {Key, _Version} <- MyDiffKV,
@@ -552,7 +554,8 @@ on({resolve_req, DBChunk, DiffBF, SigSize, VSize, DestReconPid} = _Msg,
                                                         hf_count = MyHfCount}}) ->
     ?TRACE1(_Msg, State),
     
-    DBChunkTree = decompress_kv_list(DBChunk, SigSize, VSize),
+    {DBChunkTree, _OrigDBChunkLen} =
+        decompress_kv_list(DBChunk, SigSize, VSize),
     
     Hfs = ?REP_HFS:new(MyHfCount),
     OtherBF = bloom:new_bin(util:bin_xor(MyBFBin, DiffBF),
@@ -571,7 +574,8 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                            method = art}) ->
     ?TRACE1(_Msg, State),
     
-    DBChunkTree = decompress_kv_list(DBChunk, SigSize, VSize),
+    {DBChunkTree, _OrigDBChunkLen} =
+        decompress_kv_list(DBChunk, SigSize, VSize),
 
     NewStats2 = shash_bloom_perform_resolve(
                   State, DBChunkTree, SigSize, VSize, DestReconPid, []),
@@ -1150,6 +1154,13 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
     NT = M + N,
     min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
 
+-spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
+-> NrItems::non_neg_integer().
+calc_items_in_chunk(<<>>, 0) -> 0;
+calc_items_in_chunk(DBChunk, BitsPerItem) ->
+    ?DBG_ASSERT(erlang:bit_size(DBChunk) rem BitsPerItem =:= 0),
+    erlang:bit_size(DBChunk) div BitsPerItem.
+
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
 -spec compress_kv_list(
@@ -1162,24 +1173,8 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
 compress_kv_list([_ | _], {AccDiff, AccV}, 0, 0, _KeyComprFun) ->
     {AccDiff, AccV, []};
 compress_kv_list([_ | _] = KVList, {AccDiff, AccV}, SigSize, VSize, KeyComprFun) ->
-    SortedKVList0 = lists:sort([{KeyComprFun(X, SigSize), V, X}
-                               || X = {_K0, V} <- KVList]),
-    % detect and remove duplicates (this way, the other node sends them to us
-    % and we may return a feedback response if the decision was wrong):
-    {Last, LastDup, Rest, AnyDup} =
-        lists:foldl(fun(X, {LastX, _, RestX, _}) when element(1, X) =:= element(1, LastX) ->
-                            {X, dup, RestX, dupes};
-                       (X, {LastX, nodup, RestX, Dupes}) ->
-                            {X, nodup, [LastX | RestX], Dupes};
-                       (X, {_, dup, RestX, dupes}) ->
-                            {X, nodup, RestX, dupes}
-                    end, {hd(SortedKVList0), nodup, [], nodupes}, tl(SortedKVList0)),
-    SortedKVList = ?IIF(LastDup =:= nodup, lists:reverse(Rest, [Last]), lists:reverse(Rest)),
-    if AnyDup =:= nodupes -> ok;
-       true -> log:log("~w: [ ~p:~.0p ] hash collision detected"
-                       " (redundant item transfers expected, P1E may overstep)",
-                       [?MODULE, pid_groups:my_groupname(), self()])
-    end,
+    SortedKVList = lists:sort([{KeyComprFun(X, SigSize), V, X}
+                              || X = {_K0, V} <- KVList]),
     {KList, VList, KV0List} = lists:unzip3(SortedKVList),
     DiffKBin = compress_idx_list(KList, util:pow(2, SigSize) - 1, [], 0, 0),
     DiffVBin = if VSize =:= 0 -> AccV;
@@ -1195,17 +1190,41 @@ compress_kv_list([], {AccDiff, AccV}, _SigSize, _VSize, _KeyComprFun) ->
 %%      binary key representation and the integer of the (shortened) version.
 -spec decompress_kv_list(CompressedBin::{KeyDiff::bitstring(), VBin::bitstring()},
                          SigSize::signature_size(), VSize::signature_size())
-        -> ResTree::kvi_tree().
+        -> {ResTree::kvi_tree(), NumKeys::non_neg_integer()}.
 decompress_kv_list({<<>>, <<>>}, _SigSize, _VSize) ->
-    mymaps:new();
+    {mymaps:new(), 0};
 decompress_kv_list({KeyDiff, VBin}, SigSize, VSize) ->
-    KList = decompress_idx_list(KeyDiff, util:pow(2, SigSize) - 1),
+    {KList, KListLen} = decompress_idx_list(KeyDiff, util:pow(2, SigSize) - 1),
     {<<>>, Res, _} =
         lists:foldl(
           fun(CurKeyX, {<<Version:VSize, T/bitstring>>, AccX, CurPosX}) ->
                   {T, [{CurKeyX, {Version, CurPosX}} | AccX], CurPosX + 1}
           end, {VBin, [], 0}, KList),
-    mymaps:from_list(Res).
+    KVMap = mymaps:from_list(Res),
+    % deal with duplicates:
+    KVMap1 =
+        case mymaps:size(KVMap) of
+            KListLen -> KVMap;
+            KVMapSize ->
+                log:log("~w: [ ~p:~.0p ] hash collision detected (redundant item transfers expected)",
+                        [?MODULE, pid_groups:my_groupname(), self()]),
+                % there are duplicates! (items were mapped to the same key)
+                % -> remove them from the map so we send these items to the other node
+                % since every key must be in the map, we remove them one by one
+                % and check whether something was removed (ok) or not (duplicate)
+                element(3, lists:foldl(
+                          fun(CurKeyX, {UnprocessedX, OldSize, NewMapX}) ->
+                                  UnprocessedX1 = mymaps:remove(CurKeyX, UnprocessedX),
+                                  case mymaps:size(UnprocessedX1) of
+                                      OldSize -> % already removed -> duplicate
+                                          {UnprocessedX1, OldSize,
+                                           mymaps:remove(CurKeyX, NewMapX)};
+                                      NewSize -> % first occurence
+                                          {UnprocessedX1, NewSize, NewMapX}
+                                  end
+                          end, {KVMap, KVMapSize, KVMap}, KList))
+        end,
+    {KVMap1, KListLen}.
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
@@ -1333,7 +1352,6 @@ trivial_compress_key(KV, SigSize) ->
         -> CompressedIndices::bitstring().
 compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max) ->
     CurIdx = Pos - LastPos,
-    ?DBG_ASSERT2(CurIdx >= 0, [LastPos, Pos]),
     compress_idx_list(Rest, MaxPosBound, [CurIdx | AccResult], Pos + 1,
                       erlang:max(CurIdx, Max));
 compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
@@ -1355,14 +1373,17 @@ compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
 %%      into a list of indices encoded by that function.
 -spec decompress_idx_list(CompressedBin::bitstring(),
                           MaxPosBound::non_neg_integer())
-        -> [non_neg_integer()].
+        -> {[non_neg_integer()], Count::non_neg_integer()}.
 decompress_idx_list(<<>>, _MaxPosBound) ->
-    [];
+    {[], 0};
 decompress_idx_list(Bin, MaxPosBound) ->
     IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     SigSize = erlang:max(1, SigSize0),
-    decompress_idx_list_(Bin2, 0, SigSize).
+    Count = calc_items_in_chunk(Bin2, SigSize),
+    IdxList = decompress_idx_list_(Bin2, 0, SigSize),
+    ?DBG_ASSERT(Count =:= length(IdxList)),
+    {IdxList, Count}.
 
 %% @doc Helper for decompress_idx_list/3.
 -spec decompress_idx_list_(CompressedBin::bitstring(), LastPos::non_neg_integer(),
@@ -2027,7 +2048,8 @@ merkle_resolve_retrieve_leaf_hashes(
     OBucketVBinSize = BucketSize * VSize,
     <<OBucketKBin:OBucketKBinSize/bitstring, NHashesK/bitstring>> = HashesKT,
     <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
-    OBucketTree = decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize, VSize),
+    {OBucketTree, _OrigDBChunkLen} =
+        decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize, VSize),
     {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize, NextP0E}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
