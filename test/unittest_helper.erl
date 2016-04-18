@@ -219,7 +219,6 @@ make_ring(Size, Options) ->
                         NodeAddFun::fun(() -> [pid_groups:groupname() | {error, term()}]))
         -> pid().
 make_ring_generic(Options, NodeAddFun) ->
-    error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
         _         -> ct:fail("Trying to create a new ring although there is already one.")
@@ -261,17 +260,17 @@ stop_ring() ->
 %%      when the process' pid is known.
 -spec stop_ring(pid()) -> ok.
 stop_ring(Pid) ->
+    LogLevel = config:read(log_level),
     try
         begin
             ct:pal("unittest_helper:stop_ring start."),
-            error_logger:tty(false),
-            error_logger:delete_report_handler(error_logger_log4erl_h),
             log:set_log_level(none),
             sup:sup_terminate(main_sup),
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
             sup_scalaris:stop_first_services(),
+            log:set_log_level(LogLevel),
             ct:pal("unittest_helper:stop_ring done."),
             ok
         end
@@ -281,7 +280,7 @@ stop_ring(Pid) ->
             erlang:Level(Reason)
     after
             catch(unregister(ct_test_ring)),
-            error_logger:tty(true)
+            log:set_log_level(LogLevel)
     end.
 
 -spec stop_pid_groups() -> ok.
@@ -421,11 +420,11 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
 stop_minimal_procs(CTConfig)  ->
     case lists:keytake(wrapper_pid, 1, CTConfig) of
         {value, {wrapper_pid, Pid}, CTConfig1} ->
-            error_logger:tty(false),
+            LogLevel = config:read(log_level),
             log:set_log_level(none),
             exit(Pid, kill),
             stop_pid_groups(),
-            error_logger:tty(true),
+            log:set_log_level(LogLevel),
             CTConfig1;
         false -> CTConfig
     end.

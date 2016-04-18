@@ -104,10 +104,8 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
-    error_logger:tty(false),
     randoms:stop(),
     _ = inets:stop(),
-    error_logger:tty(true),
     unittest_global_state:delete(),
     unittest_helper:kill_new_processes(State#state.processes),
     {Return, State#state{processes = [], suite = undefined, tc_start = [] } }.

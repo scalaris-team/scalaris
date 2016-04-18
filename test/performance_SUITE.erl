@@ -456,10 +456,7 @@ pid_groups_lookup(_Config) ->
                           pid_groups:pid_of(?MODULE,
                                             pid_groups)
                   end, "pid_of by group and process name"),
-    error_logger:tty(false),
-    log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
-    error_logger:tty(true),
     ok.
 
 pid_groups_lookup_by_pid(_Config) ->
@@ -468,10 +465,7 @@ pid_groups_lookup_by_pid(_Config) ->
     iter(count(), fun () ->
                           pid_groups:group_and_name_of(self())
                   end, "group_and_name_of pid"),
-    error_logger:tty(false),
-    log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
-    error_logger:tty(true),
     ok.
 
 term_to_binary1(_Config) ->
