@@ -851,11 +851,11 @@ app_check_known() ->
             case is_unittest() of
                 true -> ok;
                 _    ->
-                    %% error_logger:warning_msg("undefined application but no unittest~n"),
+                    %% log:log("undefined application but no unittest~n"),
                     ok
             end;
         {ok, App} ->
-            error_logger:warning_msg("unknown application: ~.0p~n", [App]),
+            log:log("unknown application: ~.0p~n", [App]),
             ok
     end.
 

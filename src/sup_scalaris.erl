@@ -69,14 +69,12 @@ start_link(Options) ->
             end,
             ok;
 %%        ignore ->
-%%            error_logger:error_msg(
+%%            log:log(
 %%              "error in starting sup_scalaris supervisor:"
 %%              " supervisor should not return ignore~n",
 %%              []);
         {error, Error} ->
-            error_logger:error_msg(
-              "error in starting sup_scalaris supervisor: ~p~n",
-              [Error])
+            log:log("error in starting sup_scalaris supervisor: ~p~n", [Error])
    end,
    Link.
 

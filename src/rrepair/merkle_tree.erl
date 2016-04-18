@@ -348,7 +348,7 @@ insert_to_node(Key, CheckKey, {Hash, Count, ItemCount, Interval,
                                      intervals:in(CheckKey, get_interval(N))
                              end, Childs) of
         false ->
-            error_logger:error_msg("InsertFailed!"),
+            log:log("InsertFailed!"),
             Node;
         {Dest, Rest} ->
             OldSize = node_size(Dest),
