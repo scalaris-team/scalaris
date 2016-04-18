@@ -486,7 +486,7 @@ tester_type_check_rrepair(_Config) ->
              {decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
              {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
              {decompress_idx_list, 2}, %% needs a special binary to correspond to a number of bits
-             {decompress_idx_list_, 3}, %% needs a special binary to correspond to a number of bits
+             {decompress_idx_list_, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list_, 3}, %% needs a special binary to correspond to a number of bits
              {get_full_diff, 6}, %% needs a suitable map (cannot be specified in the type def)

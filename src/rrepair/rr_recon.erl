@@ -1206,7 +1206,8 @@ decompress_kv_list({KeyDiff, VBin}, SigSize, VSize) ->
         case mymaps:size(KVMap) of
             KListLen -> KVMap;
             KVMapSize ->
-                log:log("~w: [ ~p:~.0p ] hash collision detected (redundant item transfers expected)",
+                log:log("~w: [ ~p:~.0p ] hash collision detected"
+                        " (redundant item transfers expected)",
                         [?MODULE, pid_groups:my_groupname(), self()]),
                 % there are duplicates! (items were mapped to the same key)
                 % -> remove them from the map so we send these items to the other node
@@ -1351,7 +1352,12 @@ trivial_compress_key(KV, SigSize) ->
                         LastPos::non_neg_integer(), Max::non_neg_integer())
         -> CompressedIndices::bitstring().
 compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max) ->
-    CurIdx = Pos - LastPos,
+    CurIdx0 = Pos - LastPos,
+    % need a positive value to encode:
+    CurIdx = if CurIdx0 >= 0 -> CurIdx0;
+                true -> Mod = MaxPosBound + 1,
+                        ((CurIdx0 rem Mod) + Mod) rem Mod
+             end,
     compress_idx_list(Rest, MaxPosBound, [CurIdx | AccResult], Pos + 1,
                       erlang:max(CurIdx, Max));
 compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
@@ -1381,22 +1387,27 @@ decompress_idx_list(Bin, MaxPosBound) ->
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
     SigSize = erlang:max(1, SigSize0),
     Count = calc_items_in_chunk(Bin2, SigSize),
-    IdxList = decompress_idx_list_(Bin2, 0, SigSize),
+    IdxList = decompress_idx_list_(Bin2, 0, SigSize, MaxPosBound + 1),
     ?DBG_ASSERT(Count =:= length(IdxList)),
     {IdxList, Count}.
 
 %% @doc Helper for decompress_idx_list/3.
 -spec decompress_idx_list_(CompressedBin::bitstring(), LastPos::non_neg_integer(),
-                           SigSize::signature_size()) -> ResKeys::[non_neg_integer()].
-decompress_idx_list_(<<>>, _LastPos, _SigSize) ->
+                           SigSize::signature_size(), Mod::pos_integer())
+        -> ResKeys::[non_neg_integer()].
+decompress_idx_list_(<<>>, _LastPos, _SigSize, _Mod) ->
     [];
-decompress_idx_list_(Bin, LastPos, SigSize) ->
+decompress_idx_list_(Bin, LastPos, SigSize, Mod) ->
     <<Diff:SigSize/integer-unit:1, T/bitstring>> = Bin,
-    CurPos = LastPos + Diff,
-    [CurPos | decompress_idx_list_(T, CurPos + 1, SigSize)].
+    CurPos = (LastPos + Diff) rem Mod,
+    [CurPos | decompress_idx_list_(T, CurPos + 1, SigSize, Mod)].
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5
 %%      into the encoded sub-list of the original list.
+%%      NOTE: in contrast to decompress_idx_list/2 (which is used for
+%%            compressing KV lists as well), we do not support duplicates
+%%            in the original list fed into compress_idx_list/5 and will fail
+%%            during the decode!
 -spec decompress_idx_to_list(CompressedBin::bitstring(), [X]) -> [X].
 decompress_idx_to_list(<<>>, _List) ->
     [];
@@ -1413,6 +1424,8 @@ decompress_idx_to_list_(<<>>, _, _SigSize) ->
     [];
 decompress_idx_to_list_(Bin, List, SigSize) ->
     <<KeyPosInc:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    % note: this fails if there have been duplicates in the original list or
+    %       KeyPosInc was negative!
     [X | List2] = lists:nthtail(KeyPosInc, List),
     [X | decompress_idx_to_list_(T, List2, SigSize)].
 
