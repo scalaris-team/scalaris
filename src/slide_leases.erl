@@ -96,7 +96,7 @@ update_rcv_data2(State, SlideOp, {continue}) ->
 -spec prepare_send_delta1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()} |
-           {abort, Reason::unkown_lease, State::dht_node_state:state(), SlideOp1::slide_op:slide_op()}.
+           {abort, Reason::{protocol_error, EmbeddedMsg::any()}, State::dht_node_state:state(), SlideOp1::slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
     %log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
@@ -107,18 +107,20 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
             Interval = slide_op:get_interval(OldSlideOp),
             case Interval =:= l_on_cseq:get_range(Lease) of
                 false ->
-                    {R1, R2} = case intervals:in(Id, Interval) of
-                                   true ->
+                    case intervals:in(Id, Interval) of
+                        true ->
                                                 % ->
-                                       true = false, % TS: not tested
-                                       {intervals:minus(l_on_cseq:get_range(Lease), Interval), Interval};
-                                   false ->
+                            log:log("unsupported slide direction in prepare_send_delta1~n"),
+                            log:log("~p in ~p~n == false", [Id, Interval]),
+                            log:log("~p~n", [Lease]),
+                            {abort, {protocol_error, unsupported_slide_direction}, State, OldSlideOp};
+                        false ->
                                                 % <-
-                                       {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)}
-                               end,
-                    NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
-                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
-                    {ok, State, OldSlideOp};
+                            {R1, R2} =  {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)},
+                            NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
+                            l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
+                            {ok, State, OldSlideOp}
+                    end;
                 true ->
                     log:log("only change owner instead of split and change owner", []),
                     %% @todo
@@ -142,13 +144,13 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
             log:log("unknown lease in prepare_send_delta1~n"),
             log:log("~p:~p~n", [ActiveLease, PassiveLeaseList]),
             log:log("~p~n", [Interval]),
-            {abort, unkown_lease, State, OldSlideOp}
+            {abort, {protocol_error, unknown_lease_in_prepare_send_delta}, State, OldSlideOp}
     end.
 
 
 -spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           EmbeddedMsg::any())
-        -> {ok, dht_node_state:state(), slide_op:slide_op()} | 
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
            {abort, Reason::{protocol_error, EmbeddedMsg::any()}, State::dht_node_state:state(), SlideOp1::slide_op:slide_op()}.
 prepare_send_delta2(State, SlideOp, Msg) ->
     % check that split has been done
@@ -159,7 +161,7 @@ prepare_send_delta2(State, SlideOp, Msg) ->
             %State1 = locally_disable_lease(State, NewLease),
             {ok, State, SlideOp};
         {split, fail, _Lease} ->
-            %% log:log("prepare_send_delta2: split failed~n", []),
+            log:log("prepare_send_delta2: split failed~n", []),
             {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
