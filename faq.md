@@ -272,7 +272,7 @@ Alternatively, `scalarisctl -m start` starts a management-server and `scalarisct
 ### How do I delete a key?
 
 The principle issues with deleting keys from Scalaris are described in
-[http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799 this] thread of the mailing list.
+[this thread](http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799) of the mailing list.
 
 In short: deleting a key may violate one of Scalaris' fundamental assumptions - version numbers of keys never decrease. Everything is fine, as long as all replicas are deleted. If some remain, because a node was not available during the delete, you may get into trouble.
 
