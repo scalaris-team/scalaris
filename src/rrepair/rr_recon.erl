@@ -1957,10 +1957,10 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
 merkle_resolve_add_leaf_hash(
   Bucket, BucketSize, P1EAllLeaves, NumRestLeaves, OtherMaxItemsCount, BucketSizeBits,
   HashesK, HashesV, PrevP0E) ->
-    ?DBG_ASSERT(BucketSize < util:pow(2, BucketSizeBits)),
-    ?DBG_ASSERT(BucketSize =:= length(Bucket)),
     ?DBG_ASSERT(BucketSize > 0),
-    HashesK1 = <<HashesK/bitstring, BucketSize:BucketSizeBits>>,
+    ?DBG_ASSERT(BucketSize =< util:pow(2, BucketSizeBits)),
+    ?DBG_ASSERT(BucketSize =:= length(Bucket)),
+    HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
@@ -1987,7 +1987,8 @@ merkle_resolve_add_leaf_hash(
 merkle_resolve_retrieve_leaf_hashes(
   HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount,
   BucketSizeBits) ->
-    <<BucketSize:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
+    <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
+    BucketSize = BucketSize0 + 1,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
@@ -2050,7 +2051,8 @@ merkle_resolve_leaves_send(
                     State#rr_recon_state{stats = NStats2,
                                          merkle_sync = SyncNew1, misc = []});
        SyncSend =/= [] ->
-           BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
+           % note: we do not have empty buckets here and thus always store (BucketSize - 1)
+           BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
            % note: 1 trivial proc contains 1 leaf
            {HashesK, HashesV, NewSyncSend_rev, ThisP0E, LeafCount} =
                lists:foldl(
@@ -2106,7 +2108,8 @@ merkle_resolve_leaves_send(
          is_subtype(Bin, bitstring()).
 merkle_resolve_leaves_receive(Sync, {HashesK, HashesV}, DestRRPid, Stats, OwnerL, Params,
                               P1EAllLeaves, TrivialProcs, IsInitiator) ->
-    BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size),
+    % note: we do not have empty buckets here and thus always store (BucketSize - 1)
+    BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
     % mismatches to resolve:
     % * at initiator    : inner(I)-leaf(NI) or leaf(NI)-non-empty-leaf(I)
     % * at non-initiator: inner(NI)-leaf(I)
