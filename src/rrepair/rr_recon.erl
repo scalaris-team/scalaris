@@ -720,8 +720,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
             % start a (parallel) resolve
             ?TRACE("Sync (I):~nsend:~.2p~n rcv:~.2p", [SyncNewSend, SyncNewRcv]),
             merkle_resolve_leaves_send(
-              NewState#rr_recon_state{stats = NStats1,
-                                      merkle_sync = SyncNew}, NextP0E);
+              NewState#rr_recon_state{stats = NStats1}, NextP0E);
         _ ->
             ?DBG_ASSERT(NextLvlNodesAct >= 0),
             % calculate the remaining trees' failure prob based on the already
@@ -1863,7 +1862,7 @@ merkle_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN],
             ?DBG_ASSERT(not merkle_tree:is_empty(Node)),
             % non-empty leaf on this node, empty leaf on the other node
             % this will increase HashCmpL although the process is exact
-            % -> simply remove 1 and to remain at the same count!
+            % -> simply remove 1 to remain at the same count!
             merkle_cmp_result(
               <<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
               SigSizeI, SigSizeL,
