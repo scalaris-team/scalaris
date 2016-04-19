@@ -495,8 +495,8 @@ tester_type_check_rrepair(_Config) ->
              {get_part_diff_, 6}, %% needs a suitable map (cannot be specified in the type def)
              {shash_bloom_perform_resolve, 6}, %% needs a special binary to correspond to a number of bits
              {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
-             {merkle_check_node, 20}, %% needs merkle_tree/nodes with hashes
-             {merkle_cmp_result, 19}, %% needs matching result and merkle nodes
+             {merkle_check_node, 21}, %% needs merkle_tree/nodes with hashes
+             {merkle_cmp_result, 20}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 7}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list
