@@ -165,7 +165,7 @@
          initiator          = false                                  :: boolean(),
          merkle_sync        = {[], [], 0, {[], 0, 0}}                :: merkle_sync(),
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
-         kv_list            = []                                     :: db_chunk_kv(),
+         kv_list            = []                                     :: db_chunk_kv() | [db_chunk_kv()], % list of KV chunks only temporarily when retrieving the DB in pieces
          k_list             = []                                     :: [?RT:key()],
          stats              = ?required(rr_recon_state, stats)       :: rr_recon_stats:stats(),
          to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReqIdx::[non_neg_integer()]}
@@ -760,8 +760,9 @@ build_struct(DBList, RestI,
                          not Initiator)),
     % note: RestI already is a sub-interval of the sync interval
     BeginSync = intervals:is_empty(RestI),
-    NewKVList = lists:append(KVList, DBList),
+    NewKVList0 = [DBList | KVList],
     if BeginSync ->
+           NewKVList = lists:append(lists:reverse(NewKVList0)),
            ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
                         true -> RMethod
                      end,
@@ -779,7 +780,7 @@ build_struct(DBList, RestI,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            % keep stage (at initiator: reconciliation, at other: build_struct)
-           State#rr_recon_state{kv_list = NewKVList}
+           State#rr_recon_state{kv_list = NewKVList0}
     end.
 
 -spec begin_sync(OtherSyncStruct::parameters() | {}, state()) -> state() | kill.
