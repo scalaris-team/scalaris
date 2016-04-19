@@ -304,7 +304,7 @@ on({start_recon, RMethod, Params} = _Msg,
             Hfs = ?REP_HFS:new(HfCount),
             BF = bloom:new_bin(BFBin, Hfs, BFCount),
             Params1 = Params#bloom_recon_struct{bf = BF},
-            Misc1 = [{item_count, 0},
+            Misc1 = [{my_db, []},
                      {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), Hfs)}];
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
@@ -434,10 +434,9 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            method = bloom,
                            params = #bloom_recon_struct{p1e = P1E, bf = BF},
                            stats = Stats,             kv_list = KVList,
-                           misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
+                           misc = [{my_db, MyDB}, {my_bf, MyBF}]}) ->
     ?TRACE1(_Msg, State),
-    MyDBSize1 = MyDBSize + length(DBList),
-    MyBF1 = bloom:add_list(MyBF, DBList),
+    MyDB1 = [DBList | MyDB],
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
@@ -452,8 +451,10 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
-                                misc = [{item_count, MyDBSize1}, {my_bf, MyBF1}]};
+                                misc = [{my_db, MyDB1}, {my_bf, MyBF}]};
        true ->
+           MyBF1 = bloom:add_list(MyBF, lists:append(MyDB1)),
+           MyDBSize1 = bloom:item_count(MyBF1),
            % here, the failure probability is correct (in contrast to the
            % non-initiator) since we know how many item checks we perform with
            % the BF and how many checks the non-initiator will perform on MyBF1
