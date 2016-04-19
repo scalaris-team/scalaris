@@ -1664,8 +1664,10 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                   HashCmpI_IN, HashCmpL_IN) ->
     IsLeafNode = merkle_tree:is_leaf(Node),
     EmptyNode = merkle_tree:is_empty(Node),
+    EmptyLeafNode = IsLeafNode andalso EmptyNode,
+    NonEmptyLeafNode = IsLeafNode andalso (not EmptyNode),
     NodeHash =
-        if IsLeafNode andalso EmptyNode ->
+        if EmptyLeafNode ->
                none; % to match with the hash from merkle_decompress_hashlist/3
            IsLeafNode ->
                <<X:SigSizeL/integer-unit:1>> = <<(merkle_tree:get_hash(Node)):SigSizeL>>,
@@ -1674,16 +1676,17 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                <<X:SigSizeI/integer-unit:1>> = <<(merkle_tree:get_hash(Node)):SigSizeI>>,
                X
         end,
+    EmptyLeafHash = IsLeafHash andalso Hash =:= none,
+    NonEmptyLeafHash = IsLeafHash andalso Hash =/= none,
     if Hash =:= NodeHash andalso IsLeafHash =:= IsLeafNode ->
            Skipped = merkle_tree:size(Node) - 1,
-           if IsLeafHash andalso Hash =:= none ->
-                  % empty leaf hash on both nodes - this was exact!
+           if EmptyLeafHash -> % empty leaf hash on both nodes - this was exact!
                   HashCmpI_OUT = HashCmpI_IN,
                   HashCmpL_OUT = HashCmpL_IN;
-              IsLeafHash ->
+              IsLeafHash -> % both non-empty leaf nodes
                   HashCmpI_OUT = HashCmpI_IN,
                   HashCmpL_OUT = HashCmpL_IN + 1;
-              true ->
+              true -> % both inner nodes
                   HashCmpI_OUT = HashCmpI_IN + 1,
                   HashCmpL_OUT = HashCmpL_IN
            end,
@@ -1695,7 +1698,7 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                              SyncIN, AccCmp + 1, AccSkip + Skipped,
                              NextLvlNodesActIN, HashCmpI_OUT, HashCmpL_OUT);
        (not IsLeafNode) andalso (not IsLeafHash) ->
-           % inner hash on both nodes
+           % both inner nodes
            Childs = merkle_tree:get_childs(Node),
            NextLvlNodesActOUT = NextLvlNodesActIN + Params#merkle_params.branch_factor,
            HashCmpI_OUT = HashCmpI_IN + 1,
@@ -1706,9 +1709,9 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                              MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount,
                              SyncIN, AccCmp + 1, AccSkip,
                              NextLvlNodesActOUT, HashCmpI_OUT, HashCmpL_IN);
-       (not IsLeafNode) andalso IsLeafHash andalso Hash =/= none ->
+       (not IsLeafNode) andalso NonEmptyLeafHash ->
            % inner node here, non-empty leaf there
-           % don't compare hashes -> this is an exact process based on the tags
+           % no need to compare hashes - this is an exact process based on the tags
            {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
            Sync = {MyMaxItemsCount, MyKVItems, LeafCount},
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
@@ -1718,62 +1721,58 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
                              MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount,
                              SyncIN, AccCmp + 1, AccSkip,
                              NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN);
-       (not IsLeafNode) andalso IsLeafHash -> % andalso Hash =:= none
-           % inner node here, empty leaf there -> resolve directly (without a trivial sub process)
-           % don't compare hashes -> this is an exact process based on the tags
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
-           MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
-           MySyncAccDRLCount1 = MySyncAccDRLCount + LeafCount,
-           merkle_check_node(TK, TN, SigSizeI, SigSizeL,
-                             MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
-                             <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>, RestTreeAcc,
-                             SyncAccSend, SyncAccRcv,
-                             MySyncAccDRK1, MySyncAccDRLCount1, OtherSyncAccDRLCount,
-                             SyncIN, AccCmp + 1, AccSkip,
-                             NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN);
-       IsLeafNode ->
-           if IsLeafHash andalso Hash =/= none ->
-                  % leaf mismatch (our node may be empty, the other is not)
-                  % distinguish the case where this node is empty which is exact, too!
-                  case merkle_tree:is_empty(Node) of
-                      true  -> ResultCode = ?recon_fail_cont_inner,
-                               HashCmpL_OUT = HashCmpL_IN;
-                      false -> ResultCode = ?recon_fail_stop_leaf,
-                               HashCmpL_OUT = HashCmpL_IN + 1
-                  end,
-                  SyncAccSend1 =
-                      [{erlang:min(Params#merkle_params.bucket_size,
-                                   OtherMaxItemsCount), merkle_tree:get_bucket(Node),
-                        merkle_tree:get_item_count(Node)} | SyncAccSend],
-                  MySyncAccDRK1 = MySyncAccDRK,
-                  MySyncAccDRLCount1 = MySyncAccDRLCount;
-              IsLeafHash -> % andalso Hash =:= none
-                  % empty leaf hash on the other node - we can resolve this
-                  % case directly, i.e. without a trivial sub process
-                  ResultCode = ?recon_fail_stop_leaf,
-                  SyncAccSend1 = SyncAccSend,
-                  MySyncAccDRK1 =
-                      [element(1, X) || X <- merkle_tree:get_bucket(Node)]
-                          ++ MySyncAccDRK,
-                  MySyncAccDRLCount1 = MySyncAccDRLCount + 1,
-                  HashCmpL_OUT = HashCmpL_IN;
-              true ->
-                  % leaf node and inner hash
-                  ResultCode = ?recon_fail_stop_leaf,
-                  SyncAccSend1 =
-                      [{OtherMaxItemsCount, merkle_tree:get_bucket(Node),
-                        merkle_tree:get_item_count(Node)} | SyncAccSend],
-                  MySyncAccDRK1 = MySyncAccDRK,
-                  MySyncAccDRLCount1 = MySyncAccDRLCount,
+       NonEmptyLeafNode andalso (NonEmptyLeafHash orelse not IsLeafHash) ->
+           % non-empty leaf here, non-empty leaf or inner node there
+           if NonEmptyLeafHash -> % both non-empty leaf nodes
+                  OtherMaxItemsCount1 =
+                      erlang:min(Params#merkle_params.bucket_size,
+                                 OtherMaxItemsCount),
+                  HashCmpL_OUT = HashCmpL_IN + 1;
+              true -> % inner node there
+                  OtherMaxItemsCount1 = OtherMaxItemsCount,
                   HashCmpL_OUT = HashCmpL_IN
            end,
+           SyncAccSend1 =
+               [{OtherMaxItemsCount1, merkle_tree:get_bucket(Node),
+                 merkle_tree:get_item_count(Node)} | SyncAccSend],
+           merkle_check_node(TK, TN, SigSizeI, SigSizeL,
+                             MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                             <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>, RestTreeAcc,
+                             SyncAccSend1, SyncAccRcv,
+                             MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount,
+                             SyncIN, AccCmp + 1, AccSkip,
+                             NextLvlNodesActIN, HashCmpI_IN, HashCmpL_OUT);
+       (NonEmptyLeafNode orelse not IsLeafNode) andalso EmptyLeafHash ->
+           % non-empty leaf or inner node here, empty leaf there
+           % no need to compare hashes - this is an exact process based on the tags
+           % -> resolve directly here, i.e. without a trivial sub process
+           ResultCode = if not IsLeafNode -> ?recon_fail_stop_inner; % stop_empty_leaf1
+                           NonEmptyLeafNode -> ?recon_fail_stop_leaf % stop_empty_leaf2
+                        end,
+           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
                              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
                              <<FlagsAcc/bitstring, ResultCode:2>>, RestTreeAcc,
-                             SyncAccSend1, SyncAccRcv,
-                             MySyncAccDRK1, MySyncAccDRLCount1, OtherSyncAccDRLCount,
+                             SyncAccSend, SyncAccRcv,
+                             MySyncAccDRK1, MySyncAccDRLCount + LeafCount,
+                             OtherSyncAccDRLCount,
                              SyncIN, AccCmp + 1, AccSkip,
-                             NextLvlNodesActIN, HashCmpI_IN, HashCmpL_OUT)
+                             NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN);
+       EmptyLeafNode andalso (NonEmptyLeafHash orelse not IsLeafHash) ->
+           % empty leaf here, non-empty leaf or inner node there
+           % no need to compare hashes - this is an exact process based on the tags
+           % -> resolved directly at the other node, i.e. without a trivial sub process
+           ResultCode = if not IsLeafHash -> ?recon_fail_stop_inner; % stop_empty_leaf3
+                           NonEmptyLeafHash -> ?recon_fail_cont_inner % stop_empty_leaf4
+                        end,
+           merkle_check_node(TK, TN, SigSizeI, SigSizeL,
+                             MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
+                             <<FlagsAcc/bitstring, ResultCode:2>>, RestTreeAcc,
+                             SyncAccSend, SyncAccRcv,
+                             MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount + 1,
+                             SyncIN, AccCmp + 1, AccSkip,
+                             NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN)
     end.
 
 %% @doc Processes compare results from merkle_check_node/21 on the initiator.
@@ -1844,53 +1843,68 @@ merkle_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN],
                   RestTreeAcc, SyncAccSend, SyncAccRcv,
                   MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount,
                   AccCmp, AccSkip, NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN) ->
+    % either cont_inner or stop_empty_leaf4
     case merkle_tree:is_leaf(Node) of
-        true ->
-            ?DBG_ASSERT(not merkle_tree:is_empty(Node)),
-            % non-empty leaf on this node, empty leaf on the other node
-            % this will increase HashCmpL although the process is exact
-            % -> simply remove 1 to remain at the same count!
-            merkle_cmp_result(
-              <<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
-              SigSizeI, SigSizeL,
-              MyMaxItemsCount, OtherMaxItemsCount, SyncIn, Params, Stats,
-              RestTreeAcc, SyncAccSend, SyncAccRcv,
-              MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount, AccCmp, AccSkip,
-              NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN - 1);
-        false ->
+        false -> % cont_inner
             % inner hash on both nodes
             Childs = merkle_tree:get_childs(Node),
             NextLvlNodesActOUT = NextLvlNodesActIN + Params#merkle_params.branch_factor,
-            merkle_cmp_result(
-              TR, TN, SigSizeI, SigSizeL,
-              MyMaxItemsCount, OtherMaxItemsCount, SyncIn, Params, Stats,
-              lists:reverse(Childs, RestTreeAcc), SyncAccSend, SyncAccRcv,
-              MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount,
-              AccCmp + 1, AccSkip,
-              NextLvlNodesActOUT, HashCmpI_IN + 1, HashCmpL_IN)
-    end;
+            HashCmpI_OUT = HashCmpI_IN + 1,
+            RestTreeAcc1 = lists:reverse(Childs, RestTreeAcc),
+            MySyncAccDRK1 = MySyncAccDRK,
+            MySyncAccDRLCount1 = MySyncAccDRLCount;
+        true -> % stop_empty_leaf4
+            ?DBG_ASSERT(not merkle_tree:is_empty(Node)),
+            % non-empty leaf on this node, empty leaf on the other node
+            % -> resolve directly here, i.e. without a trivial sub process
+            NextLvlNodesActOUT = NextLvlNodesActIN,
+            HashCmpI_OUT = HashCmpI_IN,
+            RestTreeAcc1 = RestTreeAcc,
+            MyKVItems = merkle_tree:get_bucket(Node),
+            MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
+            MySyncAccDRLCount1 = MySyncAccDRLCount + 1
+    end,
+    merkle_cmp_result(TR, TN, SigSizeI, SigSizeL,
+                      MyMaxItemsCount, OtherMaxItemsCount, SyncIn, Params, Stats,
+                      RestTreeAcc1, SyncAccSend, SyncAccRcv,
+                      MySyncAccDRK1, MySyncAccDRLCount1, OtherSyncAccDRLCount,
+                      AccCmp + 1, AccSkip,
+                      NextLvlNodesActOUT, HashCmpI_OUT, HashCmpL_IN);
 merkle_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN],
                   SigSizeI, SigSizeL,
                   MyMaxItemsCount, OtherMaxItemsCount, SyncIn, Params, Stats,
                   RestTreeAcc, SyncAccSend, SyncAccRcv,
                   MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount, AccCmp, AccSkip,
                   NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN) ->
-    ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
-    % leaf-inner mismatch -> this is an exact process based on the tags
-    % if our leaf is empty, the other node will directly send its items
-    case merkle_tree:is_empty(Node) of
-        false ->
-            SyncAccSend1 = [{OtherMaxItemsCount, merkle_tree:get_bucket(Node),
-                             merkle_tree:get_item_count(Node)} | SyncAccSend],
-            OtherSyncAccDRLCount1 = OtherSyncAccDRLCount;
-        true ->
-            SyncAccSend1 = SyncAccSend,
-            OtherSyncAccDRLCount1 = OtherSyncAccDRLCount + 1 % this will deviate from the other node!
+    % either stop_inner or stop_empty_leaf1 or stop_empty_leaf3
+    % NOTE: all these mismatches are exact process based on the tags
+    IsLeafNode = merkle_tree:is_leaf(Node),
+    EmptyLeafNode = IsLeafNode andalso merkle_tree:is_empty(Node),
+    
+    if IsLeafNode andalso (not EmptyLeafNode) -> % stop_inner
+           SyncAccSend1 = [{OtherMaxItemsCount, merkle_tree:get_bucket(Node),
+                            merkle_tree:get_item_count(Node)} | SyncAccSend],
+           OtherSyncAccDRLCount1 = OtherSyncAccDRLCount,
+           MySyncAccDRK1 = MySyncAccDRK,
+           MySyncAccDRLCount1 = MySyncAccDRLCount;
+       EmptyLeafNode -> % stop_empty_leaf1
+           % -> resolved directly at the other node, i.e. without a trivial sub process
+           SyncAccSend1 = SyncAccSend,
+           OtherSyncAccDRLCount1 = OtherSyncAccDRLCount + 1, % this will deviate from the other node!
+           MySyncAccDRK1 = MySyncAccDRK,
+           MySyncAccDRLCount1 = MySyncAccDRLCount;
+       not IsLeafNode -> % stop_empty_leaf3
+           % -> resolve directly here, i.e. without a trivial sub process
+           SyncAccSend1 = SyncAccSend,
+           OtherSyncAccDRLCount1 = OtherSyncAccDRLCount,
+           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
+           MySyncAccDRLCount1 = MySyncAccDRLCount + LeafCount
     end,
     merkle_cmp_result(TR, TN, SigSizeI, SigSizeL,
                       MyMaxItemsCount, OtherMaxItemsCount, SyncIn, Params, Stats,
                       RestTreeAcc, SyncAccSend1, SyncAccRcv,
-                      MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount1,
+                      MySyncAccDRK1, MySyncAccDRLCount1, OtherSyncAccDRLCount1,
                       AccCmp + 1, AccSkip,
                       NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN);
 merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
@@ -1899,22 +1913,24 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                   RestTreeAcc, SyncAccSend, SyncAccRcv,
                   MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount, AccCmp, AccSkip,
                   NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN) ->
+    % either stop_leaf or stop_empty_leaf2
     case merkle_tree:is_leaf(Node) of
         true  ->
             case merkle_tree:is_empty(Node) of
-                false ->
+                false -> % stop_leaf
                     MaxItemsCount = erlang:min(Params#merkle_params.bucket_size,
                                                MyMaxItemsCount),
                     SyncAccRcv1 =
                         [{MaxItemsCount, merkle_tree:get_bucket(Node), 1} | SyncAccRcv],
                     OtherSyncAccDRLCount1 = OtherSyncAccDRLCount,
                     HashCmpL_OUT = HashCmpL_IN + 1;
-                true ->
+                true -> % stop_empty_leaf2
+                    % -> resolved directly at the other node, i.e. without a trivial sub process
                     SyncAccRcv1 = SyncAccRcv,
                     OtherSyncAccDRLCount1 = OtherSyncAccDRLCount + 1,
                     HashCmpL_OUT = HashCmpL_IN
             end;
-        false ->
+        false -> % stop_leaf
             {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
             SyncAccRcv1 =
                 [{MyMaxItemsCount, MyKVItems, LeafCount} | SyncAccRcv],
@@ -1943,6 +1959,7 @@ merkle_resolve_add_leaf_hash(
   HashesK, HashesV, PrevP0E) ->
     ?DBG_ASSERT(BucketSize < util:pow(2, BucketSizeBits)),
     ?DBG_ASSERT(BucketSize =:= length(Bucket)),
+    ?DBG_ASSERT(BucketSize > 0),
     HashesK1 = <<HashesK/bitstring, BucketSize:BucketSizeBits>>,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
@@ -2005,8 +2022,6 @@ merkle_resolve_leaves_send(
   NextP0E) ->
     ?TRACE("Sync (~s):~nsend:~.2p~n rcv:~.2p",
            [?IIF(IsInitiator, "I", "NI"), SyncNewSend, SyncNewRcv]),
-    ?DBG_ASSERT(?implies(IsInitiator, MySyncDRK =:= [])),
-    ?DBG_ASSERT(?implies(IsInitiator, MySyncDRLCount =:= 0)),
     % resolve items from emptyLeaf-* comparisons with empty leaves on any node as key_upd:
     NStats1 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
     NStats2 = rr_recon_stats:inc(
@@ -2108,6 +2123,7 @@ merkle_resolve_leaves_receive(Sync, {HashesK, HashesV}, DestRRPid, Stats, OwnerL
                         HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc, P0EIn,
                         MyMaxItemsCount, BucketSizeBits),
                   % calc diff (trivial sync)
+                  ?DBG_ASSERT(MyKVItems =/= []),
                   {ToSend1, ToReqIdx1, OBucketTree1} =
                       get_full_diff(
                         MyKVItems, OBucketTree, ToSend, [], SigSize, VSize),
