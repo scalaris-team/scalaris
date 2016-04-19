@@ -40,6 +40,7 @@
 -export([calc_signature_size_nm_pair/4, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
 %% -export([trivial_signature_sizes/3, trivial_worst_case_failprob/3,
 %%          bloom_fp/2]).
+-export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -75,7 +76,7 @@
 -type db_chunk_kv()    :: [{?RT:key(), client_version()}].
 
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
--type kvi_tree()       :: mymaps:mymap(). % KeyShort::non_neg_integer()() => {VersionShort::non_neg_integer(), Idx::non_neg_integer()}
+-type kvi_tree()       :: mymaps:mymap(). % KeyShort::non_neg_integer() => {VersionShort::non_neg_integer(), Idx::non_neg_integer()}
 
 -record(trivial_recon_struct,
         {
@@ -2922,3 +2923,22 @@ get_art_config() ->
     [{correction_factor, config:read(rr_art_correction_factor)},
      {inner_bf_fpr, config:read(rr_art_inner_fpr)},
      {leaf_bf_fpr, config:read(rr_art_leaf_fpr)}].
+
+-spec tester_create_kvi_tree(
+        [{KeyShort::non_neg_integer(),
+          {VersionShort::non_neg_integer(), Idx::non_neg_integer()}}]) -> kvi_tree().
+tester_create_kvi_tree(KVList) ->
+    mymaps:from_list(KVList).
+
+-spec tester_is_kvi_tree(Map::any()) -> boolean().
+tester_is_kvi_tree(Map) ->
+    try mymaps:to_list(Map) of
+        KVList -> lists:all(fun({K, {V, Idx}}) when is_integer(K) andalso K >= 0
+                                 andalso is_integer(V) andalso V >= 0
+                                 andalso is_integer(Idx) andalso Idx >= 0 ->
+                                    true;
+                               ({_, _}) ->
+                                    false
+                            end, KVList)
+    catch _:_ -> false % probably no map
+    end.

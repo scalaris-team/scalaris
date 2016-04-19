@@ -411,6 +411,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
     tester:register_type_checker({typedef, intervals, non_empty_interval, []}, intervals, is_non_empty),
     tester:register_type_checker({typedef, rt_beh, segment, []}, rt_beh, tester_is_segment),
+    tester:register_type_checker({typedef, rr_recon, kvi_tree, []}, rr_recon, tester_is_kvi_tree),
     tester:register_value_creator({typedef, random_bias, generator, []},
                                   random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
@@ -421,6 +422,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, hfs_lhsp, hfs_fun, []}, hfs_lhsp, tester_create_hfs_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs, []}, hfs_lhsp, tester_create_hfs, 1),
     tester:register_value_creator({typedef, rt_beh, segment, []}, rt_beh, tester_create_segment, 1),
+    tester:register_value_creator({typedef, rr_recon, kvi_tree, []}, rr_recon, tester_create_kvi_tree, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -489,10 +491,6 @@ tester_type_check_rrepair(_Config) ->
              {decompress_idx_list_, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list_, 3}, %% needs a special binary to correspond to a number of bits
-             {get_full_diff, 6}, %% needs a suitable map (cannot be specified in the type def)
-             {get_full_diff_, 6}, %% needs a suitable map (cannot be specified in the type def)
-             {get_part_diff, 6}, %% needs a suitable map (cannot be specified in the type def)
-             {get_part_diff_, 6}, %% needs a suitable map (cannot be specified in the type def)
              {shash_bloom_perform_resolve, 6}, %% needs a special binary to correspond to a number of bits
              {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
              {merkle_check_node, 21}, %% needs merkle_tree/nodes with hashes
@@ -540,10 +538,12 @@ tester_type_check_rrepair(_Config) ->
     tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun, []}),
     tester:unregister_value_creator({typedef, hfs_lhsp, hfs, []}),
     tester:unregister_value_creator({typedef, rt_beh, segment, []}),
+    tester:unregister_value_creator({typedef, rr_recon, kvi_tree, []}),
     tester:unregister_type_checker({typedef, intervals, interval, []}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
     tester:unregister_type_checker({typedef, intervals, non_empty_interval, []}),
     tester:unregister_type_checker({typedef, rt_beh, segment, []}),
+    tester:unregister_type_checker({typedef, rr_recon, kvi_tree, []}),
     true.
 
 tester_type_check_tx(_Config) ->
