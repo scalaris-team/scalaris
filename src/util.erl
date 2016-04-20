@@ -58,7 +58,7 @@
          collect_while/1]).
 -export([list_set_nth/3]).
 -export([debug_info/0, debug_info/1]).
--export([print_bits/2, bin_xor/2]).
+-export([print_bits/2, bin_xor/2, bin_or/2, bin_and/2]).
 -export([if_verbose/1, if_verbose/2]).
 -export([tc/3, tc/2, tc/1]).
 -export([wait_for/1, wait_for/2,
@@ -1392,15 +1392,57 @@ if_verbose(String, Fmt) ->
         false -> ok
     end.
 
--spec bin_xor(binary(), binary()) -> binary().
+-spec bin_xor(bitstring(), bitstring()) -> bitstring().
 bin_xor(Binary1, Binary2) ->
+    bin_op(Binary1, Binary2, fun erlang:'bxor'/2).
+
+-spec bin_or(bitstring(), bitstring()) -> bitstring().
+bin_or(Binary1, Binary2) ->
+    bin_op(Binary1, Binary2, fun erlang:'bor'/2).
+
+-spec bin_and(bitstring(), bitstring()) -> bitstring().
+bin_and(Binary1, Binary2) ->
+    bin_op(Binary1, Binary2, fun erlang:'band'/2).
+
+-spec bin_op(bitstring(), bitstring(), fun((integer(), integer()) -> integer()))
+        -> bitstring().
+bin_op(Binary1, Binary2, BinOp) ->
     BitSize1 = erlang:bit_size(Binary1),
     BitSize2 = erlang:bit_size(Binary2),
-    <<BinNr1:BitSize1/little>> = Binary1,
-    <<BinNr2:BitSize2/little>> = Binary2,
-    ResNr = BinNr1 bxor BinNr2,
     ResSize = erlang:max(BitSize1, BitSize2),
-    <<ResNr:ResSize/little>>.
+    % up to (at least) Erlang 18.3, there is an upper limit of converting
+    % binaries to integers or if this works the following bxor/2 will fail
+    if ResSize =< 16#1FFFFC0 ->
+           <<BinNr1:BitSize1/little>> = Binary1,
+           <<BinNr2:BitSize2/little>> = Binary2,
+           ResNr = BinOp(BinNr1, BinNr2),
+           <<ResNr:ResSize/little>>;
+       BitSize1 =:= BitSize2 ->
+           % split the binary and bxor each part
+           RestSize = BitSize1 rem 16#1FFFFC0,
+           <<BinNr1:RestSize/little, Bin1TL/binary>> = Binary1,
+           <<BinNr2:RestSize/little, Bin2TL/binary>> = Binary2,
+           ResNr = BinOp(BinNr1, BinNr2),
+           bin_op(Bin1TL, Bin2TL, BinOp, <<ResNr:RestSize/little>>);
+       true ->
+           % first bring the binaries to the same size, then try again:
+           Bin1Large = <<Binary1/bitstring, 0:(ResSize - BitSize1)/little>>,
+           Bin2Large = <<Binary2/bitstring, 0:(ResSize - BitSize2)/little>>,
+           bin_op(Bin1Large, Bin2Large, BinOp)
+    end.
+
+%% @doc Helper for bin_op/3.
+%%      Note: We cannot use erlang:list_to_binary/1 either since that suffers
+%%            from the same problem with big binaries.
+-spec bin_op(binary(), binary(), fun((integer(), integer()) -> integer()),
+              ResultAcc::[bitstring()]) -> bitstring().
+bin_op(<<>>, <<>>, _BinOp, Acc) ->
+    Acc;
+bin_op(Binary1, Binary2, BinOp, Acc) ->
+    <<BinNr1:16#1FFFFC0/little, Bin1TL/binary>> = Binary1,
+    <<BinNr2:16#1FFFFC0/little, Bin2TL/binary>> = Binary2,
+    ResNr = BinOp(BinNr1, BinNr2),
+    bin_op(Bin1TL, Bin2TL, BinOp, <<Acc/bitstring, ResNr:16#1FFFFC0/little>>).
 
 -ifdef(enable_debug).
 -spec extint2atom(atom()) -> atom().

@@ -821,6 +821,8 @@ tester_type_check_util(_Config) ->
              {par_map_recv2, 2}, %% receives messages
              {sublist_, 4}, %% tested via feeder
              {pow1p_, 4}, %% already tested by root1p/2
+             {bin_op, 3}, %% cannot create funs
+             {bin_op, 4}, %% cannot create funs
              {wait_for1, 2}, %% cannot create funs
              {wait_for2, 2}, %% cannot create funs
              {collect_while,2}, %% needs fun
