@@ -1392,18 +1392,30 @@ if_verbose(String, Fmt) ->
         false -> ok
     end.
 
+%% @doc Binary XOR for the two bitstrings, even for big bitstrings where the
+%%      conversion to an integer fails.
+%%      Note: 0's are appended if the sizes do not match.
 -spec bin_xor(bitstring(), bitstring()) -> bitstring().
 bin_xor(Binary1, Binary2) ->
     bin_op(Binary1, Binary2, fun erlang:'bxor'/2).
 
+%% @doc Binary OR for the two bitstrings, even for big bitstrings where the
+%%      conversion to an integer fails.
+%%      Note: 0's are appended if the sizes do not match.
 -spec bin_or(bitstring(), bitstring()) -> bitstring().
 bin_or(Binary1, Binary2) ->
     bin_op(Binary1, Binary2, fun erlang:'bor'/2).
 
+%% @doc Binary AND for the two bitstrings, even for big bitstrings where the
+%%      conversion to an integer fails.
+%%      Note: 0's are appended if the sizes do not match.
 -spec bin_and(bitstring(), bitstring()) -> bitstring().
 bin_and(Binary1, Binary2) ->
     bin_op(Binary1, Binary2, fun erlang:'band'/2).
 
+%% @doc Generic binary operations for the two bitstrings, even for big
+%%      bitstrings where the conversion to an integer fails.
+%%      Note: 0's are appended if the sizes do not match.
 -spec bin_op(bitstring(), bitstring(), fun((integer(), integer()) -> integer()))
         -> bitstring().
 bin_op(Binary1, Binary2, BinOp) ->
