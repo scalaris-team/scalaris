@@ -169,11 +169,11 @@ p_add_list_v2_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     case BF of
         <<>> -> AccBFBin;
         _ ->
-            <<AccBF2Nr:BFSize>> = AccBFBin,
-            % merge AccBF2 and BF
-            <<BFNr:BFSize>> = BF,
-            ResultNr = AccBF2Nr bor BFNr,
-            <<ResultNr:BFSize>>
+            % merge AccBF2 and BF:
+            Result = util:bin_or(BF, AccBFBin),
+            % this also makes suce that BF and AccBFBin both have the same size:
+            ?ASSERT(erlang:bit_size(Result) =:= BFSize),
+            Result
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -210,10 +210,9 @@ join(#bloom{size = Size, items_count = Items1, filter = F1, hfs = Hfs},
            };
 join(#bloom{size = Size, items_count = Items1, filter = F1, hfs = Hfs},
      #bloom{size = Size, items_count = Items2, filter = F2}) ->
-    <<F1Val : Size>> = F1,
-    <<F2Val : Size>> = F2,
-    NewFVal = F1Val bor F2Val,
-    #bloom{size = Size, filter = <<NewFVal:Size>>, hfs = Hfs,
+    NewF = util:bin_or(F1, F2),
+    ?ASSERT(erlang:bit_size(NewF) =:= Size),
+    #bloom{size = Size, filter = NewF, hfs = Hfs,
            items_count = Items1 + Items2 %approximation
            }.
 
