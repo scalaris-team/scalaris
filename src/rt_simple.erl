@@ -205,7 +205,11 @@ get_random_in_interval2('(', L, R, ')', Count) ->
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
-    case config:read(replication_factor) of
+    get_replica_keys(Key, config:read(replication_factor)).
+
+-spec get_replica_keys(key(), pos_integer()) -> [key()].
+get_replica_keys(Key, ReplicationFactor) ->
+    case ReplicationFactor of
         2 ->
             [Key,
              Key bxor 16#80000000000000000000000000000000
@@ -251,10 +255,13 @@ get_replica_keys(Key) ->
             [MappedToFirstSector + I * Step || I <- lists:seq(0, R-1)]
     end.
 %% userdevguide-end rt_simple:get_replica_keys
-
 -spec get_key_segment(key()) -> pos_integer().
 get_key_segment(Key) ->
-    case config:read(replication_factor) of
+    get_key_segment(Key, config:read(replication_factor)).
+
+-spec get_key_segment(key(), pos_integer()) -> pos_integer().
+get_key_segment(Key, ReplicationFactor) ->
+    case ReplicationFactor of
         2  -> (Key bsr 127) + 1;
         4  -> (Key bsr 126) + 1;
         8  -> (Key bsr 125) + 1;

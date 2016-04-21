@@ -57,7 +57,9 @@
 -callback get_size(rt()) -> non_neg_integer().
 -callback get_size_ext(external_rt()) -> non_neg_integer().
 -callback get_replica_keys(key()) -> [key()].
+-callback get_replica_keys(key(), pos_integer()) -> [key()].
 -callback get_key_segment(key()) -> pos_integer().
+-callback get_key_segment(key(), pos_integer()) -> pos_integer().
 
 -callback n() -> number().
 -callback get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
@@ -114,9 +116,9 @@ behaviour_info(callbacks) ->
      {to_pid_list, 1}, {get_size, 1}, {get_size_ext, 1},
      % gets all (replicated) keys for a given (hashed) key
      % (for symmetric replication)
-     {get_replica_keys, 1},
+     {get_replica_keys, 1}, {get_replica_keys, 2},
      % get the segment of the ring a key belongs to (1-4)
-     {get_key_segment, 1},
+     {get_key_segment, 1}, {get_key_segment, 2},
      % address space size, range and split key
      % (may all throw 'throw:not_supported' if unsupported by the RT)
      {n, 0}, {get_range, 2}, {get_split_key, 3},

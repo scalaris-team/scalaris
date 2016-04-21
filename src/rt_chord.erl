@@ -219,9 +219,17 @@ get_random_in_interval2('(', L, R, ')', Count) ->
 get_replica_keys(Key) ->
     rt_simple:get_replica_keys(Key).
 
+-spec get_replica_keys(key(), pos_integer()) -> [key()].
+get_replica_keys(Key, ReplicationFactor) ->
+    rt_simple:get_replica_keys(Key, ReplicationFactor).
+
 -spec get_key_segment(key()) -> pos_integer().
 get_key_segment(Key) ->
     rt_simple:get_key_segment(Key).
+
+-spec get_key_segment(key(), pos_integer()) -> pos_integer().
+get_key_segment(Key, ReplicationFactor) ->
+    rt_simple:get_key_segment(Key, ReplicationFactor).
 
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].

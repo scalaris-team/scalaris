@@ -321,11 +321,21 @@ get_random_in_interval(SimpleI, Count) ->
 %% userdevguide-begin rt_frtchord:get_replica_keys
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
-get_replica_keys(Key) -> rt_chord:get_replica_keys(Key).
+get_replica_keys(Key) ->
+    rt_simple:get_replica_keys(Key).
+
+-spec get_replica_keys(key(), pos_integer()) -> [key()].
+get_replica_keys(Key, ReplicationFactor) ->
+    rt_simple:get_replica_keys(Key, ReplicationFactor).
 %% userdevguide-end rt_frtchord:get_replica_keys
 
 -spec get_key_segment(key()) -> pos_integer().
-get_key_segment(Key) -> rt_chord:get_key_segment(Key).
+get_key_segment(Key) ->
+    rt_simple:get_key_segment(Key).
+
+-spec get_key_segment(key(), pos_integer()) -> pos_integer().
+get_key_segment(Key, ReplicationFactor) ->
+    rt_simple:get_key_segment(Key, ReplicationFactor).
 
 %% userdevguide-begin rt_frtchord:dump
 %% @doc Dumps the RT state for output in the web interface.
