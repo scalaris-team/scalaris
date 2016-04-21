@@ -2517,24 +2517,29 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FP2),
 %%     log:pal("My: ~B OtherMax: ~B~nbloom1: ~p~nbloom2: ~p",
 %%             [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
-    FP1_ok =
-        bloom_worst_case_failprob_(
-          bloom:calc_FPR(M1, MyMaxItems, K1), InitiatorMaxItems) =< P1E_p1_bf andalso
-        bloom_worst_case_failprob_(
-          bloom:calc_FPR(M1, InitiatorMaxItems, K1), MyMaxItems) =< P1E_p1_bf,
-    FP2_ok =
-        bloom_worst_case_failprob_(
-          bloom:calc_FPR(M2, MyMaxItems, K2), InitiatorMaxItems) =< P1E_p1_bf andalso
-        bloom_worst_case_failprob_(
-          bloom:calc_FPR(M2, InitiatorMaxItems, K2), MyMaxItems) =< P1E_p1_bf,
-    BF0 = if FP1_ok andalso FP2_ok andalso M1 =< M2 ->
+    FP1_MyFP = bloom_worst_case_failprob_(
+                 bloom:calc_FPR(M1, MyMaxItems, K1), InitiatorMaxItems),
+    FP1_OtherFP = bloom_worst_case_failprob_(
+                    bloom:calc_FPR(M1, InitiatorMaxItems, K1), MyMaxItems),
+    FP2_MyFP = bloom_worst_case_failprob_(
+                 bloom:calc_FPR(M2, MyMaxItems, K2), InitiatorMaxItems),
+    FP2_OtherFP = bloom_worst_case_failprob_(
+                    bloom:calc_FPR(M2, InitiatorMaxItems, K2), MyMaxItems),
+    FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
+    FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
+    BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 =< M2 ->
                  bloom:new(M1, ?REP_HFS:new(K1));
-             FP1_ok andalso FP2_ok andalso M1 > M2 ->
+             FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 > M2 ->
                  bloom:new(M2, ?REP_HFS:new(K2));
-             FP1_ok ->
+             FP1_P1E_p1 =< P1E_p1 ->
                  bloom:new(M1, ?REP_HFS:new(K1));
-             FP2_ok ->
-                 bloom:new(M2, ?REP_HFS:new(K2))
+             FP2_P1E_p1 =< P1E_p1 ->
+                 bloom:new(M2, ?REP_HFS:new(K2));
+             true ->
+                 % all other cases are probably due to floating point inefficiencies
+                 log:log("~w: [ ~p:~.0p ] P1E constraint for phase 1 probably broken",
+                         [?MODULE, pid_groups:my_groupname(), self()]),
+                 bloom:new(M1, ?REP_HFS:new(K1))
           end,
 %%     log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p "
 %%             " m=~B k=~B NICount=~B ICount=~B~n"
