@@ -1,4 +1,4 @@
-% @copyright 2008-2013 Zuse Institute Berlin
+% @copyright 2008-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -251,8 +251,8 @@ get_replica_keys(Key, ReplicationFactor) ->
             ];
         R ->
             Step = n() div R,
-            MappedToFirstSector = Key rem Step,
-            [MappedToFirstSector + I * Step || I <- lists:seq(0, R-1)]
+            MappedToFirstSegment = Key rem Step,
+            [MappedToFirstSegment + I * Step || I <- lists:seq(0, R-1)]
     end.
 %% userdevguide-end rt_simple:get_replica_keys
 -spec get_key_segment(key()) -> pos_integer().
