@@ -217,63 +217,11 @@ get_random_in_interval2('(', L, R, ')', Count) ->
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
-    case config:read(replication_factor) of
-        2 ->
-            [Key,
-             Key bxor 16#80000000000000000000000000000000
-            ];
-        4 ->
-            [Key,
-             Key bxor 16#40000000000000000000000000000000,
-             Key bxor 16#80000000000000000000000000000000,
-             Key bxor 16#C0000000000000000000000000000000
-            ];
-        8 ->
-            [Key,
-             Key bxor 16#20000000000000000000000000000000,
-             Key bxor 16#40000000000000000000000000000000,
-             Key bxor 16#60000000000000000000000000000000,
-             Key bxor 16#80000000000000000000000000000000,
-             Key bxor 16#A0000000000000000000000000000000,
-             Key bxor 16#C0000000000000000000000000000000,
-             Key bxor 16#E0000000000000000000000000000000
-            ];
-        16 ->
-            [Key,
-             Key bxor 16#10000000000000000000000000000000,
-             Key bxor 16#20000000000000000000000000000000,
-             Key bxor 16#30000000000000000000000000000000,
-             Key bxor 16#40000000000000000000000000000000,
-             Key bxor 16#50000000000000000000000000000000,
-             Key bxor 16#60000000000000000000000000000000,
-             Key bxor 16#70000000000000000000000000000000,
-
-             Key bxor 16#80000000000000000000000000000000,
-             Key bxor 16#90000000000000000000000000000000,
-             Key bxor 16#A0000000000000000000000000000000,
-             Key bxor 16#B0000000000000000000000000000000,
-             Key bxor 16#C0000000000000000000000000000000,
-             Key bxor 16#D0000000000000000000000000000000,
-             Key bxor 16#E0000000000000000000000000000000,
-             Key bxor 16#F0000000000000000000000000000000
-            ];
-        R ->
-            Step = n() div R,
-            MappedToFirstSector = Key rem Step,
-            [MappedToFirstSector + I * Step || I <- lists:seq(0, R-1)]
-    end.
+    rt_simple:get_replica_keys(Key).
 
 -spec get_key_segment(key()) -> pos_integer().
 get_key_segment(Key) ->
-    case config:read(replication_factor) of
-        2  -> (Key bsr 127) + 1;
-        4  -> (Key bsr 126) + 1;
-        8  -> (Key bsr 125) + 1;
-        16 -> (Key bsr 124) + 1;
-        R ->
-            Step = n() div R,
-            Key div Step + 1
-    end.
+    rt_simple:get_key_segment(Key).
 
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
