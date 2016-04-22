@@ -2545,9 +2545,9 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
 %%             " m=~B k=~B NICount=~B ICount=~B~n"
 %%             " P1E_bf1=~p P1E_bf2=~p",
 %%             [?MODULE, pid_groups:my_groupname(), self(),
-%%              comm:this(), bloom:get_property(BF0, size),
+%%              comm:this(), P1E_p1_bf, bloom:get_property(BF0, size),
 %%              ?REP_HFS:size(bloom:get_property(BF0, hfs)),
-%%              MyMaxItems, InitiatorMaxItems, P1E_p1_bf,
+%%              MyMaxItems, InitiatorMaxItems,
 %%              bloom_worst_case_failprob_(
 %%                bloom:calc_FPR(
 %%                  bloom:get_property(BF0, size), MyMaxItems,
