@@ -73,9 +73,9 @@ if [ -n "${GPSCRIPT}" ]; then
   # COLDEFS_REL=$(realpath --relative-to="${DIRECTORY}" coldefs_eval_point.gp)
   GPSCRIPT_REL=$(python -c "import os.path; print os.path.relpath('${GPSCRIPT}', '${DIRECTORY}')")
   COLDEFS_REL=$(python -c "import os.path; print os.path.relpath('coldefs_eval_point.gp', '${DIRECTORY}')")
-  if [ "${ALGO:0:5}" == "bloom" ] ; then
-    REGEN_ACC_IN_PERCENT=";regenAccInPercent=1"
-  fi
+#   if [ "${ALGO:0:5}" == "bloom" ] ; then
+#     REGEN_ACC_IN_PERCENT=";regenAccInPercent=1"
+#   fi
   if [ "${ALGO:0:7}" == "trivial" -o "${ALGO:0:5}" == "shash" -o "${ALGO:0:5}" == "bloom" -o "${ALGO:0:6}" == "merkle" ] ; then
     ABSOLUTE_REDUNDANCY=";absoluteRedundancy=1"
   fi
