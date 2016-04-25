@@ -2369,19 +2369,21 @@ trivial_signature_sizes(0, _, _ExpDelta,  _P1E) ->
 trivial_signature_sizes(_, 0, _ExpDelta, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
 trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
+    MaxKeySize = 128, % see compress_key/2
     case get_min_version_bits() of
         variable ->
             % reduce P1E for the two parts here (key and version comparison)
             P1E_sub = calc_n_subparts_p1e(2, P1E),
-            % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E_sub, 128),
+            SigSize = calc_signature_size_nm_pair(
+                        ItemCount, OtherItemCount, ExpDelta, P1E_sub, MaxKeySize),
             % note: we have n one-to-one comparisons
             VCompareCount = erlang:min(ItemCount, OtherItemCount),
             VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
             VSize = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
             ok;
         VSize ->
-            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E, 128),
+            SigSize = calc_signature_size_nm_pair(
+                        ItemCount, OtherItemCount, ExpDelta, P1E, MaxKeySize),
             ok
     end,
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
@@ -2460,8 +2462,9 @@ shash_signature_sizes(_, 0, _ExpDelta, _P1E) ->
 shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     % reduce P1E for the two parts here (hash and trivial phases)
     P1E_sub = calc_n_subparts_p1e(2, P1E),
-    % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E_sub, 128),
+    MaxKeySize = 128, % see compress_key/2
+    SigSize = calc_signature_size_nm_pair(
+                ItemCount, OtherItemCount, ExpDelta, P1E_sub, MaxKeySize),
 %%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
     {SigSize, 0}.
