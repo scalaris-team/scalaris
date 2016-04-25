@@ -37,8 +37,8 @@
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
--export([calc_signature_size_nm_pair/4, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
-%% -export([trivial_signature_sizes/3, trivial_worst_case_failprob/3,
+-export([calc_signature_size_nm_pair/5, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
+%% -export([trivial_signature_sizes/4, trivial_worst_case_failprob/3,
 %%          bloom_fp/2]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
@@ -80,20 +80,22 @@
 
 -record(trivial_recon_struct,
         {
-         interval = intervals:empty()                         :: intervals:interval(),
-         reconPid = undefined                                 :: comm:mypid() | undefined,
-         db_chunk = ?required(trivial_recon_struct, db_chunk) :: {bitstring(), bitstring()} | {bitstring(), bitstring(), db_chunk_kv()}, % two binaries for transfer, the three-tuple only temporarily (locally)
-         sig_size = ?required(trivial_recon_struct, sig_size) :: signature_size(),
-         ver_size = ?required(trivial_recon_struct, ver_size) :: signature_size()
+         interval  = intervals:empty()                          :: intervals:interval(),
+         reconPid  = undefined                                  :: comm:mypid() | undefined,
+         exp_delta = ?required(trivial_recon_struct, exp_delta) :: number(),
+         db_chunk  = ?required(trivial_recon_struct, db_chunk)  :: {bitstring(), bitstring()} | {bitstring(), bitstring(), db_chunk_kv()}, % two binaries for transfer, the three-tuple only temporarily (locally)
+         sig_size  = ?required(trivial_recon_struct, sig_size)  :: signature_size(),
+         ver_size  = ?required(trivial_recon_struct, ver_size)  :: signature_size()
         }).
 
 -record(shash_recon_struct,
         {
-         interval = intervals:empty()                         :: intervals:interval(),
-         reconPid = undefined                                 :: comm:mypid() | undefined,
-         db_chunk = ?required(shash_recon_struct, db_chunk)   :: bitstring() | {bitstring(), db_chunk_kv()}, % binary for transfer, the pair only temporarily (locally)
-         sig_size = ?required(shash_recon_struct, sig_size)   :: signature_size(),
-         p1e      = ?required(shash_recon_struct, p1e)        :: float()
+         interval  = intervals:empty()                        :: intervals:interval(),
+         reconPid  = undefined                                :: comm:mypid() | undefined,
+         exp_delta = ?required(shash_recon_struct, exp_delta) :: number(),
+         db_chunk  = ?required(shash_recon_struct, db_chunk)  :: bitstring() | {bitstring(), db_chunk_kv()}, % binary for transfer, the pair only temporarily (locally)
+         sig_size  = ?required(shash_recon_struct, sig_size)  :: signature_size(),
+         p1e       = ?required(shash_recon_struct, p1e)       :: float()
         }).
 
 -record(bloom_recon_struct,
@@ -333,7 +335,8 @@ on({start_recon, RMethod, Params} = _Msg,
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = trivial,
-                           params = #trivial_recon_struct{sig_size = SigSize,
+                           params = #trivial_recon_struct{exp_delta = ExpDelta,
+                                                          sig_size = SigSize,
                                                           ver_size = VSize},
                            dest_rr_pid = DestRRPid,    stats = Stats,
                            ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
@@ -357,7 +360,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                 misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]};
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1),
+           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            NewStats = send_resolve_request(Stats1, ToSend1, OwnerL, DestRRPid,
                                            true, true),
@@ -387,7 +390,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = shash,            stats = Stats,
-                           params = #shash_recon_struct{sig_size = SigSize,
+                           params = #shash_recon_struct{exp_delta = ExpDelta,
+                                                        sig_size = SigSize,
                                                         p1e = P1E},
                            kv_list = KVList,
                            misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}]}) ->
@@ -410,7 +414,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            NewState;
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1),
+           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
            CKidxSize = mymaps:size(OtherDBChunk1),
@@ -1014,16 +1018,20 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
 %%      probability of P1E, given we compare N hashes with M other hashes
-%%      pairwise with each other (assuming the worst case, i.e. having M+N total
-%%      hashes).
+%%      pairwise with each other (assuming that ExpDelta percent of them are
+%%      different).
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
-                                  P1E::float(), MaxSize::signature_size())
+                                  ExpDelta::number(), P1E::float(),
+                                  MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
+calc_signature_size_nm_pair(_, 0, ExpDelta, P1E, _MaxSize)
+  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
     0;
-calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 andalso P1E < 1 ->
+calc_signature_size_nm_pair(0, _, ExpDelta, P1E, _MaxSize)
+  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
     0;
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
+calc_signature_size_nm_pair(N, M, ExpDelta, P1E, MaxSize)
+  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
     P = if P1E < 1.0e-8 ->
                % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
                %         point representation is sub-optimal!
@@ -1035,8 +1043,30 @@ calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso P1E < 1 ->
            true ->
                math:log(1 / (1 - P1E))
         end,
-    NT = M + N,
+    NT = calc_max_different_hashes(N, M, ExpDelta),
     min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
+
+%% @doc Helper for calc_signature_size_nm_pair/5 calculating the maximum number
+%%      of different hashes when an upper bound on the delta is known.
+-spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
+                                ExpDelta::number()) -> non_neg_integer().
+calc_max_different_hashes(N, M, ExpDelta) ->
+    if ExpDelta == 0 ->
+           % M and N may differ anyway if the actual delta is higher
+           % -> target no collisions among items on any node!
+           erlang:max(M, N);
+       ExpDelta == 100 ->
+           M + N; % special case of the one below
+       is_float(ExpDelta) ->
+           % assume the worst case, i.e. ExpDelta percent different hashes
+           % on both nodes together, e.g. due to missing items, and thus:
+           % N = NT * (100 - ExpDelta * alpha) / 100 and
+           % M = NT * (100 - ExpDelta * (1-alpha)) / 100
+           util:ceil(((M + N) * 100) / (200 - ExpDelta));
+       is_integer(ExpDelta) ->
+           % -> use integer division (and round up) for higher precision:
+           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta)
+    end.
 
 -spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
 -> NrItems::non_neg_integer().
@@ -1439,17 +1469,18 @@ phase2_run_trivial_on_diff(
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
            % (as if non-initiator in trivial recon)
+           ExpDelta = 100, % TODO: can we reduce this here?
            {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, VSizeT}} =
                util:tc(fun() ->
                                compress_kv_list_p1e(
-                                 UnidentifiedDiff, CKVSize, OtherCmpItemCount, P1E_p2,
-                                 fun trivial_signature_sizes/3, fun trivial_compress_key/2)
+                                 UnidentifiedDiff, CKVSize, OtherCmpItemCount, ExpDelta, P1E_p2,
+                                 fun trivial_signature_sizes/4, fun trivial_compress_key/2)
                        end),
            ?DBG_ASSERT(?implies(OtherDiffIdx =:= none, MyDiffK =/= <<>>)), % if no items to request
            ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
            MyDiff = {MyDiffK, MyDiffV},
            P1E_p2_real = trivial_worst_case_failprob(
-                           SigSizeT, CKVSize, OtherCmpItemCount),
+                           SigSizeT, CKVSize, OtherCmpItemCount, ExpDelta),
 
            case OtherDiffIdx of
                none -> send(DestReconPid,
@@ -1958,8 +1989,9 @@ merkle_resolve_add_leaf_hash(
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
-    {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, P1E_next),
-    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount),
+    ExpDelta = 100, % TODO: set the configured value
+    {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
+    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - P1E_p1),
 %%     log:pal("merkle_send [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
@@ -1987,8 +2019,9 @@ merkle_resolve_retrieve_leaf_hashes(
 %%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
-    {SigSize, VSize} = trivial_signature_sizes(BucketSize, MyMaxItemsCount, P1E_next),
-    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount),
+    ExpDelta = 100, % TODO: set the configured value
+    {SigSize, VSize} = trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
+    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - P1E_p1),
 %%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
@@ -2328,26 +2361,27 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
 %%      most min(ItemCount, OtherItemCount) version comparisons.
 %%      Sets the bit sizes to have an error below P1E.
 -spec trivial_signature_sizes
-        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(), P1E::float())
+        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
+         ExpDelta::number(), P1E::float())
         -> {SigSize::signature_size(), VSize::signature_size()}.
-trivial_signature_sizes(0, _, _P1E) ->
+trivial_signature_sizes(0, _, _ExpDelta,  _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-trivial_signature_sizes(_, 0, _P1E) ->
+trivial_signature_sizes(_, 0, _ExpDelta, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
-    VCompareCount = erlang:min(ItemCount, OtherItemCount),
+trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     case get_min_version_bits() of
         variable ->
             % reduce P1E for the two parts here (key and version comparison)
             P1E_sub = calc_n_subparts_p1e(2, P1E),
             % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
+            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E_sub, 128),
             % note: we have n one-to-one comparisons
+            VCompareCount = erlang:min(ItemCount, OtherItemCount),
             VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
             VSize = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
             ok;
         VSize ->
-            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
+            SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E, 128),
             ok
     end,
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
@@ -2356,46 +2390,47 @@ trivial_signature_sizes(ItemCount, OtherItemCount, P1E) ->
     {SigSize, VSize}.
 
 %% @doc Calculates the worst-case failure probability of the trivial algorithm
-%%      with the given signature size and item counts.
+%%      with the given signature size, item counts and expected delta.
 %%      NOTE: Precision loss may occur for very high values!
--spec trivial_worst_case_failprob(SigSize::signature_size(),
-                                  ItemCount::non_neg_integer(),
-                                  OtherItemCount::non_neg_integer()) -> float().
-trivial_worst_case_failprob(0, 0, _OtherItemCount) ->
-    % this is exact! (see special case in trivial_signature_sizes/3)
+-spec trivial_worst_case_failprob(
+        SigSize::signature_size(), ItemCount::non_neg_integer(),
+        OtherItemCount::non_neg_integer(), ExpDelta::number()) -> float().
+trivial_worst_case_failprob(0, 0, _OtherItemCount, _ExpDelta) ->
+    % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-trivial_worst_case_failprob(0, _ItemCount, 0) ->
-    % this is exact! (see special case in trivial_signature_sizes/3)
+trivial_worst_case_failprob(0, _ItemCount, 0, _ExpDelta) ->
+    % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount) ->
+trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
     BK2 = util:pow(2, SigSize),
     % both solutions have their problems with floats near 1
     % -> use fastest as they are quite close
+    NT = calc_max_different_hashes(ItemCount, OtherItemCount, ExpDelta),
     % exact:
-%%     1 - util:for_to_fold(1, (ItemCount + OtherItemCount) - 1,
+%%     1 - util:for_to_fold(1, NT - 1,
 %%                          fun(I) -> (1 - I / BK2) end,
 %%                          fun erlang:'*'/2, 1).
     % approx:
-    1 - math:exp(-((ItemCount + OtherItemCount) * (ItemCount + OtherItemCount - 1)
-                       / 2) / BK2).
+    1 - math:exp(-(NT * (NT - 1) / 2) / BK2).
 
 %% @doc Creates a compressed key-value list comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
 %%      Sets the bit sizes to have an error below P1E.
 -spec compress_kv_list_p1e(
-        Items::db_chunk_kv(), ItemCount, OtherItemCount, P1E,
-        SigFun::fun((ItemCount, OtherItemCount, P1E) -> {SigSize, VSize::signature_size()}),
+        Items::db_chunk_kv(), ItemCount, OtherItemCount, ExpDelta, P1E,
+        SigFun::fun((ItemCount, OtherItemCount, ExpDelta, P1E) -> {SigSize, VSize::signature_size()}),
         KeyComprFun::fun(({?RT:key(), client_version()}, SigSize) -> bitstring()))
         -> {KeyDiff::Bin, VBin::Bin, ResortedKOrigList::db_chunk_kv(),
             SigSize::signature_size(), VSize::signature_size()}
     when is_subtype(Bin, bitstring()),
          is_subtype(ItemCount, non_neg_integer()),
          is_subtype(OtherItemCount, non_neg_integer()),
+         is_subtype(ExpDelta, number()),
          is_subtype(P1E, float()),
          is_subtype(SigSize, signature_size()).
-compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E, SigFun, KeyComprFun) ->
-    {SigSize, VSize} = SigFun(ItemCount, OtherItemCount, P1E),
+compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, KeyComprFun) ->
+    {SigSize, VSize} = SigFun(ItemCount, OtherItemCount, ExpDelta, P1E),
     {HashesKNew, HashesVNew, ResortedBucket} =
         compress_kv_list(DBItems, {<<>>, <<>>}, SigSize, VSize, KeyComprFun),
     % debug compressed and uncompressed sizes:
@@ -2415,17 +2450,18 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E, SigFun, KeyComprFu
 %%      OtherItemCount other items (including versions into the hashes).
 %%      Sets the bit size to have an error below P1E.
 -spec shash_signature_sizes
-        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(), P1E::float())
+        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
+         ExpDelta::number(), P1E::float())
         -> {SigSize::signature_size(), _VSize::0}.
-shash_signature_sizes(0, _, _P1E) ->
+shash_signature_sizes(0, _, _ExpDelta, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-shash_signature_sizes(_, 0, _P1E) ->
+shash_signature_sizes(_, 0, _ExpDelta, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-shash_signature_sizes(ItemCount, OtherItemCount, P1E) ->
+shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     % reduce P1E for the two parts here (hash and trivial phases)
     P1E_sub = calc_n_subparts_p1e(2, P1E),
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E_sub, 128),
+    SigSize = calc_signature_size_nm_pair(ItemCount, OtherItemCount, ExpDelta, P1E_sub, 128),
 %%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
     {SigSize, 0}.
@@ -2476,28 +2512,32 @@ build_recon_struct(trivial, I, DBItems, InitiatorMaxItems, _Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     ItemCount = length(DBItems),
+    ExpDelta = get_max_expected_delta(),
     {MyDiffK, MyDiffV, ResortedKVOrigList, SigSize, VSize} =
-        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems, get_p1e(),
-                             fun trivial_signature_sizes/3, fun trivial_compress_key/2),
-    {#trivial_recon_struct{interval = I, reconPid = comm:this(),
+        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems,
+                             ExpDelta, get_p1e(),
+                             fun trivial_signature_sizes/4, fun trivial_compress_key/2),
+    {#trivial_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
                            db_chunk = {MyDiffK, MyDiffV, ResortedKVOrigList},
                            sig_size = SigSize, ver_size = VSize},
-     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems)};
+     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
 build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     ItemCount = length(DBItems),
     P1E = get_p1e(),
+    ExpDelta = get_max_expected_delta(),
     {MyDiffK, <<>>, ResortedKVOrigList, SigSize, 0} =
-        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems, P1E,
-                             fun shash_signature_sizes/3, fun compress_key/2),
-    {#shash_recon_struct{interval = I, reconPid = comm:this(),
+        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems,
+                             ExpDelta, P1E,
+                             fun shash_signature_sizes/4, fun compress_key/2),
+    {#shash_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
                          db_chunk = {MyDiffK, ResortedKVOrigList},
                          sig_size = SigSize, p1e = P1E},
     % Note: we can only guess the number of items of the initiator here, so
     %       this is not exactly the P1E of phase 1!
-     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems)};
+     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
 build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
@@ -2869,6 +2909,8 @@ check_config() ->
         config:cfg_is_float(rr_recon_p1e) andalso
         config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
         config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso
+        config:cfg_is_number(rr_recon_expected_delta) andalso
+        config:cfg_is_in_range(rr_recon_expected_delta, 0, 100) andalso
         config:cfg_test_and_error(rr_recon_version_bits,
                                   fun(variable) -> true;
                                      (X) -> erlang:is_integer(X) andalso X > 0
@@ -2893,6 +2935,12 @@ check_config() ->
 -spec get_p1e() -> float().
 get_p1e() ->
     config:read(rr_recon_p1e).
+
+%% @doc Specifies what the maximum expected delta is (in percent between 0 and
+%%      100, inclusive). The failure probabilities will take this into account.
+-spec get_max_expected_delta() -> number().
+get_max_expected_delta() ->
+    config:read(rr_recon_expected_delta).
 
 %% @doc Use at least these many bits for compressed version numbers.
 -spec get_min_version_bits() -> pos_integer() | variable.

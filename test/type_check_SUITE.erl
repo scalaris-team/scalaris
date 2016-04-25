@@ -466,7 +466,7 @@ tester_type_check_rrepair(_Config) ->
              {bitstring_to_k_list_kv, 3}, % needs a special binary to correspond to a number of KV entries
              {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
              {calc_n_subparts_p1e, 3}, %% needs float > 0, < 1
-             {calc_signature_size_nm_pair, 4}, %% needs float > 0, < 1
+             {calc_signature_size_nm_pair, 5}, %% needs float > 0, < 1
              {start_gen_component,5} %% unsupported types
            ],
            [
@@ -477,10 +477,11 @@ tester_type_check_rrepair(_Config) ->
              {shutdown, 2}, %% tries to send messages
              {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
-             {trivial_signature_sizes, 3}, %% needs float > 0, < 1
-             {shash_signature_sizes, 3}, %% needs float > 0, < 1
+             {trivial_signature_sizes, 4}, %% needs float > 0, < 1
+             {shash_signature_sizes, 4}, %% needs float > 0, < 1
+             {calc_max_different_hashes, 3}, %% needs 0 =< ExpDelta =< 100
              {compress_kv_list, 5}, %% needs a fun
-             {compress_kv_list_p1e, 6}, %% needs float > 0, < 1 and a fun
+             {compress_kv_list_p1e, 7}, %% needs float > 0, < 1 and a fun
              {bloom_worst_case_failprob_, 2}, %% needs float > 0, < 1
              {bloom_fp, 2}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
