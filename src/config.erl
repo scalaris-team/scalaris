@@ -28,7 +28,7 @@
 
          cfg_exists/1, cfg_is_atom/1, cfg_is_bool/1, cfg_is_mypid/1,
          cfg_is_ip/1, cfg_is_ip/2, cfg_is_port/1,
-         cfg_is_integer/1, cfg_is_float/1,
+         cfg_is_integer/1, cfg_is_float/1, cfg_is_number/1,
          cfg_is_tuple/2, cfg_is_tuple/4, cfg_is_list/1, cfg_is_list/3, cfg_is_string/1,
          cfg_is_in_range/3, cfg_is_greater_than/2, cfg_is_greater_than_equal/2,
          cfg_is_less_than/2, cfg_is_less_than_equal/2, cfg_is_in/2, cfg_is_module/1,
@@ -300,6 +300,12 @@ cfg_is_integer(Key) ->
 cfg_is_float(Key) ->
     Pred = fun erlang:is_float/1,
     Msg = "is not a valid float",
+    cfg_test_and_error(Key, Pred, Msg).
+
+-spec cfg_is_number(Key::atom()) -> boolean().
+cfg_is_number(Key) ->
+    Pred = fun erlang:is_number/1,
+    Msg = "is not a valid number",
     cfg_test_and_error(Key, Pred, Msg).
 
 -spec cfg_is_tuple(Key::atom(), TupleSize::pos_integer()) -> boolean().
