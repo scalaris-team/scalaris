@@ -483,8 +483,10 @@ tester_type_check_rrepair(_Config) ->
              {calc_max_different_hashes, 3}, %% needs 0 =< ExpDelta =< 100
              {compress_kv_list, 5}, %% needs a fun
              {compress_kv_list_p1e, 7}, %% needs float > 0, < 1 and a fun
-             {bloom_worst_case_failprob_, 2}, %% needs float > 0, < 1
-             {bloom_fp, 2}, %% needs float > 0, < 1
+             {bloom_calc_max_nr_checks, 3}, %% needs 0 =< ExpDelta =< 100
+             {bloom_worst_case_failprob, 3}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
+             {bloom_worst_case_failprob_, 4}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
+             {bloom_fp, 4}, %% needs float > 0, < 1
              {merkle_next_p1e, 2}, %% needs float > 0, < 1
              {calc_items_in_chunk, 2}, %% needs special input
              {decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits

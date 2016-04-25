@@ -39,7 +39,7 @@
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 -export([calc_signature_size_nm_pair/5, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
 %% -export([trivial_signature_sizes/4, trivial_worst_case_failprob/3,
-%%          bloom_fp/2]).
+%%          bloom_fp/4]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -102,6 +102,7 @@
         {
          interval   = intervals:empty()                         :: intervals:interval(),
          reconPid   = undefined                                 :: comm:mypid() | undefined,
+         exp_delta  = ?required(bloom_recon_struct, exp_delta)  :: number(),
          bf         = ?required(bloom_recon_struct, bloom)      :: binary() | bloom:bloom_filter(), % binary for transfer, the full filter locally
          item_count = ?required(bloom_recon_struct, item_count) :: non_neg_integer(),
          hf_count   = ?required(bloom_recon_struct, hf_count)   :: pos_integer(),
@@ -436,7 +437,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = bloom,
-                           params = #bloom_recon_struct{p1e = P1E, bf = BF},
+                           params = #bloom_recon_struct{exp_delta = ExpDelta,
+                                                        p1e = P1E, bf = BF},
                            stats = Stats,             kv_list = KVList,
                            misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
     ?TRACE1(_Msg, State),
@@ -461,8 +463,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            % here, the failure probability is correct (in contrast to the
            % non-initiator) since we know how many item checks we perform with
            % the BF and how many checks the non-initiator will perform on MyBF1
-           P1E_p1_bf1_real = bloom_worst_case_failprob(BF, MyDBSize1),
-           P1E_p1_bf2_real = bloom_worst_case_failprob(MyBF1, BFCount),
+           P1E_p1_bf1_real = bloom_worst_case_failprob(BF, MyDBSize1, ExpDelta),
+           P1E_p1_bf2_real = bloom_worst_case_failprob(MyBF1, BFCount, ExpDelta),
            P1E_p1_real = 1 - (1 - P1E_p1_bf1_real) * (1 - P1E_p1_bf2_real),
 %%            log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p~n"
 %%                    " Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
@@ -957,7 +959,7 @@ begin_sync(OtherSyncStruct,
             P1E = get_p1e(),
             % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
             P1E_p1_0 = bloom_worst_case_failprob(
-                         art:get_property(ART, leaf_bf), MyItemCount),
+                         art:get_property(ART, leaf_bf), MyItemCount, 100), % TODO: adapt ExpDelta
             P1E_p1 = if P1E_p1_0 == 1 ->
                             log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
                                     " - continuing with smallest possible failure probability",
@@ -2472,38 +2474,66 @@ shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
 %% @doc Calculates the bloom FP, i.e. a single comparison's failure probability,
 %%      assuming:
 %%      * the other node executes NrChecks number of checks
-%%      * the worst case, e.g. the other node has only items not in BF and
-%%        we need to account for the false positive probability
--spec bloom_fp(NrChecks::non_neg_integer(), P1E::float()) -> float().
-bloom_fp(NrChecks, P1E) ->
-    % 1 - math:pow(1 - P1E, 1 / erlang:max(NrChecks, 1)).
+%%      * the worst case in the number of item checks that could yield false
+%%        positives, i.e. with items that are not encoded in the Bloom filter
+%%        taking the expected delta into account
+-spec bloom_fp(BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
+               ExpDelta::number(), P1E::float()) -> float().
+bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
+    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
+    % 1 - math:pow(1 - P1E, 1 / erlang:max(NrChecksNotInBF, 1)).
     % more precise:
-    calc_n_subparts_p1e(erlang:max(NrChecks, 1), P1E).
+    calc_n_subparts_p1e(erlang:max(NrChecksNotInBF, 1), P1E).
+
+%% @doc Helper for bloom_fp/3 calculating the maximum number of item checks
+%%      with items not in the Bloom filter when an upper bound on the delta is
+%%      known.
+-spec bloom_calc_max_nr_checks(
+        BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
+        ExpDelta::number()) -> non_neg_integer().
+bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
+    MaxItems = calc_max_different_hashes(BFCount, NrChecks, ExpDelta),
+    X = if ExpDelta == 0   -> 0;
+           ExpDelta == 100 -> NrChecks; % special case of the one below
+           is_float(ExpDelta) ->
+               % worst case: we have all the ExpDelta percent items the other node does not have
+               util:ceil(MaxItems * ExpDelta / 100);
+           is_integer(ExpDelta) ->
+               % -> use integer division (and round up) for higher precision:
+               (MaxItems * ExpDelta + 99) div 100
+        end,
+%%     log:pal("[ ~p ] MaxItems: ~B Checks: ~B", [self(), MaxItems, X]),
+    X.
 
 %% @doc Calculates the worst-case failure probability of the bloom algorithm
 %%      with the Bloom filter and number of items to check inside the filter.
 %%      NOTE: Precision loss may occur for very high values!
 -spec bloom_worst_case_failprob(
-        BF::bloom:bloom_filter(), ItemCount::non_neg_integer()) -> float().
-bloom_worst_case_failprob(_BF, 0) ->
+        BF::bloom:bloom_filter(), NrChecks::non_neg_integer(),
+        ExpDelta::number()) -> float().
+bloom_worst_case_failprob(_BF, 0, _ExpDelta) ->
     0.0;
-bloom_worst_case_failprob(BF, ItemCount) ->
+bloom_worst_case_failprob(BF, NrChecks, ExpDelta) ->
     Fpr = bloom:get_property(BF, fpr),
-    bloom_worst_case_failprob_(Fpr, ItemCount).
+    BFCount = bloom:get_property(BF, items_count),
+    bloom_worst_case_failprob_(Fpr, BFCount, NrChecks, ExpDelta).
 
 %% @doc Helper for bloom_worst_case_failprob/2.
 %% @see bloom_worst_case_failprob/2
 -spec bloom_worst_case_failprob_(
-        Fpr::float(), ItemCount::non_neg_integer()) -> float().
-bloom_worst_case_failprob_(_Fpr, 0) ->
+        Fpr::float(), BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
+        ExpDelta::number()) -> float().
+bloom_worst_case_failprob_(_Fpr, _BFCount, 0, _ExpDelta) ->
     0.0;
-bloom_worst_case_failprob_(Fpr, ItemCount) ->
+bloom_worst_case_failprob_(Fpr, BFCount, NrChecks, ExpDelta) ->
     ?DBG_ASSERT2(Fpr >= 0 andalso Fpr =< 1, Fpr),
-    % 1 - math:pow(1 - Fpr, ItemCount).
+    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
+    % 1 - math:pow(1 - Fpr, NrChecksNotInBF).
     % more precise:
     if Fpr == 0.0 -> 0.0;
        Fpr == 1.0 -> 1.0;
-       true       -> calc_n_subparts_p1e(1 / ItemCount, Fpr)
+       NrChecksNotInBF == 0 -> 0.0;
+       true       -> calc_n_subparts_p1e(1 / NrChecksNotInBF, Fpr)
     end.
 
 -spec build_recon_struct(
@@ -2554,20 +2584,21 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % decide for a common Bloom filter size (and number of hash functions)
     % for an efficient diff BF - use a combination where both Bloom filters
     % are below the targeted P1E_p1_bf (we may thus not reach P1E_p1 exactly):
-    FP1 = bloom_fp(InitiatorMaxItems, P1E_p1_bf),
-    FP2 = bloom_fp(MyMaxItems, P1E_p1_bf),
+    ExpDelta = get_max_expected_delta(),
+    FP1 = bloom_fp(MyMaxItems, InitiatorMaxItems, ExpDelta, P1E_p1_bf),
+    FP2 = bloom_fp(InitiatorMaxItems, MyMaxItems, ExpDelta, P1E_p1_bf),
     {K1, M1} = bloom:calc_HF_num_Size_opt(MyMaxItems, FP1),
     {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FP2),
 %%     log:pal("My: ~B OtherMax: ~B~nbloom1: ~p~nbloom2: ~p",
 %%             [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
     FP1_MyFP = bloom_worst_case_failprob_(
-                 bloom:calc_FPR(M1, MyMaxItems, K1), InitiatorMaxItems),
+                 bloom:calc_FPR(M1, MyMaxItems, K1), MyMaxItems, InitiatorMaxItems, ExpDelta),
     FP1_OtherFP = bloom_worst_case_failprob_(
-                    bloom:calc_FPR(M1, InitiatorMaxItems, K1), MyMaxItems),
+                    bloom:calc_FPR(M1, InitiatorMaxItems, K1), InitiatorMaxItems, MyMaxItems, ExpDelta),
     FP2_MyFP = bloom_worst_case_failprob_(
-                 bloom:calc_FPR(M2, MyMaxItems, K2), InitiatorMaxItems),
+                 bloom:calc_FPR(M2, MyMaxItems, K2), MyMaxItems, InitiatorMaxItems, ExpDelta),
     FP2_OtherFP = bloom_worst_case_failprob_(
-                    bloom:calc_FPR(M2, InitiatorMaxItems, K2), MyMaxItems),
+                    bloom:calc_FPR(M2, InitiatorMaxItems, K2), InitiatorMaxItems, MyMaxItems, ExpDelta),
     FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
     FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
     BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 =< M2 ->
@@ -2601,13 +2632,13 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
 %%                  ?REP_HFS:size(bloom:get_property(BF0, hfs))), MyMaxItems)]),
     HfCount = ?REP_HFS:size(bloom:get_property(BF0, hfs)),
     BF = bloom:add_list(BF0, DBItems),
-    {#bloom_recon_struct{interval = I, reconPid = comm:this(),
+    {#bloom_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
                          bf = BF, item_count = MyMaxItems,
                          hf_count = HfCount, p1e = P1E},
     % Note: we can only guess the number of items of the initiator here, so
     %       this is not exactly the P1E of phase 1!
     %       (also we miss the returned BF's probability here)
-     _P1E_p1 = bloom_worst_case_failprob(BF, InitiatorMaxItems)};
+     _P1E_p1 = bloom_worst_case_failprob(BF, InitiatorMaxItems, ExpDelta)};
 build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     P1E_p1 = 0.0, % needs to be set at the end of phase 1!
