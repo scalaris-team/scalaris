@@ -1447,7 +1447,7 @@ bin_op(Binary1, Binary2, BinOp) ->
 %%      Note: We cannot use erlang:list_to_binary/1 either since that suffers
 %%            from the same problem with big binaries.
 -spec bin_op(binary(), binary(), fun((integer(), integer()) -> integer()),
-              ResultAcc::[bitstring()]) -> bitstring().
+              ResultAcc::bitstring()) -> bitstring().
 bin_op(<<>>, <<>>, _BinOp, Acc) ->
     Acc;
 bin_op(Binary1, Binary2, BinOp, Acc) ->
