@@ -470,9 +470,9 @@ EOF
 }
 
 run_bbench() {
+    declare -a lg_pids # the process id's of the load generators
     local no_of_hosts=${#LG_HOSTS[*]}
     local c # counter for indexing the LG_HOSTS array
-    local lg_pids # the process id's of the load generators
 
     for i in $(seq 1 $LOAD_GENERATORS); do
         PARALLEL_ID=$i
@@ -495,7 +495,9 @@ run_bbench() {
             $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
             lg_pids[$i]=$!
         else
-            ssh $host $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
+            # using -t (pseudo-tty allocation) allows to terminate children of the
+            # ssh cmd at the remote node through kill the ssh process at the local node
+            ssh -t -t $host $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
             lg_pids[$i]=$!
         fi
     done
@@ -514,7 +516,7 @@ check_result_dir() {
             $SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR
             res=$((res+=$?))
         else
-            ssh $host "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
+            ssh -t -t $host "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
             res=$((res+=$?))
         fi
 
@@ -532,7 +534,7 @@ create_result_dir() {
         if [[ $(hostname -f) = $host ]]; then
             mkdir -p $RESULT_DIR/$NAME
         else
-            ssh $host "bash -c \"mkdir -p $RESULT_DIR/$NAME\""
+            ssh -t -t $host "bash -c \"mkdir -p $RESULT_DIR/$NAME\""
         fi
     done
 }
@@ -547,36 +549,31 @@ collect_bbench_results() {
                 rm -r $RESULT_DIR/$PREFIX*
             fi
         else
-            ssh $host "bash -c \"rsync -ayhx --progress $RESULT_DIR/ $WD/\""
+            ssh -t -t $host "bash -c \"rsync -ayhx --progress $RESULT_DIR/ $WD/\""
             if [[ $? == 0 ]]; then
                 log info "deleting $RESULT_DIR/$PREFIX* on $host"
-                ssh $host "bash -c \"rm -r $RESULT_DIR/$PREFIX*\""
+                ssh -t -t $host "bash -c \"rm -r $RESULT_DIR/$PREFIX*\""
             fi
         fi
     done
 }
 
 kill_bbench(){
-    # kill all remaining processes with the SLURM_ID of the current job
-    # (ssh remote cmd execution doesn't reliable pass through signals
-    for host in ${LG_HOSTS[@]}; do
-        log info "killing bbench on $host"
-        if [[ $(hostname -f) = $host ]]; then
-            pkill -f $SLURM_JOBID
-            pkill -f basho_bench
-        else
-            ssh $host bash -c "'pkill -f $SLURM_JOBID'"
-            ssh $host bash -c "'pkill -f basho_bench'"
-        fi
-    done
+    log info "killing bbench..."
 
+    # kill all load generators (or their ssh processes respectively)
+    for pid in "${lg_pids[@]}"; do
+        kill $pid
+    done
 }
 
 trap_cleanup(){
     log info "received SIGTERM, cleaning up..."
-    shutdown
     kill_bbench
-    collect_bbench_results
+    shutdown
+    # kill all remaining children of the current script
+    PGID=$(ps -o pgid= $$ | grep -o [0-9]*)
+    setsid kill -9 -- -$PGID
     exit 1
 }
 
