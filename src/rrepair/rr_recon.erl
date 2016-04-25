@@ -1024,14 +1024,14 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
                                   ExpDelta::number(), P1E::float(),
                                   MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(_, 0, ExpDelta, P1E, _MaxSize)
-  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
+calc_signature_size_nm_pair(_, 0, _ExpDelta, P1E, _MaxSize)
+  when P1E > 0 andalso P1E < 1 ->
     0;
-calc_signature_size_nm_pair(0, _, ExpDelta, P1E, _MaxSize)
-  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
+calc_signature_size_nm_pair(0, _, _ExpDelta, P1E, _MaxSize)
+  when P1E > 0 andalso P1E < 1 ->
     0;
 calc_signature_size_nm_pair(N, M, ExpDelta, P1E, MaxSize)
-  when P1E > 0 andalso P1E < 1 andalso ExpDelta >= 0 andalso ExpDelta =< 100 ->
+  when P1E > 0 andalso P1E < 1 ->
     P = if P1E < 1.0e-8 ->
                % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
                %         point representation is sub-optimal!
@@ -1050,7 +1050,7 @@ calc_signature_size_nm_pair(N, M, ExpDelta, P1E, MaxSize)
 %%      of different hashes when an upper bound on the delta is known.
 -spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
                                 ExpDelta::number()) -> non_neg_integer().
-calc_max_different_hashes(N, M, ExpDelta) ->
+calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
     if ExpDelta == 0 ->
            % M and N may differ anyway if the actual delta is higher
            % -> target no collisions among items on any node!

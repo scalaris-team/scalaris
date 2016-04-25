@@ -478,6 +478,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
              {trivial_signature_sizes, 4}, %% needs float > 0, < 1
+             {trivial_worst_case_failprob, 4}, %% needs 0 =< ExpDelta =< 100
              {shash_signature_sizes, 4}, %% needs float > 0, < 1
              {calc_max_different_hashes, 3}, %% needs 0 =< ExpDelta =< 100
              {compress_kv_list, 5}, %% needs a fun
