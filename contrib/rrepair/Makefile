@@ -35,9 +35,12 @@ scalaris:
 	@mkdir -p "$(@D)"
 	@cp gitignore.tmpl2 $@
 
-%/Makefile: Makefile.tmpl
+# note: we must have the same dependencies as the specific rules
+#       -> otherwise this rule may be chosen instead
+%/Makefile: Makefile.tmpl %/.gitignore Makefile
 	@mkdir -p "$(@D)"
-	@cp Makefile.tmpl $@
+	@cp $< $@
+	@rm "$*/.gitignore"
 
 # fprob analysis (different delta) for different trivial recon parameters
 trivial_single-all/Makefile: Makefile.tmpl2 trivial_single-all/.gitignore
