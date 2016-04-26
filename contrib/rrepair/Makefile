@@ -9,6 +9,7 @@ EVAL_REPEATS ?= 100
 
 .PHONY: all clean subdirs
 .PRECIOUS: %/.gitignore %/Makefile
+.SECONDEXPANSION:
 
 all: subdirs
 
@@ -54,15 +55,10 @@ trivial_0-%-all/Makefile: Makefile.tmpl2 trivial_0-%-all/.gitignore Makefile
          -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-trivial_0-10-all/%/trivial.dat: trivial_0-10-all/Makefile
-	@echo " executing trivial_0-10 $* (N=$(SYSTEM_SIZE))"
+trivial_0-10-all/%/trivial.dat trivial_0-100-all/%/trivial.dat: $$(dir $$(@D))Makefile
+	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-trivial_0-100-all/%/trivial.dat: trivial_0-100-all/Makefile
-	@echo " executing trivial_0-100 $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
 
 trivial-all: trivial_0-10-all/0.1/trivial.dat trivial_0-10-all/0.01/trivial.dat trivial_0-10-all/0.001/trivial.dat trivial_0-100-all/0.1/trivial.dat trivial_0-100-all/0.01/trivial.dat trivial_0-100-all/0.001/trivial.dat
 	
@@ -100,15 +96,10 @@ shash_0-%-all/Makefile: Makefile.tmpl2 shash_0-%-all/.gitignore Makefile
          -e 's|<title3>|shash_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-shash_0-10-all/%/shash.dat: shash_0-10-all/Makefile
-	@echo " executing shash_0-10 $* (N=$(SYSTEM_SIZE))"
+shash_0-10-all/%/shash.dat shash_0-100-all/%/shash.dat: $$(dir $$(@D))Makefile
+	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-shash_0-100-all/%/shash.dat: shash_0-100-all/Makefile
-	@echo " executing shash_0-100 $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
 
 shash-all: shash_0-10-all/0.1/shash.dat shash_0-10-all/0.01/shash.dat shash_0-10-all/0.001/shash.dat shash_0-100-all/0.1/shash.dat shash_0-100-all/0.01/shash.dat shash_0-100-all/0.001/shash.dat
 	
@@ -146,15 +137,10 @@ bloom_0-%-all/Makefile: Makefile.tmpl2 bloom_0-%-all/.gitignore Makefile
          -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-bloom_0-10-all/%/bloom.dat: bloom_0-10-all/Makefile
-	@echo " executing bloom_0-10 $* (N=$(SYSTEM_SIZE))"
+bloom_0-10-all/%/bloom.dat bloom_0-100-all/%/bloom.dat: $$(dir $$(@D))Makefile
+	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-bloom_0-100-all/%/bloom.dat: bloom_0-100-all/Makefile
-	@echo " executing bloom_0-100 $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
+	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
 
 bloom-all: bloom_0-10-all/0.1/bloom.dat bloom_0-10-all/0.01/bloom.dat bloom_0-10-all/0.001/bloom.dat bloom_0-100-all/0.1/bloom.dat bloom_0-100-all/0.01/bloom.dat bloom_0-100-all/0.001/bloom.dat
 	
