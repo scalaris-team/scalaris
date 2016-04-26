@@ -32,16 +32,16 @@ scalaris:
 	$(MAKE) -C ../..
 
 %/.gitignore: gitignore.tmpl2
-	@mkdir -p "$*"
+	@mkdir -p "$(@D)"
 	@cp gitignore.tmpl2 $@
 
 %/Makefile: Makefile.tmpl
-	@mkdir -p "$*"
+	@mkdir -p "$(@D)"
 	@cp Makefile.tmpl $@
 
 # fprob analysis (different delta) for different trivial recon parameters
 trivial_single-all/Makefile: Makefile.tmpl2 trivial_single-all/.gitignore
-	@mkdir -p "trivial_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/trivial.dat|g' \
          -e 's|<dat2>|0.01/trivial.dat|g' \
@@ -57,7 +57,7 @@ trivial_single-all/%/trivial.dat: trivial_single-all/Makefile
 	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 trivial_0-100-all/Makefile: Makefile.tmpl2 trivial_0-100-all/.gitignore
-	@mkdir -p "trivial_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/trivial.dat|g' \
          -e 's|<dat2>|0.01/trivial.dat|g' \
@@ -65,7 +65,7 @@ trivial_0-100-all/Makefile: Makefile.tmpl2 trivial_0-100-all/.gitignore
          -e 's|<title1>|trivial_{P_{1e}0.001}|g' \
          -e 's|<title2>|trivial_{P_{1e}0.01}|g' \
          -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepsize=20;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 trivial_0-100-all/%/trivial.dat: trivial_0-100-all/Makefile
 	@echo " executing trivial_0-100 $* (N=$(SYSTEM_SIZE))"
@@ -98,7 +98,7 @@ trivial: trivial-all trivial_dists-all trivial_scale-all
 
 # fprob analysis (different delta) for different shash recon parameters
 shash_single-all/Makefile: Makefile.tmpl2 shash_single-all/.gitignore
-	@mkdir -p "shash_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/shash.dat|g' \
          -e 's|<dat2>|0.01/shash.dat|g' \
@@ -114,7 +114,7 @@ shash_single-all/%/shash.dat: shash_single-all/Makefile
 	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 shash_0-100-all/Makefile: Makefile.tmpl2 shash_0-100-all/.gitignore
-	@mkdir -p "shash_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/shash.dat|g' \
          -e 's|<dat2>|0.01/shash.dat|g' \
@@ -122,7 +122,7 @@ shash_0-100-all/Makefile: Makefile.tmpl2 shash_0-100-all/.gitignore
          -e 's|<title1>|shash_{P_{1e}0.001}|g' \
          -e 's|<title2>|shash_{P_{1e}0.01}|g' \
          -e 's|<title3>|shash_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepsize=20;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 shash_0-100-all/%/shash.dat: shash_0-100-all/Makefile
 	@echo " executing shash_0-100 $* (N=$(SYSTEM_SIZE))"
@@ -155,7 +155,7 @@ shash: shash-all shash_dists-all shash_scale-all
 
 # fprob analysis (different delta) for different bloom recon parameters
 bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
-	@mkdir -p "bloom_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/bloom.dat|g' \
          -e 's|<dat2>|0.01/bloom.dat|g' \
@@ -171,7 +171,7 @@ bloom_single-all/%/bloom.dat: bloom_single-all/Makefile
 	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
 bloom_0-100-all/Makefile: Makefile.tmpl2 bloom_0-100-all/.gitignore
-	@mkdir -p "bloom_single-all"
+	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/bloom.dat|g' \
          -e 's|<dat2>|0.01/bloom.dat|g' \
@@ -179,7 +179,7 @@ bloom_0-100-all/Makefile: Makefile.tmpl2 bloom_0-100-all/.gitignore
          -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
          -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
          -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|regenAccInPercent=1;absoluteRedundancy=1;stepsize=20;|g' < $< > $@
+         -e 's|<morecommands>|regenAccInPercent=1;absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 bloom_0-100-all/%/bloom.dat: bloom_0-100-all/Makefile
 	@echo " executing bloom_0-100 $* (N=$(SYSTEM_SIZE))"
