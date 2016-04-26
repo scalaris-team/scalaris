@@ -73,6 +73,9 @@ if (exists("absoluteRedundancy") && absoluteRedundancy == 1) {
   redundancy(transferred, updated, regen) = transferred / (updated + regen)
   redundancyStderr(transferred, updated, regen) = "-"
 }
+if (!exists("systemSize")) {
+  systemSize = 4000
+}
 plot_boxwidth = (0.8 / plotCount)
 
 # OUTPUT
@@ -153,7 +156,7 @@ if (plotCount == 1) {
   set style data yerrorbars
 }
 set logscale x 2
-set xrange [2:8192] # TODO: adapt if number of data points changes!
+set xrange [((systemSize/1000.0)/2):((systemSize/1000.0)*4**5*2)] # TODO: adapt if number of data points changes!
 set grid layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
 arrow_dx=.166666666667 # grid spacing in x
@@ -165,7 +168,8 @@ set style line 100 lw 2 lc -1 pt 0 lt 1
 #--------------------------------- ALL
 set boxwidth plot_boxwidth relative
 set style fill solid 1 border -1
-set xtics scale 0.1
+systemSizeScaled = systemSize / 1000.0
+set xtics scale 0.1 systemSizeScaled,4
 set ytics scale 0.8
 set grid noxtics nomxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 set for [i=1:arrow_xpoints] arrow from graph (i+arrow_di)*arrow_dx,graph 0 to graph (i+arrow_di)*arrow_dx,graph 1 nohead back linetype 0 linewidth 1.000
@@ -286,7 +290,7 @@ if (plotCount > 1) {
 }
 
 LABELu = "n × (128+32) bits\n_{(≥ naïve approach)}"
-set label 10 at 6,264000*(128+32)/8/1024 LABELu front left font ",12" textcolor rgb "#777777"
+set label 10 at systemSizeScaled*1.5,systemSize*66*(128+32)/8/1024 LABELu front left font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
@@ -310,7 +314,7 @@ set y2tics mirror format "%-5.0f" scale 0.8
 
 unset label 10
 LABELr = "n × (1-δ) × (128+32) bits\n_{(≥ naïve approach)}"
-set label 10 at 4,512000*(128+32)/8/1024 LABELr front left font ",12" textcolor rgb "#777777"
+set label 10 at systemSizeScaled,128*systemSize*(128+32)/8/1024 LABELr front left font ",12" textcolor rgb "#777777"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
