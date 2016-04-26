@@ -163,7 +163,7 @@ bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
          -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
          -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
          -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|regenAccInPercent=1;absoluteRedundancy=1;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
 
 bloom_single-all/%/bloom.dat: bloom_single-all/Makefile
 	@echo " executing bloom_single $* (N=$(SYSTEM_SIZE))"
@@ -179,7 +179,7 @@ bloom_0-100-all/Makefile: Makefile.tmpl2 bloom_0-100-all/.gitignore
          -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
          -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
          -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|regenAccInPercent=1;absoluteRedundancy=1;stepSize=20;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 bloom_0-100-all/%/bloom.dat: bloom_0-100-all/Makefile
 	@echo " executing bloom_0-100 $* (N=$(SYSTEM_SIZE))"
