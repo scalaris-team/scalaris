@@ -43,7 +43,7 @@ scalaris:
 	@rm "$*/.gitignore"
 
 # fprob analysis (different delta) for different trivial recon parameters
-trivial_single-all/Makefile: Makefile.tmpl2 trivial_single-all/.gitignore
+trivial_0-%-all/Makefile: Makefile.tmpl2 trivial_0-%-all/.gitignore Makefile
 	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/trivial.dat|g' \
@@ -52,30 +52,19 @@ trivial_single-all/Makefile: Makefile.tmpl2 trivial_single-all/.gitignore
          -e 's|<title1>|trivial_{P_{1e}0.001}|g' \
          -e 's|<title2>|trivial_{P_{1e}0.01}|g' \
          -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-trivial_single-all/%/trivial.dat: trivial_single-all/Makefile
-	@echo " executing trivial_single $* (N=$(SYSTEM_SIZE))"
+trivial_0-10-all/%/trivial.dat: trivial_0-10-all/Makefile
+	@echo " executing trivial_0-10 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-trivial_0-100-all/Makefile: Makefile.tmpl2 trivial_0-100-all/.gitignore
-	@mkdir -p "$(@D)"
-	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/trivial.dat|g' \
-         -e 's|<dat2>|0.01/trivial.dat|g' \
-         -e 's|<dat3>|0.1/trivial.dat|g' \
-         -e 's|<title1>|trivial_{P_{1e}0.001}|g' \
-         -e 's|<title2>|trivial_{P_{1e}0.01}|g' \
-         -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 trivial_0-100-all/%/trivial.dat: trivial_0-100-all/Makefile
 	@echo " executing trivial_0-100 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
-trivial-all: trivial_single-all/0.1/trivial.dat trivial_single-all/0.01/trivial.dat trivial_single-all/0.001/trivial.dat trivial_0-100-all/0.1/trivial.dat trivial_0-100-all/0.01/trivial.dat trivial_0-100-all/0.001/trivial.dat
+trivial-all: trivial_0-10-all/0.1/trivial.dat trivial_0-10-all/0.01/trivial.dat trivial_0-10-all/0.001/trivial.dat trivial_0-100-all/0.1/trivial.dat trivial_0-100-all/0.01/trivial.dat trivial_0-100-all/0.001/trivial.dat
 	
 
 # ddist+fdist analysis (different data and failure distributions) for different trivial recon parameters
@@ -100,7 +89,7 @@ trivial: trivial-all trivial_dists-all trivial_scale-all
 	
 
 # fprob analysis (different delta) for different shash recon parameters
-shash_single-all/Makefile: Makefile.tmpl2 shash_single-all/.gitignore
+shash_0-%-all/Makefile: Makefile.tmpl2 shash_0-%-all/.gitignore Makefile
 	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/shash.dat|g' \
@@ -109,30 +98,19 @@ shash_single-all/Makefile: Makefile.tmpl2 shash_single-all/.gitignore
          -e 's|<title1>|shash_{P_{1e}0.001}|g' \
          -e 's|<title2>|shash_{P_{1e}0.01}|g' \
          -e 's|<title3>|shash_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-shash_single-all/%/shash.dat: shash_single-all/Makefile
-	@echo " executing shash_single $* (N=$(SYSTEM_SIZE))"
+shash_0-10-all/%/shash.dat: shash_0-10-all/Makefile
+	@echo " executing shash_0-10 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-shash_0-100-all/Makefile: Makefile.tmpl2 shash_0-100-all/.gitignore
-	@mkdir -p "$(@D)"
-	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/shash.dat|g' \
-         -e 's|<dat2>|0.01/shash.dat|g' \
-         -e 's|<dat3>|0.1/shash.dat|g' \
-         -e 's|<title1>|shash_{P_{1e}0.001}|g' \
-         -e 's|<title2>|shash_{P_{1e}0.01}|g' \
-         -e 's|<title3>|shash_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 shash_0-100-all/%/shash.dat: shash_0-100-all/Makefile
 	@echo " executing shash_0-100 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
-shash-all: shash_single-all/0.1/shash.dat shash_single-all/0.01/shash.dat shash_single-all/0.001/shash.dat shash_0-100-all/0.1/shash.dat shash_0-100-all/0.01/shash.dat shash_0-100-all/0.001/shash.dat
+shash-all: shash_0-10-all/0.1/shash.dat shash_0-10-all/0.01/shash.dat shash_0-10-all/0.001/shash.dat shash_0-100-all/0.1/shash.dat shash_0-100-all/0.01/shash.dat shash_0-100-all/0.001/shash.dat
 	
 
 # ddist+fdist analysis (different data and failure distributions) for different shash recon parameters
@@ -157,7 +135,7 @@ shash: shash-all shash_dists-all shash_scale-all
 	
 
 # fprob analysis (different delta) for different bloom recon parameters
-bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
+bloom_0-%-all/Makefile: Makefile.tmpl2 bloom_0-%-all/.gitignore Makefile
 	@mkdir -p "$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat1>|0.001/bloom.dat|g' \
@@ -166,30 +144,19 @@ bloom_single-all/Makefile: Makefile.tmpl2 bloom_single-all/.gitignore
          -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
          -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
          -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $< > $@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
 
-bloom_single-all/%/bloom.dat: bloom_single-all/Makefile
-	@echo " executing bloom_single $* (N=$(SYSTEM_SIZE))"
+bloom_0-10-all/%/bloom.dat: bloom_0-10-all/Makefile
+	@echo " executing bloom_0-10 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
-bloom_0-100-all/Makefile: Makefile.tmpl2 bloom_0-100-all/.gitignore
-	@mkdir -p "$(@D)"
-	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/bloom.dat|g' \
-         -e 's|<dat2>|0.01/bloom.dat|g' \
-         -e 's|<dat3>|0.1/bloom.dat|g' \
-         -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
-         -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
-         -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=20;|g' < $< > $@
 
 bloom_0-100-all/%/bloom.dat: bloom_0-100-all/Makefile
 	@echo " executing bloom_0-100 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	+./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,20" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
-bloom-all: bloom_single-all/0.1/bloom.dat bloom_single-all/0.01/bloom.dat bloom_single-all/0.001/bloom.dat bloom_0-100-all/0.1/bloom.dat bloom_0-100-all/0.01/bloom.dat bloom_0-100-all/0.001/bloom.dat
+bloom-all: bloom_0-10-all/0.1/bloom.dat bloom_0-10-all/0.01/bloom.dat bloom_0-10-all/0.001/bloom.dat bloom_0-100-all/0.1/bloom.dat bloom_0-100-all/0.01/bloom.dat bloom_0-100-all/0.001/bloom.dat
 	
 
 # ddist+fdist analysis (different data and failure distributions) for different bloom recon parameters
@@ -214,8 +181,8 @@ bloom: bloom-all bloom_dists-all bloom_scale-all
 	
 
 # fprob analysis (different delta) for different merkle recon parameters
-merkle_single-all/%/merkle.dat: merkle_single-all/Makefile
-	@echo " executing merkle_single $* (N=$(SYSTEM_SIZE))"
+merkle_0-10-all/%/merkle.dat: merkle_0-10-all/Makefile
+	@echo " executing merkle_0-10 $* (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$(@D)"
 	STR="$*" ; STR_V=$${STR:`expr index "$$STR" v`} ; STR_B=$${STR:`expr index "$$STR" b`} ; STR_P=$${STR:`expr index "$$STR" p`} ; V=`expr match "$$STR_V" '\([0-9][.0-9]*\)'` ; B=`expr match "$$STR_B" '\([0-9][.0-9]*\)'` ; P=`expr match "$$STR_P" '\([0-9][.0-9]*\)'` ; ./rr_eval.sh -a merkle -n "$(SYSTEM_SIZE)" -c "$$V,$$B,$$P,2" -g eval_fprob.gp -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
 
@@ -224,13 +191,13 @@ merkle_0-100-all/%/merkle.dat: merkle_0-100-all/Makefile
 	@mkdir -p "$(@D)"
 	STR="$*" ; STR_V=$${STR:`expr index "$$STR" v`} ; STR_B=$${STR:`expr index "$$STR" b`} ; STR_P=$${STR:`expr index "$$STR" p`} ; V=`expr match "$$STR_V" '\([0-9][.0-9]*\)'` ; B=`expr match "$$STR_B" '\([0-9][.0-9]*\)'` ; P=`expr match "$$STR_P" '\([0-9][.0-9]*\)'` ; ./rr_eval.sh -a merkle -n "$(SYSTEM_SIZE)" -c "$$V,$$B,$$P,20" -g eval_fprob.gp -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s 20 > "$(@D)/eval.log"
 
-merkle-all_p0.1: merkle_single-all/v2_b1_p0.1/merkle.dat merkle_single-all/v2_b3_p0.1/merkle.dat merkle_single-all/v2_b15_p0.1/merkle.dat merkle_single-all/v4_b1_p0.1/merkle.dat merkle_single-all/v4_b3_p0.1/merkle.dat merkle_single-all/v4_b15_p0.1/merkle.dat merkle_single-all/v16_b1_p0.1/merkle.dat merkle_single-all/v16_b3_p0.1/merkle.dat merkle_single-all/v16_b15_p0.1/merkle.dat
+merkle-all_p0.1: merkle_0-10-all/v2_b1_p0.1/merkle.dat merkle_0-10-all/v2_b3_p0.1/merkle.dat merkle_0-10-all/v2_b15_p0.1/merkle.dat merkle_0-10-all/v4_b1_p0.1/merkle.dat merkle_0-10-all/v4_b3_p0.1/merkle.dat merkle_0-10-all/v4_b15_p0.1/merkle.dat merkle_0-10-all/v16_b1_p0.1/merkle.dat merkle_0-10-all/v16_b3_p0.1/merkle.dat merkle_0-10-all/v16_b15_p0.1/merkle.dat
 	
 
-merkle-all_p0.01: merkle_single-all/v2_b1_p0.01/merkle.dat merkle_single-all/v2_b3_p0.01/merkle.dat merkle_single-all/v2_b15_p0.01/merkle.dat merkle_single-all/v4_b1_p0.01/merkle.dat merkle_single-all/v4_b3_p0.01/merkle.dat merkle_single-all/v4_b15_p0.01/merkle.dat merkle_single-all/v16_b1_p0.01/merkle.dat merkle_single-all/v16_b3_p0.01/merkle.dat merkle_single-all/v16_b15_p0.01/merkle.dat merkle_0-100-all/v2_b1_p0.01/merkle.dat merkle_0-100-all/v4_b1_p0.01/merkle.dat merkle_0-100-all/v4_b3_p0.01/merkle.dat merkle_0-100-all/v4_b15_p0.01/merkle.dat merkle_0-100-all/v16_b1_p0.01/merkle.dat
+merkle-all_p0.01: merkle_0-10-all/v2_b1_p0.01/merkle.dat merkle_0-10-all/v2_b3_p0.01/merkle.dat merkle_0-10-all/v2_b15_p0.01/merkle.dat merkle_0-10-all/v4_b1_p0.01/merkle.dat merkle_0-10-all/v4_b3_p0.01/merkle.dat merkle_0-10-all/v4_b15_p0.01/merkle.dat merkle_0-10-all/v16_b1_p0.01/merkle.dat merkle_0-10-all/v16_b3_p0.01/merkle.dat merkle_0-10-all/v16_b15_p0.01/merkle.dat merkle_0-100-all/v2_b1_p0.01/merkle.dat merkle_0-100-all/v4_b1_p0.01/merkle.dat merkle_0-100-all/v4_b3_p0.01/merkle.dat merkle_0-100-all/v4_b15_p0.01/merkle.dat merkle_0-100-all/v16_b1_p0.01/merkle.dat
 	
 
-merkle-all_p0.001: merkle_single-all/v2_b1_p0.001/merkle.dat merkle_single-all/v2_b3_p0.001/merkle.dat merkle_single-all/v2_b15_p0.001/merkle.dat merkle_single-all/v4_b1_p0.001/merkle.dat merkle_single-all/v4_b3_p0.001/merkle.dat merkle_single-all/v4_b15_p0.001/merkle.dat merkle_single-all/v16_b1_p0.001/merkle.dat merkle_single-all/v16_b3_p0.001/merkle.dat merkle_single-all/v16_b15_p0.001/merkle.dat
+merkle-all_p0.001: merkle_0-10-all/v2_b1_p0.001/merkle.dat merkle_0-10-all/v2_b3_p0.001/merkle.dat merkle_0-10-all/v2_b15_p0.001/merkle.dat merkle_0-10-all/v4_b1_p0.001/merkle.dat merkle_0-10-all/v4_b3_p0.001/merkle.dat merkle_0-10-all/v4_b15_p0.001/merkle.dat merkle_0-10-all/v16_b1_p0.001/merkle.dat merkle_0-10-all/v16_b3_p0.001/merkle.dat merkle_0-10-all/v16_b15_p0.001/merkle.dat
 	
 
 merkle-all: merkle-all_p0.1 merkle-all_p0.01 merkle-all_p0.001
