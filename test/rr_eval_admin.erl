@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin
+% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,13 +58,13 @@
                        {mp_file, file:io_device()}.
 -type eval_options() :: [eval_option()].
 
--type sync_result() :: {[rr_eval_point:eval_point()],       %Sync EvalPoints 
+-type sync_result() :: {[rr_eval_point:eval_point()],       %Sync EvalPoints
                         [rr_eval_point:measure_point()],    %Sync MeasurePoints
                         NextEPId::non_neg_integer()}.       %Next unique EvalPointId
 
 -dialyzer([{no_match, [get_param_value/2, set_params/3,
                        init_rc_conf/3, init_ring_conf/3]},
-           {no_return, [system/3, system/4]}]).
+           {no_return, [system/4]}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
