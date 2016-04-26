@@ -9,7 +9,6 @@ EVAL_REPEATS ?= 100
 
 .PHONY: all clean subdirs
 .PRECIOUS: %/.gitignore %/Makefile
-.SECONDEXPANSION:
 
 all: subdirs
 
@@ -43,123 +42,86 @@ scalaris:
 	@cp $< $@
 	@rm "$*/.gitignore"
 
-# fprob analysis (different delta) for different trivial recon parameters
-trivial_0-%-all/Makefile: Makefile.tmpl2 trivial_0-%-all/.gitignore Makefile
-	@mkdir -p "$(@D)"
+define FPROB_MAKEFILE
+$(1)_0-%-all/Makefile: Makefile.tmpl2 $(1)_0-%-all/.gitignore Makefile
+	@mkdir -p "$$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/trivial.dat|g' \
-         -e 's|<dat2>|0.01/trivial.dat|g' \
-         -e 's|<dat3>|0.1/trivial.dat|g' \
-         -e 's|<title1>|trivial_{P_{1e}0.001}|g' \
-         -e 's|<title2>|trivial_{P_{1e}0.01}|g' \
-         -e 's|<title3>|trivial_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
+         -e 's|<dat1>|0.001/$(1).dat|g' \
+         -e 's|<dat2>|0.01/$(1).dat|g' \
+         -e 's|<dat3>|0.1/$(1).dat|g' \
+         -e 's|<title1>|$(1)_{P_{1e}0.001}|g' \
+         -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
+         -e 's|<title3>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$$(shell expr $$* / 5);|g' < $$< > $$@
+endef
+$(foreach ALG, trivial shash bloom, $(eval $(call FPROB_MAKEFILE, $(ALG))))
 
-trivial_0-10-all/%/trivial.dat trivial_0-100-all/%/trivial.dat: $$(dir $$(@D))Makefile
-	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a trivial -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
+# fprob analysis (different delta) for different recon parameters
+define MAX_DELTA_TARGETS
+.PRECIOUS: $(1)_0-$(2)-all/Makefile
+$(1)_0-$(2)-all/%/$(1).dat: $(1)_0-$(2)-all/Makefile
+	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
+	@mkdir -p "$$(@D)"
+	+STEP_SIZE=$$(shell expr $(2) / 5) ; ./rr_eval.sh -a $(1) -n "$(SYSTEM_SIZE)" -c "$$*,$$$$STEP_SIZE" -g eval_fprob.gp -t "$(1)_{P_{1e}$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
+endef
+$(foreach ALG, trivial shash bloom, $(foreach MAX_DELTA, 10 100,\
+$(eval $(call MAX_DELTA_TARGETS,$(ALG),$(MAX_DELTA)))\
+))
 
+define OTHER_TARGETS
+# ddist+fdist analysis (different data and failure distributions) for different recon parameters
+$(1)_ddists_fdists-all/%/$(1)_ddists_fdists.dat: $(1)_ddists_fdists-all/Makefile
+	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
+	@mkdir -p "$$(@D)"
+	+STEP_SIZE=2 ; ./rr_eval.sh -a $(1)_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$*,$$$$STEP_SIZE" -g eval_fprob_dists.gp -t "$(1)_{P_{1e}$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
+
+# scalability analysis (increasing data size) for different recon parameters
+$(1)_scale-all/%/$(1)_scale.dat: $(1)_scale-all/Makefile
+	@echo " executing $$(@D) (start at N=$(SYSTEM_SIZE_SCALE))"
+	@mkdir -p "$$(@D)"
+	+./rr_eval.sh -a $(1)_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$*" -g eval_data_inc.gp -t "$(1)_{P_{1e}$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
+endef
+$(foreach ALG, trivial shash bloom, $(eval $(call OTHER_TARGETS,$(ALG))))
+
+# fprob analysis (different delta)
 trivial-all: trivial_0-10-all/0.1/trivial.dat trivial_0-10-all/0.01/trivial.dat trivial_0-10-all/0.001/trivial.dat trivial_0-100-all/0.1/trivial.dat trivial_0-100-all/0.01/trivial.dat trivial_0-100-all/0.001/trivial.dat
 	
 
-# ddist+fdist analysis (different data and failure distributions) for different trivial recon parameters
-trivial_ddists_fdists-all/%/trivial_ddists_fdists.dat: trivial_ddists_fdists-all/Makefile
-	@echo " executing trivial_ddists_fdists $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob_dists.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
+# ddist+fdist analysis (different data and failure distributions)
 trivial_dists-all: trivial_ddists_fdists-all/0.01/trivial_ddists_fdists.dat
 	
 
-# scalability analysis (increasing data size) for different trivial recon parameters
-trivial_scale-all/%/trivial_scale.dat: trivial_scale-all/Makefile
-	@echo " executing trivial_scale $* (start at N=$(SYSTEM_SIZE_SCALE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a trivial_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*" -g eval_data_inc.gp -t "trivial_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
-
+# scalability analysis (increasing data size)
 trivial_scale-all: trivial_scale-all/0.01/trivial_scale.dat
 	
 
 trivial: trivial-all trivial_dists-all trivial_scale-all
 	
 
-# fprob analysis (different delta) for different shash recon parameters
-shash_0-%-all/Makefile: Makefile.tmpl2 shash_0-%-all/.gitignore Makefile
-	@mkdir -p "$(@D)"
-	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/shash.dat|g' \
-         -e 's|<dat2>|0.01/shash.dat|g' \
-         -e 's|<dat3>|0.1/shash.dat|g' \
-         -e 's|<title1>|shash_{P_{1e}0.001}|g' \
-         -e 's|<title2>|shash_{P_{1e}0.01}|g' \
-         -e 's|<title3>|shash_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
-
-shash_0-10-all/%/shash.dat shash_0-100-all/%/shash.dat: $$(dir $$(@D))Makefile
-	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a shash -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
-
+# fprob analysis (different delta)
 shash-all: shash_0-10-all/0.1/shash.dat shash_0-10-all/0.01/shash.dat shash_0-10-all/0.001/shash.dat shash_0-100-all/0.1/shash.dat shash_0-100-all/0.01/shash.dat shash_0-100-all/0.001/shash.dat
 	
 
-# ddist+fdist analysis (different data and failure distributions) for different shash recon parameters
-shash_ddists_fdists-all/%/shash_ddists_fdists.dat: shash_ddists_fdists-all/Makefile
-	@echo " executing shash_ddists_fdists $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob_dists.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
+# ddist+fdist analysis (different data and failure distributions)
 shash_dists-all: shash_ddists_fdists-all/0.01/shash_ddists_fdists.dat
 	
 
-# scalability analysis (increasing data size) for different shash recon parameters
-shash_scale-all/%/shash_scale.dat: shash_scale-all/Makefile
-	@echo " executing shash_scale $* (start at N=$(SYSTEM_SIZE_SCALE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a shash_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*" -g eval_data_inc.gp -t "shash_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
-
+# scalability analysis (increasing data size)
 shash_scale-all: shash_scale-all/0.01/shash_scale.dat
 	
 
 shash: shash-all shash_dists-all shash_scale-all
 	
 
-# fprob analysis (different delta) for different bloom recon parameters
-bloom_0-%-all/Makefile: Makefile.tmpl2 bloom_0-%-all/.gitignore Makefile
-	@mkdir -p "$(@D)"
-	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.001/bloom.dat|g' \
-         -e 's|<dat2>|0.01/bloom.dat|g' \
-         -e 's|<dat3>|0.1/bloom.dat|g' \
-         -e 's|<title1>|bloom_{P_{1e}0.001}|g' \
-         -e 's|<title2>|bloom_{P_{1e}0.01}|g' \
-         -e 's|<title3>|bloom_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$(shell expr $* / 5);|g' < $< > $@
-
-bloom_0-10-all/%/bloom.dat bloom_0-100-all/%/bloom.dat: $$(dir $$(@D))Makefile
-	@echo " executing $(@D) (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+MAX_DELTA=$(shell expr match "$(@D)" '.*_0-\([0-9][0-9]*\)-all/.*') ; STEP_SIZE=`expr $$MAX_DELTA / 5` ; ./rr_eval.sh -a bloom -n "$(SYSTEM_SIZE)" -c "$*,$$STEP_SIZE" -g eval_fprob.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s $$STEP_SIZE > "$(@D)/eval.log"
-
+# fprob analysis (different delta)
 bloom-all: bloom_0-10-all/0.1/bloom.dat bloom_0-10-all/0.01/bloom.dat bloom_0-10-all/0.001/bloom.dat bloom_0-100-all/0.1/bloom.dat bloom_0-100-all/0.01/bloom.dat bloom_0-100-all/0.001/bloom.dat
 	
 
-# ddist+fdist analysis (different data and failure distributions) for different bloom recon parameters
-bloom_ddists_fdists-all/%/bloom_ddists_fdists.dat: bloom_ddists_fdists-all/Makefile
-	@echo " executing bloom_ddists_fdists $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$*,2" -g eval_fprob_dists.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) -s 2 > "$(@D)/eval.log"
-
+# ddist+fdist analysis (different data and failure distributions)
 bloom_dists-all: bloom_ddists_fdists-all/0.01/bloom_ddists_fdists.dat
 	
 
-# scalability analysis (increasing data size) for different bloom recon parameters
-bloom_scale-all/%/bloom_scale.dat: bloom_scale-all/Makefile
-	@echo " executing bloom_scale $* (start at N=$(SYSTEM_SIZE_SCALE))"
-	@mkdir -p "$(@D)"
-	+./rr_eval.sh -a bloom_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$*" -g eval_data_inc.gp -t "bloom_{P_{1e}$*}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
-
+# scalability analysis (increasing data size)
 bloom_scale-all: bloom_scale-all/0.01/bloom_scale.dat
 	
 
