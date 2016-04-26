@@ -22,27 +22,18 @@
 
 % for external scripts
 -export([% trivial
-         trivial/3, trivial/6,
-         trivial_ddists_fdists/3, trivial_ddists_fdists/6,
-         trivial_scale/3, trivial_scale/5,
+         trivial/6, trivial_ddists_fdists/6, trivial_scale/5,
          % shash
-         shash/3, shash/6,
-         shash_ddists_fdists/3, shash_ddists_fdists/6,
-         shash_scale/3, shash_scale/5,
+         shash/6, shash_ddists_fdists/6, shash_scale/5,
          % bloom
-         bloom/3, bloom/6,
-         bloom_ddists_fdists/3, bloom_ddists_fdists/6,
-         bloom_scale/3, bloom_scale/5,
+         bloom/6, bloom_ddists_fdists/6, bloom_scale/5,
          % merkle
-         merkle/5, merkle/8,
-         merkle_ddists_fdists/5, merkle_ddists_fdists/8,
-         merkle_scale/5, merkle_scale/7,
+         merkle/8, merkle_ddists_fdists/8, merkle_scale/7,
          merkle_custom/11,
          % art
-         art/5, art/7,
-         art_scale/5, art_scale/7,
+         art/7, art_scale/7,
          % system sync
-         system/3, system/4]).
+         system/4]).
 
 % for debugging:
 -export([ring_build/0, get_node_interval/1,
@@ -127,21 +118,11 @@ gen_setup(DDists, FTypes, FDists, Scen, Ring, RCList) ->
 %% TRIVIAL EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec trivial(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-trivial(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(trivial),
-    trivial(Dir, FileName, N, EvalRepeats, P1E, 2).
-
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
               EvalRepeats::pos_integer(), P1E::p1e(),
               StepSize::step_size() | power) -> ok.
 trivial(Dir, FileName, N, EvalRepeats, P1E, StepSize) ->
     trivial(Dir, FileName, N, EvalRepeats, P1E, [random], [random], StepSize).
-
--spec trivial_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-trivial_ddists_fdists(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(trivial),
-    trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, 2).
 
 -spec trivial_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                             EvalRepeats::pos_integer(), P1E::p1e(),
@@ -170,11 +151,6 @@ trivial(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, StepSize) ->
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec trivial_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-trivial_scale(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(trivial),
-    trivial_scale(Dir, FileName, N, EvalRepeats, P1E).
-
 -spec trivial_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 trivial_scale(Dir, FileName, N, EvalRepeats, P1E) ->
@@ -199,21 +175,11 @@ trivial_scale(Dir, FileName, N, EvalRepeats, P1E) ->
 %% SHASH EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec shash(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-shash(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(shash),
-    shash(Dir, FileName, N, EvalRepeats, P1E, 2).
-
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), P1E::p1e(),
             StepSize::step_size() | power) -> ok.
 shash(Dir, FileName, N, EvalRepeats, P1E, StepSize) ->
     shash(Dir, FileName, N, EvalRepeats, P1E, [random], [random], StepSize).
-
--spec shash_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-shash_ddists_fdists(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(shash),
-    shash_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, 2).
 
 -spec shash_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                           EvalRepeats::pos_integer(), P1E::p1e(),
@@ -242,11 +208,6 @@ shash(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, StepSize) ->
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec shash_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-shash_scale(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(shash),
-    shash_scale(Dir, FileName, N, EvalRepeats, P1E).
-
 -spec shash_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                   EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 shash_scale(Dir, FileName, N, EvalRepeats, P1E) ->
@@ -271,21 +232,11 @@ shash_scale(Dir, FileName, N, EvalRepeats, P1E) ->
 %% BLOOM EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec bloom(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-bloom(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(bloom),
-    bloom(Dir, FileName, N, EvalRepeats, P1E, 2).
-
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), P1E::p1e(),
             StepSize::step_size() | power) -> ok.
 bloom(Dir, FileName, N, EvalRepeats, P1E, StepSize) ->
     bloom(Dir, FileName, N, EvalRepeats, P1E, [random], [random], StepSize).
-
--spec bloom_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-bloom_ddists_fdists(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(bloom),
-    bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, 2).
 
 -spec bloom_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                           EvalRepeats::pos_integer(), P1E::p1e(),
@@ -314,11 +265,6 @@ bloom(Dir, FileName, N, EvalRepeats, P1E, DDists, FDists, StepSize) ->
          fprob, 5, StepSize, 0, Options),
     ok.
 
--spec bloom_scale(N::pos_integer(), EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
-bloom_scale(N, EvalRepeats, P1E) ->
-    {Dir, FileName} = default_dir_and_name(bloom),
-    bloom_scale(Dir, FileName, N, EvalRepeats, P1E).
-
 -spec bloom_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                   EvalRepeats::pos_integer(), P1E::p1e()) -> ok.
 bloom_scale(Dir, FileName, N, EvalRepeats, P1E) ->
@@ -343,12 +289,6 @@ bloom_scale(Dir, FileName, N, EvalRepeats, P1E) ->
 %% MERKLE EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec merkle(N::pos_integer(), EvalRepeats::pos_integer(),
-             MBranch::pos_integer(), MBucket::pos_integer(), P1E::p1e()) -> ok.
-merkle(N, EvalRepeats, MBranch, MBucket, P1E) ->
-    {Dir, FileName} = default_dir_and_name(merkle),
-    merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, 2).
-
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
              MBucket::pos_integer(), P1E::p1e(),
@@ -356,13 +296,6 @@ merkle(N, EvalRepeats, MBranch, MBucket, P1E) ->
 merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, StepSize) ->
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, [random], [random],
            StepSize).
-
--spec merkle_ddists_fdists(N::pos_integer(), EvalRepeats::pos_integer(),
-                           MBranch::pos_integer(), MBucket::pos_integer(),
-                           P1E::p1e()) -> ok.
-merkle_ddists_fdists(N, EvalRepeats, MBranch, MBucket, P1E) ->
-    {Dir, FileName} = default_dir_and_name(merkle),
-    merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, 2).
 
 -spec merkle_ddists_fdists(DestDir::string(), FileName::string(),
                            N::pos_integer(), EvalRepeats::pos_integer(),
@@ -394,13 +327,6 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, DDists, FDists, Ste
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [Merkle]),
          fprob, 5, StepSize, 0, Options),
     ok.
-
--spec merkle_scale(N::pos_integer(), EvalRepeats::pos_integer(),
-                   MBranch::pos_integer(), MBucket::pos_integer(),
-                   P1E::p1e()) -> ok.
-merkle_scale(N, EvalRepeats, MBranch, MBucket, P1E) ->
-    {Dir, FileName} = default_dir_and_name(merkle),
-    merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E).
 
 -spec merkle_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                    EvalRepeats::pos_integer(), MBranch::pos_integer(),
@@ -438,13 +364,6 @@ merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E,
 %% ART EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec art(N::pos_integer(), EvalRepeats::pos_integer(),
-          MBranch::pos_integer(), MBucket::pos_integer(),
-          ACorrFactor::non_neg_integer()) -> ok.
-art(N, EvalRepeats, MBranch, MBucket, ACorrFactor) ->
-    {Dir, FileName} = default_dir_and_name(art),
-    art(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor).
-
 -spec art(DestDir::string(), FileName::string(), N::pos_integer(),
           EvalRepeats::pos_integer(), MBranch::pos_integer(),
           MBucket::pos_integer(), ACorrFactor::non_neg_integer()) -> ok.
@@ -467,13 +386,6 @@ art(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor) ->
          gen_setup([random], ?EVAL_FTYPES, [random], Scenario, PairRing, [Art]),
          fprob, 5, 2, 0, Options),
     ok.
-
--spec art_scale(N::pos_integer(), EvalRepeats::pos_integer(),
-                MBranch::pos_integer(), MBucket::pos_integer(),
-                ACorrFactor::non_neg_integer()) -> ok.
-art_scale(N, EvalRepeats, MBranch, MBucket, ACorrFactor) ->
-    {Dir, FileName} = default_dir_and_name(art),
-    art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor).
 
 -spec art_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                 EvalRepeats::pos_integer(), MBranch::pos_integer(),
@@ -500,10 +412,6 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SYSTEM EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec system(N::pos_integer(), EvalRepeats::pos_integer(), EvalName::atom()) -> ok.
-system(N, EvalRepeats, EvalName) ->
-    {Dir, _FileName} = default_dir_and_name(system),
-    system(Dir, N, EvalRepeats, EvalName).
 
 -spec system(DestDir::string(), N::pos_integer(), EvalRepeats::pos_integer(),
              EvalName::atom()) -> ok.
@@ -539,7 +447,7 @@ system(Dir, N, EvalRepeats, EvalName) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec eval(Mode::pair | sys,
-           [ring_setup()],
+           [ring_setup(),...],
            StepP::step_param(),
            StepCount::pos_integer(),
            StepSize::step_size() | power,
