@@ -34,8 +34,9 @@
 -type scenario() :: #scenario{}.
 
 -type step_param() :: node_count | data_count | fprob | rounds |
-                      recon_p1e | merkle_bucket | merkle_branch | art_corr_factor |
-                      art_leaf_fpr | art_inner_fpr.
+                      recon_p1e | expected_delta |
+                      merkle_bucket | merkle_branch |
+                      art_corr_factor | art_leaf_fpr | art_inner_fpr.
 -type step_size() :: pos_integer() | float().
 -type p1e() :: float() | pos_integer().
 
@@ -51,6 +52,7 @@
 -record(rc_config, {
                     recon_method    = ?required(rc_config, recon_method) :: rr_recon:method(),
                     recon_p1e       = 0.1                                :: p1e(),
+                    expected_delta  = 100                                :: number(),
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art
                     merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),

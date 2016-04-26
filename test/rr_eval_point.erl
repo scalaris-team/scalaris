@@ -132,7 +132,9 @@
                        MeanP1E          :: float() | '-',
                        ErrP1E           :: float() | '-',
                        MinP1E           :: float() | '-',
-                       MaxP1E           :: float() | '-'
+                       MaxP1E           :: float() | '-',
+                       % misc
+                       ExpectedDelta    :: number()
                       }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -165,7 +167,8 @@ column_names() ->
      % AVG, STD, MIN, MAX P1E of phase 1 and 2
      p1e_p1, sd_p1e_p1, min_p1e_p1, max_p1e_p1,
      p1e_p2, sd_p1e_p2, min_p1e_p2, max_p1e_p2,
-     p1e, sd_p1e, min_p1e, max_p1e
+     p1e, sd_p1e, min_p1e, max_p1e,
+     expected_delta
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,6 +203,7 @@ generate_ep(ID,
                        data_type = DType, trigger_prob = TProb},
              #ring_config{node_count = NC, data_count = DC, data_failure_prob = FProb},
              #rc_config{recon_method = RCMethod, recon_p1e = RcP1E,
+                        expected_delta = ExpDelta,
                         merkle_bucket= MBU, merkle_branch = MBR,
                         merkle_num_trees = MNT, art_corr_factor = ArtCF,
                         art_leaf_fpr = ArtLF, art_inner_fpr = ArtIF}},
@@ -246,7 +250,8 @@ generate_ep(ID,
      DType, TProb, MNT,
      MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1,
      MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2,
-     MeanP1E, ErrP1E, MinP1E, MaxP1E}.
+     MeanP1E, ErrP1E, MinP1E, MaxP1E,
+     ExpDelta}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().
 dist_to_name({binomial, P}) ->
