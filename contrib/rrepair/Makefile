@@ -142,42 +142,99 @@ define MERKLE_FPROB_TARGETS
 merkle_0-$(1)_expD$(2)-all/%/merkle.dat: merkle_0-$(1)_expD$(2)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
-	+V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)); STEP_SIZE=0$$(shell bc <<< "scale=2; $(1)/5") ; ./rr_eval.sh -a merkle -n "$(SYSTEM_SIZE)" -c "$$$$V,$$$$B,$$$$P,$(2),$$$$STEP_SIZE" -g eval_fprob.gp -t "merkle_{v$$$$V, b$$$$B, P_{1e}$$$$P}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
+	+V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)); STEP_SIZE=0$$(shell bc <<< "scale=2; $(1)/5") ; ./rr_eval.sh -a merkle -n "$(SYSTEM_SIZE)" -c "$$$${V},$$$${B},$$$${P},$(2),$$$$STEP_SIZE" -g eval_fprob.gp -t "merkle_{v$$$${V}, b$$$${B}, P_{1e}$$$${P}}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
 $(eval $(call MERKLE_FPROB_TARGETS,$(MAX_DELTA),$(EXP_DELTA)))\
 ))
 
-merkle-all_p0.1: merkle_0-10-all/v2_b1_p0.1/merkle.dat merkle_0-10-all/v2_b3_p0.1/merkle.dat merkle_0-10-all/v2_b15_p0.1/merkle.dat merkle_0-10-all/v4_b1_p0.1/merkle.dat merkle_0-10-all/v4_b3_p0.1/merkle.dat merkle_0-10-all/v4_b15_p0.1/merkle.dat merkle_0-10-all/v16_b1_p0.1/merkle.dat merkle_0-10-all/v16_b3_p0.1/merkle.dat merkle_0-10-all/v16_b15_p0.1/merkle.dat
+define MERKLE_OTHER_TARGETS
+# ddist+fdist analysis (different data and failure distributions) for different recon parameters
+.PRECIOUS: merkle_ddists_fdists_expD$(1)-all/Makefile
+merkle_ddists_fdists_expD$(1)-all/%/merkle_ddists_fdists.dat: merkle_ddists_fdists_expD$(1)-all/Makefile
+	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
+	@mkdir -p "$$(@D)"
+	+STEP_SIZE=2 ; V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$$${V},$$$${B},$$$${P},$(1),$$$$STEP_SIZE" -g eval_fprob_dists.gp -t "merkle_{v$$$${V}, b$$$${B}, P_{1e}$$$${P}}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
+
+# scalability analysis (increasing data size) for different recon parameters
+.PRECIOUS: merkle_scale_expD$(1)-all/Makefile
+merkle_scale_expD$(1)-all/%/merkle_scale.dat: merkle_scale_expD$(1)-all/Makefile
+	@echo " executing  $$(@D) (start at N=$(SYSTEM_SIZE_SCALE))"
+	@mkdir -p "$$(@D)"
+	+V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$$${V},$$$${B},$$$${P},$(1)" -g eval_data_inc.gp -t "merkle_{v$$$${V}, b$$$${B}, P_{1e}$$$${P}}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
+endef
+$(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
+$(eval $(call MERKLE_OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
+)
+
+MERKLE_DEFAULT_V_B=v2_b1 v4_b1 v4_b3 v4_b15 v16_b1
+MERKLE_DEFAULT_B_P=b1_p0.01
+MERKLE_DEFAULT_V_P=v4_p0.01
+
+# define summary targets for groups of the ones above:
+define MERKLE_SUM_1
+# fprob analysis (different delta)
+merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)_p0.01/merkle.dat) merkle_0-$(1)-all/v4_b3 merkle_0-$(1)-all/b1_p0.01 merkle_0-$(1)-all/v4_p0.01
+	
+endef
+$(foreach PAR, 1_expD0.4 10_expD4 100_expD40,$(eval $(call MERKLE_SUM_1,$(PAR))))
+
+merkle-all: merkle_0-1_expD0.4-all merkle_0-10_expD4-all merkle_0-100_expD40-all
 	
 
-merkle-all_p0.01: merkle_0-10-all/v2_b1_p0.01/merkle.dat merkle_0-10-all/v2_b3_p0.01/merkle.dat merkle_0-10-all/v2_b15_p0.01/merkle.dat merkle_0-10-all/v4_b1_p0.01/merkle.dat merkle_0-10-all/v4_b3_p0.01/merkle.dat merkle_0-10-all/v4_b15_p0.01/merkle.dat merkle_0-10-all/v16_b1_p0.01/merkle.dat merkle_0-10-all/v16_b3_p0.01/merkle.dat merkle_0-10-all/v16_b15_p0.01/merkle.dat merkle_0-100-all/v2_b1_p0.01/merkle.dat merkle_0-100-all/v4_b1_p0.01/merkle.dat merkle_0-100-all/v4_b3_p0.01/merkle.dat merkle_0-100-all/v4_b15_p0.01/merkle.dat merkle_0-100-all/v16_b1_p0.01/merkle.dat
+# ddist+fdist analysis (different data and failure distributions)
+merkle_dists-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_ddists_fdists_expD4-all/$(PAR)_p0.01/merkle_ddists_fdists.dat)
 	
 
-merkle-all_p0.001: merkle_0-10-all/v2_b1_p0.001/merkle.dat merkle_0-10-all/v2_b3_p0.001/merkle.dat merkle_0-10-all/v2_b15_p0.001/merkle.dat merkle_0-10-all/v4_b1_p0.001/merkle.dat merkle_0-10-all/v4_b3_p0.001/merkle.dat merkle_0-10-all/v4_b15_p0.001/merkle.dat merkle_0-10-all/v16_b1_p0.001/merkle.dat merkle_0-10-all/v16_b3_p0.001/merkle.dat merkle_0-10-all/v16_b15_p0.001/merkle.dat
+# scalability analysis (increasing data size)
+merkle_scale-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_expD4-all/$(PAR)_p0.01/merkle_scale.dat) merkle_scale_expD4-all/v4_b3 merkle_scale_expD4-all/b1_p0.01 merkle_scale_expD4-all/v4_p0.01
 	
 
-merkle-all: merkle-all_p0.1 merkle-all_p0.01 merkle-all_p0.001
+# summary targets for v4_b3 b1_p0.01 v4_p0.01 (Makefiles and dependencies)
+define MERKLE_SUM_V_B
+merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-all/$(3)/.gitignore Makefile
+	@mkdir -p "$$(@D)"
+	@V=$$(shell expr match "$(3)" 'v\([0-9][0-9]*\)_b[0-9][0-9]*') ; B=$$(shell expr match "$(3)" 'v[0-9][0-9]*_b\([0-9][0-9]*\)') ; \
+      sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
+          -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.001/merkle.dat|g" \
+          -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.01/merkle.dat|g" \
+          -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.1/merkle.dat|g" \
+          -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
+          -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
+          -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
+          -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
+          -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
+
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/$(3)_p0.1/merkle.dat merkle_0-$(1)_expD$(2)-all/$(3)_p0.01/merkle.dat merkle_0-$(1)_expD$(2)-all/$(3)_p0.001/merkle.dat
 	
+endef
+$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
+$(eval $(call MERKLE_SUM_V_B,$(MAX_DELTA),$(EXP_DELTA),$(PAR)))\
+)))
+define MERKLE_SUM_B_P
+merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-all/$(3)/.gitignore Makefile
+	@mkdir -p "$$(@D)"
+	@B=$$(shell expr match "$(3)" 'b\([0-9][0-9]*\)_p[0-9][.0-9]*') ; P=$$(shell expr match "$(3)" 'b[0-9][0-9]*_p\([0-9][.0-9]*\)') ; \
+      sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
+          -e "s|<dat1>|../v2_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat2>|../v4_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat3>|../v16_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<title1>|merkle_{v2, b$$$${B}, P_{1e}$$$${P}}|g" \
+          -e "s|<title2>|merkle_{v4, b$$$${B}, P_{1e}$$$${P}}|g" \
+          -e "s|<title3>|merkle_{v16, b$$$${B}, P_{1e}$$$${P}}|g" \
+          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
+          -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
+          -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-# ddist+fdist analysis (different data and failure distributions) for different merkle recon parameters
-# TODO: integrate EXP_DELTA
-merkle_ddists_fdists-all/%/merkle_ddists_fdists.dat: merkle_ddists_fdists-all/Makefile
-	@echo " executing merkle_ddists_fdists $* (N=$(SYSTEM_SIZE))"
-	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$V,$$B,$$P,100,2" -g eval_fprob_dists.gp -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
-
-merkle_dists-all: merkle_ddists_fdists-all/v2_b1_p0.01/merkle_ddists_fdists.dat merkle_ddists_fdists-all/v4_b1_p0.01/merkle_ddists_fdists.dat merkle_ddists_fdists-all/v4_b3_p0.01/merkle_ddists_fdists.dat merkle_ddists_fdists-all/v4_b15_p0.01/merkle_ddists_fdists.dat merkle_ddists_fdists-all/v16_b1_p0.01/merkle_ddists_fdists.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/v2_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v4_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v16_$(3)/merkle.dat
 	
+endef
+$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
+$(eval $(call MERKLE_SUM_B_P,$(MAX_DELTA),$(EXP_DELTA),$(PAR)))\
+)))
 
-# scalability analysis (increasing data size) for different merkle recon parameters
-# TODO: integrate EXP_DELTA
-merkle_scale-all/%/merkle_scale.dat: merkle_scale-all/Makefile
-	@echo " executing merkle_scale $* (start at N=$(SYSTEM_SIZE_SCALE))"
-	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$V,$$B,$$P,100" -g eval_data_inc.gp -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) > "$(@D)/eval.log"
-
-merkle_scale-all: merkle_scale-all/v2_b1_p0.01/merkle_scale.dat merkle_scale-all/v4_b1_p0.01/merkle_scale.dat merkle_scale-all/v4_b3_p0.01/merkle_scale.dat merkle_scale-all/v4_b15_p0.01/merkle_scale.dat merkle_scale-all/v16_b1_p0.01/merkle_scale.dat
+merkle: merkle-all merkle_dists-all merkle_scale-all
 	
 
 # v4_b3_p0.001_d10_n32000-60000,4000
@@ -193,6 +250,3 @@ merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@echo " executing merkle_eff_prob $*"
 	@mkdir -p "$(@D)"
 	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
-
-merkle: merkle-all merkle_dists-all merkle_scale-all
-	
