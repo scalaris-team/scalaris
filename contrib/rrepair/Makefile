@@ -54,15 +54,15 @@ $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore 
          -e 's|<title1>|$(1)_{P_{1e}0.001}|g' \
          -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
          -e 's|<title3>|$(1)_{P_{1e}0.1}|g' \
-         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=$$(shell expr $$* / 5);|g' < $$< > $$@
+         -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $$*/5");|g' < $$< > $$@
 endef
 $(foreach ALG, trivial shash bloom, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
-$(eval $(call FPROB_MAKEFILE, $(ALG)))\
+$(eval $(call FPROB_MAKEFILE,$(ALG),$(EXP_DELTA),$(VARIANT)))\
 ))
 
 # fprob analysis (different delta) for different recon parameters
 define MAX_DELTA_TARGETS
-.PRECIOUS: $(1)_0-$(2)-all/Makefile
+.PRECIOUS: $(1)_0-$(2)_expD$(3)-all/Makefile
 $(1)_0-$(2)_expD$(3)-all/%/$(1).dat: $(1)_0-$(2)_expD$(3)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
@@ -74,6 +74,7 @@ $(eval $(call MAX_DELTA_TARGETS,$(ALG),$(MAX_DELTA),$(EXP_DELTA)))\
 
 define OTHER_TARGETS
 # ddist+fdist analysis (different data and failure distributions) for different recon parameters
+.PRECIOUS: $(1)_ddists_fdists_expD$(2)-all/Makefile
 $(1)_ddists_fdists_expD$(2)-all/%/$(1)_ddists_fdists.dat: $(1)_ddists_fdists_expD$(2)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
@@ -141,6 +142,7 @@ MERKLE_EXTRACT_P='v[0-9][0-9]*_b[0-9][0-9]*_p\([0-9][.0-9]*\)'
 
 define MERKLE_FPROB_TARGETS
 # fprob analysis (different delta) for different merkle recon parameters
+.PRECIOUS: merkle_0-$(1)_expD$(2)-all/Makefile
 merkle_0-$(1)_expD$(2)-all/%/merkle.dat: merkle_0-$(1)_expD$(2)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
