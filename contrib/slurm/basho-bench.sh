@@ -53,13 +53,18 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # VALUE_SIZES="2 4 8 16 32 64 128 256 512 768 1024 1280 1536 1792 2048"
 # NODES=32
 
-
 # load scalability series
 # KIND='load'
 # NODES=32
 # VMS_PER_NODE=1
 # WORKERS_PER_LG_SERIES="1 2 4 8 16 32 64 128 256 512 1024 2048"
 
+# KIND="lgs"
+# LOAD_GENERATORS_SERIES="4 6 8 10 12 15"
+# WORKERS="8400"
+# NODES=32
+# VMS_PER_NODE=4
+# export ERL_SCHED_FLAGS="+S 8"
 
 #=============================
 
@@ -77,11 +82,26 @@ main() {
         main_load
     elif [[ $KIND == "value" ]]; then
         main_value
+    elif [[ $KIND == "lgs" ]]; then
+        main_lgs
     else
         log error "Unknown kind of benchmark, exiting"
         exit 1
     fi
 }
+
+main_lgs(){
+    for LOAD_GENERATORS in $LOAD_GENERATORS_SERIES; do
+        WORKERS_PER_LG=$((WORKERS/LOAD_GENERATORS))
+        log info "starting load benchmark with $LOAD_GENERATORS LOAD_GENERATORS"
+        log info "WORKERS=$WORKERS"
+        log info "WORKERS_PER_LG=$WORKERS_PER_LG"
+
+        PREFIX="lgs$(printf "%04i" $LOAD_GENERATORS)"
+        repeat_benchmark
+    done
+}
+
 
 main_value() {
     for VALUE_SIZE in $VALUE_SIZES; do
