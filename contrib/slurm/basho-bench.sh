@@ -40,7 +40,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # SCALARIS_LOCAL=true
 # COLLECTL=true
 #
-# # size scalability series (only uncomment 'size' or 'load'
+# # size scalability series (only uncomment 'size' or 'load')
 # KIND='size'
 # NODES_SERIES="1 2 4 8 16 32"
 # VMS_PER_NODE_SERIES="1"
@@ -58,6 +58,7 @@ trap 'trap_cleanup' SIGTERM SIGINT
 main() {
     source $(pwd)/config/basho-bench.cfg
     check_wdir
+    check_result_dir
     setup_logging
     print_env
     check_compile
@@ -71,7 +72,6 @@ main() {
         exit 1
     fi
 }
-
 
 main_size(){
     for NODES in $NODES_SERIES; do
@@ -97,6 +97,7 @@ repeat_benchmark() {
         NAME="${PREFIX}$NODES-$VMS_PER_NODE-r$run"
         mkdir ${WD}/${NAME}
         setup_directories
+        create_result_dir
 
         SCALARISCTL_PARAMS="-l $WD/$NAME/logs"
         echo ${!SCALARISCTL_PARAMS@}=$SCALARISCTL_PARAMS
@@ -127,6 +128,7 @@ repeat_benchmark() {
         log info "sleeping for $SLEEP2 seconds"
         sleep $SLEEP2
     fi
+    collect_bbench_results
 
 }
 
@@ -181,6 +183,7 @@ print_env(){
         echo VMS_PER_NODE_SERIES=$VMS_PER_NODE_SERIES
         echo WORKERS_BASE=$WORKERS_BASE
     fi
+    echo "ERL_SCHED_FLAGS=$ERL_SCHED_FLAGS"
     echo TIMEOUT=$TIMEOUT
     echo REPETITIONS=$REPETITIONS
     echo DURATION=$DURATION
@@ -279,6 +282,7 @@ start_scalaris() {
     [[ -n $SCALARIS_LOCAL ]] && export SCALARIS_LOCAL
     [[ -n $SCALARISCTL_PARAMS ]] && export SCALARISCTL_PARAMS
     [[ -n $NAME ]] && export NAME
+    [[ -n $ERL_SCHED_FLAGS ]] && export ERL_SCHED_FLAGS
 
     # start sbatch command and capture output
     # the ${var:+...} expands only, if the variable is set and non-empty
@@ -323,6 +327,13 @@ test_ring() {
     local ringsize=$((NODES*VMS_PER_NODE*DHT_NODES_PER_VM))
     log info "testing ring"
     erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
+        "A = rpc:call($FIRST, admin, number_of_nodes, []),
+         case A of
+             $ringsize -> halt(0);
+             _ -> io:format('number_of_nodes: ~p~n', [A]), halt(1)
+         end."
+    res=$((res+=$?))
+    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
         "A = rpc:call($FIRST, admin, check_ring, []),
          case A of
              ok -> halt(0);
@@ -336,13 +347,7 @@ test_ring() {
              Error -> io:format('check_ring_deep: ~p~n', [Error]), halt(1)
          end."
     res=$((res+=$?))
-    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval \
-        "A = rpc:call($FIRST, admin, number_of_nodes, []),
-         case A of
-             $ringsize -> halt(0);
-             _ -> io:format('number_of_nodes: ~p~n', [A]), halt(1)
-         end."
-    res=$((res+=$?))
+
 
     if  [[ $res -eq 0 ]]; then
         log info "testing ring was successful"
@@ -410,6 +415,7 @@ write_config() {
 %{remote_nodes, [{'buildbot2.zib.de', 'nodeB'}]}.
 %{distribute_work, true}.
 {report_interval, 5}.
+{log_level, info}.
 
 {scalarisclient_nodes, [$HOSTLIST]}.
 EOF
@@ -439,7 +445,8 @@ run_bbench() {
         local arg3=${WD:+"--wd=$WD"}
         local arg4=${NAME:+"--name=$NAME"}
         local arg5=${BBENCH_DIR:+"--bbdir=$BBENCH_DIR"}
-        declare -a args=($arg1 $arg2 $arg3 $arg4 $arg5)
+        local arg6=${RESULT_DIR:+"--rdir=$RESULT_DIR"}
+        declare -a args=($arg1 $arg2 $arg3 $arg4 $arg5 $arg6)
 
         # get current host and (post)increment counter
         host=${LG_HOSTS[$((c++ % no_of_hosts))]}
@@ -456,6 +463,56 @@ run_bbench() {
     # wait for load generators to finish
     for pid in "${lg_pids[@]}"; do
         wait $pid
+    done
+}
+
+check_result_dir() {
+    for host in ${LG_HOSTS[@]}; do
+        local res=0
+
+        if [[ $(hostname -f) = $host ]]; then
+            $SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR
+            res=$((res+=$?))
+        else
+            ssh $host "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
+            res=$((res+=$?))
+        fi
+
+        if [[ $res -ne 0 ]]; then
+            log error "Result dir ($RESULT_DIR) on $host not empty, aborting"
+            exit 1
+        fi
+    done
+
+}
+
+create_result_dir() {
+    for host in ${LG_HOSTS[@]}; do
+        log info "creating result dir on $host"
+        if [[ $(hostname -f) = $host ]]; then
+            mkdir -p $RESULT_DIR/$NAME
+        else
+            ssh $host "bash -c \"mkdir -p $RESULT_DIR/$NAME\""
+        fi
+    done
+}
+
+collect_bbench_results() {
+    for host in ${LG_HOSTS[@]}; do
+        log info "collecting bbench results from $host"
+        if [[ $(hostname -f) = $host ]]; then
+            rsync -ayhx --progress $RESULT_DIR/ $WD/
+            if [[ $? == 0 ]]; then
+                log info "deleting $RESULT_DIR/$PREFIX* on $host"
+                rm -r $RESULT_DIR/$PREFIX*
+            fi
+        else
+            ssh $host "bash -c \"rsync -ayhx --progress $RESULT_DIR/ $WD/\""
+            if [[ $? == 0 ]]; then
+                log info "deleting $RESULT_DIR/$PREFIX* on $host"
+                ssh $host "bash -c \"rm -r $RESULT_DIR/$PREFIX*\""
+            fi
+        fi
     done
 }
 
@@ -479,6 +536,7 @@ trap_cleanup(){
     log info "received SIGTERM, cleaning up..."
     shutdown
     kill_bbench
+    collect_bbench_results
     exit 1
 }
 
@@ -486,6 +544,7 @@ shutdown(){
     stop_scalaris
     [[ $COLLECTL = true ]] && stop_collectl
     [[ $TOPLOG = true ]] && stop_toplog
+    collect_bbench_results
     rm_lockfile
 }
 
