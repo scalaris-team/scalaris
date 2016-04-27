@@ -22,11 +22,11 @@ subdirs: $(SUBDIRS_DIR)
 #                $+ inserts a list of all dependencies
 #                $^ inserts a list of all unique dependencies
 #                $* inserts the stem an implicit rule matches with
-%-dir: %
-	$(MAKE) -C $<
+%-dir:
+	$(MAKE) -C "$*"
 
-%-dir-clean: %
-	$(MAKE) clean -C $<
+%-dir-clean:
+	$(MAKE) clean -C "$*"
 
 scalaris:
 	$(MAKE) -C ../..
