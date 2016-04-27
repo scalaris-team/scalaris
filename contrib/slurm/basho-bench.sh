@@ -45,13 +45,20 @@ trap 'trap_cleanup' SIGTERM SIGINT
 # NODES_SERIES="1 2 4 8 16 32"
 # VMS_PER_NODE_SERIES="1"
 # WORKERS_BASE=4
-#
-# # load scalability series
+
+# vary value sizes
+# KIND='value'
+# WORKERS_PER_LG=44
+# VALUE_SIZES="2 4 8 16 32 64 128 256 512 768 1024 1280 1536 1792 2048"
+# NODES=32
+
+
+# load scalability series
 # KIND='load'
 # NODES=32
 # VMS_PER_NODE=1
 # BASES="1 2 4 8 16 32 64 128 256 512 1024 2048"
-#
+
 
 #=============================
 
@@ -67,10 +74,21 @@ main() {
         main_size
     elif [[ $KIND == "load" ]]; then
         main_load
+    elif [[ $KIND == "value" ]]; then
+        main_value
     else
         log error "Unknown kind of benchmark, exiting"
         exit 1
     fi
+}
+
+main_value() {
+    for VALUE_SIZE in $VALUE_SIZES; do
+        local value=$(printf "%04i" $VALUE_SIZE)
+        PREFIX="value$value"
+        log info "starting value benchmark with $VALUE_SIZE"
+        repeat_benchmark
+    done
 }
 
 main_size(){
@@ -193,6 +211,7 @@ print_env(){
     echo SLEEP2=$SLEEP2
     echo "COLLECTL=$COLLECTL"
     echo "PARTITION=$PARTITION"
+    echo "VALUE_SIZE=$VALUE_SIZE"
 }
 
 check_compile(){
@@ -408,7 +427,7 @@ write_config() {
 {key_generator, {int_to_str, {uniform_int, $max_key}}}.
 %%{key_generator, {int_to_str, {uniform_int, 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}}}.
 %% size in Bytes
-{value_generator, {fixed_bin, 512}}.
+{value_generator, {fixed_bin, $VALUE_SIZE}}.
 {scalarisclient_mynode, ['benchclient${PARALLEL_ID}']}.
 {scalarisclient_cookie, 'chocolate chip cookie'}.
 
