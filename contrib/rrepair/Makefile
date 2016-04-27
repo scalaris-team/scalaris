@@ -42,7 +42,7 @@ scalaris:
 	@cp $< $@
 	@rm "$*/.gitignore"
 
-EXP_DELTA_LIST=$(shell seq -s" " 0 100)
+EXP_DELTA_LIST=$(shell seq -s" " 0 0.1 1 ; seq -s" " 0 100)
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
@@ -81,6 +81,18 @@ $(1)_ddists_fdists_expD$(2)-all/%/$(1)_ddists_fdists.dat: $(1)_ddists_fdists_exp
 	+STEP_SIZE=2 ; ./rr_eval.sh -a $(1)_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$*,$(2),$$$$STEP_SIZE" -g eval_fprob_dists.gp -t "$(1)_{P_{1e}$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
 
 # scalability analysis (increasing data size) for different recon parameters
+.PRECIOUS: $(1)_scale_expD$(2)-all/Makefile
+$(1)_scale_expD$(2)-all/Makefile: Makefile_scale.tmpl2 $(1)_scale_expD$(2)-all/.gitignore Makefile
+	@mkdir -p "$$(@D)"
+	@sed -e 's|<sys_size>|$(SYSTEM_SIZE_SCALE)|g' \
+         -e 's|<dat1>|0.001/$(1)_scale.dat|g' \
+         -e 's|<dat2>|0.01/$(1)_scale.dat|g' \
+         -e 's|<dat3>|0.1/$(1)_scale.dat|g' \
+         -e 's|<title1>|$(1)_{P_{1e}0.001}|g' \
+         -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
+         -e 's|<title3>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $$< > $$@
+
 $(1)_scale_expD$(2)-all/%/$(1)_scale.dat: $(1)_scale_expD$(2)-all/Makefile
 	@echo " executing $$(@D) (start at N=$(SYSTEM_SIZE_SCALE))"
 	@mkdir -p "$$(@D)"
@@ -90,50 +102,34 @@ $(foreach ALG, trivial shash bloom, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
 $(eval $(call OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
 ))
 
+# define summary targets for groups of the ones above:
+define SUM_1
 # fprob analysis (different delta)
-trivial-all: trivial_0-10-all/0.1/trivial.dat trivial_0-10-all/0.01/trivial.dat trivial_0-10-all/0.001/trivial.dat trivial_0-100-all/0.1/trivial.dat trivial_0-100-all/0.01/trivial.dat trivial_0-100-all/0.001/trivial.dat
+$(1)_0-$(2)-all: $(1)_0-$(2)-all/0.1/$(1).dat $(1)_0-$(2)-all/0.01/$(1).dat $(1)_0-$(2)-all/0.001/$(1).dat
 	
+endef
+$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expD0.4 10_expD4 100_expD40,\
+$(eval $(call SUM_1,$(ALG),$(PAR)))\
+))
 
-# ddist+fdist analysis (different data and failure distributions)
-trivial_dists-all: trivial_ddists_fdists-all/0.01/trivial_ddists_fdists.dat
-	
-
-# scalability analysis (increasing data size)
-trivial_scale-all: trivial_scale-all/0.01/trivial_scale.dat
-	
-
-trivial: trivial-all trivial_dists-all trivial_scale-all
-	
-
+define SUM_2
 # fprob analysis (different delta)
-shash-all: shash_0-10-all/0.1/shash.dat shash_0-10-all/0.01/shash.dat shash_0-10-all/0.001/shash.dat shash_0-100-all/0.1/shash.dat shash_0-100-all/0.01/shash.dat shash_0-100-all/0.001/shash.dat
+$(1)-all: $(1)_0-1_expD0.4-all $(1)_0-10_expD4-all $(1)_0-100_expD40-all
 	
+endef
+$(foreach ALG, trivial shash bloom, $(eval $(call SUM_2,$(ALG))))
 
+define SUM_3
 # ddist+fdist analysis (different data and failure distributions)
-shash_dists-all: shash_ddists_fdists-all/0.01/shash_ddists_fdists.dat
+$(1)_dists-all: $(1)_ddists_fdists_expD4-all/0.01/$(1)_ddists_fdists.dat
 	
-
 # scalability analysis (increasing data size)
-shash_scale-all: shash_scale-all/0.01/shash_scale.dat
+$(1)_scale-all: $(1)_scale_expD4-all/0.1/$(1)_scale.dat $(1)_scale_expD4-all/0.01/$(1)_scale.dat $(1)_scale_expD4-all/0.001/$(1)_scale.dat
 	
-
-shash: shash-all shash_dists-all shash_scale-all
+$(1): $(1)-all $(1)_dists-all $(1)_scale-all
 	
-
-# fprob analysis (different delta)
-bloom-all: bloom_0-10-all/0.1/bloom.dat bloom_0-10-all/0.01/bloom.dat bloom_0-10-all/0.001/bloom.dat bloom_0-100-all/0.1/bloom.dat bloom_0-100-all/0.01/bloom.dat bloom_0-100-all/0.001/bloom.dat
-	
-
-# ddist+fdist analysis (different data and failure distributions)
-bloom_dists-all: bloom_ddists_fdists-all/0.01/bloom_ddists_fdists.dat
-	
-
-# scalability analysis (increasing data size)
-bloom_scale-all: bloom_scale-all/0.01/bloom_scale.dat
-	
-
-bloom: bloom-all bloom_dists-all bloom_scale-all
-	
+endef
+$(foreach ALG, trivial shash bloom, $(eval $(call SUM_3,$(ALG))))
 
 # v4_b3_p0.001
 MERKLE_EXTRACT_V='v\([0-9][0-9]*\)_b[0-9][0-9]*_p[0-9][.0-9]*'

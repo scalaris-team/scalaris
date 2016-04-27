@@ -1,0 +1,32 @@
+MAKEFLAGS=-k $MAKEFLAGS
+GNUPLOT=gnuplot
+SUBDIRS := $(shell ls -d */)
+SUBDIRS_DIR := $(patsubst %/,%-dir,$(SUBDIRS))
+SUBDIRS_DIR_CLEAN := $(patsubst %/,%-dir-clean,$(SUBDIRS))
+
+.PHONY: all clean subdirs
+
+all: subdirs .eval_data_inc.gp-done
+
+.eval_data_inc.gp-done: <dat1> <dat2> <dat3> ../eval_data_inc.gp Makefile
+	echo ">plot using [eval_data_inc.gp]"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat1>';srcFile1_title='<title1>';srcFile2='<dat2>';srcFile2_title='<title2>';srcFile3='<dat3>';srcFile3_title='<title3>';<morecommands>destDir='./'" "../eval_data_inc.gp"
+	touch $@
+
+clean: $(SUBDIRS_DIR_CLEAN)
+	rm -f *.pdf
+	rm -f .*.gp-done
+
+subdirs: $(SUBDIRS_DIR)
+
+# % replaces any name
+# within a rule: $@ inserts the target
+#                $< inserts the first dependency (source)
+#                $+ inserts a list of all dependencies
+#                $^ inserts a list of all unique dependencies
+#                $* inserts the stem an implicit rule matches with
+%-dir: %
+	$(MAKE) -C $<
+
+%-dir-clean: %
+	$(MAKE) clean -C $<
