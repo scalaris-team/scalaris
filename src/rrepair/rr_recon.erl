@@ -781,7 +781,7 @@ build_struct(DBList, RestI,
            Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
            NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats2,
                                            kv_list = NewKVList},
-           begin_sync(Params, NewState#rr_recon_state{stage = reconciliation});
+           begin_sync(NewState#rr_recon_state{stage = reconciliation});
        true ->
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
@@ -789,9 +789,8 @@ build_struct(DBList, RestI,
            State#rr_recon_state{kv_list = NewKVList0}
     end.
 
--spec begin_sync(OtherSyncStruct::parameters() | {}, state()) -> state() | kill.
-begin_sync(_OtherSyncStruct = {},
-           State = #rr_recon_state{method = trivial, initiator = false,
+-spec begin_sync(state()) -> state() | kill.
+begin_sync(State = #rr_recon_state{method = trivial, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
@@ -803,8 +802,7 @@ begin_sync(_OtherSyncStruct = {},
                      {start_recon, trivial, MySyncStruct1}}),
     State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
                          k_list = [K || {K, _V} <- ResortedKVOrigList]};
-begin_sync(_OtherSyncStruct = {},
-           State = #rr_recon_state{method = shash, initiator = false,
+begin_sync(State = #rr_recon_state{method = shash, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
@@ -818,8 +816,7 @@ begin_sync(_OtherSyncStruct = {},
         <<>> -> shutdown(sync_finished, State#rr_recon_state{struct = {}, kv_list = []});
         _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = ResortedKVOrigList}
     end;
-begin_sync(_OtherSyncStruct = {},
-           State = #rr_recon_state{method = bloom, initiator = false,
+begin_sync(State = #rr_recon_state{method = bloom, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
@@ -833,8 +830,7 @@ begin_sync(_OtherSyncStruct = {},
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{struct = MySyncStruct1, stage = resolve}
     end;
-begin_sync(_OtherSyncStruct = {},
-           State = #rr_recon_state{method = merkle_tree, initiator = false,
+begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
@@ -895,15 +891,14 @@ begin_sync(_OtherSyncStruct = {},
                                  {p1e_phase_x, P1ETotal2},
                                  {icount, ItemCount}],
                          kv_list = []};
-begin_sync(OtherSyncStruct,
-           State = #rr_recon_state{method = merkle_tree, initiator = true,
+begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
                                    dest_recon_pid = DestReconPid}) ->
     ?TRACE("BEGIN SYNC", []),
     MTSize = merkle_tree:size_detail(MySyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
-                   ni_item_count = OtherItemsCount} = OtherSyncStruct,
+                   ni_item_count = OtherItemsCount} = Params,
     MyItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
     ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~n"
@@ -915,7 +910,7 @@ begin_sync(OtherSyncStruct,
     P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
     
     {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
-        merkle_next_signature_sizes(OtherSyncStruct, P1ETotal3, MyItemCount,
+        merkle_next_signature_sizes(Params, P1ETotal3, MyItemCount,
                                     OtherItemsCount),
     
     Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
@@ -927,8 +922,7 @@ begin_sync(OtherSyncStruct,
                                  {icount, MyItemCount},
                                  {oicount, OtherItemsCount}],
                          kv_list = []};
-begin_sync(_OtherSyncStruct = {},
-           State = #rr_recon_state{method = art, initiator = false,
+begin_sync(State = #rr_recon_state{method = art, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
@@ -940,12 +934,11 @@ begin_sync(_OtherSyncStruct = {},
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{struct = {}, stage = resolve}
     end;
-begin_sync(OtherSyncStruct,
-           State = #rr_recon_state{method = art, initiator = true,
+begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
                                    dest_recon_pid = DestReconPid}) ->
     ?TRACE("BEGIN SYNC", []),
-    ART = OtherSyncStruct#art_recon_struct.art,
+    ART = Params#art_recon_struct.art,
     Stats1 = rr_recon_stats:set(
                [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
     OtherItemCount = art:get_property(ART, items_count),
