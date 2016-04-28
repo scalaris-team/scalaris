@@ -113,6 +113,7 @@
         {
          interval       = ?required(merkle_param, interval)       :: intervals:interval(),
          reconPid       = undefined                               :: comm:mypid() | undefined,
+         exp_delta      = ?required(merkle_param, exp_delta)      :: number(),
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
          num_trees      = ?required(merkle_param, num_trees)      :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
@@ -854,7 +855,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
     P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
     
-    MySyncParams = #merkle_params{interval = MerkleI,
+    MySyncParams = #merkle_params{exp_delta = get_max_expected_delta(),
+                                  interval = MerkleI,
                                   branch_factor = MerkleV,
                                   bucket_size = MerkleB,
                                   num_trees = NumTrees,
@@ -1538,14 +1540,16 @@ merkle_next_p1e(BranchFactor, P1ETotal) ->
         NextSigSizeI::signature_size(), NextSigSizeL::signature_size(),
         EffectiveP1E_I::float(), EffectiveP1E_L::float()}.
 merkle_next_signature_sizes(
-  #merkle_params{bucket_size = BucketSize, branch_factor = BranchFactor}, P1ETotal,
+  #merkle_params{bucket_size = BucketSize, branch_factor = BranchFactor,
+                 exp_delta = ExpDelta}, P1ETotal,
   MyMaxItemsCount, OtherMaxItemsCount) ->
     {P1E_I, P1E_L} = merkle_next_p1e(BranchFactor, P1ETotal),
 
     % note: we need to use the same P1E for this level's signature
     %       comparison as a children's tree has in total!
     if MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
-           AffectedItemsI = MyMaxItemsCount + OtherMaxItemsCount,
+           AffectedItemsI =
+               calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, ExpDelta),
            NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / P1E_I)),
                                   get_min_hash_bits(), 160),
            EffectiveP1E_I = float(AffectedItemsI / util:pow(2, NextSigSizeI));
@@ -1967,16 +1971,17 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
+%% @see merkle_resolve_retrieve_leaf_hashes/8
 -spec merkle_resolve_add_leaf_hash(
         Bucket::merkle_tree:mt_bucket(), P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         OtherMaxItemsCount::non_neg_integer(), BucketSizeBits::pos_integer(),
-        HashesK::Bin, HashesV::Bin, PrevP0E::float())
+        ExpDelta::number(), HashesK::Bin, HashesV::Bin, PrevP0E::float())
         -> {HashesK::Bin, HashesV::Bin, PrevP0E::float(),
             ResortedBucket::merkle_tree:mt_bucket()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_add_leaf_hash(
   Bucket, P1EAllLeaves, NumRestLeaves, OtherMaxItemsCount, BucketSizeBits,
-  HashesK, HashesV, PrevP0E) ->
+  ExpDelta, HashesK, HashesV, PrevP0E) ->
     BucketSize = length(Bucket),
     ?DBG_ASSERT(BucketSize > 0),
     ?DBG_ASSERT(BucketSize =< util:pow(2, BucketSizeBits)),
@@ -1984,7 +1989,6 @@ merkle_resolve_add_leaf_hash(
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
-    ExpDelta = 100, % TODO: set the configured value
     {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
     P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - P1E_p1),
@@ -1996,25 +2000,25 @@ merkle_resolve_add_leaf_hash(
     {HashesKNew, HashesVNew, NextP0E, ResortedBucket}.
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
-%%      returned by merkle_resolve_add_leaf_hash/8 during merkle sync.
+%%      returned by merkle_resolve_add_leaf_hash/9 during merkle sync.
+%% @see merkle_resolve_add_leaf_hash/9
 -spec merkle_resolve_retrieve_leaf_hashes(
         HashesK::Bin, HashesV::Bin, P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         PrevP0E::float(), MyMaxItemsCount::non_neg_integer(),
-        BucketSizeBits::pos_integer())
+        BucketSizeBits::pos_integer(), ExpDelta::number())
         -> {NewHashesK::Bin, NewHashesV::Bin, OtherBucketTree::kvi_tree(),
             OrigDBChunkLen::non_neg_integer(),
             SigSize::signature_size(), VSize::signature_size(), NextP0E::float()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_retrieve_leaf_hashes(
   HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount,
-  BucketSizeBits) ->
+  BucketSizeBits, ExpDelta) ->
     <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
     BucketSize = BucketSize0 + 1,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
-    ExpDelta = 100, % TODO: set the configured value
     {SigSize, VSize} = trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
     P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - P1E_p1),
@@ -2075,6 +2079,7 @@ merkle_resolve_leaves_send(
        SyncSend =/= [] ->
            % note: we do not have empty buckets here and thus always store (BucketSize - 1)
            BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
+           ExpDelta = Params#merkle_params.exp_delta,
            % note: 1 trivial proc contains 1 leaf
            {HashesK, HashesV, NewSyncSend_rev, ThisP0E, LeafCount} =
                lists:foldl(
@@ -2083,8 +2088,8 @@ merkle_resolve_leaves_send(
                          {HashesKAcc1, HashesVAcc1, CurP0E, MyKVItems1} =
                              merkle_resolve_add_leaf_hash(
                                MyKVItems, P1EAllLeaves, TrivialProcs - LeafNAcc,
-                               OtherMaxItemsCount, BucketSizeBits, HashesKAcc, HashesVAcc,
-                               PrevP0E),
+                               OtherMaxItemsCount, BucketSizeBits, ExpDelta,
+                               HashesKAcc, HashesVAcc, PrevP0E),
                          {HashesKAcc1, HashesVAcc1,
                           [{OtherMaxItemsCount, MyKVItems1} | SyncAcc],
                           CurP0E, LeafNAcc + 1}
@@ -2134,6 +2139,7 @@ merkle_resolve_leaves_receive(
     ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
     % note: we do not have empty buckets here and thus always store (BucketSize - 1)
     BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
+    ExpDelta = Params#merkle_params.exp_delta,
     % mismatches to resolve:
     % * at initiator    : inner(I)-leaf(NI) or leaf(NI)-non-empty-leaf(I)
     % * at non-initiator: inner(NI)-leaf(I)
@@ -2148,7 +2154,7 @@ merkle_resolve_leaves_receive(
                    SigSize, VSize, ThisP0E} =
                       merkle_resolve_retrieve_leaf_hashes(
                         HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc, P0EIn,
-                        MyMaxItemsCount, BucketSizeBits),
+                        MyMaxItemsCount, BucketSizeBits, ExpDelta),
                   % calc diff (trivial sync)
                   ?DBG_ASSERT(MyKVItems =/= []),
                   {ToSend1, ToReqIdx1, OBucketTree1} =
