@@ -164,7 +164,7 @@ merkle_scale_expD$(1)-all/%/merkle_scale.dat: merkle_scale_expD$(1)-all/Makefile
 	+V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$$${V},$$$${B},$$$${P},$(1)" -g eval_data_inc.gp -t "merkle_{v$$$${V}, b$$$${B}, P_{1e}$$$${P}}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
 endef
 $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
-$(eval $(call MERKLE_OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
+$(eval $(call MERKLE_OTHER_TARGETS,$(EXP_DELTA)))\
 )
 
 MERKLE_DEFAULT_V_B=v2_b1 v4_b1 v4_b3 v4_b15 v16_b1
