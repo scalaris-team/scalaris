@@ -73,3 +73,4 @@ col_p1e = 72
 col_sd_p1e = 73
 col_min_p1e = 74
 col_max_p1e = 75
+col_exp_delta = 76
