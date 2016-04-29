@@ -1561,18 +1561,15 @@ phase2_run_trivial_on_diff(
            State#rr_recon_state{stats = NewStats, stage = resolve,
                                 kv_list = [], k_list = KList,
                                 misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
-       StartResolve -> % andalso OtherHasShutdown ->
-           % TODO: can we merge this case and the next?
+       OtherHasShutdown ->
            % no need to send resolve_req message - the non-initiator already shut down
-           % the other node does not have any items but there is a diff at our node!
+           % the other node does not have any items but there may be a diff at our node!
            % start a resolve here:
            KList = [element(1, KV) || KV <- UnidentifiedDiff],
            NewStats = send_resolve_request(
-                        Stats, KList, OwnerL, DestRRPid, IsInitiator, false),
+                        Stats, KList, OwnerL, DestRRPid, IsInitiator, true),
            NewState = State#rr_recon_state{stats = NewStats, stage = resolve},
            shutdown(sync_finished, NewState);
-       OtherHasShutdown -> % CKVSize =:= 0
-           shutdown(sync_finished, State);
        true -> % not OtherHasShutdown, CKVSize =:= 0
            % must send resolve_req message for the non-initiator to shut down
            send(DestReconPid, {resolve_req, shutdown, Payload}),
