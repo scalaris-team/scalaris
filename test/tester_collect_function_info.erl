@@ -1,4 +1,4 @@
-%  @copyright 2010-2015 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -450,7 +450,7 @@ parse_type({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_l
     {{builtin_type, maybe_improper_list}, ParseState};
 parse_type({user_type, Line, TypeName, L}, Module, ParseState) ->
     parse_type({type, Line, TypeName, L}, Module, ParseState);
-parse_type({type, _Line, map, MapFields = [{type, _, map_field_assoc, _}| _]}, Module, ParseState) ->
+parse_type({type, _Line, map, MapFields}, Module, ParseState) when is_list(MapFields) ->
     %% ct:pal("type assoc map ~p:~p~n~w~n~w~n~w~n", [Module, map, MapFields, erlang:get(current_module), _Line]),
     {Fields, NextParseState}
         = lists:foldl(fun (FieldType, {FieldList, State}) ->
@@ -458,7 +458,11 @@ parse_type({type, _Line, map, MapFields = [{type, _, map_field_assoc, _}| _]}, M
                                   {type, _, map_field_assoc, [NameType, Type]} ->
                                       {TheNameTypeSpec, NewParseState} = parse_type(NameType, Module, State),
                                       {TheTypeSpec, NewParseState2} = parse_type(Type, Module, NewParseState),
-                                      {[{assoc_map_fields, TheNameTypeSpec, TheTypeSpec} | FieldList], NewParseState2};
+                                      {[{assoc_map_field, TheNameTypeSpec, TheTypeSpec} | FieldList], NewParseState2};
+                                  {type, _, map_field_exact, [NameType, Type]} ->
+                                      {TheNameTypeSpec, NewParseState} = parse_type(NameType, Module, State),
+                                      {TheTypeSpec, NewParseState2} = parse_type(Type, Module, NewParseState),
+                                      {[{exact_map_field, TheNameTypeSpec, TheTypeSpec} | FieldList], NewParseState2};
                                   _ ->
                                       ct:pal("unknown map field: ~p", [FieldType]),
                                       throw(parse_error)
