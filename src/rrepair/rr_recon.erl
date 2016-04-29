@@ -196,11 +196,11 @@
     request() |
     % trivial/shash/bloom sync messages
     {resolve_req, BinReqIdxPos::bitstring()} |
-    {resolve_req, DBChunk::{bitstring(), bitstring()}, DiffIdx::bitstring(), SigSize::signature_size(),
-     VSize::signature_size(), SenderPid::comm:mypid()} |
-    {resolve_req, DBChunk::{bitstring(), bitstring()}, SigSize::signature_size(),
-     VSize::signature_size(), SenderPid::comm:mypid()} |
-    {resolve_req, shutdown} |
+    {resolve_req, DBChunk::{bitstring(), bitstring()}, Payload::any(),
+     SigSize::signature_size(), VSize::signature_size(), SenderPid::comm:mypid()} |
+    {resolve_req, DiffBFBin::bitstring(), OtherBFCount::non_neg_integer(),
+     OtherDiffCount::non_neg_integer(), SenderPid::comm:mypid()} |
+    {resolve_req, shutdown, Payload::any()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
@@ -431,16 +431,16 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                       <<>>
                end,
            phase2_run_trivial_on_diff(
-             NewKVList, OtherDiffIdx, CKidxSize, OrigDBChunkLen, P1E_p2,
+             NewKVList, OtherDiffIdx, CKidxSize, OrigDBChunkLen =:= 0, P1E_p2,
              CKidxSize, NewState#rr_recon_state{stats = Stats1})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
-                           method = bloom,
-                           params = #bloom_recon_struct{exp_delta = ExpDelta,
-                                                        p1e = P1E, bf = BF},
-                           stats = Stats,             kv_list = KVList,
+                           method = bloom,            kv_list = KVList,
+                           params = #bloom_recon_struct{bf = BF} = Params,
+                           dest_recon_pid = DestReconPid, stats = Stats,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
     ?TRACE1(_Msg, State),
     MyDBSize1 = MyDBSize + length(DBList),
@@ -460,35 +460,23 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                           RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
                                 misc = [{item_count, MyDBSize1}, {my_bf, MyBF1}]};
+       BFCount =:= 0 ->
+           % in this case, the other node has already shut down
+           % -> we need to send our diff (see phase2_run_trivial_on_diff/7)
+           KList = [element(1, KV) || KV <- NewKVList],
+           NewStats = send_resolve_request(
+                        Stats, KList, OwnerL, DestRRPid, _IsInitiator = true, false),
+           NewState = State#rr_recon_state{stage = resolve, kv_list = NewKVList,
+                                           stats = NewStats},
+           shutdown(sync_finished, NewState);
        true ->
-           % here, the failure probability is correct (in contrast to the
-           % non-initiator) since we know how many item checks we perform with
-           % the BF and how many checks the non-initiator will perform on MyBF1
-           P1E_p1_bf1_real = bloom_worst_case_failprob(BF, MyDBSize1, ExpDelta),
-           P1E_p1_bf2_real = bloom_worst_case_failprob(MyBF1, BFCount, ExpDelta),
-           P1E_p1_real = 1 - (1 - P1E_p1_bf1_real) * (1 - P1E_p1_bf2_real),
-%%            log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p~n"
-%%                    " Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
-%%                    " Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p",
-%%                    [?MODULE, pid_groups:my_groupname(), self(),
-%%                     State#rr_recon_state.dest_recon_pid,
-%%                     calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
-%%                     bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
-%%                     BFCount, MyDBSize1, P1E_p1_bf1_real,
-%%                     bloom:get_property(MyBF1, size), ?REP_HFS:size(bloom:get_property(MyBF1, hfs)),
-%%                     bloom:item_count(MyBF1), BFCount, P1E_p1_bf2_real]),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            DiffBF = util:bin_xor(bloom:get_property(BF, filter),
                                  bloom:get_property(MyBF1, filter)),
-           % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
-           phase2_run_trivial_on_diff(
-             NewKVList, DiffBF,
-             % note: this is not the number of (unmatched) elements but the binary size:
-             erlang:byte_size(erlang:term_to_binary(DiffBF, [compressed])),
-             BFCount, P1E_p2, BFCount,
-             State#rr_recon_state{params = {}, kv_list = NewKVList,
-                                  stats = Stats1})
+           send(DestReconPid, {resolve_req, DiffBF, MyDBSize1, length(NewKVList),
+                               comm:this()}),
+           % allow the garbage collector to free the original Bloom filter here
+           Params1 = Params#bloom_recon_struct{bf = <<>>},
+           State#rr_recon_state{stage = resolve, params = Params1, kv_list = NewKVList}
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -517,11 +505,21 @@ on({'DOWN', MonitorRef, process, _Owner, _Info}, _State) ->
 %% trivial/shash/bloom/art reconciliation sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({resolve_req, shutdown} = _Msg,
+on({resolve_req, shutdown, _Payload} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = RMethod})
-  when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) ->
+  when (RMethod =:= shash orelse RMethod =:= art) ->
+    ?DBG_ASSERT(?implies(RMethod =:= shash, _Payload =:= <<>>)),
+    ?DBG_ASSERT(?implies(RMethod =:= art, _Payload =:= none)),
     shutdown(sync_finished, State);
+
+on({resolve_req, shutdown, P1E_p1_real} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = true,
+                           method = bloom,            stats = Stats}) ->
+    % note: no real phase 2 since the other node has no items
+    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real},
+                                  {p1e_phase2, 0.0}], Stats),
+    shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
 
 on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
@@ -556,29 +554,80 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
-on({resolve_req, DBChunk, DiffBF, SigSize, VSize, DestReconPid} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = false,
+on({resolve_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg,
+   State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = bloom,            kv_list = KVList,
-                           struct = #bloom_recon_struct{bf = MyBFBin,
-                                                        hf_count = MyHfCount}}) ->
+                           struct = #bloom_recon_struct{bf = BF,
+                                                        hf_count = MyHfCount,
+                                                        exp_delta = ExpDelta,
+                                                        p1e = P1E} = Struct,
+                           stats = Stats}) ->
     ?TRACE1(_Msg, State),
     
-    {DBChunkTree, _OrigDBChunkLen} =
+    Hfs = ?REP_HFS:new(MyHfCount),
+    OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
+                                         DiffBFBin), Hfs, OtherBFCount),
+    Diff = if OtherBFCount =:= 0 -> KVList;
+              true -> [X || X <- KVList, not bloom:is_element(OtherBF, X)]
+           end,
+    MyDiffLen = length(KVList),
+    % allow the garbage collector to free the original Bloom filter
+    Struct1 = Struct#bloom_recon_struct{bf = <<>>},
+    State1 = State#rr_recon_state{kv_list = Diff, struct = Struct1,
+                                  dest_recon_pid = DestReconPid},
+    
+    % here, the failure probability is correct (in contrast to the
+    % initiator) since we know the number of item checks and BF sizes of both
+    % Bloom filters
+    P1E_p1_bf_I_real = bloom_worst_case_failprob(BF, OtherBFCount, ExpDelta),
+    MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyDiffLen),
+    P1E_p1_bf_NI_real = bloom_worst_case_failprob(OtherBF, MyNrChecks, ExpDelta),
+    P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
+%%     log:pal("~w: [ ~p:~.0p ]~n I:~p, P1E_bf=~p~n"
+%%             " Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
+%%             " Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p",
+%%             [?MODULE, pid_groups:my_groupname(), self(),
+%%              State#rr_recon_state.dest_recon_pid,
+%%              calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
+%%              bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
+%%              bloom:item_count(BF), OtherBFCount, P1E_p1_bf_I_real,
+%%              bloom:get_property(OtherBF, size), ?REP_HFS:size(bloom:get_property(OtherBF, hfs)),
+%%              bloom:item_count(OtherBF), MyNrChecks, P1E_p1_bf_NI_real]),
+    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
+    % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
+    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
+    phase2_run_trivial_on_diff(
+      Diff, P1E_p1_real, OtherDiffCount, false, P1E_p2, OtherDiffCount,
+      State1#rr_recon_state{params = {}, stats = Stats1});
+
+on({resolve_req, DBChunk, P1E_p1_real, SigSize, VSize, _DestReconPid} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = true,
+                           method = bloom,            kv_list = KVList,
+                           stats = Stats,
+                           dest_recon_pid = DestReconPid}) ->
+    ?TRACE1(_Msg, State),
+    
+    {DBChunkTree, OrigDBChunkLen} =
         decompress_kv_list(DBChunk, SigSize, VSize),
     
-    Hfs = ?REP_HFS:new(MyHfCount),
-    OtherBF = bloom:new_bin(util:bin_xor(MyBFBin, DiffBF),
-                            Hfs, 0), % fake item count (this is not used here!)
-    FBItems = [Key || X = {Key, _Version} <- KVList,
+    % worst case diff here is 100% since both nodes now operate on the
+    % differences only and each node may have what the other node does not
+    P1E_p2_real = trivial_worst_case_failprob(
+                    SigSize, length(KVList), OrigDBChunkLen, 100),
+    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real},
+                                  {p1e_phase2, P1E_p2_real}], Stats),
+    
+    % TODO: use get_full_diff instead
+    FBItems = [Key || {Key, _Version} <- KVList,
                       not mymaps:is_key(compress_key(Key, SigSize),
-                                        DBChunkTree),
-                      not bloom:is_element(OtherBF, X)],
+                                        DBChunkTree)],
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, SigSize, VSize, DestReconPid, FBItems),
+                  State#rr_recon_state{stats = Stats1}, DBChunkTree, SigSize,
+                  VSize, DestReconPid, FBItems),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
-on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
+on({resolve_req, DBChunk, none, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = art}) ->
     ?TRACE1(_Msg, State),
@@ -591,12 +640,14 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
 on({resolve_req, BinReqIdxPos} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = true,
+   State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            k_list = KList,            stats = Stats,
                            misc = [{my_bin_diff_empty, MyBinDiffEmpty}]})
-  when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) ->
+  when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) andalso
+           ((RMethod =:= bloom andalso not IsInitiator) orelse
+            (RMethod =/= bloom andalso IsInitiator)) ->
     ?TRACE1(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx2: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(BinReqIdxPos),
@@ -605,7 +656,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                 true           -> bitstring_to_k_list_k(BinReqIdxPos, KList, [])
              end,
     NewStats = send_resolve_request(
-                 Stats, ToSend, OwnerL, DestRRPid, _Initiator = true, true),
+                 Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -829,7 +880,7 @@ begin_sync(State = #rr_recon_state{method = bloom, params = {}, initiator = fals
                      {start_recon, bloom, MySyncStruct1}}),
     case MySyncStruct#bloom_recon_struct.item_count of
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
-        _ -> State#rr_recon_state{struct = MySyncStruct1, stage = resolve}
+        _ -> State#rr_recon_state{stage = reconciliation}
     end;
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator = false,
                                    struct = MySyncStruct,
@@ -970,12 +1021,12 @@ begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = tr
                                          {tree_compareSkipped, NSkip},
                                          {tree_leavesSynced, NLSync}], Stats2),
             
-            phase2_run_trivial_on_diff(Diff, none, 0, OtherItemCount,
+            phase2_run_trivial_on_diff(Diff, none, 0, OtherItemCount =:= 0,
                                        P1E_p2, OtherItemCount,
                                        State#rr_recon_state{stats = Stats3});
         false when OtherItemCount =/= 0 ->
             % must send resolve_req message for the non-initiator to shut down
-            send(DestReconPid, {resolve_req, shutdown}),
+            send(DestReconPid, {resolve_req, shutdown, none}),
             shutdown(sync_finished, State#rr_recon_state{stats = Stats1,
                                                          kv_list = []});
         false ->
@@ -1421,13 +1472,13 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
 shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
-                  method = _RMethod},
+                  method = _RMethod,         initiator = IsInitiator},
   DBChunkTree, SigSize, VSize, DestReconPid, FBItems) ->
     {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
         get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
 
     NewStats1 = send_resolve_request(Stats, ToSendKeys1, OwnerL, DestRRPid,
-                                     false, false),
+                                     IsInitiator, false),
 
     % let the initiator's rr_recon process identify the remaining keys
     ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(DBChunkTree1)] ++ ToReqIdx1),
@@ -1448,21 +1499,23 @@ shash_bloom_perform_resolve(
 %% @doc Sets up a phase2 trivial synchronisation on the identified differences
 %%      where the mapping of the differences is not clear yet and only the
 %%      current node knows them.
+%%      NOTE: Payload is only sent if the other node has not shutdown yet!
 -spec phase2_run_trivial_on_diff(
-  UnidentifiedDiff::db_chunk_kv(), OtherDiffIdx::bitstring() | none,
-  OtherDiffIdxSize::non_neg_integer(), OtherItemCount::non_neg_integer(),
+  UnidentifiedDiff::db_chunk_kv(), Payload::any(),
+  PayloadSize::non_neg_integer(), OtherHasShutdown::boolean(),
   P1E_p2::float(), OtherCmpItemCount::non_neg_integer(), State::state())
         -> NewState::state().
 phase2_run_trivial_on_diff(
-  UnidentifiedDiff, OtherDiffIdx, OtherDiffIdxSize, OtherItemCount, P1E_p2,
+  UnidentifiedDiff, Payload, OtherDiffIdxSize, OtherHasShutdown, P1E_p2,
   OtherCmpItemCount, % number of items the other nodes compares CKV entries with
   State = #rr_recon_state{stats = Stats, dest_recon_pid = DestReconPid,
+                          initiator = IsInitiator,
                           dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
     CKVSize = length(UnidentifiedDiff),
     StartResolve = CKVSize + OtherDiffIdxSize > 0,
     ?TRACE("Reconcile SHash/Bloom/ART Session=~p ; Diff=~B+~B",
            [rr_recon_stats:get(session_id, Stats), CKVSize, OtherDiffIdxSize]),
-    if StartResolve andalso OtherItemCount > 0 ->
+    if StartResolve andalso not OtherHasShutdown ->
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
            % (as if non-initiator in trivial recon)
@@ -1473,19 +1526,15 @@ phase2_run_trivial_on_diff(
                                  UnidentifiedDiff, CKVSize, OtherCmpItemCount, ExpDelta, P1E_p2,
                                  fun trivial_signature_sizes/4, fun trivial_compress_key/2)
                        end),
-           ?DBG_ASSERT(?implies(OtherDiffIdx =:= none, MyDiffK =/= <<>>)), % if no items to request
+           ?DBG_ASSERT(?implies(Payload =:= none, MyDiffK =/= <<>>)), % if no items to request
            ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
            MyDiff = {MyDiffK, MyDiffV},
            P1E_p2_real = trivial_worst_case_failprob(
                            SigSizeT, CKVSize, OtherCmpItemCount, ExpDelta),
 
-           case OtherDiffIdx of
-               none -> send(DestReconPid,
-                            {resolve_req, MyDiff, SigSizeT, VSizeT, comm:this()});
-               _    -> send(DestReconPid,
-                            {resolve_req, MyDiff, OtherDiffIdx, SigSizeT, VSizeT, comm:this()})
-           end,
-           % the non-initiator will use key_upd_send and we must thus increase
+           send(DestReconPid,
+                {resolve_req, MyDiff, Payload, SigSizeT, VSizeT, comm:this()}),
+           % the other node will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
                                            {build_time, BuildTime}], Stats),
@@ -1494,21 +1543,21 @@ phase2_run_trivial_on_diff(
            State#rr_recon_state{stats = NewStats, stage = resolve,
                                 kv_list = [], k_list = KList,
                                 misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
-       StartResolve -> % andalso OtherItemCount =:= 0 ->
-           ?DBG_ASSERT(OtherItemCount =:= 0),
+       StartResolve -> % andalso OtherHasShutdown ->
+           % TODO: can we merge this case and the next?
            % no need to send resolve_req message - the non-initiator already shut down
            % the other node does not have any items but there is a diff at our node!
            % start a resolve here:
            KList = [element(1, KV) || KV <- UnidentifiedDiff],
            NewStats = send_resolve_request(
-                        Stats, KList, OwnerL, DestRRPid, true, false),
+                        Stats, KList, OwnerL, DestRRPid, IsInitiator, false),
            NewState = State#rr_recon_state{stats = NewStats, stage = resolve},
            shutdown(sync_finished, NewState);
-       OtherItemCount =:= 0 ->
+       OtherHasShutdown -> % CKVSize =:= 0
            shutdown(sync_finished, State);
-       true -> % OtherItemCount > 0, CKVSize =:= 0
+       true -> % not OtherHasShutdown, CKVSize =:= 0
            % must send resolve_req message for the non-initiator to shut down
-           send(DestReconPid, {resolve_req, shutdown}),
+           send(DestReconPid, {resolve_req, shutdown, Payload}),
            shutdown(sync_finished, State)
     end.
 
