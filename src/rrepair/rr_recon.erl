@@ -195,11 +195,11 @@
     % API
     request() |
     % trivial/shash/bloom sync messages
+    {reconcile_req, DiffBFBin::bitstring(), OtherBFCount::non_neg_integer(),
+     OtherDiffCount::non_neg_integer(), SenderPid::comm:mypid()} |
     {resolve_req, BinReqIdxPos::bitstring()} |
     {resolve_req, DBChunk::{bitstring(), bitstring()}, Payload::any(),
      SigSize::signature_size(), VSize::signature_size(), SenderPid::comm:mypid()} |
-    {resolve_req, DiffBFBin::bitstring(), OtherBFCount::non_neg_integer(),
-     OtherDiffCount::non_neg_integer(), SenderPid::comm:mypid()} |
     {resolve_req, shutdown, Payload::any()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
@@ -472,7 +472,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
        true ->
            DiffBF = util:bin_xor(bloom:get_property(BF, filter),
                                  bloom:get_property(MyBF1, filter)),
-           send(DestReconPid, {resolve_req, DiffBF, MyDBSize1, length(NewKVList),
+           send(DestReconPid, {reconcile_req, DiffBF, MyDBSize1, length(NewKVList),
                                comm:this()}),
            % allow the garbage collector to free the original Bloom filter here
            Params1 = Params#bloom_recon_struct{bf = <<>>},
@@ -554,7 +554,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
 
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
-on({resolve_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg,
+on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = bloom,            kv_list = KVList,
                            struct = #bloom_recon_struct{bf = BF,

@@ -1194,6 +1194,9 @@ bw_map_fun({continue_recon, _SenderPid, _SId, {start_recon, _Method, _Struct}} =
            _Source, _Dest, CalcMsgSize) ->
     {recon_map, msg_size(Msg, CalcMsgSize)};
 bw_map_fun(Msg, _Source, _Dest, CalcMsgSize)
+  when element(1, Msg) =:= reconcile_req ->
+    {recon_map, msg_size(Msg, CalcMsgSize)};
+bw_map_fun(Msg, _Source, _Dest, CalcMsgSize)
   when element(1, Msg) =:= resolve_req ->
     {recon_map2, msg_size(Msg, CalcMsgSize)};
 bw_map_fun(Msg, _Source, _Dest, CalcMsgSize)
