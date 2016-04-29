@@ -1509,7 +1509,7 @@ phase2_run_trivial_on_diff(
   UnidentifiedDiff, Payload, OtherDiffIdxSize, OtherHasShutdown, P1E_p2,
   OtherCmpItemCount, % number of items the other nodes compares CKV entries with
   State = #rr_recon_state{stats = Stats, dest_recon_pid = DestReconPid,
-                          initiator = IsInitiator,
+                          method = Method, initiator = IsInitiator,
                           dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
     CKVSize = length(UnidentifiedDiff),
     StartResolve = CKVSize + OtherDiffIdxSize > 0,
@@ -1519,7 +1519,25 @@ phase2_run_trivial_on_diff(
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
            % (as if non-initiator in trivial recon)
-           ExpDelta = 100, % TODO: can we reduce this here?
+           ExpDelta =
+               case Method of
+                   shash ->
+                       % UnidentifiedDiff contains Delta(*,*) without Reg(I, NI),
+                       % the non-initiator (NI) checks the CkIdx in the Payload
+                       % (Delta(*,*) without Reg(NI, I)) against it.
+                       % In the worst case, these do not overlap
+                       % (UnidentifiedDiff contains Reg(NI, I),
+                       %  OtherDiffIdx contains Reg(I, NI))
+                       % and thus the expected max delta among these sets is:
+                       100;
+                   bloom ->
+                       % UnidentifiedDiff contains Delta(*,*) without Reg(NI, I),
+                       % the non-initiator (NI) checks these against
+                       % Delta(*,*) without Reg(I, NI), so the same applies here
+                       100;
+                   art ->
+                       100 % TODO
+               end,
            {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, VSizeT}} =
                util:tc(fun() ->
                                compress_kv_list_p1e(
