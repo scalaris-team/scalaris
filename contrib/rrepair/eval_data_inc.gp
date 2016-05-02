@@ -14,6 +14,7 @@
 #	destDir -> destination path for pdfs
 #	regenAccInPercent -> whether to show the regen accuracy in percent instead of absolute values (useful for bloom)
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
+#	plot_label -> additional label to print at the bottom left of the screen
 
 set macro
 
@@ -336,6 +337,14 @@ set format y2 "%5.0f"
 unset label 10
 LABELr = "n × (1-δ) × (128+32) bits\n_{(≥ naïve approach)}"
 set label 10 at systemSizeScaled,128*systemSize*(128+32)/8/1024 LABELr front left font ",12" textcolor rgb "#777777"
+
+if (exists("plot_label") && strlen(plot_label) > 0) {
+# label with box: (box width unreliable for enhanced text)
+# set obj 100 rect at char (strlen(plot_label)/2.0+0.25),char 1 size char strlen(plot_label),char 1
+# set obj 100 fillstyle empty border -1 front
+unset label 100
+set label 100 at char 1,char 1 plot_label front left font ",12"
+}
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \

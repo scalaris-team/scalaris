@@ -16,6 +16,7 @@
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
 #	stepSize -> the stepSize parameter used (2 if unset)
 #	systemSize -> the number of items being reconciled
+#	plot_label -> additional label to print at the bottom left of the screen
 
 set macro
 
@@ -325,6 +326,14 @@ unset ytics
 set grid y2tics
 set y2tics autofreq mirror format "%-3.0f" scale 0.8
 set my2tics 2
+
+if (exists("plot_label") && strlen(plot_label) > 0) {
+# label with box: (box width unreliable for enhanced text)
+# set obj 100 rect at char (strlen(plot_label)/2.0+0.25),char 1 size char strlen(plot_label),char 1
+# set obj 100 fillstyle empty border -1 front
+unset label 100
+set label 100 at char 1,char 1 plot_label front left font ",12"
+}
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
