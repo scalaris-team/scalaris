@@ -51,9 +51,13 @@ $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore 
          -e 's|<dat1>|0.001/$(1).dat|g' \
          -e 's|<dat2>|0.01/$(1).dat|g' \
          -e 's|<dat3>|0.1/$(1).dat|g' \
+         -e 's|<dat4>||g' \
+         -e 's|<dat5>||g' \
          -e 's|<title1>|$(1)_{P_{1e}0.001}|g' \
          -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
          -e 's|<title3>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title4>||g' \
+         -e 's|<title5>||g' \
          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $$*/5");|g' < $$< > $$@
 endef
 $(foreach ALG, trivial shash bloom, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
@@ -88,9 +92,13 @@ $(1)_scale_expD$(2)-all/Makefile: Makefile_scale.tmpl2 $(1)_scale_expD$(2)-all/.
          -e 's|<dat1>|0.001/$(1)_scale.dat|g' \
          -e 's|<dat2>|0.01/$(1)_scale.dat|g' \
          -e 's|<dat3>|0.1/$(1)_scale.dat|g' \
+         -e 's|<dat4>||g' \
+         -e 's|<dat5>||g' \
          -e 's|<title1>|$(1)_{P_{1e}0.001}|g' \
          -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
          -e 's|<title3>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title4>||g' \
+         -e 's|<title5>||g' \
          -e 's|<morecommands>|absoluteRedundancy=1;|g' < $$< > $$@
 
 $(1)_scale_expD$(2)-all/%/$(1)_scale.dat: $(1)_scale_expD$(2)-all/Makefile
@@ -199,9 +207,13 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
           -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.001/merkle.dat|g" \
           -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.01/merkle.dat|g" \
           -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.1/merkle.dat|g" \
+          -e 's|<dat4>||g' \
+          -e 's|<dat5>||g' \
           -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
           -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
           -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e 's|<title4>||g' \
+          -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
@@ -221,9 +233,13 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.001/merkle_scale.dat|g" \
           -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.01/merkle_scale.dat|g" \
           -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.1/merkle_scale.dat|g" \
+          -e 's|<dat4>||g' \
+          -e 's|<dat5>||g' \
           -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
           -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
           -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e 's|<title4>||g' \
+          -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;|g' \
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
@@ -241,16 +257,20 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
 	@B=$$(shell expr match "$(3)" 'b\([0-9][0-9]*\)_p[0-9][.0-9]*') ; P=$$(shell expr match "$(3)" 'b[0-9][0-9]*_p\([0-9][.0-9]*\)') ; \
       sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
           -e "s|<dat1>|../v2_b$$$${B}_p$$$${P}/merkle.dat|g" \
-          -e "s|<dat2>|../v4_b$$$${B}_p$$$${P}/merkle.dat|g" \
-          -e "s|<dat3>|../v16_b$$$${B}_p$$$${P}/merkle.dat|g" \
-          -e "s|<title1>|merkle_{v2, b$$$${B}, P_{1e}$$$${P}}|g" \
-          -e "s|<title2>|merkle_{v4, b$$$${B}, P_{1e}$$$${P}}|g" \
-          -e "s|<title3>|merkle_{v16, b$$$${B}, P_{1e}$$$${P}}|g" \
-          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
+          -e "s|<dat2>|../v3_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat3>|../v4_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat4>|../v8_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat5>|../v16_b$$$${B}_p$$$${P}/merkle.dat|g" \
+          -e "s|<title1>|merkle_{v2        }|g" \
+          -e "s|<title2>|merkle_{v3        }|g" \
+          -e "s|<title3>|merkle_{v4        }|g" \
+          -e "s|<title4>|merkle_{v8        }|g" \
+          -e "s|<title5>|merkle_{v16       }|g" \
+          -e "s|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");plot_label='b=$$$${B}, P_{1e}=$$$${P}\';|g" \
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/v2_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v4_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v16_$(3)/merkle.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/v2_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v3_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v4_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v8_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v16_$(3)/merkle.dat
 	
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
@@ -265,9 +285,13 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e "s|<dat1>|../v2_b$$$${B}_p$$$${P}/merkle_scale.dat|g" \
           -e "s|<dat2>|../v4_b$$$${B}_p$$$${P}/merkle_scale.dat|g" \
           -e "s|<dat3>|../v16_b$$$${B}_p$$$${P}/merkle_scale.dat|g" \
+          -e 's|<dat4>||g' \
+          -e 's|<dat5>||g' \
           -e "s|<title1>|merkle_{v2, b$$$${B}, P_{1e}$$$${P}}|g" \
           -e "s|<title2>|merkle_{v4, b$$$${B}, P_{1e}$$$${P}}|g" \
           -e "s|<title3>|merkle_{v16, b$$$${B}, P_{1e}$$$${P}}|g" \
+          -e 's|<title4>||g' \
+          -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;|g' \
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
@@ -285,16 +309,20 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
 	@V=$$(shell expr match "$(3)" 'v\([0-9][0-9]*\)_p[0-9][.0-9]*') ; P=$$(shell expr match "$(3)" 'v[0-9][0-9]*_p\([0-9][.0-9]*\)') ; \
       sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
           -e "s|<dat1>|../v$$$${V}_b1_p$$$${P}/merkle.dat|g" \
-          -e "s|<dat2>|../v$$$${V}_b3_p$$$${P}/merkle.dat|g" \
-          -e "s|<dat3>|../v$$$${V}_b15_p$$$${P}/merkle.dat|g" \
-          -e "s|<title1>|merkle_{v$$$${V}, b1, P_{1e}$$$${P}}|g" \
-          -e "s|<title2>|merkle_{v$$$${V}, b3, P_{1e}$$$${P}}|g" \
-          -e "s|<title3>|merkle_{v$$$${V}, b15, P_{1e}$$$${P}}|g" \
-          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
+          -e "s|<dat2>|../v$$$${V}_b2_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat3>|../v$$$${V}_b3_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat4>|../v$$$${V}_b4_p$$$${P}/merkle.dat|g" \
+          -e "s|<dat5>|../v$$$${V}_b8_p$$$${P}/merkle.dat|g" \
+          -e "s|<title1>|merkle_{b1        }|g" \
+          -e "s|<title2>|merkle_{b2        }|g" \
+          -e "s|<title3>|merkle_{b3        }|g" \
+          -e "s|<title4>|merkle_{b4        }|g" \
+          -e "s|<title5>|merkle_{b8        }|g" \
+          -e "s|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");plot_label='v=$$$${V}, P_{1e}=$$$${P}';|g" \
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/$(subst _,_b1_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b3_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b15_,$(3))/merkle.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/$(subst _,_b1_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b2_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b3_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b4_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b8_,$(3))/merkle.dat
 	
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
@@ -309,9 +337,13 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e "s|<dat1>|../v$$$${V}_b1_p$$$${P}/merkle_scale.dat|g" \
           -e "s|<dat2>|../v$$$${V}_b3_p$$$${P}/merkle_scale.dat|g" \
           -e "s|<dat3>|../v$$$${V}_b15_p$$$${P}/merkle_scale.dat|g" \
+          -e 's|<dat4>||g' \
+          -e 's|<dat5>||g' \
           -e "s|<title1>|merkle_{v$$$${V}, b1, P_{1e}$$$${P}}|g" \
           -e "s|<title2>|merkle_{v$$$${V}, b3, P_{1e}$$$${P}}|g" \
           -e "s|<title3>|merkle_{v$$$${V}, b15, P_{1e}$$$${P}}|g" \
+          -e 's|<title4>||g' \
+          -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;|g' \
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@

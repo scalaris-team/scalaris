@@ -20,7 +20,7 @@ set macro
 
 load colDefFile
 
-plotCount = exists("srcFile5") ? 5 : exists("srcFile4") ? 4 : exists("srcFile3") ? 3 : exists("srcFile2") ? 2 : 1
+plotCount = exists("srcFile5") && strlen(srcFile5) > 0 ? 5 : exists("srcFile4") && strlen(srcFile4) > 0 ? 4 : exists("srcFile3") && strlen(srcFile3) > 0 ? 3 : exists("srcFile2") && strlen(srcFile2) > 0 ? 2 : 1
 files = srcFile1 . (plotCount >= 2 ? " " . srcFile2 : "") . (plotCount >= 3 ? " " . srcFile3 : "") . (plotCount >= 4 ? " " . srcFile4 : "") . (plotCount >= 5 ? " " . srcFile5 : "")
 get_file(i) = (i == 5) ? srcFile5 : (i == 4) ? srcFile4 : (i == 3) ? srcFile3 : (i == 2) ? srcFile2 : srcFile1
 get_title(i) = (i == 5) ? srcFile5_title : (i == 4) ? srcFile4_title : (i == 3) ? srcFile3_title : (i == 2) ? srcFile2_title : srcFile1_title

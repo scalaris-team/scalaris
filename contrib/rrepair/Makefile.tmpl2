@@ -8,9 +8,9 @@ SUBDIRS_DIR_CLEAN := $(patsubst %/,%-dir-clean,$(SUBDIRS))
 
 all: subdirs .eval_fprob.gp-done
 
-.eval_fprob.gp-done: <dat1> <dat2> <dat3> ../eval_fprob.gp Makefile
+.eval_fprob.gp-done: <dat1> <dat2> <dat3> <dat4> <dat5> ../eval_fprob.gp Makefile
 	echo ">plot using [eval_fprob.gp]"
-	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat1>';srcFile1_title='<title1>';srcFile2='<dat2>';srcFile2_title='<title2>';srcFile3='<dat3>';srcFile3_title='<title3>';<morecommands>destDir='./'" "../eval_fprob.gp"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat1>';srcFile1_title='<title1>';srcFile2='<dat2>';srcFile2_title='<title2>';srcFile3='<dat3>';srcFile3_title='<title3>';srcFile4='<dat4>';srcFile4_title='<title4>';srcFile5='<dat5>';srcFile5_title='<title5>';<morecommands>destDir='./'" "../eval_fprob.gp"
 	touch $@
 
 clean: $(SUBDIRS_DIR_CLEAN)
