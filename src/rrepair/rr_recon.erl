@@ -349,7 +349,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
     MyDBSize1 = MyDBSize + length(DBList),
     % identify items to send, request and the remaining (non-matched) DBChunk:
     {ToSend1, ToReqIdx1, OtherDBChunk1} =
-        get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize, VSize),
+        get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize,
+                      util:pow(2, VSize)),
     ?DBG_ASSERT2(length(ToSend1) =:= length(lists:usort(ToSend1)),
                  {non_unique_send_list, ToSend, ToSend1}),
 
@@ -545,12 +546,9 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
         decompress_kv_list(OtherDBChunk, SigSize, VSize),
     MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
-    FBItems = [Key || {Key, _Version} <- MyDiffKV,
-                      not mymaps:is_key(compress_key(Key, SigSize),
-                                        DBChunkTree)],
-
     NewStats2 = shash_bloom_perform_resolve(
-                  State1, DBChunkTree, SigSize, VSize, DestReconPid, FBItems),
+                  State1, DBChunkTree, SigSize, VSize, DestReconPid,
+                  fun get_full_diff/6),
 
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
@@ -616,16 +614,11 @@ on({resolve_req, DBChunk, P1E_p1_real, SigSize, VSize, _DestReconPid} = _Msg,
                     SigSize, length(KVList), OrigDBChunkLen, 100),
     Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real},
                                   {p1e_phase2, P1E_p2_real}], Stats),
-    
-    % TODO: use get_full_diff instead
-    FBItems = [Key || {Key, _Version} <- KVList,
-                      not mymaps:is_key(compress_key(Key, SigSize),
-                                        DBChunkTree)],
-
+    State1 = State#rr_recon_state{stats = Stats1},
     NewStats2 = shash_bloom_perform_resolve(
-                  State#rr_recon_state{stats = Stats1}, DBChunkTree, SigSize,
-                  VSize, DestReconPid, FBItems),
-    shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
+                  State1, DBChunkTree, SigSize, VSize, DestReconPid,
+                  fun get_full_diff/6),
+    shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
 on({resolve_req, DBChunk, none, SigSize, VSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
@@ -636,7 +629,8 @@ on({resolve_req, DBChunk, none, SigSize, VSize, DestReconPid} = _Msg,
         decompress_kv_list(DBChunk, SigSize, VSize),
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, SigSize, VSize, DestReconPid, []),
+                  State, DBChunkTree, SigSize, VSize, DestReconPid,
+                  fun get_part_diff/6),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
 on({resolve_req, BinReqIdxPos} = _Msg,
@@ -1193,40 +1187,32 @@ decompress_kv_list({KeyDiff, VBin}, SigSize, VSize) ->
 %%      or the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
+%%      VMod = 2^(number of bits)
+%% @see get_part_diff/6
 -spec get_full_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                    SigSize::signature_size(), VSize::signature_size())
+                    SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
             MyIOtherKvTree::kvi_tree()}.
-get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
-    get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
-                  util:pow(2, VSize)).
-
-%% @doc Helper for get_full_diff/6.
--spec get_full_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                     SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
-            MyIOtherKvTree::kvi_tree()}.
-get_full_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+get_full_diff([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
-get_full_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
+get_full_diff([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
     {KeyShort, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case mymaps:find(KeyShort, MyIOtKvTree) of
         error ->
-            get_full_diff_(Rest, MyIOtKvTree, [Key | FBItems],
-                           ReqItemsIdx, SigSize, VMod);
+            get_full_diff(Rest, MyIOtKvTree, [Key | FBItems],
+                          ReqItemsIdx, SigSize, VMod);
         {ok, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = mymaps:remove(KeyShort, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_full_diff_(Rest, MyIOtKvTree2, [Key | FBItems],
-                                  ReqItemsIdx, SigSize, VMod);
+                   get_full_diff(Rest, MyIOtKvTree2, [Key | FBItems],
+                                 ReqItemsIdx, SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_full_diff_(Rest, MyIOtKvTree2, FBItems,
-                                  ReqItemsIdx, SigSize, VMod);
+                   get_full_diff(Rest, MyIOtKvTree2, FBItems,
+                                 ReqItemsIdx, SigSize, VMod);
                true -> % VersionShort < OtherVersionShort
-                   get_full_diff_(Rest, MyIOtKvTree2, FBItems,
-                                  [Idx | ReqItemsIdx], SigSize, VMod)
+                   get_full_diff(Rest, MyIOtKvTree2, FBItems,
+                                 [Idx | ReqItemsIdx], SigSize, VMod)
             end
     end.
 
@@ -1234,40 +1220,32 @@ get_full_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSi
 %%      and the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
+%%      VMod = 2^(number of bits)
+%% @see get_full_diff/6
 -spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                    SigSize::signature_size(), VSize::signature_size())
+                    SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
             MyIOtherKvTree::kvi_tree()}.
-get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize) ->
-    get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize,
-                   util:pow(2, VSize)).
-
-%% @doc Helper for get_part_diff/6.
--spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                     AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                     SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
-            MyIOtherKvTree::kvi_tree()}.
-get_part_diff_([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+get_part_diff([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
-get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
+get_part_diff([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
     {KeyShort, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case mymaps:find(KeyShort, MyIOtKvTree) of
         error ->
-            get_part_diff_(Rest, MyIOtKvTree, FBItems, ReqItemsIdx,
-                           SigSize, VMod);
+            get_part_diff(Rest, MyIOtKvTree, FBItems,
+                          ReqItemsIdx, SigSize, VMod);
         {ok, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = mymaps:remove(KeyShort, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtKvTree2, [Key | FBItems], ReqItemsIdx,
-                                  SigSize, VMod);
+                   get_part_diff(Rest, MyIOtKvTree2, [Key | FBItems],
+                                 ReqItemsIdx, SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, ReqItemsIdx,
-                                  SigSize, VMod);
+                   get_part_diff(Rest, MyIOtKvTree2, FBItems,
+                                 ReqItemsIdx, SigSize, VMod);
                true ->
-                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [Idx | ReqItemsIdx],
-                                  SigSize, VMod)
+                   get_part_diff(Rest, MyIOtKvTree2, FBItems,
+                                 [Idx | ReqItemsIdx], SigSize, VMod)
             end
     end.
 
@@ -1467,15 +1445,20 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
 -spec shash_bloom_perform_resolve(
         State::state(), DBChunkTree::kvi_tree(),
         SigSize::signature_size(), VSize::signature_size(),
-        DestReconPid::comm:mypid(), FBItems::[?RT:key()])
+        DestReconPid::comm:mypid(),
+        GetDiffFun::fun((MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
+                         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
+                         SigSize::signature_size(), VMod::pos_integer())
+                       -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+                           MyIOtherKvTree::kvi_tree()}))
         -> rr_recon_stats:stats().
 shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod,         initiator = IsInitiator},
-  DBChunkTree, SigSize, VSize, DestReconPid, FBItems) ->
+  DBChunkTree, SigSize, VSize, DestReconPid, GetDiffFun) ->
     {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
-        get_part_diff(KVList, DBChunkTree, FBItems, [], SigSize, VSize),
+        GetDiffFun(KVList, DBChunkTree, [], [], SigSize, util:pow(2, VSize)),
 
     NewStats1 = send_resolve_request(Stats, ToSendKeys1, OwnerL, DestRRPid,
                                      IsInitiator, false),
@@ -1489,7 +1472,7 @@ shash_bloom_perform_resolve(
     ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
            [_RMethod, rr_recon_stats:get(session_id, NewStats1), erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
-    % the initiator will use key_upd_send and we must thus increase
+    % the other node will use key_upd_send and we must thus increase
     % the number of resolve processes here!
     if ReqIdx =/= [] ->
            rr_recon_stats:inc([{rs_expected, 1}], NewStats1);
@@ -2223,7 +2206,7 @@ merkle_resolve_leaves_receive(
                   ?DBG_ASSERT(MyKVItems =/= []),
                   {ToSend1, ToReqIdx1, OBucketTree1} =
                       get_full_diff(
-                        MyKVItems, OBucketTree, ToSend, [], SigSize, VSize),
+                        MyKVItems, OBucketTree, ToSend, [], SigSize, util:pow(2, VSize)),
                   ReqIdx = lists:usort(
                              [Idx || {_Version, Idx} <- mymaps:values(OBucketTree1)]
                                  ++ ToReqIdx1),
