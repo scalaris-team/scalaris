@@ -1,6 +1,6 @@
 MAKEFLAGS=-k $MAKEFLAGS
 GNUPLOT=gnuplot
-SUBDIRS := $(shell ls -d */)
+SUBDIRS := $(shell ls -d */ 2>/dev/null)
 SUBDIRS_DIR := $(patsubst %/,%-dir,$(SUBDIRS))
 SUBDIRS_DIR_CLEAN := $(patsubst %/,%-dir-clean,$(SUBDIRS))
 
