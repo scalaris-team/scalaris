@@ -133,13 +133,17 @@ if (red_max > 0.5) {red_max=red_max*1.05}
 if (red_max >= 1.5 && red_max < 2) {red_max=2}
 
 bw_max=1
+bw_min=1
 do for [i=1:plotCount] {
   stats get_file(i) using (kB(column(col_bw_rc_size)+column(col_bw_rc2_size)+stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) nooutput
   if (STATS_max > bw_max) {bw_max = STATS_max}
+  if (STATS_min < bw_min) {bw_min = STATS_min}
 }
 # is naive solution more expensive?
 stats get_file(1) using (kB(column(col_dbsize)/4*(128+32)/8)) nooutput
 if (STATS_max > bw_max) {bw_max = STATS_max}
+if (STATS_min < bw_min) {bw_min = STATS_min}
+bw_min = 2.0**floor(log(bw_min) / log(2))
 
 key_width_fun(i) = min(-0.5, (6-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.15)
 key_width = min(key_width_fun(1),key_width_fun(plotCount))
@@ -277,11 +281,19 @@ set size all_width_l,bw_height
 set origin -0.002,-0.025
 set xlabel "n in 10^3, update" font ",16"
 set ylabel "RC costs (phase 1+2) in KiB" font ",16"
-set yrange [1:bw_max*1.2]
-set y2range [1:bw_max*1.2]
+set yrange [bw_min:bw_max*1.2]
+set y2range [bw_min:bw_max*1.2]
 set logscale y 2
 set logscale y2 2
+if (bw_min < 1) {
+  if (bw_min < 0.5) {
+set format y "   2^{%L}"
+  } else {
+set format y "%4.1f"
+  }
+} else {
 set format y "%5.0f"
+}
 set format x
 if (plotCount > 1) {
   set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
@@ -310,7 +322,16 @@ unset key
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror format "%-5.0f" scale 0.8
+set y2tics mirror scale 0.8
+if (bw_min < 1) {
+  if (bw_min < 0.5) {
+set format y2 "   2^{%L}"
+  } else {
+set format y2 "%4.1f"
+  }
+} else {
+set format y2 "%5.0f"
+}
 
 unset label 10
 LABELr = "n × (1-δ) × (128+32) bits\n_{(≥ naïve approach)}"
