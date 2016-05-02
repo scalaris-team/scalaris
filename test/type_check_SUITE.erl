@@ -500,7 +500,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_check_node, 22}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 21}, %% needs matching result and merkle nodes
              {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
-             {merkle_resolve_retrieve_leaf_hashes, 8}, %% needs special bitstring
+             {merkle_resolve_retrieve_leaf_hashes, 10}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_receive, 3}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists

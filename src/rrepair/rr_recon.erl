@@ -206,7 +206,7 @@
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer()} |
     {resolve_req, HashesK::bitstring(), HashesV::bitstring()} |
-    {resolve_req, BinKeyList::bitstring()} |
+    {resolve_req, BinKeyList::bitstring(), SyncSendP0E_real::float()} |
     % dht node response
     {create_struct2, SenderI::intervals:interval(), {get_state_response, MyI::intervals:interval()}} |
     {process_db, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
@@ -363,8 +363,9 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                 misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]};
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
+           P1E_p1_real =
+               trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            NewStats = send_resolve_request(Stats1, ToSend1, OwnerL, DestRRPid,
                                            true, true),
            % let the non-initiator's rr_recon process identify the remaining keys
@@ -417,9 +418,10 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            NewState;
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1 = trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
-           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats),
+           P1E_p1_real =
+               trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
+           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
+           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            CKidxSize = mymaps:size(OtherDBChunk1),
            StartResolve = NewKVList =/= [] orelse CKidxSize > 0,
            OtherDiffIdx =
@@ -545,6 +547,7 @@ on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
     {DBChunkTree, _OrigDBChunkLen} =
         decompress_kv_list(OtherDBChunk, SigSize, VSize),
     MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
+    % items not in CKidx cannot be in the diff!
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
     NewStats2 = shash_bloom_perform_resolve(
                   State1, DBChunkTree, SigSize, VSize, DestReconPid,
@@ -771,7 +774,7 @@ on({resolve_req, HashesK, HashesV} = _Msg,
     %       received after the {resolve_req, Hashes} message from the other node!
     merkle_resolve_leaves_receive(State, HashesK, HashesV);
 
-on({resolve_req, BinKeyList} = _Msg,
+on({resolve_req, BinKeyList, SyncSendP0E_real} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = merkle_tree,
                            merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
@@ -786,11 +789,14 @@ on({resolve_req, BinKeyList} = _Msg,
                    erlang:byte_size(
                      erlang:term_to_binary(BinKeyList, [compressed]))]),
     ?TRACE1(_Msg, State),
+    PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, Stats), % from sync_receive
+    Stats1  = rr_recon_stats:set(
+                [{p1e_phase2, 1 - (1 - PrevP1E_p2) * SyncSendP0E_real}], Stats),
     NStats = if BinKeyList =:= <<>> ->
-                    Stats;
+                    Stats1;
                 true ->
                     merkle_resolve_leaves_ckidx(
-                      SyncSend, BinKeyList, DestRRPid, Stats, OwnerL,
+                      SyncSend, BinKeyList, DestRRPid, Stats1, OwnerL,
                       Params, [], IsInitiator)
              end,
     NewState = State#rr_recon_state{merkle_sync = {[], [], SyncRcvLeafCount, DirectResolve},
@@ -2018,7 +2024,7 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
-%% @see merkle_resolve_retrieve_leaf_hashes/8
+%% @see merkle_resolve_retrieve_leaf_hashes/10
 -spec merkle_resolve_add_leaf_hash(
         Bucket::merkle_tree:mt_bucket(), P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         OtherMaxItemsCount::non_neg_integer(), BucketSizeBits::pos_integer(),
@@ -2036,9 +2042,15 @@ merkle_resolve_add_leaf_hash(
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
-    {SigSize, VSize} = trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
-    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
-    NextP0E = PrevP0E * (1 - P1E_p1),
+    {SigSize, VSize} =
+        trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
+    % note: we can only estimate the real P1E of this part here - the other
+    %       node will report back the exact probability based on its actual
+    %       number of items (we nonetheless need this value to adjust the
+    %       individual trivial syncs' signatures!)
+    P1E_p1_upper_bound =
+        trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
+    NextP0E = PrevP0E * (1 - P1E_p1_upper_bound),
 %%     log:pal("merkle_send [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     {HashesKNew, HashesVNew, ResortedBucket} =
@@ -2052,23 +2064,30 @@ merkle_resolve_add_leaf_hash(
 -spec merkle_resolve_retrieve_leaf_hashes(
         HashesK::Bin, HashesV::Bin, P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         PrevP0E::float(), MyMaxItemsCount::non_neg_integer(),
+        PrevP0E_real::float(), MyActualItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer(), ExpDelta::number())
         -> {NewHashesK::Bin, NewHashesV::Bin, OtherBucketTree::kvi_tree(),
             OrigDBChunkLen::non_neg_integer(),
-            SigSize::signature_size(), VSize::signature_size(), NextP0E::float()}
+            SigSize::signature_size(), VSize::signature_size(),
+            NextP0E::float(), NextP0E_real::float()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_retrieve_leaf_hashes(
   HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount,
-  BucketSizeBits, ExpDelta) ->
+  PrevP0E_real, MyActualItemsCount, BucketSizeBits, ExpDelta) ->
     <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
     BucketSize = BucketSize0 + 1,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
 %%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
-    {SigSize, VSize} = trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
-    P1E_p1 = trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
+    {SigSize, VSize} =
+        trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
+    P1E_p1 =
+        trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - P1E_p1),
+    P1E_p1_real =
+        trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
+    NextP0E_real = PrevP0E_real * (1 - P1E_p1_real),
 %%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     % we need to know how large a piece is
@@ -2082,7 +2101,8 @@ merkle_resolve_retrieve_leaf_hashes(
     <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
     {OBucketTree, _OrigDBChunkLen} =
         decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize, VSize),
-    {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize, NextP0E}.
+    {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize,
+     NextP0E, NextP0E_real}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
@@ -2128,7 +2148,7 @@ merkle_resolve_leaves_send(
            BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
            ExpDelta = Params#merkle_params.exp_delta,
            % note: 1 trivial proc contains 1 leaf
-           {HashesK, HashesV, NewSyncSend_rev, ThisP0E, LeafCount} =
+           {HashesK, HashesV, NewSyncSend_rev, _ThisP0E_upper_bound, LeafCount} =
                lists:foldl(
                  fun({OtherMaxItemsCount, MyKVItems},
                      {HashesKAcc, HashesVAcc, SyncAcc, PrevP0E, LeafNAcc}) ->
@@ -2144,9 +2164,7 @@ merkle_resolve_leaves_send(
            % the other node will send its items from this CKV list - increase rs_expected, too
            NStats3 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
                                          {rs_expected, 1}], NStats2),
-           ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, NStats3) =:= 0.0),
            
-           NStats4  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E}], NStats3),
            MerkleSyncNew1 = {lists:reverse(NewSyncSend_rev), SyncRcv, SyncRcvLeafCount,
                              {[], MySyncDRLCount, OtherSyncDRLCount}},
            ?MERKLE_DEBUG("merkle (~s) - HashesSize: ~B (~B compressed)",
@@ -2157,7 +2175,7 @@ merkle_resolve_leaves_send(
                             erlang:term_to_binary(Hashes, [compressed]))]),
            ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
            send(DestReconPid, {resolve_req, HashesK, HashesV}),
-           State#rr_recon_state{stage = resolve, stats = NStats4,
+           State#rr_recon_state{stage = resolve, stats = NStats3,
                                 merkle_sync = MerkleSyncNew1,
                                 misc = [{all_leaf_p1e, P1EAllLeaves},
                                         {trivial_procs, TrivialProcs}]};
@@ -2192,16 +2210,17 @@ merkle_resolve_leaves_receive(
     % * at non-initiator: inner(NI)-leaf(I)
     % note: 1 trivial proc may contain more than 1 leaf!
     {<<>>, <<>>, ToSend, ToResolve, ResolveNonEmpty, _TrivialProcsRest,
-     ThisP0E} =
+     _ThisP0E_upper_bound, ThisP0E_real} =
         lists:foldl(
           fun({MyMaxItemsCount, MyKVItems},
               {HashesKAcc, HashesVAcc, ToSend, ToResolve, ResolveNonEmpty,
-               TProcsAcc, P0EIn}) ->
+               TProcsAcc, P0EIn, P0EIn_real}) ->
                   {NHashesKAcc, NHashesVAcc, OBucketTree, _OrigDBChunkLen,
-                   SigSize, VSize, ThisP0E} =
+                   SigSize, VSize, ThisP0E, ThisP0E_real} =
                       merkle_resolve_retrieve_leaf_hashes(
-                        HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc, P0EIn,
-                        MyMaxItemsCount, BucketSizeBits, ExpDelta),
+                        HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc,
+                        P0EIn, MyMaxItemsCount, P0EIn_real, length(MyKVItems),
+                        BucketSizeBits, ExpDelta),
                   % calc diff (trivial sync)
                   ?DBG_ASSERT(MyKVItems =/= []),
                   {ToSend1, ToReqIdx1, OBucketTree1} =
@@ -2214,8 +2233,8 @@ merkle_resolve_leaves_receive(
                                                 Params#merkle_params.bucket_size),
                   {NHashesKAcc, NHashesVAcc, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   TProcsAcc - 1, ThisP0E}
-          end, {HashesK, HashesV, [], [], false, TrivialProcs, 1.0}, SyncRcv),
+                   TProcsAcc - 1, ThisP0E, ThisP0E_real}
+          end, {HashesK, HashesV, [], [], false, TrivialProcs, 1.0, 1.0}, SyncRcv),
 
     % send resolve message:
     % resolve items we should send as key_upd:
@@ -2232,16 +2251,15 @@ merkle_resolve_leaves_receive(
            ToResolve1 = <<>>,
            MerkleResReqs = 0
     end,
-    NStats1 = rr_recon_stats:inc([{tree_leavesSynced, SyncRcvLeafCount},
-                                  {rs_expected, MerkleResReqs}], Stats1),
-    PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, NStats1),
-    NStats  = rr_recon_stats:set(
-                [{p1e_phase2, 1 - (1 - PrevP1E_p2) * ThisP0E}], NStats1),
+    Stats2 = rr_recon_stats:inc([{tree_leavesSynced, SyncRcvLeafCount},
+                                 {rs_expected, MerkleResReqs}], Stats1),
+    ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, Stats2) =:= 0.0),
+    NStats  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E_real}], Stats2),
     ?TRACE("resolve_req Merkle Session=~p ; resolve expexted=~B",
            [rr_recon_stats:get(session_id, NStats),
             rr_recon_stats:get(rs_expected, NStats)]),
 
-    comm:send(DestRCPid, {resolve_req, ToResolve1}),
+    comm:send(DestRCPid, {resolve_req, ToResolve1, ThisP0E_real}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
                                     stats = NStats},
