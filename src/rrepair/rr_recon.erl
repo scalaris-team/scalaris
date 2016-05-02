@@ -2435,22 +2435,9 @@ trivial_signature_sizes(_, 0, _ExpDelta, _P1E) ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
 trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     MaxKeySize = 128, % see compress_key/2
-    case get_min_version_bits() of
-        variable ->
-            % reduce P1E for the two parts here (key and version comparison)
-            P1E_sub = calc_n_subparts_p1e(2, P1E),
-            SigSize = calc_signature_size_nm_pair(
-                        ItemCount, OtherItemCount, ExpDelta, P1E_sub, MaxKeySize),
-            % note: we have n one-to-one comparisons
-            VCompareCount = erlang:min(ItemCount, OtherItemCount),
-            VP = calc_n_subparts_p1e(erlang:max(1, VCompareCount), P1E_sub),
-            VSize = min_max(util:ceil(util:log2(1 / VP)), 1, 128),
-            ok;
-        VSize ->
-            SigSize = calc_signature_size_nm_pair(
-                        ItemCount, OtherItemCount, ExpDelta, P1E, MaxKeySize),
-            ok
-    end,
+    VSize = get_min_version_bits(),
+    SigSize = calc_signature_size_nm_pair(
+                ItemCount, OtherItemCount, ExpDelta, P1E, MaxKeySize),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, VSize, ItemCount, OtherItemCount]),
@@ -3008,10 +2995,8 @@ check_config() ->
         config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso
         config:cfg_is_number(rr_recon_expected_delta) andalso
         config:cfg_is_in_range(rr_recon_expected_delta, 0, 100) andalso
-        config:cfg_test_and_error(rr_recon_version_bits,
-                                  fun(variable) -> true;
-                                     (X) -> erlang:is_integer(X) andalso X > 0
-                                  end, "is not 'variable' or an integer > 0"),
+        config:cfg_is_integer(rr_recon_version_bits) andalso
+        config:cfg_is_greater_than(rr_recon_version_bits, 0) andalso
         config:cfg_test_and_error(rr_max_items,
                                   fun(all) -> true;
                                      (X) -> erlang:is_integer(X) andalso X > 0
@@ -3040,7 +3025,7 @@ get_max_expected_delta() ->
     config:read(rr_recon_expected_delta).
 
 %% @doc Use at least these many bits for compressed version numbers.
--spec get_min_version_bits() -> pos_integer() | variable.
+-spec get_min_version_bits() -> pos_integer().
 get_min_version_bits() ->
     config:read(rr_recon_version_bits).
 
