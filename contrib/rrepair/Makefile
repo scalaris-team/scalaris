@@ -42,7 +42,7 @@ scalaris:
 	@cp $< $@
 	@rm "$*/.gitignore"
 
-EXP_DELTA_LIST=$(shell seq -s" " 0 0.1 1 ; seq -s" " 0 100)
+EXP_DELTA_LIST=$(shell seq -s" " 0 0.1 1 ; seq -s" " 0 100) as_fprob
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
@@ -116,23 +116,23 @@ define SUM_1
 $(1)_0-$(2)-all: $(1)_0-$(2)-all/0.1/$(1).dat $(1)_0-$(2)-all/0.01/$(1).dat $(1)_0-$(2)-all/0.001/$(1).dat
 	
 endef
-$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expD0.4 10_expD4 100_expD40,\
+$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,\
 $(eval $(call SUM_1,$(ALG),$(PAR)))\
 ))
 
 define SUM_2
 # fprob analysis (different delta)
-$(1)-all: $(1)_0-1_expD0.4-all $(1)_0-10_expD4-all $(1)_0-100_expD40-all
+$(1)-all: $(1)_0-1_expDas_fprob-all $(1)_0-10_expDas_fprob-all $(1)_0-100_expDas_fprob-all $(1)_0-1_expD0.4-all $(1)_0-10_expD4-all $(1)_0-100_expD40-all
 	
 endef
 $(foreach ALG, trivial shash bloom, $(eval $(call SUM_2,$(ALG))))
 
 define SUM_3
 # ddist+fdist analysis (different data and failure distributions)
-$(1)_dists-all: $(1)_ddists_fdists_expD4-all/0.01/$(1)_ddists_fdists.dat
+$(1)_dists-all: $(1)_ddists_fdists_expDas_fprob-all/0.01/$(1)_ddists_fdists.dat
 	
 # scalability analysis (increasing data size)
-$(1)_scale-all: $(1)_scale_expD4-all/0.1/$(1)_scale.dat $(1)_scale_expD4-all/0.01/$(1)_scale.dat $(1)_scale_expD4-all/0.001/$(1)_scale.dat
+$(1)_scale-all: $(1)_scale_expDas_fprob-all/0.1/$(1)_scale.dat $(1)_scale_expDas_fprob-all/0.01/$(1)_scale.dat $(1)_scale_expDas_fprob-all/0.001/$(1)_scale.dat
 	
 $(1): $(1)-all $(1)_dists-all $(1)_scale-all
 	
@@ -185,17 +185,17 @@ define MERKLE_SUM_1
 merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)_p0.01/merkle.dat) merkle_0-$(1)-all/v4_b3 merkle_0-$(1)-all/b1_p0.01 merkle_0-$(1)-all/v4_p0.01
 	
 endef
-$(foreach PAR, 1_expD0.4 10_expD4 100_expD40,$(eval $(call MERKLE_SUM_1,$(PAR))))
+$(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,$(eval $(call MERKLE_SUM_1,$(PAR))))
 
-merkle-all: merkle_0-1_expD0.4-all merkle_0-10_expD4-all merkle_0-100_expD40-all
+merkle-all: merkle_0-1_expDas_fprob-all merkle_0-10_expDas_fprob-all merkle_0-100_expDas_fprob-all merkle_0-1_expD0.4-all merkle_0-10_expD4-all merkle_0-100_expD40-all
 	
 
 # ddist+fdist analysis (different data and failure distributions)
-merkle_dists-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_ddists_fdists_expD4-all/$(PAR)_p0.01/merkle_ddists_fdists.dat)
+merkle_dists-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_ddists_fdists_expDas_fprob-all/$(PAR)_p0.01/merkle_ddists_fdists.dat)
 	
 
 # scalability analysis (increasing data size)
-merkle_scale-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_expD4-all/$(PAR)_p0.01/merkle_scale.dat) merkle_scale_expD4-all/v4_b3 merkle_scale_expD4-all/b1_p0.01 merkle_scale_expD4-all/v4_p0.01
+merkle_scale-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_expDas_fprob-all/$(PAR)_p0.01/merkle_scale.dat) merkle_scale_expDas_fprob-all/v4_b3 merkle_scale_expDas_fprob-all/b1_p0.01 merkle_scale_expDas_fprob-all/v4_p0.01
 	
 
 # summary targets for v4_b3 b1_p0.01 v4_p0.01 (Makefiles and dependencies)

@@ -52,7 +52,7 @@
 -record(rc_config, {
                     recon_method    = ?required(rc_config, recon_method) :: rr_recon:method(),
                     recon_p1e       = 0.1                                :: p1e(),
-                    expected_delta  = 100                                :: number(),
+                    expected_delta  = 100                                :: number() | as_fprob,
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art
                     merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),
