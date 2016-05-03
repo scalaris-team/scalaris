@@ -16,7 +16,8 @@
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
 #	stepSize -> the stepSize parameter used (2 if unset)
 #	systemSize -> the number of items being reconciled
-#	plot_label -> additional label to print at the bottom left of the screen
+#	plot_label -> additional label to print at the bottom left of the screen (optional)
+#	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the RC costs (optional)
 
 set macro
 
@@ -289,7 +290,7 @@ set size all_width_l,bw_height
 set origin -0.002,0
 set xlabel "total δ, update" font ",16"
 set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
-set ylabel "RC costs (phase 1+2) in KiB" font ",16"
+set ylabel sprintf("RC costs (%s) in KiB",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
 set yrange [0:bw_max]
 set y2range [0:bw_max]
 set format y "%4.0f"

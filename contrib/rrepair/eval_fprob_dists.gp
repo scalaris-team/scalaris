@@ -5,6 +5,8 @@
 #	srcFile1_title -> prepend this to titles of lines from srcFile1
 #	destDir -> destination path for pdfs
 #	stepSize -> the stepSize parameter used
+#	plot_label -> additional label to print at the bottom left of the screen (optional)
+#	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the RC costs (optional)
 
 set macro
 
@@ -199,7 +201,7 @@ set size all_width_l,bw_height
 set origin -0.002,0
 set xlabel "total δ, update" font ",16"
 set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
-set ylabel "RC costs (phase 1+2)" font ",16"
+set ylabel sprintf("RC costs (%s)",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
 set yrange [bw_min:bw_max]
 set y2range [bw_min:bw_max]
 set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
@@ -219,6 +221,14 @@ unset ylabel
 unset ytics
 set grid y2tics
 set y2tics mirror offset (largeRCdiff ? 7 : 6),0 right format "%+1.1f_{ }%%" scale 0.8
+
+if (exists("plot_label") && strlen(plot_label) > 0) {
+# label with box: (box width unreliable for enhanced text)
+# set obj 100 rect at char (strlen(plot_label)/2.0+0.25),char 1 size char strlen(plot_label),char 1
+# set obj 100 fillstyle empty border -1 front
+unset label 100
+set label 100 at char 1,char 1 plot_label front left font ",12"
+}
 
 plot "<awk '$" . col_ftype . " == \"regen\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(100*($3/$2)-100) axes x1y2 with boxes t "data_{rand}   , fail_{bin_{0.2 }}" ls 1, \

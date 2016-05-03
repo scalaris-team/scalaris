@@ -14,7 +14,8 @@
 #	destDir -> destination path for pdfs
 #	regenAccInPercent -> whether to show the regen accuracy in percent instead of absolute values (useful for bloom)
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
-#	plot_label -> additional label to print at the bottom left of the screen
+#	plot_label -> additional label to print at the bottom left of the screen (optional)
+#	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the RC costs (optional)
 
 set macro
 
@@ -281,7 +282,7 @@ set grid noy2tics
 set size all_width_l,bw_height
 set origin -0.002,-0.025
 set xlabel "n in 10^3, update" font ",16"
-set ylabel "RC costs (phase 1+2) in KiB" font ",16"
+set ylabel sprintf("RC costs (%s) in KiB",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
 set yrange [bw_min:bw_max*1.2]
 set y2range [bw_min:bw_max*1.2]
 set logscale y 2
