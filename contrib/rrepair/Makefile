@@ -35,7 +35,7 @@ scalaris:
 	@mkdir -p "$(@D)"
 	@cp gitignore.tmpl2 $@
 
-EXP_DELTA_LIST=$(shell seq -s" " 0 0.1 1 ; seq -s" " 0 100) as_fprob
+EXP_DELTA_LIST=$(shell seq -s" " 0.1 0.1 1 ; seq -s" " 0 1 9 ; seq -s" " 10 10 100) as_fprob
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
@@ -99,14 +99,14 @@ $(1)_scale_expD$(2)-all/%/$(1)_scale.dat: $(1)_scale_expD$(2)-all/Makefile
 	@mkdir -p "$$(@D)"
 	+./rr_eval.sh -a $(1)_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$*,$(2)" -g eval_data_inc.gp -t "$(1)_{P_{1e}$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
 endef
-$(foreach ALG, trivial shash bloom, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
+$(foreach ALG, trivial shash bloom, $(foreach EXP_DELTA, as_fprob,\
 $(eval $(call OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
 ))
 
 # define summary targets for groups of the ones above:
 define SUM_1
 # fprob analysis (different delta)
-$(1)_0-$(2)-all: $(1)_0-$(2)-all/0.1/$(1).dat $(1)_0-$(2)-all/0.01/$(1).dat $(1)_0-$(2)-all/0.001/$(1).dat
+$(1)_0-$(2)-all: $(foreach P1E, 0.1 0.01 0.001, $(1)_0-$(2)-all/$(P1E)/$(1).dat)
 	
 endef
 $(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,\
@@ -115,7 +115,7 @@ $(eval $(call SUM_1,$(ALG),$(PAR)))\
 
 define SUM_2
 # fprob analysis (different delta)
-$(1)-all: $(1)_0-1_expDas_fprob-all $(1)_0-10_expDas_fprob-all $(1)_0-100_expDas_fprob-all $(1)_0-1_expD0.4-all $(1)_0-10_expD4-all $(1)_0-100_expD40-all
+$(1)-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD0.4 0-10_expD4 0-100_expD40, $(1)_$(PAR)-all)
 	
 endef
 $(foreach ALG, trivial shash bloom, $(eval $(call SUM_2,$(ALG))))
@@ -125,7 +125,7 @@ define SUM_3
 $(1)_dists-all: $(1)_ddists_fdists_expDas_fprob-all/0.01/$(1)_ddists_fdists.dat
 	
 # scalability analysis (increasing data size)
-$(1)_scale-all: $(1)_scale_expDas_fprob-all/0.1/$(1)_scale.dat $(1)_scale_expDas_fprob-all/0.01/$(1)_scale.dat $(1)_scale_expDas_fprob-all/0.001/$(1)_scale.dat
+$(1)_scale-all: $(foreach P1E, 0.1 0.01 0.001, $(1)_scale_expDas_fprob-all/$(P1E)/$(1)_scale.dat)
 	
 $(1): $(1)-all $(1)_dists-all $(1)_scale-all
 	
@@ -164,7 +164,7 @@ merkle_scale_expD$(1)-all/%/merkle_scale.dat: merkle_scale_expD$(1)-all/Makefile
 	@mkdir -p "$$(@D)"
 	+V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; P=$$(shell expr match "$$*" $(MERKLE_EXTRACT_P)) ; ./rr_eval.sh -a merkle_scale -n "$(SYSTEM_SIZE_SCALE)" -c "$$$${V},$$$${B},$$$${P},$(1)" -g eval_data_inc.gp -t "merkle_{v$$$${V}, b$$$${B}, P_{1e}$$$${P}}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
 endef
-$(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
+$(foreach EXP_DELTA, as_fprob,\
 $(eval $(call MERKLE_OTHER_TARGETS,$(EXP_DELTA)))\
 )
 
@@ -180,7 +180,7 @@ merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR
 endef
 $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,$(eval $(call MERKLE_SUM_1,$(PAR))))
 
-merkle-all: merkle_0-1_expDas_fprob-all merkle_0-10_expDas_fprob-all merkle_0-100_expDas_fprob-all merkle_0-1_expD0.4-all merkle_0-10_expD4-all merkle_0-100_expD40-all
+merkle-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD0.4 0-10_expD4 0-100_expD40, merkle_$(PAR)-all)
 	
 
 # ddist+fdist analysis (different data and failure distributions)
@@ -211,7 +211,7 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/$(3)_p0.1/merkle.dat merkle_0-$(1)_expD$(2)-all/$(3)_p0.01/merkle.dat merkle_0-$(1)_expD$(2)-all/$(3)_p0.001/merkle.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach P1E, 0.1 0.01 0.001, merkle_0-$(1)_expD$(2)-all/$(3)_p$(P1E)/merkle.dat)
 	
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
@@ -237,10 +237,10 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile merkle_scale_expD$(1)-all/$(2)_p0.1/merkle_scale.dat merkle_scale_expD$(1)-all/$(2)_p0.01/merkle_scale.dat merkle_scale_expD$(1)-all/$(2)_p0.001/merkle_scale.dat
+merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach P1E, 0.1 0.01 0.001, merkle_scale_expD$(1)-all/$(2)_p$(P1E)/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
+$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
 $(eval $(call MERKLE_SCALE_SUM_V_B,$(EXP_DELTA),$(PAR)))\
 ))
 
@@ -263,7 +263,7 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/v2_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v3_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v4_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v8_$(3)/merkle.dat merkle_0-$(1)_expD$(2)-all/v16_$(3)/merkle.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach V, 2 3 4 8 16, merkle_0-$(1)_expD$(2)-all/v$(V)_$(3)/merkle.dat)
 	
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
@@ -289,10 +289,10 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile merkle_scale_expD$(1)-all/v2_$(2)/merkle_scale.dat merkle_scale_expD$(1)-all/v4_$(2)/merkle_scale.dat merkle_scale_expD$(1)-all/v16_$(2)/merkle_scale.dat
+merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach V, 2 4 16, merkle_scale_expD$(1)-all/v$(V)_$(2)/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
+$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
 $(eval $(call MERKLE_SCALE_SUM_B_P,$(EXP_DELTA),$(PAR)))\
 ))
 
@@ -315,7 +315,7 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile merkle_0-$(1)_expD$(2)-all/$(subst _,_b1_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b2_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b3_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b4_,$(3))/merkle.dat merkle_0-$(1)_expD$(2)-all/$(subst _,_b8_,$(3))/merkle.dat
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach B, 1 2 3 4 8, merkle_0-$(1)_expD$(2)-all/$(subst _,_b$(B)_,$(3))/merkle.dat)
 	
 endef
 $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
@@ -341,10 +341,10 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile merkle_scale_expD$(1)-all/$(subst _,_b1_,$(2))/merkle_scale.dat merkle_scale_expD$(1)-all/$(subst _,_b3_,$(2))/merkle_scale.dat merkle_scale_expD$(1)-all/$(subst _,_b15_,$(2))/merkle_scale.dat
+merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach B, 1 3 8, merkle_scale_expD$(1)-all/$(subst _,_b$(B)_,$(2))/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
+$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
 $(eval $(call MERKLE_SCALE_SUM_V_P,$(EXP_DELTA),$(PAR)))\
 ))
 
@@ -363,7 +363,7 @@ MERKLE_EFF_PROB_EXTRACT_STEPSIZE='v[0-9][0-9]*_b[0-9][0-9]*_p[0-9][.0-9]*_d[0-9]
 merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@echo " executing merkle_eff_prob $*"
 	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,as_fprob,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
 # note: we must have the same dependencies as the specific rules
 #       -> otherwise this rule may be chosen instead
