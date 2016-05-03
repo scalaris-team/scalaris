@@ -958,7 +958,8 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
                art_leaf_fpr    -> RCC#rc_config{art_leaf_fpr = Value};
                merkle_branch   -> RCC#rc_config{merkle_branch = Value};
                merkle_bucket   -> RCC#rc_config{merkle_bucket = Value};
-               fprob when ExpDelta =:= as_fprob -> RCC#rc_config{expected_delta = Value};
+               _ when ExpDelta =:= as_fprob ->
+                   RCC#rc_config{expected_delta = NRC#ring_config.data_failure_prob};
                _               -> RCC
            end,
     {NRC, NRCC}.
