@@ -35,13 +35,6 @@ scalaris:
 	@mkdir -p "$(@D)"
 	@cp gitignore.tmpl2 $@
 
-# note: we must have the same dependencies as the specific rules
-#       -> otherwise this rule may be chosen instead
-%/Makefile: Makefile.tmpl %/.gitignore Makefile
-	@mkdir -p "$(@D)"
-	@cp $< $@
-	@rm "$*/.gitignore"
-
 EXP_DELTA_LIST=$(shell seq -s" " 0 0.1 1 ; seq -s" " 0 100) as_fprob
 
 define FPROB_MAKEFILE
@@ -371,3 +364,12 @@ merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@echo " executing merkle_eff_prob $*"
 	@mkdir -p "$(@D)"
 	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+
+# note: we must have the same dependencies as the specific rules
+#       -> otherwise this rule may be chosen instead
+# also we need to order this (default) target as the last one so it has no
+# precedence over the special targets above (in older Make versions)
+%/Makefile: Makefile.tmpl %/.gitignore Makefile
+	@mkdir -p "$(@D)"
+	@cp $< $@
+	@rm "$*/.gitignore"
