@@ -1068,6 +1068,8 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %%      probability of P1E, given we compare N hashes with M other hashes
 %%      pairwise with each other (assuming that ExpDelta percent of them are
 %%      different).
+%%      NOTE: if multiple items are affected by the collision, simply divide
+%%            P1E by the number of affected items!
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
                                   ExpDelta::number(), P1E::float(),
                                   MaxSize::signature_size())
@@ -2437,8 +2439,10 @@ trivial_signature_sizes(_, 0, _ExpDelta, _P1E) ->
 trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     MaxKeySize = 128, % see compress_key/2
     VSize = get_min_version_bits(),
+    % note: there are up to 2 affected items for a hash collision
+    %       -> use (P1E / 2)
     SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, ExpDelta, P1E, MaxKeySize),
+                ItemCount, OtherItemCount, ExpDelta, P1E / 2, MaxKeySize),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, VSize, ItemCount, OtherItemCount]),
@@ -2462,11 +2466,11 @@ trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
     % -> use fastest as they are quite close
     NT = calc_max_different_hashes(ItemCount, OtherItemCount, ExpDelta),
     % exact:
-%%     1 - util:for_to_fold(1, NT - 1,
-%%                          fun(I) -> (1 - I / BK2) end,
-%%                          fun erlang:'*'/2, 1).
+%%     2 * (1 - util:for_to_fold(1, NT - 1,
+%%                               fun(I) -> (1 - I / BK2) end,
+%%                               fun erlang:'*'/2, 1)).
     % approx:
-    1 - math:exp(-(NT * (NT - 1) / 2) / BK2).
+    2 * (1 - math:exp(-(NT * (NT - 1) / 2) / BK2)).
 
 %% @doc Creates a compressed key-value list comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
@@ -2516,8 +2520,10 @@ shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     % reduce P1E for the two parts here (hash and trivial phases)
     P1E_sub = calc_n_subparts_p1e(2, P1E),
     MaxKeySize = 128, % see compress_key/2
+    % note: there are up to 2 affected items for a hash collision
+    %       -> use (P1E_sub / 2)
     SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, ExpDelta, P1E_sub, MaxKeySize),
+                ItemCount, OtherItemCount, ExpDelta, P1E_sub / 2, MaxKeySize),
 %%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
     {SigSize, 0}.
