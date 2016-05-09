@@ -203,7 +203,7 @@ set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
 set format y " %4.1f"
 if (plotCount > 1) {
-  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -298,7 +298,7 @@ set format y "%5.0f"
 }
 set format x
 if (plotCount > 1) {
-  set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+1) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
