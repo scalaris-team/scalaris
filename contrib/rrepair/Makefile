@@ -109,13 +109,13 @@ define SUM_1
 $(1)_0-$(2)-all: $(foreach P1E, 0.1 0.01 0.001 0.0001, $(1)_0-$(2)-all/$(P1E)/$(1).dat)
 	
 endef
-$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,\
+$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 10_expD1 100_expD1,\
 $(eval $(call SUM_1,$(ALG),$(PAR)))\
 ))
 
 define SUM_2
 # fprob analysis (different delta)
-$(1)-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD0.4 0-10_expD4 0-100_expD40, $(1)_$(PAR)-all)
+$(1)-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-10_expD1 0-100_expD1, $(1)_$(PAR)-all)
 	
 endef
 $(foreach ALG, trivial shash bloom, $(eval $(call SUM_2,$(ALG))))
@@ -178,9 +178,9 @@ define MERKLE_SUM_1
 merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)_p0.01/merkle.dat) merkle_0-$(1)-all/v4_b3 merkle_0-$(1)-all/b1_p0.01 merkle_0-$(1)-all/v4_p0.01
 	
 endef
-$(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD0.4 10_expD4 100_expD40,$(eval $(call MERKLE_SUM_1,$(PAR))))
+$(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 10_expD1 100_expD1,$(eval $(call MERKLE_SUM_1,$(PAR))))
 
-merkle-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD0.4 0-10_expD4 0-100_expD40, merkle_$(PAR)-all)
+merkle-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-10_expD1 0-100_expD1, merkle_$(PAR)-all)
 	
 
 # ddist+fdist analysis (different data and failure distributions)
