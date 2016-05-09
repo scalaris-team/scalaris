@@ -97,7 +97,7 @@ BuildRequires:  ruby(abi) >= 1.8
 
 %if 0%{?with_cpp}
 BuildRequires:  automake
-BuildRequires:  boost-devel >= 1.35
+BuildRequires:  boost-devel >= 1.47
 BuildRequires:  gcc-c++
 %endif
 
@@ -148,7 +148,7 @@ Java Bindings and command line client for Scalaris
 Summary:    C++-API for Scalaris
 Group:      Productivity/Databases/Clients
 Provides:   libscalaris-static = %{version}-%{release}
-Requires:   boost-devel >= 1.35
+Requires:   boost-devel >= 1.47
 
 %description -n libscalaris-devel
 C++ Bindings for Scalaris

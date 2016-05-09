@@ -51,7 +51,7 @@ if test "x$ENABLE_CPP" != xno ; then
   done
   # C++ and boost checks
   AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
-  AX_BOOST_BASE([1.35])
+  AX_BOOST_BASE([1.47])
   AX_BOOST_SYSTEM
   AX_BOOST_REGEX
   AX_BOOST_ASIO
