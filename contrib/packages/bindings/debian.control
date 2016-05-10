@@ -2,7 +2,7 @@ Source: scalaris-bindings
 Section: devel
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, openjdk-7-jdk | java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev, automake, libboost-dev (>= 1.47), libboost-regex-dev (>= 1.47), libboost-system-dev (>= 1.47), libboost-test-dev (>= 1.47), libboost-program-options-dev (>= 1.47)
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 14.b.4), erlang-tools (>= 14.b.4), erlang-edoc (>= 14.b.4), erlang-crypto (>= 14.b.4), ant, openjdk-7-jdk | java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev, automake, libboost-dev (>= 1.47), libboost-regex-dev (>= 1.47), libboost-system-dev (>= 1.47), libboost-test-dev (>= 1.47), libboost-program-options-dev (>= 1.47)
 Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 

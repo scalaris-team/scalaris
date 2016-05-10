@@ -19,7 +19,7 @@ BuildRequires:  ruby >= 1.8
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
+BuildRequires:  erlang-erts >= R14B04, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 BuildRequires:  pkgconfig
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 %define with_cpp 1
@@ -53,7 +53,7 @@ BuildRequires:  python3-setuptools python-tools
 ###########################################################################################
 %if 0%{?suse_version}
 # note: erlang is still needed for configure
-BuildRequires:  erlang >= R13B01
+BuildRequires:  erlang >= R14B04
 BuildRequires:  pkg-config
 %if 0%{?suse_version} >= 1110 || 0%{?sles_version} >= 11 
 %define with_python 1

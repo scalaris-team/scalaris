@@ -2,13 +2,13 @@ Source: scalaris
 Section: database
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), sudo, screen, erlang-dev (>= 13.b.1), erlang-parsetools (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), pkg-config
+Build-Depends: debhelper (>= 4.1.16), sudo, screen, erlang-dev (>= 14.b.4), erlang-parsetools (>= 14.b.4), erlang-tools (>= 14.b.4), erlang-edoc (>= 14.b.4), erlang-crypto (>= 14.b.4), pkg-config
 Homepage: http://scalaris.zib.de
 Standards-Version: 3.9.6
 
 Package: scalaris
 Architecture: all
-Depends: ${misc:Depends}, adduser, sudo, screen, debianutils, hostname, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Depends: ${misc:Depends}, adduser, sudo, screen, debianutils, hostname, erlang-base (>= 14.b.4), erlang-crypto (>= 14.b.4), erlang-inets (>= 14.b.4), erlang-ssl (>= 14.b.4), erlang-xmerl (>= 14.b.4)
 Suggests: scalaris-java, scalaris-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It

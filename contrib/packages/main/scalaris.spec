@@ -23,8 +23,8 @@ Requires:       screen net-tools
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
-Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
+BuildRequires:  erlang-erts >= R14B04, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
+Requires:       erlang-erts >= R14B04, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
 Requires:       which
 %if 0%{?fedora_version} >= 19
 BuildRequires:  erlang-js
@@ -62,8 +62,8 @@ Requires:       sudo
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
-BuildRequires:  erlang >= R13B01
-Requires:       erlang >= R13B01
+BuildRequires:  erlang >= R14B04
+Requires:       erlang >= R14B04
 %if 0%{?suse_version} >= 1310
 Requires:       which
 %else
