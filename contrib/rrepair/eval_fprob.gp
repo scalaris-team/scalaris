@@ -140,7 +140,7 @@ do for [i=1:plotCount] {
 }
 if (bw_max > 1) {bw_max=bw_max*1.015}
 
-key_width_fun(i) = min(-0.5, (6-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.15)
+key_width_fun(i) = min(-0.5, (9-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.25)
 key_width = min(key_width_fun(1),key_width_fun(plotCount))
 # print "key_width: ",key_width
 
@@ -189,7 +189,15 @@ set origin -0.002,acc_pos_y
 if (acc_upd_max > 0.5 && acc_upd_max <= 1) {
   set ytics 0.2
 } else {
-  set ytics autofreq
+  if (acc_upd_max > 3 && acc_upd_max <= 6) {
+    set ytics 1
+  } else {
+    if (acc_upd_max > 6 && acc_upd_max <= 12) {
+      set ytics 2
+    } else {
+      set ytics autofreq
+    }
+  }
 }
 unset xlabel
 set format x ""
@@ -221,7 +229,15 @@ if (regenAccInPercent == 1) {
   if (acc_reg_max > 0.5 && acc_reg_max <= 1) {
     set y2tics 0.2 mirror format "%-1.1f" scale 0.8
   } else {
-    set y2tics autofreq mirror format "%-1.1f" scale 0.8
+    if (acc_reg_max > 3 && acc_reg_max <= 6) {
+      set y2tics 1 mirror format "%-1.1f" scale 0.8
+    } else {
+      if (acc_reg_max > 6 && acc_reg_max <= 12) {
+        set y2tics 2 mirror format "%-1.1f" scale 0.8
+      } else {
+        set y2tics autofreq mirror format "%-1.1f" scale 0.8
+      }
+    }
   }
   set y2range [0:acc_reg_max]
 }
@@ -241,7 +257,15 @@ set origin -0.002,red_pos_y
 if (red_max > 0.5 && red_max <= 1) {
   set ytics 0.2
 } else {
-  set ytics autofreq
+  if (red_max > 2 && red_max <= 6) {
+    set ytics 1
+  } else {
+    if (red_max > 6 && red_max <= 12) {
+      set ytics 2
+    } else {
+      set ytics autofreq
+    }
+  }
 }
 if (absoluteRedundancy == 1) {
 set ylabel "Red." font ",16" # transferred / updated
@@ -271,7 +295,15 @@ set grid y2tics
 if (red_max > 0.5 && red_max <= 1) {
   set y2tics 0.2 mirror scale 0.8
 } else {
-  set y2tics autofreq mirror scale 0.8
+  if (red_max > 2 && red_max <= 6) {
+    set y2tics 1 mirror scale 0.8
+  } else {
+    if (red_max > 6 && red_max <= 12) {
+      set y2tics 2 mirror scale 0.8
+    } else {
+      set y2tics autofreq mirror scale 0.8
+    }
+  }
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
