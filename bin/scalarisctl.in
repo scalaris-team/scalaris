@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2015 Zuse Institute Berlin
+# Copyright 2007-2016 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS-""}
 
 # default values (commandline options change these parameters)
-NODE_NAME=node1
+NODE_NAME=checkinstallation
 ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
 daemonize=0
 first=0
@@ -183,7 +183,17 @@ get_cookie() {
     echo -n ${cookie:-"chocolate chip cookie"}
 }
 
+cleanup_before_checkinstallation() {
+  for pid in `ps aux | grep beam.smp | grep $NODE_NAME | awk '{print $2}'`;
+  do
+    #echo "Killing $pid..."
+    kill $pid
+  done
+}
+
 checkinstallation() {
+    echo "Running cleanup..."
+    cleanup_before_checkinstallation
     echo -n "Running basic tests..."
     MSG_FAILED="\x1b[1;31mFAILED\x1b[0m" #red
     MSG_ATTENTION="\x1b[1;34mATTENTION\x1b[0m" #blue
