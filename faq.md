@@ -63,9 +63,58 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 ## Installation
 
+There are three different ways for installing Scalaris:
+
+1. use our prebuild packages
+
+   see [here](http://scalaris.zib.de/faq.html#prebuild-packages)
+
+2. use packages from your distribution to fulfill our requirements and install Scalaris yourself
+
+3. install the requirements and Scalaris yourself
+
+
+When you used packages from your distribution to install Erlang
+etc. configure should be able to find the requirements and it is sufficient to
+call:
+
+~~~~~~
+git clone https://github.com/scalaris-team/scalaris.git
+cd scalaris
+./configure
+make
+~~~~~~
+
+When you install the requirements yourself, like e.g. Erlang and
+boost. They will be in non-standard paths and configure will not
+automatically find them. E.g. if you installed Erlang yourself, you
+have to adapt the PATH variable:
+
+~~~~~~
+export PATH=/path_to_my_erlang_installation/bin:$PATH
+~~~~~~
+
+For most other dependencies, you can use configure parameters to tell configure where to look for them. E.g. for boost, you can use the with-boost parameter:
+
+~~~~~~
+git clone https://github.com/scalaris-team/scalaris.git
+cd scalaris
+./configure --with-boost=/path_to_my_boost_installation
+make
+~~~~~~
+
+For further parameters see
+
+~~~~~~
+./configure --help
+~~~~~~
+
+For more details please consult our Users and Developers Guide ([pdf]({{ site.repository }}/blob/master/user-dev-guide/main.pdf)).
+
 ### Minimum Requirements
 
   * Erlang >= R14B04
+  * OpenSSL (required by Erlang's crypto module)
 
 #### Optional requirements
 
@@ -73,6 +122,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
   * Python-API, CLI: Python >= 2.6 (including 3.x)
   * Ruby-API, CLI: Ruby >= 1.8
   * Storage on disk: Tokyocabinet, toke
+  * C++-API, CLI: boost >= 1.47
 
 ### Prebuild packages
 
