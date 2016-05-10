@@ -114,7 +114,6 @@ For more details please consult our Users and Developers Guide ([pdf]({{ site.re
 ### Minimum Requirements
 
   * Erlang >= R14B04
-  * OpenSSL (required by Erlang's crypto module)
 
 #### Optional requirements
 
