@@ -205,7 +205,7 @@ set ylabel sprintf("RC costs (%s)",exists("RC_costs_note") ? RC_costs_note : "ph
 set yrange [bw_min:bw_max]
 set y2range [bw_min:bw_max]
 set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
-set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
+set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
 
 plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(100*($3/$2)-100) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \

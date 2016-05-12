@@ -128,7 +128,7 @@ if (acc_reg_max > 0.5) {acc_reg_max=acc_reg_max*1.05}
 
 red_max=0.5
 do for [i=1:plotCount] {
-  stats get_file(i) using (redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))+redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) nooutput
+  stats "<awk '$" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\"' " . get_file(i) using (redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))+redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) nooutput
   if (STATS_max > red_max) {red_max = STATS_max}
 }
 if (red_max > 0.5) {red_max=red_max*1.05}
@@ -137,7 +137,7 @@ if (red_max >= 1.5 && red_max < 2) {red_max=2}
 bw_max=1
 bw_min=1
 do for [i=1:plotCount] {
-  stats get_file(i) using (kB(column(col_bw_rc_size)+column(col_bw_rc2_size)+stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) nooutput
+  stats "<awk '$" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\"' " . get_file(i) using (kB(column(col_bw_rc_size)+column(col_bw_rc2_size)+stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) nooutput
   if (STATS_max > bw_max) {bw_max = STATS_max}
   if (STATS_min < bw_min) {bw_min = STATS_min}
 }
@@ -149,7 +149,7 @@ bw_min = 2.0**floor(log(bw_min) / log(2))
 
 key_width_fun(i) = min(-0.5, (9-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.25)
 key_width = min(key_width_fun(1),key_width_fun(plotCount))
-#print "key_width: ",key_width
+# print "key_width: ",key_width
 
 # Solid Background
 # set object 1 rect from screen 0, 0, 0 to screen 1, 1, 0 behind
@@ -216,7 +216,7 @@ set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
 set format y " %4.1f"
 if (plotCount > 1) {
-  set key at screen 0.512,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.500,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -238,12 +238,12 @@ if (regenAccInPercent == 1) {
     set y2tics 0.2 mirror format "%-4.1f " scale 0.8
   } else {
     if (acc_reg_max > 3 && acc_reg_max <= 6) {
-      set y2tics 1 mirror format "%-4.1f" scale 0.8
+      set y2tics 1 mirror format "%-4.1f " scale 0.8
     } else {
       if (acc_reg_max > 6 && acc_reg_max <= 12) {
-        set y2tics 2 mirror format "%-4.1f" scale 0.8
+        set y2tics 2 mirror format "%-4.1f " scale 0.8
       } else {
-        set y2tics autofreq mirror format "%-4.1f" scale 0.8
+        set y2tics autofreq mirror format "%-4.1f " scale 0.8
       }
     }
   }
@@ -322,7 +322,7 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) with yerrorbars notitle ls (plotCount > 1 ? (100+i) : 100)
 
-set ytics scale 0.8
+set ytics autofreq scale 0.8
 unset y2tics
 set grid noy2tics
 
@@ -347,7 +347,7 @@ set format y "%5.0f"
 }
 set format x
 if (plotCount > 1) {
-  set key at screen 0.512,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-2.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -373,7 +373,7 @@ unset key
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror scale 0.8
+set y2tics autofreq mirror scale 0.8
 if (bw_min < 1) {
   if (bw_min < 0.5) {
 set format y2 "   2^{%L}"
