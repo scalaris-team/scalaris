@@ -39,6 +39,7 @@
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 -export([calc_signature_size_nm_pair/5, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
 %% -export([trivial_signature_sizes/4, trivial_worst_case_failprob/4,
+%%          shash_signature_sizes/4,
 %%          calc_max_different_hashes/3, bloom_fp/4]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
@@ -2508,6 +2509,8 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, 
 %% @doc Calculates the signature size for comparing ItemCount items with
 %%      OtherItemCount other items (including versions into the hashes).
 %%      Sets the bit size to have an error below P1E.
+%%      NOTE: P1E is reduced in this function for the two phases of the
+%%            reconciliation protocol!
 -spec shash_signature_sizes
         (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
          ExpDelta::number(), P1E::float())
@@ -2632,8 +2635,6 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
-    % note: for bloom, parameters don't need to match (only one bloom filter at
-    %       the non-initiator is created!) - use our own parameters
     MyMaxItems = length(DBItems),
     P1E = get_p1e(),
     P1E_p1 = calc_n_subparts_p1e(2, P1E),
