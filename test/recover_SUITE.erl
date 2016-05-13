@@ -1,4 +1,4 @@
-%% @copyright 2015 Zuse Institute Berlin
+%% @copyright 2015, 2016 Zuse Institute Berlin
 
 %%   Licensed under the Apache License, Version 2.0 (the "License");
 %%   you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ half_join_and_recover(Config, MsgTag) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, config:read(replication_factor)}]),
     io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
     io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
     lease_checker2:get_kv_db(),
@@ -152,7 +152,7 @@ half_leave_and_recover(Config, MsgTag) ->
     %% write data
     _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
     %% check ring
-    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, config:read(replication_factor)}]),
     %% hook into merge-protocol
     [gen_component:bp_set_cond(Pid, block(self(), MsgTag),
                                block)
@@ -179,7 +179,7 @@ half_leave_and_recover(Config, MsgTag) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, config:read(replication_factor)-1),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, config:read(replication_factor)-1}]),
     io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
     io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
     lease_checker2:get_kv_db(),

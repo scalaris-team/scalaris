@@ -1,4 +1,4 @@
-%% @copyright 2015 Zuse Institute Berlin
+%% @copyright 2015, 2016 Zuse Institute Berlin
 
 %%   Licensed under the Apache License, Version 2.0 (the "License");
 %%   you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ test_make_ring(Config) ->
                                                  {leases, true},
                                                  {db_backend, db_mnesia},
                                                  {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, 4),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -159,7 +159,7 @@ read(Config) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, 4),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
     %% ring restored -> checking KV data integrity
     _ = check_data_integrity(),
     true.
@@ -169,7 +169,7 @@ read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(_Config) ->
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, 4),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
     %% delete random node from ring
     RandomNode = comm:make_local(lease_checker:get_random_save_node()),
     io:format("show prbr statistics for the ring~n"),
@@ -186,7 +186,7 @@ remove_node(_Config) ->
     timer:sleep(11000),
     _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, 3),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, 3}]),
     %% check data integrity
     ct:pal("check data integrity"),
     _ = check_data_integrity(),
@@ -201,7 +201,7 @@ remove_node(_Config) ->
     ct:pal("check_ring_size_fully_joined"),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, 4),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
     true.
 
 check_data_integrity() ->

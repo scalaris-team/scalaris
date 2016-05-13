@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ test_crash_recovery(_Config) ->
                 ok
         end,
 
-    generic_crash_recovery_test(F, config:read(replication_factor)).
+    generic_crash_recovery_test(F).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -95,7 +95,7 @@ test_crash_recovery_one_new_node(_Config) ->
                 erase_lease_dbs(hd(DHTNodes))
         end,
 
-    generic_crash_recovery_test(F, config:read(replication_factor)).
+    generic_crash_recovery_test(F).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -109,7 +109,7 @@ test_crash_recovery_one_outdated_node(_Config) ->
                 change_lease_replicas(hd(DHTNodes))
         end,
 
-    generic_crash_recovery_test(F, config:read(replication_factor)).
+    generic_crash_recovery_test(F).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -125,7 +125,7 @@ test_crash_recovery_two_outdated_nodes(_Config) ->
                 change_lease_replicas(N2)
         end,
 
-    generic_crash_recovery_test(F, config:read(replication_factor)).
+    generic_crash_recovery_test(F).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -138,7 +138,7 @@ test_crash_recovery_bad_owner_pids(_Config) ->
                 change_owner_pids(DHTNodes)
         end,
 
-    generic_crash_recovery_test(F, config:read(replication_factor)).
+    generic_crash_recovery_test(F).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,7 +146,7 @@ test_crash_recovery_bad_owner_pids(_Config) ->
 % generic crash recovery test
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
+generic_crash_recovery_test(DoBadThings) ->
     % we create a ring with four nodes. We stop lease renewal on all
     % nodes and wait for the leases to timeout.
     DHTNodes = pid_groups:find_all(dht_node),
@@ -166,12 +166,10 @@ generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
 
     % wait for leases to reappear
     ct:pal("cr: wait for leases to reappear"),
-    case config:read(replication_factor) of
-        ExpectedLeases ->
-            lease_checker2:wait_for_clean_leases(400, ExpectedLeases);
-        _ ->
-            lease_helper:wait_for_number_of_valid_active_leases(ExpectedLeases)
-    end.
+    %% tolerate one failed node, as long as a correct ring is created
+    lease_checker2:wait_for_clean_leases(400, [{ring_size_range,
+                                                config:read(replication_factor)-1,
+                                                config:read(replication_factor)}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

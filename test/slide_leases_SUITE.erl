@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -195,7 +195,7 @@ synchronous_join(TargetSize) ->
     log:log("wait for ring size ~w", [TargetSize]),
     lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for ring to stabilize in sync. join"),
-    lease_checker2:wait_for_clean_leases(200, TargetSize).
+    lease_checker2:wait_for_clean_leases(200, [{ring_size, TargetSize}]).
     %% util:wait_for(fun admin:check_leases/0, 10000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
