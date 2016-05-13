@@ -600,7 +600,7 @@ build_config(ParamList) ->
     lists:foldl(
       fun({Key, Val}, Conf) ->
               case Key of
-                  branch_factor  -> Conf#mt_config{ branch_factor = Val };
+                  branch_factor  -> ?ASSERT(Val >= 2), Conf#mt_config{ branch_factor = Val };
                   bucket_size    -> Conf#mt_config{ bucket_size = Val };
                   leaf_hf        -> Conf#mt_config{ leaf_hf = Val };
                   inner_hf       -> Conf#mt_config{ inner_hf = Val };
