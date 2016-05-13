@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin,
+% @copyright 2012-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -37,9 +37,12 @@
 -type leases_state() :: #leases_state_t{}.
 -type node_info() :: #node_info_t{}.
 
+-type option() :: {ring_size, pos_integer()} | {ring_size_range, pos_integer(), pos_integer()}.
+-type options() :: list(option()).
+
 -export_type([leases_state/0]).
 
--export([wait_for_clean_leases/1, wait_for_clean_leases/2]).
+-export([wait_for_clean_leases/2]).
 
 -export([get_kv_db/0, get_kv_db/1]).
 
@@ -49,15 +52,10 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec wait_for_clean_leases(WaitTimeInMs::pos_integer(), TargetSize::pos_integer()) -> ok.
-wait_for_clean_leases(WaitTimeInMs, TargetSize) ->
+-spec wait_for_clean_leases(WaitTimeInMs::pos_integer(), Options::options()) -> ok.
+wait_for_clean_leases(WaitTimeInMs, Options) ->
     ?ASSERT(not gen_component:is_gen_component(self())),
-    wait_for_clean_leases(WaitTimeInMs, TargetSize, true, create_new_state()).
-
--spec wait_for_clean_leases(WaitTimeInMs::pos_integer()) -> ok.
-wait_for_clean_leases(WaitTimeInMs) ->
-    ?ASSERT(not gen_component:is_gen_component(self())),
-    wait_for_clean_leases(WaitTimeInMs, admin:number_of_nodes(), true, create_new_state()).
+    wait_for_clean_leases(WaitTimeInMs, Options, true, create_new_state()).
 
 -spec get_kv_db() -> ok.
 get_kv_db() ->
@@ -85,10 +83,10 @@ get_kv_db(Pid) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec wait_for_clean_leases(WaitTimeInMs::pos_integer(), TargetSize::pos_integer(),
+-spec wait_for_clean_leases(WaitTimeInMs::pos_integer(), Options::options(),
                             First::boolean(), State::leases_state()) -> ok.
-wait_for_clean_leases(WaitTimeInMs, TargetSize, First, State) ->
-    case check_leases(State, TargetSize, First) of
+wait_for_clean_leases(WaitTimeInMs, Options, First, State) ->
+    case check_leases(State, Options, First) of
         {true, _}  -> ok;
         {false, NewState} ->
             WaitID = uid:get_pids_uid(),
@@ -96,15 +94,16 @@ wait_for_clean_leases(WaitTimeInMs, TargetSize, First, State) ->
             trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV({continue_wait, WaitID},% ->
-                               wait_for_clean_leases(WaitTimeInMs, TargetSize, false, NewState))
+                               wait_for_clean_leases(WaitTimeInMs, Options, false, NewState))
             end
     end.
 
--spec check_leases(OldState::leases_state(), TargetSize::pos_integer(), First::boolean()) ->
+-spec check_leases(OldState::leases_state(), Options::options(), First::boolean()) ->
                           {boolean(), leases_state()}.
-check_leases(OldState, TargetSize, First) ->
+check_leases(OldState, Options, First) ->
     LastFailed = OldState#leases_state_t.last_failed,
     NewState = create_new_state(),
+    TargetSize = renderTargetSize(Options),
     case {gb_trees:size(OldState#leases_state_t.node_infos),
           gb_trees:size(NewState#leases_state_t.node_infos)} of
         {Old, Old} ->
@@ -131,16 +130,16 @@ check_leases(OldState, TargetSize, First) ->
                 true
         end,
     Verbose = First orelse not LastFailed orelse Changed,
-    Res = check_state(NewState, Verbose, TargetSize),
+    Res = check_state(NewState, Verbose, Options),
     io:format("check_state returned(verbose=~p) ~p~n", [Verbose, Res]),
     {Res, NewState#leases_state_t{last_failed=not Res}}.
 
 -spec check_state(State::leases_state(), Verbose::boolean(),
-                  TargetSize::pos_integer()) -> boolean().
-check_state(State, Verbose, TargetSize) ->
+                  Options::options()) -> boolean().
+check_state(State, Verbose, Options) ->
     case check_leases_locally(State, Verbose) of
         true ->
-            case check_leases_globally(State, Verbose, TargetSize) of
+            case check_leases_globally(State, Verbose, Options) of
                 true ->
                     true;
                 false -> io:format("check_leases_globally failed~n"),
@@ -158,9 +157,9 @@ check_leases_locally(#leases_state_t{node_infos=Nodes}, Verbose) ->
                         Acc and check_local_leases(Pid, Node, Verbose)
                 end, true, gb_trees:to_list(Nodes)).
 
--spec check_leases_globally(leases_state(), boolean(), pos_integer()) -> boolean().
-check_leases_globally(State, Verbose, TargetSize) ->
-    lease_checker(State, Verbose, TargetSize).
+-spec check_leases_globally(leases_state(), boolean(), options()) -> boolean().
+check_leases_globally(State, Verbose, Options) ->
+    lease_checker(State, Verbose, Options).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -540,8 +539,8 @@ check_local_leases(Pid, NodeInfo, Verbose) ->
     end.
 
 -spec lease_checker(State::leases_state(), Verbose::boolean(),
-                    TargetSize::pos_integer()) -> boolean().
-lease_checker(#leases_state_t{node_infos=NodeInfos}, Verbose, TargetSize) ->
+                    Options::options()) -> boolean().
+lease_checker(#leases_state_t{node_infos=NodeInfos}, Verbose, Options) ->
     LeaseLists = [Node#node_info_t.lease_list || Node <- gb_trees:values(NodeInfos)],
     ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
     PassiveLeases = lists:flatmap(fun lease_list:get_passive_leases/1, LeaseLists),
@@ -552,7 +551,8 @@ lease_checker(#leases_state_t{node_infos=NodeInfos}, Verbose, TargetSize) ->
     %ct:pal("PassiveLeases: ~p", [PassiveLeases]),
     IsAll = intervals:is_all(NormalizedActiveIntervals),
     IsDisjoint = is_disjoint(ActiveIntervals),
-    HaveAllActiveLeases = length(ActiveLeases) == TargetSize,
+    HaveAllActiveLeases = checkActiveLeases(length(ActiveLeases), Options),
+    %% HaveAllActiveLeases = length(ActiveLeases) == TargetSize,
     HaveNoPassiveLeases = length(PassiveLeases) == 0,
     HaveAllAuxEmpty = lists:all(fun(L) ->
                                         L =/= empty andalso l_on_cseq:get_aux(L) =:= empty
@@ -686,4 +686,32 @@ gb_trees_filter(F, Acc, Iter) ->
                 false ->
                     gb_trees_filter(F, Acc, Iter2)
             end
+    end.
+
+-spec renderTargetSize(Options::options()) -> term().
+renderTargetSize(Options) ->
+    case lists:keyfind(ring_size, 1, Options) of
+        false ->
+            case lists:keyfind(ring_size_range, 1, Options) of
+                false ->
+                    unknown;
+                {ring_size_range, From, To} ->
+                    [From, To]
+            end;
+        {ring_size, TargetSize} ->
+            TargetSize
+    end.
+
+-spec checkActiveLeases(NumberOfActiveLeases::pos_integer(), Options::options()) -> boolean().
+checkActiveLeases(NumberOfActiveLeases, Options) ->
+    case lists:keyfind(ring_size, 1, Options) of
+        false ->
+            case lists:keyfind(ring_size_range, 1, Options) of
+                false ->
+                    true; %% unknown
+                {ring_size_range, From, To} ->
+                    From =< NumberOfActiveLeases andalso  NumberOfActiveLeases =< To
+            end;
+        {ring_size, TargetSize} ->
+            NumberOfActiveLeases =:= TargetSize
     end.
