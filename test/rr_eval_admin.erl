@@ -945,7 +945,7 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
               rounds     -> RC#ring_config{round = Value};
               _          -> RC
           end,
-    NRCC = case Param of
+    RCC1 = case Param of
                recon_p1e       -> RCC#rc_config{recon_p1e = Value};
                expected_delta  -> RCC#rc_config{expected_delta = Value};
                art_corr_factor -> RCC#rc_config{art_corr_factor = Value};
@@ -953,9 +953,11 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
                art_leaf_fpr    -> RCC#rc_config{art_leaf_fpr = Value};
                merkle_branch   -> RCC#rc_config{merkle_branch = Value};
                merkle_bucket   -> RCC#rc_config{merkle_bucket = Value};
-               _ when ExpDelta =:= as_fprob ->
-                   RCC#rc_config{expected_delta = NRC#ring_config.data_failure_prob};
                _               -> RCC
+           end,
+    NRCC = if ExpDelta =:= as_fprob ->
+                   RCC1#rc_config{expected_delta = NRC#ring_config.data_failure_prob};
+              true -> RCC1
            end,
     {NRC, NRCC}.
 
