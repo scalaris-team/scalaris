@@ -363,7 +363,17 @@ MERKLE_EFF_PROB_EXTRACT_STEPSIZE='v[0-9][0-9]*_b[0-9][0-9]*_p[0-9][.0-9]*_d[0-9]
 merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@echo " executing merkle_eff_prob $*"
 	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,as_fprob,$$STEPSIZE,$$STEPS,[update],$$D" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; P=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_P)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$P,as_fprob,$$STEPSIZE,$$STEPS,[update],$$D,data_count" -t "merkle_{v$$V, b$$B, P_{1e}$$P}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+
+MERKLE_2_EXTRACT_V='v\([0-9][0-9]*\)'
+
+merkle_2_p0.01_expDas_fprob/%/merkle_custom.dat: merkle_2_p0.01_expDas_fprob/Makefile
+	@echo " executing merkle_2_p0.01_expDas_fprob $*"
+	@mkdir -p "$(@D)"
+	V=$(shell expr match "$*" $(MERKLE_2_EXTRACT_V)) ; P=0.01 ; D=2 ; STEPSIZE=1 ; STEPS=15 ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE)" -c "$$V,1,$$P,as_fprob,$$STEPSIZE,$$STEPS,[update,regen],$$D,merkle_bucket" -t "merkle_{v$$V, P_{1e}0.01}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+
+merkle_2_p0.01_expDas_fprob-all: merkle_2_p0.01_expDas_fprob/Makefile $(foreach V, $(shell seq -s" " 2 16), merkle_2_p0.01_expDas_fprob/v$(V)/merkle_custom.dat)
+	
 
 # note: we must have the same dependencies as the specific rules
 #       -> otherwise this rule may be chosen instead

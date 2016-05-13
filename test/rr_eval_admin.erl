@@ -29,7 +29,7 @@
          bloom/7, bloom_ddists_fdists/7, bloom_scale/6,
          % merkle
          merkle/9, merkle_ddists_fdists/9, merkle_scale/8,
-         merkle_custom/12,
+         merkle_custom/13,
          % art
          art/8, art_scale/8,
          % system sync
@@ -343,15 +343,16 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
                    MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob) -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta) ->
     merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
-                  power, 5, ?EVAL_FTYPES, 3).
+                  power, 5, ?EVAL_FTYPES, 3, data_count).
 
 -spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), MBranch::pos_integer(),
                     MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
                     StepSize::step_size() | power, Steps::pos_integer(),
-                    FTypes::[update | regen], Delta::pos_integer()) -> ok.
+                    FTypes::[update | regen], Delta::pos_integer(),
+                    step_param()) -> ok.
 merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
-              StepSize, Steps, FTypes, Delta) ->
+              StepSize, Steps, FTypes, Delta, StepParam) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
@@ -364,11 +365,12 @@ merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
     Merkle = #rc_config{ recon_method = merkle_tree, recon_p1e = P1E,
                          expected_delta = ExpDelta,
                          merkle_branch = MBranch, merkle_bucket = MBucket },
-
+    
+    Init = get_param_value({PairRing, Merkle}, StepParam),
     eval(pair,
          gen_setup([random], FTypes, [random],
                    Scenario, PairRing, [Merkle]),
-         data_count, Steps, StepSize, N, Options),
+         StepParam, Steps, StepSize, Init, Options),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -460,13 +462,9 @@ system(Dir, N, EvalRepeats, EvalName) ->
 %% EVAL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec eval(Mode::pair | sys,
-           [ring_setup(),...],
-           StepP::step_param(),
-           StepCount::pos_integer(),
-           StepSize::step_size() | power,
-           StepInit::step_size(),
-           Options::eval_options()) -> ok.
+-spec eval(Mode::pair | sys, [ring_setup(),...], StepP::step_param(),
+           StepCount::pos_integer(), StepSize::step_size() | power,
+           StepInit::step_size(), Options::eval_options()) -> ok.
 eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
     {{YY, MM, DD}, {Hour, Min, Sec}} = erlang:localtime(),
     Options = [{eval_time, {Hour, Min, Sec}} | Options0],
@@ -550,12 +548,9 @@ get_db(NodePid) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts one sync between 2 nodes.
--spec pair_sync(ring_setup(),
-                 eval_options(),
-                 step_param(),
-                 IncSize::step_size() | power,
-                 Steps::pos_integer(),
-                 Acc::sync_result()) -> sync_result().
+-spec pair_sync(ring_setup(), eval_options(), step_param(),
+                IncSize::step_size() | power, Steps::pos_integer(),
+                Acc::sync_result()) -> sync_result().
 pair_sync(_RingSetup, _Options, _IncParam, _IncSize, -1, Acc) ->
     Acc;
 pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, {AccEP, AccMP, EPId}) ->
