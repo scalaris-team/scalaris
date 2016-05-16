@@ -35,7 +35,7 @@ scalaris:
 	@mkdir -p "$(@D)"
 	@cp gitignore.tmpl2 $@
 
-EXP_DELTA_LIST=$(shell seq -s" " 0.1 0.1 1 ; seq -s" " 0 1 9 ; seq -s" " 10 10 100) as_fprob
+EXP_DELTA_LIST=$(shell LC_NUMERIC=C seq -s" " 0.1 0.1 1 ; seq -s" " 0 1 9 ; seq -s" " 10 10 100) as_fprob
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
