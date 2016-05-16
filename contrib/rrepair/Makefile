@@ -36,6 +36,8 @@ scalaris:
 	@cp gitignore.tmpl2 $@
 
 EXP_DELTA_LIST=$(shell LC_NUMERIC=C seq -s" " 0.1 0.1 1 ; seq -s" " 0 1 9 ; seq -s" " 10 10 100) as_fprob
+# keep ALL_P in sync with the special makefile targets creating the summary plots!
+ALL_P=0.0001 0.001 0.01 0.1
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
@@ -106,7 +108,7 @@ $(eval $(call OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
 # define summary targets for groups of the ones above:
 define SUM_1
 # fprob analysis (different delta)
-$(1)_0-$(2)-all: $(foreach P1E, 0.1 0.01 0.001 0.0001, $(1)_0-$(2)-all/$(P1E)/$(1).dat)
+$(1)_0-$(2)-all: $(foreach P1E, $(ALL_P), $(1)_0-$(2)-all/$(P1E)/$(1).dat)
 	
 endef
 $(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD1 10_expD1 100_expD1,\
@@ -125,7 +127,7 @@ define SUM_3
 $(1)_dists-all: $(1)_ddists_fdists_expDas_fprob-all/0.01/$(1)_ddists_fdists.dat
 	
 # scalability analysis (increasing data size)
-$(1)_scale-all: $(foreach P1E, 0.1 0.01 0.001 0.0001, $(1)_scale_expDas_fprob-all/$(P1E)/$(1)_scale.dat)
+$(1)_scale-all: $(foreach P1E, $(ALL_P), $(1)_scale_expDas_fprob-all/$(P1E)/$(1)_scale.dat)
 	
 $(1): $(1)-all $(1)_dists-all $(1)_scale-all
 	
@@ -171,6 +173,8 @@ $(eval $(call MERKLE_OTHER_TARGETS,$(EXP_DELTA)))\
 MERKLE_DEFAULT_V_B=v2_b1 v4_b1 v4_b3 v4_b15 v16_b1
 MERKLE_DEFAULT_B_P=b1_p0.01
 MERKLE_DEFAULT_V_P=v4_p0.01
+ALL_V=2 3 4 8 16
+ALL_B=1 2 3 4 8
 
 # define summary targets for groups of the ones above:
 define MERKLE_SUM_1
@@ -211,12 +215,12 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach P1E, 0.1 0.01 0.001 0.0001, merkle_0-$(1)_expD$(2)-all/$(3)_p$(P1E)/merkle.dat)
+merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach P1E, $(ALL_P), merkle_0-$(1)_expD$(2)-all/$(3)_p$(P1E)/merkle.dat)
 	
 endef
-$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
-$(eval $(call MERKLE_SUM_V_B,$(MAX_DELTA),$(EXP_DELTA),$(PAR)))\
-)))
+$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach V, $(ALL_V), $(foreach B, $(ALL_B),\
+$(eval $(call MERKLE_SUM_V_B,$(MAX_DELTA),$(EXP_DELTA),v$(V)_b$(B)))\
+))))
 
 define MERKLE_SCALE_SUM_V_B
 merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$(1)-all/$(2)/.gitignore Makefile
@@ -237,12 +241,12 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
           -e 's|../coldefs_eval_point.gp|../../coldefs_eval_point.gp|g' < $$< > $$@
 
-merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach P1E, 0.1 0.01 0.001 0.0001, merkle_scale_expD$(1)-all/$(2)_p$(P1E)/merkle_scale.dat)
+merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach P1E, $(ALL_P), merkle_scale_expD$(1)-all/$(2)_p$(P1E)/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_V_B),\
-$(eval $(call MERKLE_SCALE_SUM_V_B,$(EXP_DELTA),$(PAR)))\
-))
+$(foreach EXP_DELTA, as_fprob, $(foreach V, $(ALL_V), $(foreach B, $(ALL_B),\
+$(eval $(call MERKLE_SCALE_SUM_V_B,$(EXP_DELTA),v$(V)_b$(B)))\
+)))
 
 define MERKLE_SUM_B_P
 merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-all/$(3)/.gitignore Makefile
@@ -266,9 +270,9 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
 merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach V, 2 3 4 8 16, merkle_0-$(1)_expD$(2)-all/v$(V)_$(3)/merkle.dat)
 	
 endef
-$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
-$(eval $(call MERKLE_SUM_B_P,$(MAX_DELTA),$(EXP_DELTA),$(PAR)))\
-)))
+$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach B, $(ALL_B), $(foreach P, $(ALL_P),\
+$(eval $(call MERKLE_SUM_B_P,$(MAX_DELTA),$(EXP_DELTA),b$(B)_p$(P)))\
+))))
 
 define MERKLE_SCALE_SUM_B_P
 merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$(1)-all/$(2)/.gitignore Makefile
@@ -292,9 +296,9 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
 merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach V, 2 4 16, merkle_scale_expD$(1)-all/v$(V)_$(2)/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_B_P),\
-$(eval $(call MERKLE_SCALE_SUM_B_P,$(EXP_DELTA),$(PAR)))\
-))
+$(foreach EXP_DELTA, as_fprob, $(foreach B, $(ALL_B), $(foreach P, $(ALL_P),\
+$(eval $(call MERKLE_SCALE_SUM_B_P,$(EXP_DELTA),b$(B)_p$(P)))\
+)))
 
 define MERKLE_SUM_V_P
 merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-all/$(3)/.gitignore Makefile
@@ -318,9 +322,9 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
 merkle_0-$(1)_expD$(2)-all/$(3): merkle_0-$(1)_expD$(2)-all/$(3)/Makefile $(foreach B, 1 2 3 4 8, merkle_0-$(1)_expD$(2)-all/$(subst _,_b$(B)_,$(3))/merkle.dat)
 	
 endef
-$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
-$(eval $(call MERKLE_SUM_V_P,$(MAX_DELTA),$(EXP_DELTA),$(PAR)))\
-)))
+$(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach V, $(ALL_V), $(foreach P, $(ALL_P),\
+$(eval $(call MERKLE_SUM_V_P,$(MAX_DELTA),$(EXP_DELTA),v$(V)_p$(P)))\
+))))
 
 define MERKLE_SCALE_SUM_V_P
 merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$(1)-all/$(2)/.gitignore Makefile
@@ -344,9 +348,9 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
 merkle_scale_expD$(1)-all/$(2): merkle_scale_expD$(1)-all/$(2)/Makefile $(foreach B, 1 3 8, merkle_scale_expD$(1)-all/$(subst _,_b$(B)_,$(2))/merkle_scale.dat)
 	
 endef
-$(foreach EXP_DELTA, as_fprob, $(foreach PAR, $(MERKLE_DEFAULT_V_P),\
-$(eval $(call MERKLE_SCALE_SUM_V_P,$(EXP_DELTA),$(PAR)))\
-))
+$(foreach EXP_DELTA, as_fprob, $(foreach V, $(ALL_V), $(foreach P, $(ALL_P),\
+$(eval $(call MERKLE_SCALE_SUM_V_P,$(EXP_DELTA),v$(V)_p$(P)))\
+)))
 
 merkle: merkle-all merkle_dists-all merkle_scale-all
 	
