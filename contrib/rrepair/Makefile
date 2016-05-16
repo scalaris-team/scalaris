@@ -170,8 +170,8 @@ $(foreach EXP_DELTA, as_fprob,\
 $(eval $(call MERKLE_OTHER_TARGETS,$(EXP_DELTA)))\
 )
 
-MERKLE_DEFAULT_V_B=v2_b1 v4_b1 v4_b3 v4_b15 v16_b1
-MERKLE_DEFAULT_B_P=b1_p0.01
+MERKLE_DEFAULT_V_B=v4_b2
+MERKLE_DEFAULT_B_P=b2_p0.01
 MERKLE_DEFAULT_V_P=v4_p0.01
 ALL_V=2 3 4 8 16
 ALL_B=1 2 3 4 8
@@ -179,7 +179,7 @@ ALL_B=1 2 3 4 8
 # define summary targets for groups of the ones above:
 define MERKLE_SUM_1
 # fprob analysis (different delta)
-merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)_p0.01/merkle.dat) merkle_0-$(1)-all/v4_b3 merkle_0-$(1)-all/b1_p0.01 merkle_0-$(1)-all/v4_p0.01
+merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_B_P), merkle_0-$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_V_P), merkle_0-$(1)-all/$(PAR))
 	
 endef
 $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD1 10_expD1 100_expD1,$(eval $(call MERKLE_SUM_1,$(PAR))))
@@ -192,7 +192,7 @@ merkle_dists-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_ddists_fdists_exp
 	
 
 # scalability analysis (increasing data size)
-merkle_scale-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_expDas_fprob-all/$(PAR)_p0.01/merkle_scale.dat) merkle_scale_expDas_fprob-all/v4_b3 merkle_scale_expDas_fprob-all/b1_p0.01 merkle_scale_expDas_fprob-all/v4_p0.01
+merkle_scale-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_expDas_fprob-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_B_P), merkle_scale_expDas_fprob-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_V_P), merkle_scale_expDas_fprob-all/$(PAR))
 	
 
 # summary targets for v4_b3 b1_p0.01 v4_p0.01 (Makefiles and dependencies)
