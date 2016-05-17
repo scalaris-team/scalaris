@@ -132,7 +132,7 @@ tester_type_check_rm_leases(_Config) ->
 test_single_kill(_Config) ->
     case config:read(replication_factor) < 4 of
         true ->
-            lo:log("skipped: this test case is likely to fail for small replication factors"),
+            log:log("skipped: this test case is likely to fail for small replication factors"),
             ok;
         false ->
             NrOfNodes = api_vm:number_of_nodes(),
