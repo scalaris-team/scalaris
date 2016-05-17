@@ -37,21 +37,21 @@ scalaris:
 
 EXP_DELTA_LIST=$(shell LC_NUMERIC=C seq -s" " 0.1 0.1 1 ; seq -s" " 0 1 9 ; seq -s" " 10 10 100) as_fprob
 # keep ALL_P in sync with the special makefile targets creating the summary plots!
-ALL_P=0.0001 0.001 0.01 0.1
+ALL_P=0.1 0.01 0.001 0.0001
 
 define FPROB_MAKEFILE
 $(1)_0-%_expD$(2)-all/Makefile: Makefile.tmpl2 $(1)_0-%_expD$(2)-all/.gitignore Makefile
 	@mkdir -p "$$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-         -e 's|<dat1>|0.0001/$(1).dat|g' \
-         -e 's|<dat2>|0.001/$(1).dat|g' \
-         -e 's|<dat3>|0.01/$(1).dat|g' \
-         -e 's|<dat4>|0.1/$(1).dat|g' \
+         -e 's|<dat1>|0.1/$(1).dat|g' \
+         -e 's|<dat2>|0.01/$(1).dat|g' \
+         -e 's|<dat3>|0.001/$(1).dat|g' \
+         -e 's|<dat4>|0.0001/$(1).dat|g' \
          -e 's|<dat5>||g' \
-         -e 's|<title1>|$(1)_{P_{1e}0.0001}|g' \
-         -e 's|<title2>|$(1)_{P_{1e}0.001}|g' \
-         -e 's|<title3>|$(1)_{P_{1e}0.01}|g' \
-         -e 's|<title4>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title1>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
+         -e 's|<title3>|$(1)_{P_{1e}0.001}|g' \
+         -e 's|<title4>|$(1)_{P_{1e}0.0001}|g' \
          -e 's|<title5>||g' \
          -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $$*/5");|g' < $$< > $$@
 endef
@@ -84,15 +84,15 @@ $(1)_ddists_fdists_expD$(2)-all/%/$(1)_ddists_fdists.dat: $(1)_ddists_fdists_exp
 $(1)_scale_expD$(2)-all/Makefile: Makefile_scale.tmpl2 $(1)_scale_expD$(2)-all/.gitignore Makefile
 	@mkdir -p "$$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE_SCALE)|g' \
-         -e 's|<dat1>|0.0001/$(1)_scale.dat|g' \
-         -e 's|<dat2>|0.001/$(1)_scale.dat|g' \
-         -e 's|<dat3>|0.01/$(1)_scale.dat|g' \
-         -e 's|<dat4>|0.1/$(1)_scale.dat|g' \
+         -e 's|<dat1>|0.1/$(1)_scale.dat|g' \
+         -e 's|<dat2>|0.01/$(1)_scale.dat|g' \
+         -e 's|<dat3>|0.001/$(1)_scale.dat|g' \
+         -e 's|<dat4>|0.0001/$(1)_scale.dat|g' \
          -e 's|<dat5>||g' \
-         -e 's|<title1>|$(1)_{P_{1e}0.0001}|g' \
-         -e 's|<title2>|$(1)_{P_{1e}0.001}|g' \
-         -e 's|<title3>|$(1)_{P_{1e}0.01}|g' \
-         -e 's|<title4>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title1>|$(1)_{P_{1e}0.1}|g' \
+         -e 's|<title2>|$(1)_{P_{1e}0.01}|g' \
+         -e 's|<title3>|$(1)_{P_{1e}0.001}|g' \
+         -e 's|<title4>|$(1)_{P_{1e}0.0001}|g' \
          -e 's|<title5>||g' \
          -e 's|<morecommands>|absoluteRedundancy=1;|g' < $$< > $$@
 
@@ -201,15 +201,15 @@ merkle_0-$(1)_expD$(2)-all/$(3)/Makefile: Makefile.tmpl2 merkle_0-$(1)_expD$(2)-
 	@mkdir -p "$$(@D)"
 	@V=$$(shell expr match "$(3)" 'v\([0-9][0-9]*\)_b[0-9][0-9]*') ; B=$$(shell expr match "$(3)" 'v[0-9][0-9]*_b\([0-9][0-9]*\)') ; \
       sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
-          -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.0001/merkle.dat|g" \
-          -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.001/merkle.dat|g" \
-          -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.01/merkle.dat|g" \
-          -e "s|<dat4>|../v$$$${V}_b$$$${B}_p0.1/merkle.dat|g" \
+          -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.1/merkle.dat|g" \
+          -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.01/merkle.dat|g" \
+          -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.001/merkle.dat|g" \
+          -e "s|<dat4>|../v$$$${V}_b$$$${B}_p0.0001/merkle.dat|g" \
           -e 's|<dat5>||g' \
-          -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.0001}|g" \
-          -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
-          -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
-          -e "s|<title4>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
+          -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
+          -e "s|<title4>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.0001}|g" \
           -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;stepSize=0$$(shell bc <<< "scale=2; $(1)/5");|g' \
           -e 's|../eval_fprob.gp|../../eval_fprob.gp|g' \
@@ -227,15 +227,15 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
 	@mkdir -p "$$(@D)"
 	@V=$$(shell expr match "$(2)" 'v\([0-9][0-9]*\)_b[0-9][0-9]*') ; B=$$(shell expr match "$(2)" 'v[0-9][0-9]*_b\([0-9][0-9]*\)') ; \
       sed -e 's|<sys_size>|$(SYSTEM_SIZE_SCALE)|g' \
-          -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.0001/merkle_scale.dat|g" \
-          -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.001/merkle_scale.dat|g" \
-          -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.01/merkle_scale.dat|g" \
-          -e "s|<dat4>|../v$$$${V}_b$$$${B}_p0.1/merkle_scale.dat|g" \
+          -e "s|<dat1>|../v$$$${V}_b$$$${B}_p0.1/merkle_scale.dat|g" \
+          -e "s|<dat2>|../v$$$${V}_b$$$${B}_p0.01/merkle_scale.dat|g" \
+          -e "s|<dat3>|../v$$$${V}_b$$$${B}_p0.001/merkle_scale.dat|g" \
+          -e "s|<dat4>|../v$$$${V}_b$$$${B}_p0.0001/merkle_scale.dat|g" \
           -e 's|<dat5>||g' \
-          -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.0001}|g" \
-          -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
-          -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
-          -e "s|<title4>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e "s|<title1>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.1}|g" \
+          -e "s|<title2>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.01}|g" \
+          -e "s|<title3>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.001}|g" \
+          -e "s|<title4>|merkle_{v$$$${V}, b$$$${B}, P_{1e}0.0001}|g" \
           -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;|g' \
           -e 's|../eval_data_inc.gp|../../eval_data_inc.gp|g' \
