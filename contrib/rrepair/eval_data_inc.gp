@@ -29,18 +29,20 @@ get_title(i) = (i == 5) ? srcFile5_title : (i == 4) ? srcFile4_title : (i == 3) 
 # http://colorbrewer2.org/?type=qualitative&scheme=Set1&n=5
 # (#e41a1c, #377eb8, #4daf4a, #984ea3, #ff7f00)
 # -> a little brighter version:
-set style line 1 lw 2 lt 1 lc rgb '#ff191b' pt 5 # dark red
-set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
-set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
-set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
-set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
-set style line 6 lw 3 lc rgb "#777777" pt 8 lt 3 # gray (for the naive line)
+set style line 1 lw 1 lt 1 lc rgb '#ff191b' pt 5 # dark red
+set style line 2 lw 1 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
+set style line 3 lw 1 lt 1 lc rgb '#59c955' pt 7 # dark green
+set style line 4 lw 1 lt 1 lc rgb '#b05abd' pt 4 # dark purple
+set style line 5 lw 1 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
-set style line 101 lw 3 lt 1 lc rgb '#ff191b' pt 0 # dark red
-set style line 102 lw 3 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
-set style line 103 lw 3 lt 1 lc rgb '#59c955' pt 0 # dark green
-set style line 104 lw 3 lt 1 lc rgb '#b05abd' pt 0 # dark purple
-set style line 105 lw 3 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
+set dashtype 11 (8,6,8,6)
+set style line 6 lw 1 lt 1 dt 11 lc rgb "#777777" pt 8 # gray (for the naive line)
+
+set style line 101 lw 1 lt 1 lc rgb '#ff191b' pt 0 # dark red
+set style line 102 lw 1 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
+set style line 103 lw 1 lt 1 lc rgb '#59c955' pt 0 # dark green
+set style line 104 lw 1 lt 1 lc rgb '#b05abd' pt 0 # dark purple
+set style line 105 lw 1 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
 
 if (plotCount == 5) {
   plotShift(x, i) = (i == 5) ? (x + (x / 1.6)) : (i == 4) ? (x + (x / 3.7)) : (i == 3) ? (x) : (i == 2) ? (x - (x / 4.6)) : (x - (x / 2.6))
@@ -360,11 +362,11 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with lines notitle ls (plotCount > 1 ? (100+i) : 100), \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with lines notitle ls (plotCount > 1 ? (100+i) : 100) lw 2, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 6
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)/4*(128+32)/8)) with linespoints notitle ls 6 lw 2
 
 set size all_width_r,bw_height
 set origin 0.49,-0.025
@@ -401,8 +403,8 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with lines notitle ls (plotCount > 1 ? (100+i) : 100), \
+ u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with lines notitle ls (plotCount > 1 ? (100+i) : 100) lw 2, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)*(1-column(col_fprob)/100.0)/4*(128+32)/8)) with linespoints notitle ls 6
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)*(1-column(col_fprob)/100.0)/4*(128+32)/8)) with linespoints notitle ls 6 lw 2

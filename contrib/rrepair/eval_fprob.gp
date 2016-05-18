@@ -32,17 +32,17 @@ get_title(i) = (i == 5) ? srcFile5_title : (i == 4) ? srcFile4_title : (i == 3) 
 # http://colorbrewer2.org/?type=qualitative&scheme=Set1&n=5
 # (#e41a1c, #377eb8, #4daf4a, #984ea3, #ff7f00)
 # -> a little brighter version:
-set style line 1 lw 2 lt 1 lc rgb '#ff191b' pt 5 # dark red
-set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
-set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
-set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
-set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
+set style line 1 lw 1 lt 1 lc rgb '#ff191b' pt 5 # dark red
+set style line 2 lw 1 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
+set style line 3 lw 1 lt 1 lc rgb '#59c955' pt 7 # dark green
+set style line 4 lw 1 lt 1 lc rgb '#b05abd' pt 4 # dark purple
+set style line 5 lw 1 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
-set style line 101 lw 3 lt 1 lc rgb '#ff191b' pt 0 # dark red
-set style line 102 lw 3 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
-set style line 103 lw 3 lt 1 lc rgb '#59c955' pt 0 # dark green
-set style line 104 lw 3 lt 1 lc rgb '#b05abd' pt 0 # dark purple
-set style line 105 lw 3 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
+set style line 101 lw 1 lt 1 lc rgb '#ff191b' pt 0 # dark red
+set style line 102 lw 1 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
+set style line 103 lw 1 lt 1 lc rgb '#59c955' pt 0 # dark green
+set style line 104 lw 1 lt 1 lc rgb '#b05abd' pt 0 # dark purple
+set style line 105 lw 1 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
 
 if (plotCount == 5) {
   plotShift(x, i) = (i == 5) ? (x + 0.7*(0.5*step_size)) : (i == 4) ? (x + 0.35*(0.5*step_size)) : (i == 3) ? (x) : (i == 2) ? (x - 0.35*(0.5*step_size)) : (x - 0.7*(0.5*step_size))

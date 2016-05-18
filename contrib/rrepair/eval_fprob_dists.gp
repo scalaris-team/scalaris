@@ -89,13 +89,13 @@ set style data linespoint
 set xtics 0,step_size,5*step_size
 set grid layerdefault   linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 
-set style line 100 lw 2 lc -1 pt 0 lt 1
+set style line 100 lw 1 lc -1 pt 0 lt 1
 
-set style line 1 lw 2 lt 1 lc rgb '#ff191b' pt 5 # dark red
-set style line 2 lw 2 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
-set style line 3 lw 2 lt 1 lc rgb '#59c955' pt 7 # dark green
-set style line 4 lw 2 lt 1 lc rgb '#b05abd' pt 4 # dark purple
-set style line 5 lw 2 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
+set style line 1 lw 1 lt 1 lc rgb '#ff191b' pt 5 # dark red
+set style line 2 lw 1 lt 1 lc rgb '#2d8ede' pt 9 # dark blue
+set style line 3 lw 1 lt 1 lc rgb '#59c955' pt 7 # dark green
+set style line 4 lw 1 lt 1 lc rgb '#b05abd' pt 4 # dark purple
+set style line 5 lw 1 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
 #--------------------------------- ALL
 set xrange [-(0.5*step_size):(5.5*step_size)]
