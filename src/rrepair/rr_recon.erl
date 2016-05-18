@@ -85,8 +85,7 @@
          reconPid  = undefined                                  :: comm:mypid() | undefined,
          exp_delta = ?required(trivial_recon_struct, exp_delta) :: number(),
          db_chunk  = ?required(trivial_recon_struct, db_chunk)  :: {bitstring(), bitstring()} | {bitstring(), bitstring(), db_chunk_kv()}, % two binaries for transfer, the three-tuple only temporarily (locally)
-         sig_size  = ?required(trivial_recon_struct, sig_size)  :: signature_size(),
-         ver_size  = ?required(trivial_recon_struct, ver_size)  :: signature_size()
+         sig_size  = ?required(trivial_recon_struct, sig_size)  :: signature_size()
         }).
 
 -record(shash_recon_struct,
@@ -200,7 +199,7 @@
      OtherDiffCount::non_neg_integer(), SenderPid::comm:mypid()} |
     {resolve_req, BinReqIdxPos::bitstring()} |
     {resolve_req, DBChunk::{bitstring(), bitstring()}, Payload::any(),
-     SigSize::signature_size(), VSize::signature_size(), SenderPid::comm:mypid()} |
+     SigSize::signature_size(), SenderPid::comm:mypid()} |
     {resolve_req, shutdown, Payload::any()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
@@ -278,23 +277,24 @@ on({start_recon, RMethod, Params} = _Msg,
         trivial ->
             #trivial_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                   db_chunk = DBChunk,
-                                  sig_size = SigSize, ver_size = VSize} = Params,
+                                  sig_size = SigSize} = Params,
             Params1 = Params#trivial_recon_struct{db_chunk = {<<>>, <<>>}},
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a map for faster access checks
-            {DBChunkTree, OrigDBChunkLen} =
-                decompress_kv_list(DBChunk, SigSize, VSize),
+            {DBChunkTree, OrigDBChunkLen, VSize} =
+                decompress_kv_list(DBChunk, SigSize),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}}];
+            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}},
+                     {ver_size, VSize}];
         shash ->
             #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                 db_chunk = DBChunk, sig_size = SigSize} = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a gb_set for faster access checks
-            {DBChunkSet, OrigDBChunkLen} =
-                decompress_kv_list({DBChunk, <<>>}, SigSize, 0),
+            {DBChunkSet, OrigDBChunkLen, 0} =
+                decompress_kv_list({DBChunk, <<>>}, SigSize),
             %DBChunkSet = mymaps:from_list(DBChunkList),
             Params1 = Params#shash_recon_struct{db_chunk = <<>>},
             ?DBG_ASSERT(Misc =:= []),
@@ -339,11 +339,11 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
                            method = trivial,
                            params = #trivial_recon_struct{exp_delta = ExpDelta,
-                                                          sig_size = SigSize,
-                                                          ver_size = VSize},
+                                                          sig_size = SigSize},
                            dest_rr_pid = DestRRPid,    stats = Stats,
                            ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
-                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}],
+                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}},
+                                   {ver_size, VSize}],
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
 
@@ -361,7 +361,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
            State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
-                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]};
+                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}},
+                                        {ver_size, VSize}]};
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
            P1E_p1_real =
@@ -536,17 +537,17 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                              OwnerL, DestRRPid, _Initiator = false, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
-on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, VSize, DestReconPid} = _Msg,
+on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = shash,            kv_list = KVList}) ->
     ?TRACE1(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx1: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(MyDiffIdx),
 %%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
-    ?DBG_ASSERT(SigSize >= 0 andalso VSize >= 0),
+    ?DBG_ASSERT(SigSize >= 0),
 
-    {DBChunkTree, _OrigDBChunkLen} =
-        decompress_kv_list(OtherDBChunk, SigSize, VSize),
+    {DBChunkTree, _OrigDBChunkLen, VSize} =
+        decompress_kv_list(OtherDBChunk, SigSize),
     MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
     % items not in CKidx cannot be in the diff!
     State1 = State#rr_recon_state{kv_list = MyDiffKV},
@@ -602,15 +603,15 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
       Diff, P1E_p1_real, OtherDiffCount, false, P1E_p2, OtherDiffCount,
       State1#rr_recon_state{params = {}, stats = Stats1});
 
-on({resolve_req, DBChunk, P1E_p1_real, SigSize, VSize, _DestReconPid} = _Msg,
+on({resolve_req, DBChunk, P1E_p1_real, SigSize, _DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = true,
                            method = bloom,            kv_list = KVList,
                            stats = Stats,
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
     
-    {DBChunkTree, OrigDBChunkLen} =
-        decompress_kv_list(DBChunk, SigSize, VSize),
+    {DBChunkTree, OrigDBChunkLen, VSize} =
+        decompress_kv_list(DBChunk, SigSize),
     
     % worst case diff here is 100% since both nodes now operate on the
     % differences only and each node may have what the other node does not
@@ -624,13 +625,13 @@ on({resolve_req, DBChunk, P1E_p1_real, SigSize, VSize, _DestReconPid} = _Msg,
                   fun get_full_diff/6),
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
-on({resolve_req, DBChunk, none, SigSize, VSize, DestReconPid} = _Msg,
+on({resolve_req, DBChunk, none, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = art}) ->
     ?TRACE1(_Msg, State),
     
-    {DBChunkTree, _OrigDBChunkLen} =
-        decompress_kv_list(DBChunk, SigSize, VSize),
+    {DBChunkTree, _OrigDBChunkLen, VSize} =
+        decompress_kv_list(DBChunk, SigSize),
 
     NewStats2 = shash_bloom_perform_resolve(
                   State, DBChunkTree, SigSize, VSize, DestReconPid,
@@ -1123,7 +1124,7 @@ calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =<
 -> NrItems::non_neg_integer().
 calc_items_in_chunk(<<>>, 0) -> 0;
 calc_items_in_chunk(DBChunk, BitsPerItem) ->
-    ?DBG_ASSERT(erlang:bit_size(DBChunk) rem BitsPerItem =:= 0),
+    ?ASSERT(erlang:bit_size(DBChunk) rem BitsPerItem =:= 0),
     erlang:bit_size(DBChunk) div BitsPerItem.
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
@@ -1154,12 +1155,15 @@ compress_kv_list([], {AccDiff, AccV}, _SigSize, _VSize, _KeyComprFun) ->
 %% @doc De-compresses the binary from compress_kv_list/6 into a map with a
 %%      binary key representation and the integer of the (shortened) version.
 -spec decompress_kv_list(CompressedBin::{KeyDiff::bitstring(), VBin::bitstring()},
-                         SigSize::signature_size(), VSize::signature_size())
-        -> {ResTree::kvi_tree(), NumKeys::non_neg_integer()}.
-decompress_kv_list({<<>>, <<>>}, _SigSize, _VSize) ->
-    {mymaps:new(), 0};
-decompress_kv_list({KeyDiff, VBin}, SigSize, VSize) ->
+                         SigSize::signature_size())
+        -> {ResTree::kvi_tree(), NumKeys::non_neg_integer(), VSize::signature_size()}.
+decompress_kv_list({<<>>, <<>>}, _SigSize) ->
+    {mymaps:new(), 0, 0};
+decompress_kv_list({KeyDiff, VBin}, SigSize) ->
     {KList, KListLen} = decompress_idx_list(KeyDiff, util:pow(2, SigSize) - 1),
+    VBinSize = erlang:bit_size(VBin),
+    VSize = VBinSize div KListLen,
+    ?ASSERT(VBinSize rem KListLen =:= 0),
     {<<>>, Res, _} =
         lists:foldl(
           fun(CurKeyX, {<<Version:VSize, T/bitstring>>, AccX, CurPosX}) ->
@@ -1190,7 +1194,7 @@ decompress_kv_list({KeyDiff, VBin}, SigSize, VSize) ->
                                   end
                           end, {KVMap, KVMapSize, KVMap}, KList))
         end,
-    {KVMap1, KListLen}.
+    {KVMap1, KListLen, VSize}.
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
@@ -1530,7 +1534,7 @@ phase2_run_trivial_on_diff(
                    art ->
                        100 % TODO
                end,
-           {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, VSizeT}} =
+           {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, _VSizeT}} =
                util:tc(fun() ->
                                compress_kv_list_p1e(
                                  UnidentifiedDiff, CKVSize, OtherCmpItemCount, ExpDelta, P1E_p2,
@@ -1543,7 +1547,7 @@ phase2_run_trivial_on_diff(
                            SigSizeT, CKVSize, OtherCmpItemCount, ExpDelta),
 
            send(DestReconPid,
-                {resolve_req, MyDiff, Payload, SigSizeT, VSizeT, comm:this()}),
+                {resolve_req, MyDiff, Payload, SigSizeT, comm:this()}),
            % the other node will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
@@ -2102,8 +2106,8 @@ merkle_resolve_retrieve_leaf_hashes(
     OBucketVBinSize = BucketSize * VSize,
     <<OBucketKBin:OBucketKBinSize/bitstring, NHashesK/bitstring>> = HashesKT,
     <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
-    {OBucketTree, _OrigDBChunkLen} =
-        decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize, VSize),
+    {OBucketTree, _OrigDBChunkLen, VSize} =
+        decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize),
     {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize,
      NextP0E, NextP0E_real}.
 
@@ -2606,13 +2610,13 @@ build_recon_struct(trivial, I, DBItems, InitiatorMaxItems, _Params) ->
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     ItemCount = length(DBItems),
     ExpDelta = get_max_expected_delta(),
-    {MyDiffK, MyDiffV, ResortedKVOrigList, SigSize, VSize} =
+    {MyDiffK, MyDiffV, ResortedKVOrigList, SigSize, _VSize} =
         compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems,
                              ExpDelta, get_p1e(),
                              fun trivial_signature_sizes/4, fun trivial_compress_key/2),
     {#trivial_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
                            db_chunk = {MyDiffK, MyDiffV, ResortedKVOrigList},
-                           sig_size = SigSize, ver_size = VSize},
+                           sig_size = SigSize},
      _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
 build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
