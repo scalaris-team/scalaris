@@ -94,8 +94,6 @@ clean:
 	rm -f *.pdf
 	rm -f .${GPSCRIPT}-done
 MAKEFILESTRING
-
-  make -C "${DIRECTORY}"
 fi
 
 cat > "${DIRECTORY}/.gitignore" <<MAKEFILESTRING
