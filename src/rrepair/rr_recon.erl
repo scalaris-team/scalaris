@@ -37,10 +37,10 @@
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
--export([calc_signature_size_nm_pair/5, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
+-export([calc_signature_size_nm_pair/6, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
 %% -export([trivial_signature_sizes/4, trivial_worst_case_failprob/4,
-%%          shash_signature_sizes/4,
-%%          calc_max_different_hashes/3, bloom_fp/4]).
+%%          shash_signature_sizes/4, shash_worst_case_failprob/4,
+%%          calc_max_different_hashes/4, bloom_fp/4]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -421,7 +421,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
        true ->
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
            P1E_p1_real =
-               trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
+               shash_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            CKidxSize = mymaps:size(OtherDBChunk1),
@@ -1073,16 +1073,17 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %%      NOTE: if multiple items are affected by the collision, simply divide
 %%            P1E by the number of affected items!
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
+                                  HashType::key | key_version,
                                   ExpDelta::number(), P1E::float(),
                                   MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(_, 0, _ExpDelta, P1E, _MaxSize)
+calc_signature_size_nm_pair(_, 0, _HashType, _ExpDelta, P1E, _MaxSize)
   when P1E > 0 andalso P1E < 1 ->
     0;
-calc_signature_size_nm_pair(0, _, _ExpDelta, P1E, _MaxSize)
+calc_signature_size_nm_pair(0, _, _HashType, _ExpDelta, P1E, _MaxSize)
   when P1E > 0 andalso P1E < 1 ->
     0;
-calc_signature_size_nm_pair(N, M, ExpDelta, P1E, MaxSize)
+calc_signature_size_nm_pair(N, M, HashType, ExpDelta, P1E, MaxSize)
   when P1E > 0 andalso P1E < 1 ->
     P = if P1E < 1.0e-8 ->
                % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
@@ -1095,29 +1096,41 @@ calc_signature_size_nm_pair(N, M, ExpDelta, P1E, MaxSize)
            true ->
                math:log(1 / (1 - P1E))
         end,
-    NT = calc_max_different_hashes(N, M, ExpDelta),
+    NT = calc_max_different_hashes(N, M, HashType, ExpDelta),
     min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
 
 %% @doc Helper for calc_signature_size_nm_pair/5 calculating the maximum number
 %%      of different hashes when an upper bound on the delta is known.
 -spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
+                                HashType::key | key_version,
                                 ExpDelta::number()) -> non_neg_integer().
-calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+calc_max_different_hashes(N, M, HashType, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
     if ExpDelta == 0 ->
            % M and N may differ anyway if the actual delta is higher
            % -> target no collisions among items on any node!
            erlang:max(M, N);
        ExpDelta == 100 ->
-           M + N; % special case of the one below
-       is_float(ExpDelta) ->
+           M + N; % special case of the ones below
+       HashType =:= key andalso is_float(ExpDelta) ->
            % assume the worst case, i.e. ExpDelta percent different hashes
-           % on both nodes together, e.g. due to missing items, and thus:
+           % on both nodes together due to missing items (out-dated items have
+           % the same key!), and thus:
            % N = NT * (100 - ExpDelta * alpha) / 100 and
            % M = NT * (100 - ExpDelta * (1-alpha)) / 100
            util:ceil(((M + N) * 100) / (200 - ExpDelta));
-       is_integer(ExpDelta) ->
+       HashType =:= key andalso is_integer(ExpDelta) ->
            % -> use integer division (and round up) for higher precision:
-           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta)
+           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta);
+       HashType =:= key_version andalso is_float(ExpDelta) ->
+           % assume the worst case, i.e. ExpDelta percent different hashes
+           % on both nodes together due to outdated items which result in
+           % different key-version pairs (missing items would reduce the total
+           % number of hashes even under ExpDelta),
+           % and thus N = NT and M = NT - but just in case assume NT = (N + M) / 2
+           util:ceil(((M + N) * (100 + ExpDelta)) / 200);
+       HashType =:= key_version andalso is_integer(ExpDelta) ->
+           % -> use integer division (and round up) for higher precision:
+           ((M + N) * (100 + ExpDelta) + 199) div 200
     end.
 
 -spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
@@ -1609,7 +1622,7 @@ merkle_next_signature_sizes(
     %       comparison as a children's tree has in total!
     if MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
            AffectedItemsI =
-               calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, ExpDelta),
+               calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, key, ExpDelta),
            NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / P1E_I)),
                                   get_min_hash_bits(), 160),
            EffectiveP1E_I = float(AffectedItemsI / util:pow(2, NextSigSizeI));
@@ -2055,9 +2068,9 @@ merkle_resolve_add_leaf_hash(
     %       node will report back the exact probability based on its actual
     %       number of items (we nonetheless need this value to adjust the
     %       individual trivial syncs' signatures!)
-    P1E_p1_upper_bound =
+    ThisP1E_upper_bound =
         trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
-    NextP0E = PrevP0E * (1 - P1E_p1_upper_bound),
+    NextP0E = PrevP0E * (1 - ThisP1E_upper_bound),
 %%     log:pal("merkle_send [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     {HashesKNew, HashesVNew, ResortedBucket} =
@@ -2089,12 +2102,12 @@ merkle_resolve_retrieve_leaf_hashes(
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
     {SigSize, VSize} =
         trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
-    P1E_p1 =
+    ThisP1E =
         trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
-    NextP0E = PrevP0E * (1 - P1E_p1),
-    P1E_p1_real =
+    NextP0E = PrevP0E * (1 - ThisP1E),
+    ThisP1E_real =
         trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
-    NextP0E_real = PrevP0E_real * (1 - P1E_p1_real),
+    NextP0E_real = PrevP0E_real * (1 - ThisP1E_real),
 %%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     % we need to know how large a piece is
@@ -2433,6 +2446,7 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
 %%      Sets the bit sizes to have an error below P1E.
+%% @see shash_signature_sizes/4
 -spec trivial_signature_sizes
         (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
          ExpDelta::number(), P1E::float())
@@ -2447,7 +2461,7 @@ trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     % note: there are up to 2 affected items for a hash collision
     %       -> use (P1E / 2)
     SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, ExpDelta, P1E / 2, MaxKeySize),
+                ItemCount, OtherItemCount, key, ExpDelta, P1E / 2, MaxKeySize),
 %%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "MyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, VSize, ItemCount, OtherItemCount]),
@@ -2456,6 +2470,7 @@ trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
 %% @doc Calculates the worst-case failure probability of the trivial algorithm
 %%      with the given signature size, item counts and expected delta.
 %%      NOTE: Precision loss may occur for very high values!
+%% @see shash_worst_case_failprob/4
 -spec trivial_worst_case_failprob(
         SigSize::signature_size(), ItemCount::non_neg_integer(),
         OtherItemCount::non_neg_integer(), ExpDelta::number()) -> float().
@@ -2467,9 +2482,9 @@ trivial_worst_case_failprob(0, _ItemCount, 0, _ExpDelta) ->
     0.0;
 trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
     BK2 = util:pow(2, SigSize),
+    NT = calc_max_different_hashes(ItemCount, OtherItemCount, key, ExpDelta),
     % both solutions have their problems with floats near 1
     % -> use fastest as they are quite close
-    NT = calc_max_different_hashes(ItemCount, OtherItemCount, ExpDelta),
     % exact:
 %%     2 * (1 - util:for_to_fold(1, NT - 1,
 %%                               fun(I) -> (1 - I / BK2) end,
@@ -2515,6 +2530,7 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, 
 %%      Sets the bit size to have an error below P1E.
 %%      NOTE: P1E is reduced in this function for the two phases of the
 %%            reconciliation protocol!
+%% @see trivial_signature_sizes/4
 -spec shash_signature_sizes
         (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
          ExpDelta::number(), P1E::float())
@@ -2530,10 +2546,36 @@ shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
     % note: there are up to 2 affected items for a hash collision
     %       -> use (P1E_sub / 2)
     SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, ExpDelta, P1E_sub / 2, MaxKeySize),
+                ItemCount, OtherItemCount, key_version, ExpDelta, P1E_sub / 2,
+                MaxKeySize),
 %%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
 %%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
     {SigSize, 0}.
+
+%% @doc Calculates the worst-case failure probability of the SHash algorithm
+%%      with the given signature size, item counts and expected delta.
+%%      NOTE: Precision loss may occur for very high values!
+%% @see trivial_worst_case_failprob/4
+-spec shash_worst_case_failprob(
+        SigSize::signature_size(), ItemCount::non_neg_integer(),
+        OtherItemCount::non_neg_integer(), ExpDelta::number()) -> float().
+shash_worst_case_failprob(0, 0, _OtherItemCount, _ExpDelta) ->
+    % this is exact! (see special case in trivial_signature_sizes/4)
+    0.0;
+shash_worst_case_failprob(0, _ItemCount, 0, _ExpDelta) ->
+    % this is exact! (see special case in trivial_signature_sizes/4)
+    0.0;
+shash_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
+    BK2 = util:pow(2, SigSize),
+    NT = calc_max_different_hashes(ItemCount, OtherItemCount, key_version, ExpDelta),
+    % both solutions have their problems with floats near 1
+    % -> use fastest as they are quite close
+    % exact:
+%%     2 * (1 - util:for_to_fold(1, NT - 1,
+%%                               fun(I) -> (1 - I / BK2) end,
+%%                               fun erlang:'*'/2, 1)).
+    % approx:
+    2 * (1 - math:exp(-(NT * (NT - 1) / 2) / BK2)).
 
 %% @doc Calculates the bloom FP, i.e. a single comparison's failure probability,
 %%      assuming:
@@ -2556,7 +2598,7 @@ bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
         BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
         ExpDelta::number()) -> non_neg_integer().
 bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
-    MaxItems = calc_max_different_hashes(BFCount, NrChecks, ExpDelta),
+    MaxItems = calc_max_different_hashes(BFCount, NrChecks, key_version, ExpDelta),
     X = if ExpDelta == 0   -> 0;
            ExpDelta == 100 -> NrChecks; % special case of the one below
            is_float(ExpDelta) ->
@@ -2634,7 +2676,7 @@ build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
                          sig_size = SigSize, p1e = P1E},
     % Note: we can only guess the number of items of the initiator here, so
     %       this is not exactly the P1E of phase 1!
-     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
+     _P1E_p1 = shash_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
 build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
