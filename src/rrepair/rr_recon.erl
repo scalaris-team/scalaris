@@ -573,7 +573,7 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     Diff = if OtherBFCount =:= 0 -> KVList;
               true -> [X || X <- KVList, not bloom:is_element(OtherBF, X)]
            end,
-    MyDiffLen = length(KVList),
+    MyItemCount = length(KVList),
     % allow the garbage collector to free the original Bloom filter
     Struct1 = Struct#bloom_recon_struct{bf = <<>>},
     State1 = State#rr_recon_state{kv_list = Diff, struct = Struct1,
@@ -583,7 +583,7 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     % initiator) since we know the number of item checks and BF sizes of both
     % Bloom filters
     P1E_p1_bf_I_real = bloom_worst_case_failprob(BF, OtherBFCount, ExpDelta),
-    MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyDiffLen),
+    MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyItemCount),
     P1E_p1_bf_NI_real = bloom_worst_case_failprob(OtherBF, MyNrChecks, ExpDelta),
     P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
 %%     log:pal("~w: [ ~p:~.0p ]~n I:~p, P1E_bf=~p~n"
