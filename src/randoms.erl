@@ -64,7 +64,7 @@ rand_uniform_feeder(X, X, C) -> {X, X + 1, C}.
 %% @doc Generates Count random numbers N with Lo &lt;= N &lt; Hi using the crypto
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer(), Count::non_neg_integer()) -> [integer()].
-rand_uniform(Lo, Hi, Count) ->
+rand_uniform(Lo, Hi, Count) when Lo < Hi ->
     % alternative, without the use of crypto's internal API (but slower):
     % util:for_to_ex(1, Count, fun(_) -> crypto:rand_uniform(L, R) end)
     rand_uniform_(crypto:mpint(Lo), crypto:mpint(Hi), Count).
