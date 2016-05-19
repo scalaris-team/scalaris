@@ -1,4 +1,4 @@
-% @copyright 2011-2015 Zuse Institute Berlin
+% @copyright 2011-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -48,9 +48,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
--define(TRACE_SEND(Pid, Msg), ?TRACE("to ~p:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
--define(TRACE1(Msg, State),
+%-define(TRACE(X,Y), log:pal("~w: [ ~.0p:~.0p ] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("to ~.0p:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
+-define(TRACE_RCV(Msg, State),
         ?TRACE("~n  Msg: ~.0p~n"
                  "State: method: ~.0p;  stage: ~.0p;  initiator: ~.0p~n"
                  "      syncI@I: ~.0p~n"
@@ -58,8 +58,8 @@
                [Msg, State#rr_recon_state.method, State#rr_recon_state.stage,
                 State#rr_recon_state.initiator, State#rr_recon_state.'sync_interval@I',
                 ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
--define(MERKLE_DEBUG(X,Y), ok).
-%-define(MERKLE_DEBUG(X,Y), log:pal("~w: [ ~p:~.0p ] " ++ X, [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+-define(ALG_DEBUG(X,Y), ok).
+%-define(ALG_DEBUG(X,Y), log:pal("~w: [ ~.0p:~.0p ] " ++ X, [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -224,7 +224,7 @@
 -spec on(message(), state()) -> state() | kill.
 
 on({create_struct, RMethod, SenderI, SenderMaxItems} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % (first) request from initiator to create a sync struct
     This = comm:reply_as(comm:this(), 3, {create_struct2, SenderI, '_'}),
     comm:send_local(pid_groups:get_my(dht_node), {get_state, This, my_range}),
@@ -234,7 +234,7 @@ on({create_struct, RMethod, SenderI, SenderMaxItems} = _Msg, State) ->
 on({create_struct2, SenderI, {get_state_response, MyI}} = _Msg,
    State = #rr_recon_state{stage = req_shared_interval, initiator = false,
                            method = RMethod,            dest_rr_pid = DestRRPid}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % target node got sync request, asked for its interval
     % dest_interval contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
@@ -258,7 +258,7 @@ on({create_struct2, SenderI, {get_state_response, MyI}} = _Msg,
 on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = build_struct,       initiator = false,
                            'sync_interval@I' = SenderSyncI}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % create recon structure based on all elements in sync interval
     DBList = [{Key, VersionX} || {KeyX, VersionX} <- DBList0,
                                  none =/= (Key = map_key_to_interval(KeyX, SenderSyncI))],
@@ -266,7 +266,7 @@ on({process_db, {get_chunk_response, {RestI, DBList0}}} = _Msg,
 
 on({start_recon, RMethod, Params} = _Msg,
    State = #rr_recon_state{dest_rr_pid = DestRRPid, misc = Misc}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % initiator got other node's sync struct or parameters over sync interval
     % (mapped to the initiator's range)
     % -> create own recon structure based on sync interval and reconcile
@@ -345,7 +345,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}},
                                    {ver_size, VSize}],
                            dest_recon_pid = DestReconPid}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
 
     MyDBSize1 = MyDBSize + length(DBList),
     % identify items to send, request and the remaining (non-matched) DBChunk:
@@ -382,9 +382,9 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   true -> NewStats
                end,
 
-           ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
-                  [rr_recon_stats:get(session_id, Stats1), length(ReqIdx),
-                   erlang:bit_size(ToReq2)]),
+           ?ALG_DEBUG("resolve_req Trivial~n  Session=~.0p ; ToReq=~p (~p bits)",
+                      [rr_recon_stats:get(session_id, Stats1), length(ReqIdx),
+                       erlang:bit_size(ToReq2)]),
            comm:send(DestReconPid, {resolve_req, ToReq2}),
            
            shutdown(sync_finished,
@@ -401,7 +401,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                                         p1e = P1E},
                            kv_list = KVList,
                            misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}]}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % this is similar to the trivial sync above and the bloom sync below
 
     MyDBSize1 = MyDBSize + length(DBList),
@@ -447,12 +447,16 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            dest_recon_pid = DestReconPid, stats = Stats,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     MyDBSize1 = MyDBSize + length(DBList),
     MyBF1 = bloom:add_list(MyBF, DBList),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
+    % get a subset of Delta without what is missing on this node:
+    % NOTE: The only errors which might occur are bloom:is_element/2 returning
+    %       true for an item which is not on the other node (with the filter's
+    %       false positive probability/rate). These are the items we would miss.
     Diff = if BFCount =:= 0 -> DBList;
               true -> [X || X <- DBList, not bloom:is_element(BF, X)]
            end,
@@ -488,11 +492,11 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = RMethod})
   when RMethod =:= merkle_tree orelse RMethod =:= art->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     build_struct(DBList, RestI, State);
 
 on({fd_notify, crash, _Pid, _Reason} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     shutdown(recon_node_crash, State);
 
 on({fd_notify, _Event, _Pid, _Reason} = _Msg, State) ->
@@ -531,7 +535,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
                            method = trivial,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            k_list = KList,            stats = Stats}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     NewStats =
         send_resolve_request(Stats, decompress_idx_to_list(BinReqIdxPos, KList),
                              OwnerL, DestRRPid, _Initiator = false, true),
@@ -540,7 +544,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
 on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = shash,            kv_list = KVList}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx1: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(MyDiffIdx),
 %%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
@@ -565,11 +569,15 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
                                                         exp_delta = ExpDelta,
                                                         p1e = P1E} = Struct,
                            stats = Stats}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     
     Hfs = ?REP_HFS:new(MyHfCount),
     OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
                                          DiffBFBin), Hfs, OtherBFCount),
+    % get a subset of Delta without what is missing on this node:
+    % NOTE: The only errors which might occur are bloom:is_element/2 returning
+    %       true for an item which is not on the other node (with the filter's
+    %       false positive probability/rate). These are the items we would miss.
     Diff = if OtherBFCount =:= 0 -> KVList;
               true -> [X || X <- KVList, not bloom:is_element(OtherBF, X)]
            end,
@@ -586,19 +594,19 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyItemCount),
     P1E_p1_bf_NI_real = bloom_worst_case_failprob(OtherBF, MyNrChecks, ExpDelta),
     P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
-%%     log:pal("~w: [ ~p:~.0p ]~n I:~p, P1E_bf=~p~n"
-%%             " Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
-%%             " Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p",
-%%             [?MODULE, pid_groups:my_groupname(), self(),
-%%              State#rr_recon_state.dest_recon_pid,
-%%              calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
-%%              bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
-%%              bloom:item_count(BF), OtherBFCount, P1E_p1_bf_I_real,
-%%              bloom:get_property(OtherBF, size), ?REP_HFS:size(bloom:get_property(OtherBF, hfs)),
-%%              bloom:item_count(OtherBF), MyNrChecks, P1E_p1_bf_NI_real]),
-    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
     % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
     P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
+    ?ALG_DEBUG("I:~.0p, P1E_bf=~p~n"
+               "  Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
+               "  Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p~n"
+               "-> P1E(phase2): ~p",
+               [State1#rr_recon_state.dest_recon_pid,
+                calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
+                bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
+                bloom:item_count(BF), OtherBFCount, P1E_p1_bf_I_real,
+                bloom:get_property(OtherBF, size), ?REP_HFS:size(bloom:get_property(OtherBF, hfs)),
+                bloom:item_count(OtherBF), MyNrChecks, P1E_p1_bf_NI_real, P1E_p2]),
+    Stats1 = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
     phase2_run_trivial_on_diff(
       Diff, P1E_p1_real, OtherDiffCount, false, P1E_p2, OtherDiffCount,
       State1#rr_recon_state{params = {}, stats = Stats1});
@@ -608,7 +616,7 @@ on({resolve_req, DBChunk, P1E_p1_real, SigSize, _DestReconPid} = _Msg,
                            method = bloom,            kv_list = KVList,
                            stats = Stats,
                            dest_recon_pid = DestReconPid}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     
     {DBChunkTree, OrigDBChunkLen, VSize} =
         decompress_kv_list(DBChunk, SigSize),
@@ -628,7 +636,7 @@ on({resolve_req, DBChunk, P1E_p1_real, SigSize, _DestReconPid} = _Msg,
 on({resolve_req, DBChunk, none, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = art}) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     
     {DBChunkTree, _OrigDBChunkLen, VSize} =
         decompress_kv_list(DBChunk, SigSize),
@@ -647,7 +655,7 @@ on({resolve_req, BinReqIdxPos} = _Msg,
   when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) andalso
            ((RMethod =:= bloom andalso not IsInitiator) orelse
             (RMethod =/= bloom andalso IsInitiator)) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx2: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(BinReqIdxPos),
 %%              erlang:byte_size(erlang:term_to_binary(BinReqIdxPos, [compressed]))]),
@@ -689,7 +697,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                           0, 0),
     ?IIF((EffectiveP1E_I > 0 andalso (1 - EffectiveP1E_I >= 1)) orelse
              (1 - EffectiveP1E_L >= 1), % EffectiveP1E_L is always greater than 0
-         log:log("~w: [ ~p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
+         log:log("~w: [ ~.0p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
                  " P1E_I = ~g, P1E_L = ~g",
                  [?MODULE, pid_groups:my_groupname(), self(),
                   EffectiveP1E_I, EffectiveP1E_L]),
@@ -698,8 +706,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                   * math:pow(1 - EffectiveP1E_L, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
-    ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~nP1E: ~g -> ~g",
-                  [length(RTree), 1 - PrevP0E, 1 - NextP0E]),
+    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
+               [length(RTree), 1 - PrevP0E, 1 - NextP0E]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
     if RTree =:= [] ->
@@ -735,7 +743,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                           Sync, Params, Stats, [], [], [], 0, [], 0, 0, 0, 0, 0,
                           0, 0),
     ?IIF((1 - EffectiveP1ETotal_I >= 1) orelse (1 - EffectiveP1ETotal_L >= 1),
-         log:log("~w: [ ~p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
+         log:log("~w: [ ~.0p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
                  " P1E_I = ~g, P1E_L = ~g",
                  [?MODULE, pid_groups:my_groupname(), self(),
                   EffectiveP1ETotal_I, EffectiveP1ETotal_L]),
@@ -744,8 +752,8 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                   * math:pow(1 - EffectiveP1ETotal_L, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
-    ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~nP1E: ~g -> ~g",
-                  [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
+    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
+               [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
@@ -771,7 +779,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
 on({resolve_req, HashesK, HashesV} = _Msg,
    State = #rr_recon_state{stage = resolve,           method = merkle_tree})
   when is_bitstring(HashesK) andalso is_bitstring(HashesV) ->
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
     merkle_resolve_leaves_receive(State, HashesK, HashesV);
@@ -786,11 +794,11 @@ on({resolve_req, BinKeyList, SyncSendP0E_real} = _Msg,
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
   when is_bitstring(BinKeyList) ->
-    ?MERKLE_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed",
-                  [?IIF(IsInitiator, "I", "NI"),
-                   erlang:byte_size(
-                     erlang:term_to_binary(BinKeyList, [compressed]))]),
-    ?TRACE1(_Msg, State),
+    ?TRACE_RCV(_Msg, State),
+    ?ALG_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed",
+               [?IIF(IsInitiator, "I", "NI"),
+                erlang:byte_size(
+                  erlang:term_to_binary(BinKeyList, [compressed]))]),
     PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, Stats), % from sync_receive
     Stats1  = rr_recon_stats:set(
                 [{p1e_phase2, 1 - (1 - PrevP1E_p2) * SyncSendP0E_real}], Stats),
@@ -848,7 +856,7 @@ begin_sync(State = #rr_recon_state{method = trivial, params = {}, initiator = fa
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     {KList, VList, ResortedKVOrigList} = MySyncStruct#trivial_recon_struct.db_chunk,
     MySyncStruct1 = MySyncStruct#trivial_recon_struct{db_chunk = {KList, VList}},
@@ -860,7 +868,7 @@ begin_sync(State = #rr_recon_state{method = shash, params = {}, initiator = fals
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     {KList, ResortedKVOrigList} = MySyncStruct#shash_recon_struct.db_chunk,
     MySyncStruct1 = MySyncStruct#shash_recon_struct{db_chunk = KList},
@@ -874,7 +882,7 @@ begin_sync(State = #rr_recon_state{method = bloom, params = {}, initiator = fals
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     BFBin = bloom:get_property(MySyncStruct#bloom_recon_struct.bf, filter),
     MySyncStruct1 = MySyncStruct#bloom_recon_struct{bf = BFBin},
@@ -888,7 +896,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     % tell the initiator to create its struct first, and then build ours
     % (at this stage, we do not have any data in the merkle tree yet!)
     DBItems = State#rr_recon_state.kv_list,
@@ -934,11 +942,11 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     MTSize = merkle_tree:size_detail(SyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
-    ?MERKLE_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
-                  "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-                  [length(SyncStruct), MTSize,
-                   length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-                                 merkle_tree:is_empty(L)])]),
+    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
+               "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+               [length(SyncStruct), MTSize,
+                length([ok || L <- merkle_tree:get_leaves(SyncStruct),
+                              merkle_tree:is_empty(L)])]),
     
     State#rr_recon_state{struct = SyncStruct,
                          stats = Stats2, params = MySyncParams,
@@ -949,18 +957,18 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
                                    dest_recon_pid = DestReconPid}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     MTSize = merkle_tree:size_detail(MySyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
                    ni_item_count = OtherItemsCount} = Params,
     MyItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
-    ?MERKLE_DEBUG("merkle (I) - CurrentNodes: ~B~n"
-                  "Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-                  [length(MySyncStruct), MTSize,
-                   length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-                                 merkle_tree:is_empty(L)])]),
+    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n"
+               "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
+               [length(MySyncStruct), MTSize,
+                length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
+                              merkle_tree:is_empty(L)])]),
     P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
     P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
     
@@ -981,7 +989,7 @@ begin_sync(State = #rr_recon_state{method = art, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, art, MySyncStruct}}),
@@ -992,7 +1000,7 @@ begin_sync(State = #rr_recon_state{method = art, params = {}, initiator = false,
 begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
                                    dest_recon_pid = DestReconPid}) ->
-    ?TRACE("BEGIN SYNC", []),
+    ?ALG_DEBUG("BEGIN SYNC", []),
     ART = Params#art_recon_struct.art,
     Stats1 = rr_recon_stats:set(
                [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
@@ -1008,13 +1016,14 @@ begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = tr
             % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
             P1E_p1_0 = bloom_worst_case_failprob(
                          art:get_property(ART, leaf_bf), MyItemCount, 100), % TODO: adapt ExpDelta
-            P1E_p1 = if P1E_p1_0 == 1 ->
-                            log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
-                                    " - continuing with smallest possible failure probability",
-                                    [?MODULE, pid_groups:my_groupname(), self()]),
-                            1 - 1.0e-16;
-                        true -> P1E_p1_0
-                     end,
+            P1E_p1 =
+                if P1E_p1_0 == 1 ->
+                       log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
+                               "  continuing with smallest possible failure probability",
+                               [?MODULE, pid_groups:my_groupname(), self()]),
+                       1 - 1.0e-16;
+                   true -> P1E_p1_0
+                end,
             Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
             % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
             P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
@@ -1041,8 +1050,8 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
                                  initiator = Initiator, dest_rr_pid = DestRR,
                                  dest_recon_pid = DestRC, method = RMethod,
                                  'sync_interval@I' = SyncI}) ->
-    ?TRACE("SHUTDOWN Session=~p Reason=~p",
-           [rr_recon_stats:get(session_id, Stats), Reason]),
+    ?ALG_DEBUG("SHUTDOWN~n  Session=~.0p Reason=~p",
+               [rr_recon_stats:get(session_id, Stats), Reason]),
 
     % unsubscribe from fd if a subscription was made:
     case Initiator orelse (not intervals:is_empty(SyncI)) of
@@ -1188,7 +1197,7 @@ decompress_kv_list({KeyDiff, VBin}, SigSize) ->
         case mymaps:size(KVMap) of
             KListLen -> KVMap;
             KVMapSize ->
-                log:log("~w: [ ~p:~.0p ] hash collision detected"
+                log:log("~w: [ ~.0p:~.0p ] hash collision detected"
                         " (redundant item transfers expected)",
                         [?MODULE, pid_groups:my_groupname(), self()]),
                 % there are duplicates! (items were mapped to the same key)
@@ -1495,8 +1504,8 @@ shash_bloom_perform_resolve(
                lists:reverse(
                  pos_to_bitstring(% note: ReqIdx positions start with 0
                    ReqIdx, [], 0, ?IIF(ReqIdx =:= [], 0, lists:last(ReqIdx) + 1)))),
-    ?TRACE("resolve_req ~s Session=~p ; ToReq= ~p bytes",
-           [_RMethod, rr_recon_stats:get(session_id, NewStats1), erlang:byte_size(ToReq2)]),
+    ?ALG_DEBUG("resolve_req ~s~n  Session=~.0p ; ToReq= ~p bytes",
+               [_RMethod, rr_recon_stats:get(session_id, NewStats1), erlang:byte_size(ToReq2)]),
     comm:send(DestReconPid, {resolve_req, ToReq2}),
     % the other node will use key_upd_send and we must thus increase
     % the number of resolve processes here!
@@ -1522,8 +1531,8 @@ phase2_run_trivial_on_diff(
                           dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
     CKVSize = length(UnidentifiedDiff),
     StartResolve = CKVSize + OtherDiffIdxSize > 0,
-    ?TRACE("Reconcile SHash/Bloom/ART Session=~p ; Diff=~B+~B",
-           [rr_recon_stats:get(session_id, Stats), CKVSize, OtherDiffIdxSize]),
+    ?ALG_DEBUG("Reconcile SHash/Bloom/ART~n  Session=~.0p ; Diff=~B+~B",
+               [rr_recon_stats:get(session_id, Stats), CKVSize, OtherDiffIdxSize]),
     if StartResolve andalso not OtherHasShutdown ->
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
@@ -1600,7 +1609,7 @@ merkle_next_p1e(BranchFactor, P1ETotal) ->
     % => current node's probability of 0 errors = P0E(child)^B
     P1E_I = calc_n_subparts_p1e(BranchFactor + 1, P1ETotal),
     P1E_L = P1ETotal,
-%%     log:pal("merkle [ ~p ]~n - P1ETotal: ~p, \tP1E_I: ~p, \tP1E_L: ~p",
+%%     log:pal("merkle [ ~p ]~n  P1ETotal: ~p, \tP1E_I: ~p, \tP1E_L: ~p",
 %%             [self(), P1ETotal, P1E_I, P1E_L]),
     {P1E_I, P1E_L}.
 
@@ -1638,12 +1647,12 @@ merkle_next_signature_sizes(
     EffectiveP1E_L = float(AffectedItemsL / util:pow(2, NextSigSizeL)),
     ?DBG_ASSERT2(EffectiveP1E_L > 0 andalso EffectiveP1E_L < 1, EffectiveP1E_L),
 
-    ?MERKLE_DEBUG("merkle - signatures~nMyMI: ~B,\tOtMI: ~B"
-                  "\tP1E_I: ~g,\tP1E_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
-                  "  -> eff. P1E_I: ~g,\teff. P1E_L: ~g",
-                  [MyMaxItemsCount, OtherMaxItemsCount,
-                   P1E_I, P1E_L, NextSigSizeI, NextSigSizeL,
-                   EffectiveP1E_I, EffectiveP1E_L]),
+    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B"
+               "\tP1E_I: ~g,\tP1E_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
+               "  -> eff. P1E_I: ~g,\teff. P1E_L: ~g",
+               [MyMaxItemsCount, OtherMaxItemsCount,
+                P1E_I, P1E_L, NextSigSizeI, NextSigSizeL,
+                EffectiveP1E_I, EffectiveP1E_L]),
     {P1E_I, P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L}.
 
 -compile({nowarn_unused_function, {min_max_feeder, 3}}).
@@ -2060,7 +2069,7 @@ merkle_resolve_add_leaf_hash(
     ?DBG_ASSERT(BucketSize =< util:pow(2, BucketSizeBits)),
     HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
-%%     log:pal("merkle_send [ ~p ]:~n   ~p~n   ~p",
+%%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
     {SigSize, VSize} =
         trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
@@ -2071,7 +2080,7 @@ merkle_resolve_add_leaf_hash(
     ThisP1E_upper_bound =
         trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
     NextP0E = PrevP0E * (1 - ThisP1E_upper_bound),
-%%     log:pal("merkle_send [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
+%%     log:pal("merkle_send [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     {HashesKNew, HashesVNew, ResortedBucket} =
         compress_kv_list(Bucket, {HashesK1, HashesV}, SigSize, VSize,
@@ -2097,7 +2106,7 @@ merkle_resolve_retrieve_leaf_hashes(
     <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
     BucketSize = BucketSize0 + 1,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
-%%     log:pal("merkle_receive [ ~p ]:~n   ~p~n   ~p",
+%%     log:pal("merkle_receive [ ~p ]:~n  ~p~n  ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
     {SigSize, VSize} =
@@ -2108,7 +2117,7 @@ merkle_resolve_retrieve_leaf_hashes(
     ThisP1E_real =
         trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
     NextP0E_real = PrevP0E_real * (1 - ThisP1E_real),
-%%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n   bits: ~p, P1E: ~p vs. ~p~n   P0E: ~p -> ~p",
+%%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     % we need to know how large a piece is
     % -> peak into the binary (using the format in decompress_idx_list/3):
@@ -2134,8 +2143,8 @@ merkle_resolve_leaves_send(
                           merkle_sync = {SyncSend, SyncRcv, SyncRcvLeafCount,
                                          {MySyncDRK, MySyncDRLCount, OtherSyncDRLCount}}},
   NextP0E) ->
-    ?TRACE("Sync (~s):~nsend:~.2p~n rcv:~.2p",
-           [?IIF(IsInitiator, "I", "NI"), SyncNewSend, SyncNewRcv]),
+%%     log:pal("Sync (~s):~n  send:~.2p~n  rcv:~.2p",
+%%             [?IIF(IsInitiator, "I", "NI"), SyncSend, SyncRcv]),
     % resolve items from emptyLeaf-* comparisons with empty leaves on any node as key_upd:
     NStats1 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
     NStats2 = rr_recon_stats:inc(
@@ -2148,15 +2157,15 @@ merkle_resolve_leaves_send(
     SyncRcvL = length(SyncRcv),
     TrivialProcs = SyncSendL + SyncRcvL,
     P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP0E),
-    ?MERKLE_DEBUG("merkle (~s) - LeafSync~n~B (send), ~B (receive), ~B direct (~s)\tP1EAllLeaves: ~g\t"
-                  "ItemsToSend: ~B (~g per leaf)",
-                  [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
-                   SyncDRLCount, ?IIF(IsInitiator, "in", "out"),
-                   P1EAllLeaves,
-                   lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]),
-                   ?IIF(SyncSend =/= [],
-                        lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]) /
-                            SyncSendL, 0.0)]),
+    ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tP1EAllLeaves: ~g\t"
+               "ItemsToSend: ~B (~g per leaf)",
+               [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
+                MySyncDRLCount, ?IIF(IsInitiator, "in", "out"),
+                P1EAllLeaves,
+                lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]),
+                ?IIF(SyncSend =/= [],
+                     lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]) /
+                         SyncSendL, 0.0)]),
     
     if SyncSendL =:= 0 andalso SyncRcvL =:= 0 ->
            % nothing to do
@@ -2187,12 +2196,14 @@ merkle_resolve_leaves_send(
            
            MerkleSyncNew1 = {lists:reverse(NewSyncSend_rev), SyncRcv, SyncRcvLeafCount,
                              {[], MySyncDRLCount, OtherSyncDRLCount}},
-           ?MERKLE_DEBUG("merkle (~s) - HashesSize: ~B (~B compressed)",
-                         [?IIF(_IsInitiator, "I", "NI"),
-                          erlang:byte_size(
-                            erlang:term_to_binary(Hashes)),
-                          erlang:byte_size(
-                            erlang:term_to_binary(Hashes, [compressed]))]),
+           ?ALG_DEBUG("merkle (~s) - HashesSize: ~B+~B (~B+~B compressed)",
+                      [?IIF(IsInitiator, "I", "NI"),
+                       erlang:byte_size(erlang:term_to_binary(HashesK)),
+                       erlang:byte_size(erlang:term_to_binary(HashesV)),
+                       erlang:byte_size(
+                         erlang:term_to_binary(HashesK, [compressed])),
+                       erlang:byte_size(
+                         erlang:term_to_binary(HashesV, [compressed]))]),
            ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
            send(DestReconPid, {resolve_req, HashesK, HashesV}),
            State#rr_recon_state{stage = resolve, stats = NStats3,
@@ -2275,9 +2286,9 @@ merkle_resolve_leaves_receive(
                                  {rs_expected, MerkleResReqs}], Stats1),
     ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, Stats2) =:= 0.0),
     NStats  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E_real}], Stats2),
-    ?TRACE("resolve_req Merkle Session=~p ; resolve expexted=~B",
-           [rr_recon_stats:get(session_id, NStats),
-            rr_recon_stats:get(rs_expected, NStats)]),
+    ?ALG_DEBUG("resolve_req Merkle~n  Session=~.0p ; resolve expexted=~B",
+               [rr_recon_stats:get(session_id, NStats),
+                rr_recon_stats:get(rs_expected, NStats)]),
 
     comm:send(DestRCPid, {resolve_req, ToResolve1, ThisP0E_real}),
     % free up some memory:
@@ -2350,13 +2361,13 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
     when is_subtype(Stats, rr_recon_stats:stats()).
 send_resolve_request(Stats, [] = _ToSend, _OwnerL, _DestRRPid, _IsInitiator,
                      true = _SkipIfEmpty) ->
-    ?TRACE("Resolve Session=~p ; ToSend=~p",
-           [rr_recon_stats:get(session_id, Stats), 0]),
+    ?ALG_DEBUG("Resolve~n  Session=~.0p ; ToSend=~p",
+               [rr_recon_stats:get(session_id, Stats), 0]),
     Stats;
 send_resolve_request(Stats, ToSend, OwnerL, DestRRPid, IsInitiator,
                      _SkipIfEmpty) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    ?TRACE("Resolve Session=~p ; ToSend=~p", [SID, length(ToSend)]),
+    ?ALG_DEBUG("Resolve~n  Session=~.0p ; ToSend=~p", [SID, length(ToSend)]),
     % note: the resolve request is counted at the initiator and
     %       thus from_my_node must be set accordingly on this node!
     ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
@@ -2423,9 +2434,9 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1.0e-8 andalso
     if VP > 0 andalso VP < 1 ->
            VP;
        VP =< 0 ->
-           log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
-                   " continuing with smallest possible failure probability"
-                   " (instead of ~g)",
+           log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
+                   "  continuing with smallest possible failure probability"
+                   "  (instead of ~g)",
                    [?MODULE, pid_groups:my_groupname(), self(), VP]),
            1.0e-16 % do not go below this so that the opposite probability is possible as a float!
     end;
@@ -2435,9 +2446,9 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
     if VP > 0 andalso VP < 1 ->
            VP;
        VP =< 0 ->
-           log:log("~w: [ ~p:~.0p ] P1E constraint broken (phase 1 overstepped?)"
-                   " - continuing with smallest possible failure probability"
-                   " (instead of ~g)",
+           log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
+                   "  continuing with smallest possible failure probability"
+                   "  (instead of ~g)",
                    [?MODULE, pid_groups:my_groupname(), self(), VP]),
            1.0e-16 % do not go below this so that the opposite probability is possible as a float!
     end.
@@ -2513,16 +2524,16 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, 
     {HashesKNew, HashesVNew, ResortedBucket} =
         compress_kv_list(DBItems, {<<>>, <<>>}, SigSize, VSize, KeyComprFun),
     % debug compressed and uncompressed sizes:
-    ?TRACE("~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
-            [ItemCount, OtherItemCount, SigSize, VSize,
-             erlang:bit_size(erlang:term_to_binary(HashesKNew)),
-             erlang:bit_size(erlang:term_to_binary(HashesVNew)),
-             erlang:bit_size(
-                 erlang:term_to_binary(HashesKNew,
-                                       [{minor_version, 1}, {compressed, 2}])),
-             erlang:bit_size(
-                 erlang:term_to_binary(HashesVNew,
-                                       [{minor_version, 1}, {compressed, 2}]))]),
+    ?ALG_DEBUG("compress_kv_list~n  ~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
+               [ItemCount, OtherItemCount, SigSize, VSize,
+                erlang:bit_size(erlang:term_to_binary(HashesKNew)),
+                erlang:bit_size(erlang:term_to_binary(HashesVNew)),
+                erlang:bit_size(
+                  erlang:term_to_binary(HashesKNew,
+                                        [{minor_version, 1}, {compressed, 2}])),
+                erlang:bit_size(
+                  erlang:term_to_binary(HashesVNew,
+                                        [{minor_version, 1}, {compressed, 2}]))]),
     {HashesKNew, HashesVNew, ResortedBucket, SigSize, VSize}.
 
 %% @doc Calculates the signature size for comparing ItemCount items with
@@ -2693,8 +2704,8 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     FP2 = bloom_fp(InitiatorMaxItems, MyMaxItems, ExpDelta, P1E_p1_bf),
     {K1, M1} = bloom:calc_HF_num_Size_opt(MyMaxItems, FP1),
     {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FP2),
-%%     log:pal("My: ~B OtherMax: ~B~nbloom1: ~p~nbloom2: ~p",
-%%             [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
+    ?ALG_DEBUG("Bloom My: ~B OtherMax: ~B~n  bloom1: ~p~n  bloom2: ~p",
+               [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
     FP1_MyFP = bloom_worst_case_failprob_(
                  bloom:calc_FPR(M1, MyMaxItems, K1), MyMaxItems, InitiatorMaxItems, ExpDelta),
     FP1_OtherFP = bloom_worst_case_failprob_(
@@ -2715,25 +2726,27 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
                  bloom:new(M2, ?REP_HFS:new(K2));
              true ->
                  % all other cases are probably due to floating point inefficiencies
-                 log:log("~w: [ ~p:~.0p ] P1E constraint for phase 1 probably broken",
+                 log:log("~w: [ ~.0p:~.0p ] P1E constraint for phase 1 probably broken",
                          [?MODULE, pid_groups:my_groupname(), self()]),
                  bloom:new(M1, ?REP_HFS:new(K1))
           end,
-%%     log:pal("~w: [ ~p:~.0p ]~n NI:~p, P1E_bf=~p "
-%%             " m=~B k=~B NICount=~B ICount=~B~n"
-%%             " P1E_bf1=~p P1E_bf2=~p",
-%%             [?MODULE, pid_groups:my_groupname(), self(),
-%%              comm:this(), P1E_p1_bf, bloom:get_property(BF0, size),
-%%              ?REP_HFS:size(bloom:get_property(BF0, hfs)),
-%%              MyMaxItems, InitiatorMaxItems,
-%%              bloom_worst_case_failprob_(
-%%                bloom:calc_FPR(
-%%                  bloom:get_property(BF0, size), MyMaxItems,
-%%                  ?REP_HFS:size(bloom:get_property(BF0, hfs))), InitiatorMaxItems),
-%%              bloom_worst_case_failprob_(
-%%                bloom:calc_FPR(
-%%                  bloom:get_property(BF0, size), InitiatorMaxItems,
-%%                  ?REP_HFS:size(bloom:get_property(BF0, hfs))), MyMaxItems)]),
+    %TODO: include ExpDelta in these values:
+    ?ALG_DEBUG("NI:~.0p, P1E_bf=~p~n"
+               "  m=~B k=~B NICount=~B ICount=~B~n"
+               "  P1E_bf1=~p P1E_bf2=~p",
+               [comm:this(), P1E_p1_bf, bloom:get_property(BF0, size),
+                ?REP_HFS:size(bloom:get_property(BF0, hfs)),
+                MyMaxItems, InitiatorMaxItems,
+                bloom_worst_case_failprob_(
+                  bloom:calc_FPR(
+                    bloom:get_property(BF0, size), MyMaxItems,
+                    ?REP_HFS:size(bloom:get_property(BF0, hfs))),
+                  MyMaxItems, InitiatorMaxItems, ExpDelta),
+                bloom_worst_case_failprob_(
+                  bloom:calc_FPR(
+                    bloom:get_property(BF0, size), InitiatorMaxItems,
+                    ?REP_HFS:size(bloom:get_property(BF0, hfs))),
+                  InitiatorMaxItems, MyMaxItems, ExpDelta)]),
     HfCount = ?REP_HFS:size(bloom:get_property(BF0, hfs)),
     BF = bloom:add_list(BF0, DBItems),
     {#bloom_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
