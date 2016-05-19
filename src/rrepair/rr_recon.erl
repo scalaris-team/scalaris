@@ -103,7 +103,7 @@
          interval   = intervals:empty()                         :: intervals:interval(),
          reconPid   = undefined                                 :: comm:mypid() | undefined,
          exp_delta  = ?required(bloom_recon_struct, exp_delta)  :: number(),
-         bf         = ?required(bloom_recon_struct, bloom)      :: binary() | bloom:bloom_filter(), % binary for transfer, the full filter locally
+         bf         = ?required(bloom_recon_struct, bloom)      :: [bitstring(),...] | bloom:bloom_filter() | none, % [bitstring(),...] for transfer, the full filter locally
          item_count = ?required(bloom_recon_struct, item_count) :: non_neg_integer(),
          hf_count   = ?required(bloom_recon_struct, hf_count)   :: pos_integer(),
          p1e        = ?required(bloom_recon_struct, p1e)        :: float()
@@ -310,7 +310,7 @@ on({start_recon, RMethod, Params} = _Msg,
             BF = bloom:new_bin(BFBin, Hfs, BFCount),
             Params1 = Params#bloom_recon_struct{bf = BF},
             Misc1 = [{item_count, 0},
-                     {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), Hfs)}];
+                     {my_bf, bloom:new(bloom:get_property(BF, size), Hfs)}];
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             Params1 = Params,
@@ -479,12 +479,14 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                            stats = NewStats},
            shutdown(sync_finished, NewState);
        true ->
-           DiffBF = util:bin_xor(bloom:get_property(BF, filter),
-                                 bloom:get_property(MyBF1, filter)),
+           DiffBF =
+               [util:bin_xor(X, Y)
+               || {X, Y} <- lists:zip(bloom:get_property(BF, filter),
+                                      bloom:get_property(MyBF1, filter))],
            send(DestReconPid, {reconcile_req, DiffBF, MyDBSize1, length(NewKVList),
                                comm:this()}),
            % allow the garbage collector to free the original Bloom filter here
-           Params1 = Params#bloom_recon_struct{bf = <<>>},
+           Params1 = Params#bloom_recon_struct{bf = none},
            State#rr_recon_state{stage = resolve, params = Params1, kv_list = NewKVList}
     end;
 
@@ -572,8 +574,10 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     ?TRACE_RCV(_Msg, State),
     
     Hfs = ?REP_HFS:new(MyHfCount),
-    OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
-                                         DiffBFBin), Hfs, OtherBFCount),
+    OtherBF = bloom:new_bin(
+                [util:bin_xor(X, Y)
+                   || {X, Y} <- lists:zip(bloom:get_property(BF, filter), DiffBFBin)],
+                Hfs, OtherBFCount),
     % get a subset of Delta without what is missing on this node:
     % NOTE: The only errors which might occur are bloom:is_element/2 returning
     %       true for an item which is not on the other node (with the filter's
@@ -583,7 +587,7 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
            end,
     MyItemCount = length(KVList),
     % allow the garbage collector to free the original Bloom filter
-    Struct1 = Struct#bloom_recon_struct{bf = <<>>},
+    Struct1 = Struct#bloom_recon_struct{bf = none},
     State1 = State#rr_recon_state{kv_list = Diff, struct = Struct1,
                                   dest_recon_pid = DestReconPid},
     
