@@ -591,6 +591,25 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
 %    EvalDir = proplists:get_value(eval_dir, Options, "../"),
 %    {Hour, Min, Sec} = proplists:get_value(eval_time, Options, {0, 0, 0}),
     
+    % spawn a separate process for writing measure points:
+    Self = self(),
+    MPFileWriter =
+        if MPFile =/= null ->
+               erlang:spawn_link(
+                 fun() ->
+                         util:for_to_ex(
+                           1, EvalRepeats,
+                           fun(_I) ->
+                                   receive MPRow ->
+                                               rr_eval_export:write_ds(
+                                                 MPFile, {[], [tuple_to_list(MPRow)]})
+                                   end
+                           end),
+                         Self ! mp_write_done
+                 end);
+           true -> nopid
+        end,
+
     MPList =
         util:for_to_ex(
           1, EvalRepeats,
@@ -623,6 +642,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
                   %                              {subdir, io_lib:format("~s/Trace", [EvalDir])}]),
                   
                   reset(),
+                  MPFile =/= null andalso MPFileWriter ! MP,
                   MP
           end),
     
@@ -637,8 +657,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
     % WRITE LINE
     EPFile =/= null andalso
         rr_eval_export:write_ds(EPFile, {[], [tuple_to_list(EP)]}),
-    MPFile =/= null andalso
-        rr_eval_export:write_ds(MPFile, {[], [tuple_to_list(Row) || Row <- MPList]}),
+    MPFile =/= null andalso receive mp_write_done -> true end,
     
     pair_sync(Setup, Options, IncParam, IncSize, StepCount - 1, {[EP | AccEP], lists:append(MPList, AccMP), EPId + 1}).
 
