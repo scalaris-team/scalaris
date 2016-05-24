@@ -2524,6 +2524,7 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, 
     {HashesKNew, HashesVNew, ResortedBucket} =
         compress_kv_list(DBItems, {<<>>, <<>>}, SigSize, VSize, KeyComprFun),
     % debug compressed and uncompressed sizes:
+    % TODO: include ExpDelta in these values:
     ?ALG_DEBUG("compress_kv_list~n  ~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
                [ItemCount, OtherItemCount, SigSize, VSize,
                 erlang:bit_size(erlang:term_to_binary(HashesKNew)),
@@ -2603,8 +2604,8 @@ bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
     calc_n_subparts_p1e(erlang:max(NrChecksNotInBF, 1), P1E).
 
 %% @doc Helper for bloom_fp/3 calculating the maximum number of item checks
-%%      with items not in the Bloom filter when an upper bound on the delta is
-%%      known.
+%%      that could yield false positives, i.e. items not originally encoded
+%%      in the Bloom filter, when an upper bound on the delta is known.
 -spec bloom_calc_max_nr_checks(
         BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
         ExpDelta::number()) -> non_neg_integer().
@@ -2730,7 +2731,7 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
                          [?MODULE, pid_groups:my_groupname(), self()]),
                  bloom:new(M1, ?REP_HFS:new(K1))
           end,
-    %TODO: include ExpDelta in these values:
+    % TODO: include ExpDelta in these values:
     ?ALG_DEBUG("NI:~.0p, P1E_bf=~p~n"
                "  m=~B k=~B NICount=~B ICount=~B~n"
                "  P1E_bf1=~p P1E_bf2=~p",
