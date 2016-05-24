@@ -306,11 +306,10 @@ on({start_recon, RMethod, Params} = _Msg,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             ?DBG_ASSERT(Misc =:= []),
-            Hfs = ?REP_HFS:new(HfCount),
-            BF = bloom:new_bin(BFBin, Hfs, BFCount),
+            BF = bloom:new_bin(BFBin, HfCount, BFCount),
             Params1 = Params#bloom_recon_struct{bf = BF},
             Misc1 = [{item_count, 0},
-                     {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), Hfs)}];
+                     {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), HfCount)}];
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             Params1 = Params,
@@ -571,9 +570,8 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
                            stats = Stats}) ->
     ?TRACE_RCV(_Msg, State),
     
-    Hfs = ?REP_HFS:new(MyHfCount),
     OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
-                                         DiffBFBin), Hfs, OtherBFCount),
+                                         DiffBFBin), MyHfCount, OtherBFCount),
     % get a subset of Delta without what is missing on this node:
     % NOTE: The only errors which might occur are bloom:is_element/2 returning
     %       true for an item which is not on the other node (with the filter's
@@ -602,9 +600,9 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
                "-> P1E(phase2): ~p",
                [State1#rr_recon_state.dest_recon_pid,
                 calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
-                bloom:get_property(BF, size), ?REP_HFS:size(bloom:get_property(BF, hfs)),
+                bloom:get_property(BF, size), bloom:get_property(BF, hfs_size),
                 bloom:item_count(BF), OtherBFCount, P1E_p1_bf_I_real,
-                bloom:get_property(OtherBF, size), ?REP_HFS:size(bloom:get_property(OtherBF, hfs)),
+                bloom:get_property(OtherBF, size), bloom:get_property(OtherBF, hfs_size),
                 bloom:item_count(OtherBF), MyNrChecks, P1E_p1_bf_NI_real, P1E_p2]),
     Stats1 = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
     phase2_run_trivial_on_diff(
@@ -2724,37 +2722,37 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
     FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
     BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 =< M2 ->
-                 bloom:new(M1, ?REP_HFS:new(K1));
+                 bloom:new(M1, K1);
              FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 > M2 ->
-                 bloom:new(M2, ?REP_HFS:new(K2));
+                 bloom:new(M2, K2);
              FP1_P1E_p1 =< P1E_p1 ->
-                 bloom:new(M1, ?REP_HFS:new(K1));
+                 bloom:new(M1, K1);
              FP2_P1E_p1 =< P1E_p1 ->
-                 bloom:new(M2, ?REP_HFS:new(K2));
+                 bloom:new(M2, K2);
              true ->
                  % all other cases are probably due to floating point inefficiencies
                  log:log("~w: [ ~.0p:~.0p ] P1E constraint for phase 1 probably broken",
                          [?MODULE, pid_groups:my_groupname(), self()]),
-                 bloom:new(M1, ?REP_HFS:new(K1))
+                 bloom:new(M1, K1)
           end,
     % TODO: include ExpDelta in these values:
     ?ALG_DEBUG("NI:~.0p, P1E_bf=~p~n"
                "  m=~B k=~B NICount=~B ICount=~B~n"
                "  P1E_bf1=~p P1E_bf2=~p",
                [comm:this(), P1E_p1_bf, bloom:get_property(BF0, size),
-                ?REP_HFS:size(bloom:get_property(BF0, hfs)),
+                bloom:get_property(BF0, hfs_size),
                 MyMaxItems, InitiatorMaxItems,
                 bloom_worst_case_failprob_(
                   bloom:calc_FPR(
                     bloom:get_property(BF0, size), MyMaxItems,
-                    ?REP_HFS:size(bloom:get_property(BF0, hfs))),
+                    bloom:get_property(BF0, hfs_size)),
                   MyMaxItems, InitiatorMaxItems, ExpDelta),
                 bloom_worst_case_failprob_(
                   bloom:calc_FPR(
                     bloom:get_property(BF0, size), InitiatorMaxItems,
-                    ?REP_HFS:size(bloom:get_property(BF0, hfs))),
+                    bloom:get_property(BF0, hfs_size)),
                   InitiatorMaxItems, MyMaxItems, ExpDelta)]),
-    HfCount = ?REP_HFS:size(bloom:get_property(BF0, hfs)),
+    HfCount = bloom:get_property(BF0, hfs_size),
     BF = bloom:add_list(BF0, DBItems),
     {#bloom_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
                          bf = BF, item_count = MyMaxItems,

@@ -31,6 +31,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
+-define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
+
 -export([new/2, new/3, insert/3, delete/3, get/2, list_entries/1]).
 -export([is_element/2]).
 -export([get_fpr/1, get_prop/2]).
@@ -65,11 +67,13 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec new(?REP_HFS:hfs(), pos_integer()) -> iblt().
+-spec new(?REP_HFS:hfs() | non_neg_integer(), pos_integer()) -> iblt().
 new(Hfs, CellCount) ->
     new(Hfs, CellCount, [prime]).
 
--spec new(?REP_HFS:hfs(), pos_integer(), options()) -> iblt().
+-spec new(?REP_HFS:hfs() | non_neg_integer(), pos_integer(), options()) -> iblt().
+new(HfCount, CellCount, Options) when is_integer(HfCount) ->
+    new(?REP_HFS:new(HfCount), CellCount, Options);
 new(Hfs, CellCount, Options) ->
     K = ?REP_HFS:size(Hfs),
     {Cells, ColSize} = case proplists:get_bool(prime, Options) of

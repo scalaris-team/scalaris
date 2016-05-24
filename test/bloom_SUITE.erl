@@ -152,7 +152,7 @@ prop_fpr(ItemCount, ItemType) ->
     ct:pal("ItemCount=~p ; ItemType=~p ; Tests=~p ; Functions=~p ; CompressionRate=~.2f~n"
                "DestFpr, Measured, Diff in %, Status~n~p",
                [ItemCount, ItemType, ?Fpr_Test_NumTests,
-                ?REP_HFS:size(bloom:get_property(ExampleBF, hfs)),
+                bloom:get_property(ExampleBF, hfs_size),
                 ?BLOOM:get_property(ExampleBF, size) / ItemCount, FPs2]),
     true.
 

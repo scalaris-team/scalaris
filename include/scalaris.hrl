@@ -54,9 +54,6 @@
 %% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, erlang:byte_size(erlang:term_to_binary(MESSAGE, [{minor_version, 1}])))).
 
 
-% Replica Repair
--define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
-
 % Back-end of the pdb module
 -define(PDB_ERL, true). % erlang put and get (process dictionary)
 %-define(PDB_ETS, true). % may have performance issues with msg_delay

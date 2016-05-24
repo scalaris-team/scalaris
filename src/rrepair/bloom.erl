@@ -24,8 +24,9 @@
 -vsn('$Id$').
 
 -include("record_helpers.hrl").
-
 -include("scalaris.hrl").
+
+-define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
          add/2, add_list/2, is_element/2, item_count/1,
@@ -63,7 +64,7 @@ new_fpr(MaxItems, FPR) ->
 
 %% @doc Creates a new bloom filter with the given hash function set
 %%      based on the given false positive rate.
--spec new_fpr(MaxItems::non_neg_integer(), FPR::float(), ?REP_HFS:hfs())
+-spec new_fpr(MaxItems::non_neg_integer(), FPR::float(), ?REP_HFS:hfs() | non_neg_integer())
         -> bloom_filter().
 new_fpr(MaxItems, FPR, Hfs) ->
     Size = calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)),
@@ -71,20 +72,24 @@ new_fpr(MaxItems, FPR, Hfs) ->
 
 %% @doc Creates a new bloom filter with the given hash function set and a fixed
 %%      number of bits per item.
--spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::number(), ?REP_HFS:hfs())
+-spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::number(), ?REP_HFS:hfs() | non_neg_integer())
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
     new(util:ceil(BitPerItem * MaxItems), Hfs).
 
 %% @doc Creates a new bloom filter with the given binary, hash function set and
 %%      item count.
--spec new_bin(Filter::bitstring(), ?REP_HFS:hfs(), ItemsCount::non_neg_integer())
+-spec new_bin(Filter::bitstring(), ?REP_HFS:hfs() | non_neg_integer(), ItemsCount::non_neg_integer())
         -> bloom_filter().
+new_bin(Filter, HfCount, ItemsCount) when is_integer(HfCount) ->
+    new_bin(Filter, ?REP_HFS:new(HfCount), ItemsCount);
 new_bin(Filter, Hfs, ItemsCount) ->
     #bloom{filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
 %% @doc Creates a new bloom filter.
--spec new(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
+-spec new(BitSize::pos_integer(), ?REP_HFS:hfs() | non_neg_integer()) -> bloom_filter().
+new(BitSize, HfCount) when is_integer(HfCount) ->
+    new(BitSize, ?REP_HFS:new(HfCount));
 new(BitSize, Hfs) ->
     #bloom{filter = <<0:BitSize>>, hfs = Hfs, items_count = 0}.
 
@@ -247,6 +252,7 @@ print(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
 -spec get_property(bloom_filter(), fpr) -> float();
                   (bloom_filter(), size) -> non_neg_integer();
                   (bloom_filter(), filter) -> bitstring();
+                  (bloom_filter(), hfs_size) -> non_neg_integer();
                   (bloom_filter(), hfs) -> ?REP_HFS:hfs();
                   (bloom_filter(), items_count) -> non_neg_integer().
 get_property(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems}, fpr) ->
@@ -255,6 +261,7 @@ get_property(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems}, fpr) ->
 get_property(#bloom{filter = Filter}, size)        ->
     erlang:bit_size(Filter);
 get_property(#bloom{filter = X}     , filter)      -> X;
+get_property(#bloom{hfs = X}        , hfs_size)    -> ?REP_HFS:size(X);
 get_property(#bloom{hfs = X}        , hfs)         -> X;
 get_property(#bloom{items_count = X}, items_count) -> X.
 

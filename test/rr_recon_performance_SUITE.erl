@@ -322,7 +322,8 @@ bloom2(_) ->
             using bloom:add_list/2 (V1 vs. V2) consecutively:" ++
                lists:append(lists:duplicate(length(AddTimesFold), "
             Res: ~.2p")),
-           [ToAdd, ExecTimes, BFSize, ?REP_HFS:size(Hfs)] ++ AddTimesAdd ++ AddTimesNew ++ AddTimesFold),
+           [ToAdd, ExecTimes, BFSize, bloom:get_property(BaseBF, hfs_size)]
+               ++ AddTimesAdd ++ AddTimesNew ++ AddTimesFold),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
