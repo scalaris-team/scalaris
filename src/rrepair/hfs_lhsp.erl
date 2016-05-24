@@ -101,9 +101,14 @@ apply_val_helper(N, HV2, [H|_] = L) ->
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1) rem Rem,
+    % TODO: what if both hashes are 0?
     if K > 1 ->
            HV2 = hash_value(ValBin, H2) rem Rem,
-           apply_val_rem_helper(K - 1, HV2, Rem, [HV1]);
+           if HV2 =:= 0 ->
+                  apply_val_rem_helper(K - 1, HV1, Rem, [HV2]);
+              true ->
+                  apply_val_rem_helper(K - 1, HV2, Rem, [HV1])
+           end;
        true ->
            [HV1]
     end.
