@@ -2610,7 +2610,13 @@ bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
         BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
         ExpDelta::number()) -> non_neg_integer().
 bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
-    MaxItems = calc_max_different_hashes(BFCount, NrChecks, key_version, ExpDelta),
+    % the worst case with the maximal number of item checks is when
+    % this node has all ExpDelta items missing
+    % -> calculate the (expected) original item count
+    % -> have ExpDelta percent checks
+    % (if items are only outdated, there are ExpDelta percent checks from this
+    % item count which is less than the worst case above)
+    MaxItems = calc_max_different_hashes(BFCount, NrChecks, key, ExpDelta),
     X = if ExpDelta == 0   -> 0;
            ExpDelta == 100 -> NrChecks; % special case of the one below
            is_float(ExpDelta) ->
