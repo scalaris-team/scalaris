@@ -74,7 +74,7 @@ new(Hfs, CellCount, Options) ->
     K = ?REP_HFS:size(Hfs),
     {Cells, ColSize} = case proplists:get_bool(prime, Options) of
                             true ->
-                                CCS = prime:get_nearest(erlang:round(CellCount / K)),
+                                CCS = prime:get_nearest(util:ceil(CellCount / K)),
                                 {CCS * K, CCS};
                             false ->
                                 RCC = resize(CellCount, K),

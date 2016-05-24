@@ -49,25 +49,36 @@
 -spec get_nearest_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
 get_nearest_feeder(N) -> {N}.
 
-% @doc returns first prime larger than N
+%% @doc Returns the first prime larger than or equal to N.
 -spec get_nearest(pos_integer()) -> prime().
-get_nearest(N) when N >= ?PrimeCache ->
-    find_bigger_prime(?PrimeCache, N, lists:reverse(prime_cache()));
-get_nearest(N) when N < ?PrimeCache ->
+get_nearest(N) when N > ?PrimeCache ->
+    ?DBG_ASSERT(N >= 25),
+    sieve_num(prime_cache() ++ lists:seq(?PrimeCache, (12 * N + 9) div 10, 2), N);
+get_nearest(N) when N =< ?PrimeCache ->
     find_in_cache(N, prime_cache()).
 
+%% @doc Finds a number at least as large as N in the given prime list.
+%%      Such a number must exist!
 -spec find_in_cache(pos_integer(), prime_list()) -> prime().
-find_in_cache(N, [P | _Cache]) when P > N -> P;
-find_in_cache(N, [_ | Cache])             -> find_in_cache(N, Cache);
-find_in_cache(_, [])                      -> 2.
+find_in_cache(N, [P | _Cache]) when P >= N ->
+    P;
+find_in_cache(N, [_ | Cache]) ->
+    find_in_cache(N, Cache).
 
--spec find_bigger_prime(pos_integer(), pos_integer(), rev_prime_list()) -> prime().
-find_bigger_prime(I, N, Primes) ->
-    case is_prime(I, Primes) of
-        false -> find_bigger_prime(I + 2, N, Primes);
-        true when I =< N -> find_bigger_prime(I + 2, N, [I | Primes]);
-        true when I > N -> I
-    end.
+%% @doc Sieves out all non-primes of the given list and returns the first
+%%      number bigger than Num.
+%%      BEWARE: Start with a list up to 2xNum to be sure to always get a prime
+%%              (Bertrand's postulate)!
+%%              Even better: for n >= 25, there is always a prime between n
+%%              and (1 + 1/5)n
+%%              (Nagura, J. "On the interval containing at least one prime number."
+%%               Proceedings of the Japan Academy, Series A 28 (1952), pp. 177-181.)
+-spec sieve_num(List::[non_neg_integer()], Num::non_neg_integer())
+        -> Prime::non_neg_integer().
+sieve_num([H | _TL], Num) when H >= Num ->
+    H;
+sieve_num([H | TL], Num) ->
+    sieve_num(sieve_filter(TL, H*H, H), Num).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -94,35 +105,25 @@ get_feeder(N) -> {N}.
 get(N) when N =< ?PrimeCache ->
     [P || P <- prime_cache(), P =< N];
 get(N) ->
-    find_primes(?PrimeCache, N, lists:reverse(prime_cache())).
+    [2 | sieve(tl(prime_cache()) ++ lists:seq(?PrimeCache, N, 2))].
 
--compile({nowarn_unused_function, {find_primes_feeder, 3}}).
--spec find_primes_feeder(0 | 2, 1..?TESTER_MAX_PRIME, rev_prime_list())
-        -> {pos_integer(), 1..?TESTER_MAX_PRIME, rev_prime_list()}.
-find_primes_feeder(_Add, N, [] = Primes) ->
-    {2, N, Primes};
-find_primes_feeder(Add, N, [H|_] = Primes) ->
-    {H + Add, N, Primes}.
+%% @doc Sieves out all non-primes of the given list.
+-spec sieve(List::[non_neg_integer()]) -> Primes::[non_neg_integer()].
+sieve([]) -> [];
+sieve([H | TL]) ->
+    [H | sieve(sieve_filter(TL, H*H, H))].
 
-%% @doc Extends the prime list with all primes up to N.
-%%      PreCond: no prime between the largest prime in Primes and I
--spec find_primes(pos_integer(), pos_integer(), rev_prime_list()) -> prime_list().
-find_primes(I, N, Primes) when I > N -> lists:reverse(Primes);
-find_primes(I, N, Primes) ->
-    NewPrimes = case is_prime(I, Primes) of
-                    true -> [I | Primes];
-                    false -> Primes
-                end,
-    find_primes(I + 2, N, NewPrimes).
-
--spec is_prime(pos_integer(), rev_prime_list()) -> boolean().
-is_prime(I, [Prime | L]) when Prime * Prime > I -> is_prime(I, L);
-is_prime(I, [Prime | L]) ->
-    case I rem Prime of
-        0 -> false;
-        _ -> is_prime(I, L)
-    end;
-is_prime(I, []) -> I > 1.
+%% @doc Removes all factors of Inc from List, starting with Num.
+-spec sieve_filter(List::[non_neg_integer()], Num::non_neg_integer(),
+                   Inc::non_neg_integer()) -> [non_neg_integer()].
+sieve_filter([], _Num, _Inc) ->
+    [];
+sieve_filter([Num | TL], Num, Inc) ->
+    sieve_filter(TL, Num + Inc, Inc);
+sieve_filter([H | _TL] = All, Num, Inc) when H > Num ->
+    sieve_filter(All, Num + Inc, Inc);
+sieve_filter([H | TL], Num, Inc) ->
+    [H | sieve_filter(TL, Num, Inc)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

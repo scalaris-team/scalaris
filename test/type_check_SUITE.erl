@@ -279,10 +279,13 @@ tester_type_check_math(_Config) ->
           {prime,
            [ {get, 1}, %% too slow for large integers, tested via feeder
              {get_nearest, 1}, %% too slow for large integers, tested via feeder
-             {is_prime, 1} %% too slow for large integers, tested via feeder
+             {is_prime, 1}, %% too slow for large integers, tested via feeder
+             {prime_cache, 0} %% there really is no point in testing this function!
            ],
-           [ {find_bigger_prime, 3}, %% too slow for large integers
-             {find_primes, 3} %% special precond; tested via feeder
+           [ {sieve_num, 2}, %% throws if no prime is found
+             {sieve, 1}, %% properly tested via get/1
+             {sieve_filter, 3}, %% slow for large gaps between integers in the list
+             {find_in_cache, 2} %% pre-condition between parameters must be met
            ]},
           {randoms,
            [ {start, 0},
