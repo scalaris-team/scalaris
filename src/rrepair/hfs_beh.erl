@@ -23,12 +23,14 @@
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).
 -endif.
+-export([tester_create_hfs_fun/1]).
+
+-export_type([hfs_fun/0]).
 
 -ifdef(have_callback_support).
 -type itemKey() :: any().
 -type hfs()     :: term().
 -callback new(pos_integer()) -> hfs().
--callback new([function(),...], pos_integer()) -> hfs().
 -callback apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
 -callback apply_val(hfs(), pos_integer(), itemKey()) -> non_neg_integer().
 -callback apply_val_rem(hfs(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
@@ -37,7 +39,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {new, 1}, {new, 2},
+     {new, 1},
      {apply_val, 2},
      {apply_val, 3},
      {apply_val_rem, 3},
@@ -46,3 +48,9 @@ behaviour_info(callbacks) ->
 behaviour_info(_Other) ->
     undefined.
 -endif.
+
+-type hfs_fun() :: fun((binary()) -> non_neg_integer() | binary()).
+
+-spec tester_create_hfs_fun(1..2) -> hfs_fun().
+tester_create_hfs_fun(1) -> fun erlang:adler32/1;
+tester_create_hfs_fun(2) -> fun erlang:md5/1.

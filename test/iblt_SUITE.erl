@@ -192,6 +192,6 @@ tester_list_entries(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_hfs() ->
-    ?REP_HFS:new([fun erlang:adler32/1, fun erlang:md5/1], 5).
+    ?REP_HFS:new(5).
 
 

@@ -422,8 +422,9 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, intervals, non_empty_interval, []}, intervals, tester_create_non_empty_interval, 2),
     tester:register_value_creator({typedef, merkle_tree, leaf_hash_fun, []}, merkle_tree, tester_create_hash_fun, 1),
     tester:register_value_creator({typedef, merkle_tree, inner_hash_fun, []}, merkle_tree, tester_create_inner_hash_fun, 1),
-    tester:register_value_creator({typedef, hfs_lhsp, hfs_fun, []}, hfs_lhsp, tester_create_hfs_fun, 1),
+    tester:register_value_creator({typedef, hfs_beh, hfs_fun, []}, hfs_beh, tester_create_hfs_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs, []}, hfs_lhsp, tester_create_hfs, 1),
+    tester:register_value_creator({typedef, hfs_plain, hfs, []}, hfs_plain, tester_create_hfs, 1),
     tester:register_value_creator({typedef, rt_beh, segment, []}, rt_beh, tester_create_segment, 1),
     tester:register_value_creator({typedef, rr_recon, kvi_tree, []}, rr_recon, tester_create_kvi_tree, 1),
     Modules =
@@ -448,12 +449,15 @@ tester_type_check_rrepair(_Config) ->
              {get_non_uniform_probs, 1} %% needs feeder
            ]},
           {hfs_lhsp,
-           [ {new, 2}, %% tested via feeder
-             {apply_val, 3} %% tested via feeder
+           [ {apply_val, 3} %% tested via feeder
            ],
            [ {apply_val_helper, 3}, %% tested via feeder
              {apply_val_rem_helper, 4} %% tested via feeder
            ]},
+          {hfs_plain,
+           [ {apply_val, 3} %% tested via feeder
+           ],
+           [ ]},
           {rr_recon,
            [
              {init, 1}, %% registers a monitor (only one allowed per PID)
@@ -543,8 +547,9 @@ tester_type_check_rrepair(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     tester:unregister_value_creator({typedef, intervals, non_empty_interval, []}),
-    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun, []}),
+    tester:unregister_value_creator({typedef, hfs_beh, hfs_fun, []}),
     tester:unregister_value_creator({typedef, hfs_lhsp, hfs, []}),
+    tester:unregister_value_creator({typedef, hfs_plain, hfs, []}),
     tester:unregister_value_creator({typedef, rt_beh, segment, []}),
     tester:unregister_value_creator({typedef, rr_recon, kvi_tree, []}),
     tester:unregister_type_checker({typedef, intervals, interval, []}),

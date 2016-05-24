@@ -34,17 +34,16 @@
 -behaviour(hfs_beh).
 
 -type itemKey() :: any().
--type hfs_fun() :: fun((binary()) -> non_neg_integer() | binary()).
--opaque hfs()   :: {hfs_lhsp, Hf_count::pos_integer(), H1_fun::hfs_fun(), H2_fun::hfs_fun()}.
+-opaque hfs()   :: {hfs_lhsp, Hf_count::pos_integer(), H1_fun::hfs_beh:hfs_fun(), H2_fun::hfs_beh:hfs_fun()}.
 
 -export_type([hfs/0]).
 
--export([new/1, new/2, apply_val/2, apply_val/3, apply_val_rem/3]).
+-export([new/1, apply_val/2, apply_val/3, apply_val_rem/3]).
 -export([size/1]).
 
 % for tester:
--export([new_feeder/2, apply_val_feeder/3,
-         tester_create_hfs_fun/1, tester_create_hfs/1]).
+-export([apply_val_feeder/3,
+         tester_create_hfs/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API functions
@@ -53,16 +52,7 @@
 %% @doc returns a new lhsp hfs with default functions
 -spec new(pos_integer()) -> hfs().
 new(HFCount) ->
-    new([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
-
--spec new_feeder({hfs_fun(), hfs_fun()}, pos_integer())
-        -> {[hfs_fun(),...], pos_integer()}.
-new_feeder({H1, H2}, HFCount) ->
-    {[H1, H2], HFCount}.
-
--spec new([hfs_fun(),...], pos_integer()) -> hfs().
-new([H1, H2], HFCount) ->
-    {hfs_lhsp, HFCount, H1, H2}.
+    {hfs_lhsp, HFCount, fun erlang:adler32/1, fun erlang:md5/1}.
 
 % @doc Applies Val to all hash functions in container HC
 -spec apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
@@ -163,7 +153,7 @@ size({hfs_lhsp, K, _, _}) ->
 
 -compile({inline, [hash_value/2]}).
 
--spec hash_value(binary(), hfs_fun()) -> non_neg_integer().
+-spec hash_value(binary(), hfs_beh:hfs_fun()) -> non_neg_integer().
 hash_value(Val, HashFun) ->
     H = HashFun(Val),
     if erlang:is_binary(H) ->
@@ -173,10 +163,7 @@ hash_value(Val, HashFun) ->
        true -> H
     end.
 
--spec tester_create_hfs_fun(1..2) -> hfs_fun().
-tester_create_hfs_fun(1) -> fun erlang:adler32/1;
-tester_create_hfs_fun(2) -> fun erlang:md5/1.
-
--spec tester_create_hfs({hfs_lhsp, Hf_count::1..100, H1_fun::hfs_fun(), H2_fun::hfs_fun()}) -> hfs().
+-spec tester_create_hfs({hfs_lhsp, Hf_count::1..100, H1_fun::hfs_beh:hfs_fun(),
+                         H2_fun::hfs_beh:hfs_fun()}) -> hfs().
 tester_create_hfs({hfs_lhsp, Hf_count, H1_fun, H2_fun}) ->
     {hfs_lhsp, Hf_count, H1_fun, H2_fun}.
