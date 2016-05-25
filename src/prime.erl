@@ -42,7 +42,7 @@
 
 % last prime in prime_cache/0
 -define(PrimeCache, 1299827).
--define(TESTER_MAX_PRIME, 1299850).
+-define(TESTER_MAX_PRIME, 10000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
