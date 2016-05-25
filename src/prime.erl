@@ -52,8 +52,14 @@ get_nearest_feeder(N) -> {N}.
 %% @doc Returns the first prime larger than or equal to N.
 -spec get_nearest(pos_integer()) -> prime().
 get_nearest(N) when N > ?PrimeCache ->
-    ?DBG_ASSERT(N >= 25),
-    sieve_num(prime_cache() ++ lists:seq(?PrimeCache, (12 * N + 9) div 10, 2), N);
+    ?DBG_ASSERT(N >= 396738),
+    % for x >= 396738 there is at least one prime between x and (1 + 1/(25ln^2(x)))x
+    % Dusart, Pierre (2010). "Estimates of Some Functions Over Primes without R.H.". arXiv:1002.0442
+    LogN = math:log(N),
+    sieve_num(tl(prime_cache()),
+              lists:seq(?PrimeCache + 2,
+                        util:ceil((1 + 1 / (25 * LogN*LogN)) * N), 2),
+              N);
 get_nearest(N) when N =< ?PrimeCache ->
     find_in_cache(N, prime_cache()).
 
@@ -66,19 +72,17 @@ find_in_cache(N, [_ | Cache]) ->
     find_in_cache(N, Cache).
 
 %% @doc Sieves out all non-primes of the given list and returns the first
-%%      number bigger than Num.
-%%      BEWARE: Start with a list up to 2xNum to be sure to always get a prime
-%%              (Bertrand's postulate)!
-%%              Even better: for n >= 25, there is always a prime between n
-%%              and (1 + 1/5)n
-%%              (Nagura, J. "On the interval containing at least one prime number."
-%%               Proceedings of the Japan Academy, Series A 28 (1952), pp. 177-181.)
--spec sieve_num(List::[non_neg_integer()], Num::non_neg_integer())
-        -> Prime::non_neg_integer().
-sieve_num([H | _TL], Num) when H >= Num ->
+%%      number bigger than Num. Throws if there is no such number.
+-spec sieve_num(Primes::[non_neg_integer()], Candidates::[non_neg_integer()],
+                Num::non_neg_integer()) -> Prime::non_neg_integer().
+sieve_num([H | _TL], _Candidates, Num) when H >= Num ->
     H;
-sieve_num([H | TL], Num) ->
-    sieve_num(sieve_filter(TL, H*H, H), Num).
+sieve_num([H | TL], Candidates, Num) ->
+    sieve_num(TL, sieve_filter(Candidates, H*H, H), Num);
+sieve_num([], [H | _TL], Num) when H >= Num ->
+    H;
+sieve_num([], [H | TL], Num) ->
+    sieve_num([], sieve_filter(TL, H*H, H), Num).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -103,15 +107,18 @@ get_feeder(N) -> {N}.
 % @doc returns all primes less than or equal to N
 -spec get(pos_integer()) -> prime_list().
 get(N) when N =< ?PrimeCache ->
-    [P || P <- prime_cache(), P =< N];
+    lists:takewhile(fun(P) -> P =< N end, prime_cache());
 get(N) ->
-    [2 | sieve(tl(prime_cache()) ++ lists:seq(?PrimeCache, N, 2))].
+    sieve(tl(prime_cache()), lists:seq(?PrimeCache + 2, N, 2), [2]).
 
 %% @doc Sieves out all non-primes of the given list.
--spec sieve(List::[non_neg_integer()]) -> Primes::[non_neg_integer()].
-sieve([]) -> [];
-sieve([H | TL]) ->
-    [H | sieve(sieve_filter(TL, H*H, H))].
+-spec sieve(Primes::Numbers, Candidates::Numbers, Acc::Numbers)
+        -> Primes::Numbers when is_subtype(Numbers, [non_neg_integer()]).
+sieve([H | TL], Candidates, Acc) ->
+    sieve(TL, sieve_filter(Candidates, H*H, H), [H | Acc]);
+sieve([], [], Acc) -> lists:reverse(Acc);
+sieve([], [H | TL], Acc) ->
+    sieve([], sieve_filter(TL, H*H, H), [H | Acc]).
 
 %% @doc Removes all factors of Inc from List, starting with Num.
 -spec sieve_filter(List::[non_neg_integer()], Num::non_neg_integer(),

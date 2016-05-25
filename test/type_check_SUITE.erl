@@ -282,8 +282,8 @@ tester_type_check_math(_Config) ->
              {is_prime, 1}, %% too slow for large integers, tested via feeder
              {prime_cache, 0} %% there really is no point in testing this function!
            ],
-           [ {sieve_num, 2}, %% throws if no prime is found
-             {sieve, 1}, %% properly tested via get/1
+           [ {sieve_num, 3}, %% throws if no prime is found
+             {sieve, 3}, %% properly tested via get/1
              {sieve_filter, 3}, %% slow for large gaps between integers in the list
              {find_in_cache, 2} %% pre-condition between parameters must be met
            ]},
