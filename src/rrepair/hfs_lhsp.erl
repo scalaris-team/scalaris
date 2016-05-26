@@ -88,10 +88,9 @@ apply_val_helper(N, HV2, [H|_] = L) ->
 
 %% @doc Applies Val to all hash functions in container HC and returns only
 %%      remainders of divisions by Rem.
--spec apply_val_rem(HC::hfs(), Val::itemKey(), Rem::pos_integer())
+-spec apply_val_rem(HC::hfs(), Val::itemKey(), Rem::2..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
         -> [non_neg_integer(),...].
-apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
-    ?DBG_ASSERT(Rem > 1),
+apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) when Rem > 1 ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1) rem Rem,
     % TODO: what if both hashes are 0?

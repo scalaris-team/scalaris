@@ -63,10 +63,9 @@ apply_val_rem_feeder({hfs_plain, _K, {_HashFun, HashBits}} = HFS, Val, Rem) ->
 
 %% @doc Hashes Val K-times as defined by the HFS and returns only
 %%      remainders of divisions by Rem.
--spec apply_val_rem(hfs(), Val::itemKey(), Rem::pos_integer())
+-spec apply_val_rem(hfs(), Val::itemKey(), Rem::2..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
         -> [non_neg_integer(),...].
-apply_val_rem({hfs_plain, K, {HashFun, HashBits}}, Val, Rem) ->
-    ?DBG_ASSERT(Rem > 1),
+apply_val_rem({hfs_plain, K, {HashFun, HashBits}}, Val, Rem) when Rem > 1 ->
     RemBits = util:ceil(util:log2(Rem)),
     Partitions = HashBits div RemBits,
     ?ASSERT2(Partitions > 0, 'hashfun not suitable for chosen remainder'), %% too few bits
