@@ -26,9 +26,6 @@
 -include("client_types.hrl").
 -include("unittest.hrl").
 
-
--define(HFS, hfs_lhsp).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() -> [
