@@ -52,7 +52,7 @@
 %% @doc returns a new lhsp hfs with default functions
 -spec new(pos_integer()) -> hfs().
 new(HFCount) ->
-    {hfs_lhsp, HFCount, fun erlang:adler32/1, fun erlang:md5/1}.
+    {hfs_lhsp, HFCount, {fun erlang:adler32/1, 32}, {fun erlang:md5/1, 128}}.
 
 % @doc Applies Val to all hash functions in container HC
 -spec apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
@@ -154,11 +154,10 @@ size({hfs_lhsp, K, _, _}) ->
 -compile({inline, [hash_value/2]}).
 
 -spec hash_value(binary(), hfs_beh:hfs_fun()) -> non_neg_integer().
-hash_value(Val, HashFun) ->
+hash_value(Val, {HashFun, HashBits}) ->
     H = HashFun(Val),
     if erlang:is_binary(H) ->
-           Size = erlang:bit_size(H),
-           <<R:Size>> = H,
+           <<R:HashBits>> = H,
            R;
        true -> H
     end.

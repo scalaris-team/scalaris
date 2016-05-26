@@ -49,8 +49,9 @@ behaviour_info(_Other) ->
     undefined.
 -endif.
 
--type hfs_fun() :: fun((binary()) -> non_neg_integer() | binary()).
+-type hfs_fun() :: {fun((binary()) -> non_neg_integer() | binary()),
+                    HashBits::pos_integer()}.
 
 -spec tester_create_hfs_fun(1..2) -> hfs_fun().
-tester_create_hfs_fun(1) -> fun erlang:adler32/1;
-tester_create_hfs_fun(2) -> fun erlang:md5/1.
+tester_create_hfs_fun(1) -> {fun erlang:adler32/1, 32};
+tester_create_hfs_fun(2) -> {fun erlang:md5/1, 128}.

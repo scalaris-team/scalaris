@@ -455,9 +455,12 @@ tester_type_check_rrepair(_Config) ->
              {apply_val_rem_helper, 4} %% tested via feeder
            ]},
           {hfs_plain,
-           [ {apply_val, 3} %% tested via feeder
+           [ {apply_val, 3}, %% tested via feeder
+             {apply_val_rem, 3} %% tested via feeder
            ],
-           [ ]},
+           [ {hash_value, 4}, %% needs bit sizes to fit, already tested via the apply_val* functions
+             {split_bin, 3} %% bitstring needs to have a minimum size
+           ]},
           {rr_recon,
            [
              {init, 1}, %% registers a monitor (only one allowed per PID)
