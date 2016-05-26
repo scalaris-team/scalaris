@@ -30,6 +30,8 @@
 -author('malange@informatik.hu-berlin.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 % types
 -behaviour(hfs_beh).
 
@@ -89,6 +91,7 @@ apply_val_helper(N, HV2, [H|_] = L) ->
 -spec apply_val_rem(HC::hfs(), Val::itemKey(), Rem::pos_integer())
         -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
+    ?DBG_ASSERT(Rem > 1),
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1) rem Rem,
     % TODO: what if both hashes are 0?

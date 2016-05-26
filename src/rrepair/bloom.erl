@@ -119,13 +119,14 @@ add_list(#bloom{hfs = Hfs,
 
 % V1 - good for few items / positions to set
 % faster than lists:foldl
--spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+-spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
                     BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
 p_add_list_v1(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v1(Hfs, BFSize, BF, Items) ->
+p_add_list_v1(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
+p_add_list_v1(Hfs, BFSize, BF, Items = [_|_]) ->
     p_add_list_v1_(Hfs, BFSize, BF, Items).
 
--spec p_add_list_v1_(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+-spec p_add_list_v1_(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
                     BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
 p_add_list_v1_(Hfs, BFSize, BF, [Item | Items]) ->
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
@@ -134,10 +135,11 @@ p_add_list_v1_(_Hfs, _BFSize, BF, []) ->
     BF.
 
 % V2 - good for large number of items / positions to set
--spec p_add_list_v2(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+-spec p_add_list_v2(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
                     BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
 p_add_list_v2(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v2(Hfs, BFSize, BF, Items) ->
+p_add_list_v2(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
+p_add_list_v2(Hfs, BFSize, BF, Items = [_|_]) ->
     Positions = lists:flatmap(fun(Item) ->
                                       ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
                               end, Items),
