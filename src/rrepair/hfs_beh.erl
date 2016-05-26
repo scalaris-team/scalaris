@@ -20,6 +20,8 @@
 -author('malange@informatik.hu-berlin.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).
 -endif.
@@ -52,6 +54,7 @@ behaviour_info(_Other) ->
 -type hfs_fun() :: {fun((binary()) -> non_neg_integer() | binary()),
                     HashBits::pos_integer()}.
 
--spec tester_create_hfs_fun(1..2) -> hfs_fun().
+-spec tester_create_hfs_fun(1..3) -> hfs_fun().
 tester_create_hfs_fun(1) -> {fun erlang:adler32/1, 32};
-tester_create_hfs_fun(2) -> {fun erlang:md5/1, 128}.
+tester_create_hfs_fun(2) -> {fun erlang:md5/1, 128};
+tester_create_hfs_fun(3) -> {fun(X) -> ?CRYPTO_SHA(X) end, 160}.
