@@ -26,7 +26,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
+-define(REP_HFS, hfs_plain). %HashFunctionSet selection for usage by bloom filter
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
          add/2, add_list/2, is_element/2, item_count/1,
