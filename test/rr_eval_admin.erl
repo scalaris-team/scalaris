@@ -597,14 +597,14 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
         if MPFile =/= null ->
                erlang:spawn_link(
                  fun() ->
-                         util:for_to_ex(
-                           1, EvalRepeats,
-                           fun(_I) ->
-                                   receive MPRow ->
-                                               rr_eval_export:write_ds(
-                                                 MPFile, {[], [tuple_to_list(MPRow)]})
-                                   end
-                           end),
+                         _ = util:for_to_ex(
+                               1, EvalRepeats,
+                               fun(_I) ->
+                                       receive MPRow ->
+                                                   rr_eval_export:write_ds(
+                                                     MPFile, {[], [tuple_to_list(MPRow)]})
+                                       end
+                               end),
                          Self ! mp_write_done
                  end);
            true -> nopid
