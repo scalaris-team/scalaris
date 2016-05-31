@@ -2615,8 +2615,9 @@ bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
     % (if items are only outdated, there are ExpDelta percent checks from this
     % item count which is less than the worst case above)
     MaxItems = calc_max_different_hashes(BFCount, NrChecks, key, ExpDelta),
-    X = if ExpDelta == 0   -> 0;
-           ExpDelta == 100 -> NrChecks; % special case of the one below
+    FPCandidates =
+        if ExpDelta == 0   -> 0;
+           ExpDelta == 100 -> MaxItems; % special case of the one below
            is_float(ExpDelta) ->
                % worst case: we have all the ExpDelta percent items the other node does not have
                util:ceil(MaxItems * ExpDelta / 100);
@@ -2624,8 +2625,9 @@ bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
                % -> use integer division (and round up) for higher precision:
                (MaxItems * ExpDelta + 99) div 100
         end,
-%%     log:pal("[ ~p ] MaxItems: ~B Checks: ~B", [self(), MaxItems, X]),
-    X.
+    MaxNrChecks = erlang:min(NrChecks, FPCandidates),
+%%     log:pal("[ ~p ] MaxItems: ~B Checks: ~B", [self(), MaxItems, MaxNrChecks]),
+    MaxNrChecks.
 
 %% @doc Calculates the worst-case failure probability of the bloom algorithm
 %%      with the Bloom filter and number of items to check inside the filter.
