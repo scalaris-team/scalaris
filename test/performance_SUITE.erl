@@ -153,7 +153,7 @@ ets_ordset_insert2(_Config) ->
 
 ets_ordset_foldl(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -164,7 +164,7 @@ ets_ordset_foldl(_Config) ->
 
 ets_ordset_next_iteration(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -180,7 +180,7 @@ ets_next(Table, Key, Acc) ->
 
 ets_ordset_lists_foldl(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -192,7 +192,7 @@ ets_ordset_lists_foldl(_Config) ->
 
 ets_ordset_match(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -204,7 +204,7 @@ ets_ordset_match(_Config) ->
 
 ets_ordset_match_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
                                                                       * 2)],
     ets:insert(Table, Data),
@@ -218,7 +218,7 @@ ets_ordset_match_with_limit(_Config) ->
 
 ets_ordset_select(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -232,7 +232,7 @@ ets_ordset_select(_Config) ->
 
 ets_ordset_select_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
                                                                       * 2)],
     ets:insert(Table, Data),
@@ -248,7 +248,7 @@ ets_ordset_select_with_limit(_Config) ->
 
 ets_ordset_select_with_guards(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count())],
     ets:insert(Table, Data),
     iter(10, fun() ->
@@ -264,7 +264,7 @@ ets_ordset_select_with_guards(_Config) ->
 
 ets_ordset_select_with_guards_with_limit(_Config) ->
     Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
-    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+    Data = [{X, crypto:strong_rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
                                                                       data_count()
                                                                       * 2)],
     ets:insert(Table, Data),
