@@ -1,4 +1,4 @@
-%  @copyright 2008-2015 Zuse Institute Berlin
+%  @copyright 2008-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@
 all() ->
     [empty,
      intervals_in,
-     get_keys_for_replica_string,
+%%     get_keys_for_replica_string,
      md5,
      {group, with_config},
      pid_groups_lookup,
@@ -75,7 +75,7 @@ suite() ->
     ].
 
 groups() ->
-    [{with_config, [sequence], [next_hop_with_neighbors]}].
+    [{with_config, [sequence], [get_keys_for_replica_string, next_hop_with_neighbors]}].
 
 init_per_suite(Config) ->
     Config.
