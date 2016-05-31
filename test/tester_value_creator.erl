@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -278,7 +278,7 @@ create_map(ParseState) ->
     maps:from_list(L).
 -else.
 -spec create_map(ParseState::tester_parse_state:state()) -> no_return().
-create_map(ParseState) ->
+create_map(_ParseState) ->
     erlang:error('maps_not_available').
 -endif.
 
