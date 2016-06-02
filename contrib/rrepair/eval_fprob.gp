@@ -279,9 +279,7 @@ set format y2 "%-2.1f"
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))) with boxes t get_title(i) ls i, \
-     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) with yerrorbars notitle ls (plotCount > 1 ? (100+i) : 100)
+ u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls i
 
 set size all_width_r,red_height
 set origin 0.49,red_pos_y
@@ -307,9 +305,7 @@ if (red_max > 0.5 && red_max <= 1) {
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
-     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 with yerrorbars notitle ls (plotCount > 1 ? (100+i) : 100)
+ u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
 
 set ytics autofreq scale 0.8
 unset y2tics
