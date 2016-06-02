@@ -44,7 +44,7 @@
 %% @doc returns a new hfs with default functions
 -spec new(pos_integer()) -> hfs().
 new(HFCount) ->
-    {hfs_plain, HFCount, {fun erlang:md5/1, 128}}.
+    {hfs_plain, HFCount, {fun(X) -> ?CRYPTO_SHA(X) end, 160}}.
 
 %% @doc Hashes Val K-times as defined by the HFS.
 -spec apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
