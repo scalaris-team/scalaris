@@ -2723,19 +2723,30 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
                     bloom:calc_FPR(M2, InitiatorMaxItems, K2), InitiatorMaxItems, MyMaxItems, ExpDelta),
     FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
     FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
-    BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 =< M2 ->
+    BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 ->
+                 if M1 < M2 ->
+                        bloom:new(M1, K1);
+                    M1 =:= M2 andalso FP1_P1E_p1 < FP2_P1E_p1 ->
+                        bloom:new(M1, K1);
+                    true ->
+                        bloom:new(M2, K2)
+                 end;
+             FP1_P1E_p1 =< P1E_p1 -> % andalso FP2_P1E_p1 > P1E_p1
                  bloom:new(M1, K1);
-             FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 andalso M1 > M2 ->
+             FP2_P1E_p1 =< P1E_p1 -> % andalso FP1_P1E_p1 > P1E_p1
                  bloom:new(M2, K2);
-             FP1_P1E_p1 =< P1E_p1 ->
-                 bloom:new(M1, K1);
-             FP2_P1E_p1 =< P1E_p1 ->
-                 bloom:new(M2, K2);
-             true ->
+             true -> % FP1_P1E_p1 > P1E_p1 andalso FP2_P1E_p1 > P1E_p1
                  % all other cases are probably due to floating point inefficiencies
                  log:log("~w: [ ~.0p:~.0p ] P1E constraint for phase 1 probably broken",
                          [?MODULE, pid_groups:my_groupname(), self()]),
-                 bloom:new(M1, K1)
+                 % use the one with the lowest error and size:
+                 if FP1_P1E_p1 < FP2_P1E_p1 ->
+                        bloom:new(M1, K1);
+                    FP1_P1E_p1 == FP2_P1E_p1 andalso M1 =< M2 ->
+                        bloom:new(M1, K1);
+                    true ->
+                        bloom:new(M2, K2)
+                 end
           end,
     % TODO: include ExpDelta in these values:
     ?ALG_DEBUG("NI:~.0p, P1E_bf=~p~n"

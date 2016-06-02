@@ -335,8 +335,8 @@ check_bits(_, []) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Calculates the optimal number of hash functions K and Bloom filter
-%%      size M when K = ln(2)*M/N and M = N * log_2(1/FP) / ln(2) (aligned to
-%%      full bytes) with N elements and a false positive probability FP.
+%%      size M when K = ln(2)*M/N and M = N * log_2(1/FP) / ln(2)
+%%      with N elements and a false positive probability FP.
 -spec calc_HF_num_Size_opt(N::non_neg_integer(), FP::float())
         -> {K::pos_integer(), M::pos_integer()}.
 calc_HF_num_Size_opt(N, FP) ->
@@ -355,14 +355,24 @@ calc_HF_num_Size_opt(N, FP) ->
 %%     log:pal("Bloom (~g): K=~B, M=~B (FP=~g) vs. K=~B, M=~B (FP=~g)",
 %%             [FP, K_Min, M_Min, FPR_Min, K_Max, M_Max, FPR_Max]),
     if FPR_Min =< FP andalso FPR_Max =< FP ->
-           if M_Min < M_Max -> {K_Min, M_Min};
-              M_Min =:= M_Max andalso FPR_Min < FPR_Max -> {K_Min, M_Min};
-              true -> {K_Max, M_Max}
+           if M_Min < M_Max ->
+                  {K_Min, M_Min};
+              M_Min =:= M_Max andalso FPR_Min < FPR_Max ->
+                  {K_Min, M_Min};
+              true ->
+                  {K_Max, M_Max}
            end;
-       FPR_Min =< FP andalso FPR_Max > FP -> {K_Min, M_Min};
-       FPR_Min > FP andalso FPR_Max =< FP -> {K_Max, M_Max};
-       FPR_Min > FP andalso FPR_Max > FP andalso FPR_Max > FPR_Min -> {K_Min, M_Min};
-       FPR_Min > FP andalso FPR_Max > FP -> {K_Max, M_Max}
+       FPR_Min =< FP -> % andalso FPR_Max > FP
+           {K_Min, M_Min};
+       FPR_Max =< FP -> % andalso FPR_Min > FP
+           {K_Max, M_Max};
+       % all below have FPR_Min > FP andalso FPR_Max > FP
+       FPR_Min < FPR_Max ->
+           {K_Min, M_Min};
+       FPR_Min == FPR_Max andalso M_Min =< M_Max ->
+           {K_Min, M_Min};
+       true ->
+           {K_Max, M_Max}
     end.
 
 %% @doc Calculates the number of bits needed by a bloom filter to have a false
