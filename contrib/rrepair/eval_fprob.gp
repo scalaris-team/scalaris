@@ -161,7 +161,7 @@ set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
 set style line 100 lw 2 lc -1 pt 0 lt 1
 
 #--------------------------------- ALL
-set xrange [-(0.5*step_size):(5.5*step_size)]
+set xrange [(0.5*step_size):(5.5*step_size)]
 set boxwidth plot_boxwidth relative
 set style fill solid 1 border -1
 set xtics scale 0.1

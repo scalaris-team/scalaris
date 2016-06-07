@@ -98,7 +98,7 @@ set style line 4 lw 1 lt 1 lc rgb '#b05abd' pt 4 # dark purple
 set style line 5 lw 1 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
 #--------------------------------- ALL
-set xrange [-(0.5*step_size):(5.5*step_size)]
+set xrange [(0.5*step_size):(5.5*step_size)]
 set boxwidth plot_boxwidth relative
 set style fill solid 1 border -1
 set xtics scale 0.1

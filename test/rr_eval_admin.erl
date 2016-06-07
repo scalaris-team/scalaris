@@ -149,7 +149,7 @@ trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) 
     
     eval(pair,
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [Trivial]),
-         fprob, 5, StepSize, 0, Options),
+         fprob, 4, StepSize, StepSize, Options),
     ok.
 
 -spec trivial_scale(DestDir::string(), FileName::string(), N::pos_integer(),
@@ -208,7 +208,7 @@ shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
     
     eval(pair,
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [SHash]),
-         fprob, 5, StepSize, 0, Options),
+         fprob, 4, StepSize, StepSize, Options),
     ok.
 
 -spec shash_scale(DestDir::string(), FileName::string(), N::pos_integer(),
@@ -267,7 +267,7 @@ bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
     
     eval(pair,
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [Bloom]),
-         fprob, 5, StepSize, 0, Options),
+         fprob, 4, StepSize, StepSize, Options),
     ok.
 
 -spec bloom_scale(DestDir::string(), FileName::string(), N::pos_integer(),
@@ -335,7 +335,7 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
     
     eval(pair,
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [Merkle]),
-         fprob, 5, StepSize, 0, Options),
+         fprob, 4, StepSize, StepSize, Options),
     ok.
 
 -spec merkle_scale(DestDir::string(), FileName::string(), N::pos_integer(),
@@ -395,10 +395,11 @@ art(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta) ->
                      merkle_bucket = MBucket, merkle_branch = MBranch,
                      art_corr_factor = ACorrFactor,
                      art_inner_fpr = 0.01, art_leaf_fpr = 0.01},
-    
+    StepSize = 2,
+
     eval(pair,
          gen_setup([random], ?EVAL_FTYPES, [random], Scenario, PairRing, [Art]),
-         fprob, 5, 2, 0, Options),
+         fprob, 4, StepSize, StepSize, Options),
     ok.
 
 -spec art_scale(DestDir::string(), FileName::string(), N::pos_integer(),
@@ -421,7 +422,7 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta
 
     eval(pair,
          gen_setup([random], ?EVAL_FTYPES, [random], Scenario, PairRing, [Art]),
-         data_count, 10, power, 1000, Options),
+         data_count, 5, power, N, Options),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
