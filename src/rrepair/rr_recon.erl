@@ -38,9 +38,11 @@
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 -export([calc_signature_size_nm_pair/6, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
-%% -export([trivial_signature_sizes/4, trivial_worst_case_failprob/4,
+%% -export([calc_max_different_hashes/4,
+%%          trivial_signature_sizes/4, trivial_worst_case_failprob/4,
 %%          shash_signature_sizes/4, shash_worst_case_failprob/4,
-%%          calc_max_different_hashes/4, bloom_fp/4]).
+%%          bloom_calc_max_nr_checks/3,
+%%          bloom_fp/4, bloom_worst_case_failprob_/4]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
