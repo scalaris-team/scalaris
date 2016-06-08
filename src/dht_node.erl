@@ -1,4 +1,4 @@
-%  @copyright 2007-2015 Zuse Institute Berlin
+%  @copyright 2007-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -113,6 +113,10 @@ on(Msg, State) when move =:= element(1, Msg) ->
 % Lease management messages (see l_on_cseq.erl)
 on(Msg, State) when l_on_cseq =:= element(1, Msg) ->
     l_on_cseq:on(Msg, State);
+
+% DHT node extensions (see dht_node_extensions.erl)
+on(Msg, State) when extensions =:= element(1, Msg) ->
+    dht_node_extensions:on(Msg, State);
 
 % RM messages (see rm_loop.erl)
 on(Msg, State) when element(1, Msg) =:= rm ->
@@ -505,6 +509,7 @@ init(Options) ->
     dht_node_move:send_trigger(),
 
     Recover = config:read(start_type) =:= recover,
+    dht_node_extensions:init(Options),
     case {is_first(Options), config:read(leases), Recover, is_add_nodes(Options)} of
         {_   , true, true, false} ->
             % we are recovering
