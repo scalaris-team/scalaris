@@ -34,10 +34,11 @@ wrap(Extension, Message) ->
 
 -spec on({extensions, {extension(), comm:message()}}, dht_node:state()) -> dht_node:state().
 on({extensions, {Extension, Message}}, State) ->
-    (config:read(Extension)):on(Message, State).
+    Extension:on(Message, State).
 
 -spec init(any()) -> ok.
 init(Options) ->
+    io:format("Extensions init~n"),
     Extensions = config:read(extensions),
-    [Extension:init(Options) || Extension <- Extensions],
+    _ = [Extension:init(Options) || Extension <- Extensions],
     ok.
