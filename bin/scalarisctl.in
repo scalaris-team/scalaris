@@ -42,7 +42,7 @@ SCALARISCLIENT_PYTHON=${exec_prefix}/bin/scalaris-python
 SCALARISCLIENT_PYTHON3=${exec_prefix}/bin/scalaris-python3
 SCALARISCLIENT_RUBY=${exec_prefix}/bin/scalaris-ruby
 
-TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
+ERLANG_ADDITIONAL_FLAGS="@ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@"
 
 # By default, no emulator flags are used.
 # This is still useful for passing flags to erl though.
@@ -724,7 +724,7 @@ scalarisstart(){
     START_CMD="\"$ERL\" -setcookie \"$SCALARIS_COOKIE\"\
  -pa $SCALARISDIR/contrib/yaws/ebin\
  -pa $SCALARISDIR/contrib/log4erl/ebin\
- -pa $BEAMDIR $TOKEFLAGS $BACKGROUND\
+ -pa $BEAMDIR $ERLANG_ADDITIONAL_FLAGS $BACKGROUND\
  -sasl sasl_error_logger false\
  -yaws embedded true\
  -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
