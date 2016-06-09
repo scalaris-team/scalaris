@@ -38,7 +38,6 @@ on({extensions, {Extension, Message}}, State) ->
 
 -spec init(any()) -> ok.
 init(Options) ->
-    io:format("Extensions init~n"),
     Extensions = config:read(extensions),
     _ = [Extension:init(Options) || Extension <- Extensions],
     ok.
