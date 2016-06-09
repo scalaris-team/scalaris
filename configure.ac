@@ -311,11 +311,7 @@ AS_IF([test "x$TOKEPREFIX" != xno],
             AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS="$TOKEPREFIX"])
             AC_ERLANG_CHECK_LIB(toke,
               [AC_CHECK_FILE($ERLANG_LIB_DIR_toke/priv/libtoke.so,
-                [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_toke}"
-                 EDOCMACROS="${EDOCMACROS}, {have_toke, true}"
-                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_toke"
-                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
-                ],
+                [ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"],
                 [ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"])
               ],
               [ERLANG_TOKE_MESSAGE="toke erlang library not found"])
@@ -335,12 +331,7 @@ AS_IF([test "x$HANOIDBPREFIX" != xno],
             ERLANG_HANOIDB_MESSAGE=
             AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS="$HANOIDBPREFIX"])
             AC_ERLANG_CHECK_LIB(hanoidb,
-              [
-                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
-                EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
-                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"
-                ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"
-              ],
+              [ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"],
               [ERLANG_HANOIDB_MESSAGE="hanoidb erlang not found"])
             AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS=""])
             AS_IF([test "x$ERLANG_HANOIDB_MESSAGE" != x],
@@ -359,11 +350,7 @@ AS_IF([test "x$ERLANGJSPREFIX" != xno],
             AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS="$ERLANGJSPREFIX"])
             AC_ERLANG_CHECK_LIB(erlang_js,
               [AC_CHECK_FILE($ERLANG_LIB_DIR_erlang_js/priv/erlang_js_drv.so,
-                [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
-                 EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
-                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
-                 ERLANG_ERLANGJS_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
-                ],
+                [ERLANG_ERLANGJS_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"],
                 [ERLANG_ERLANGJS_MESSAGE="erlang_js library erlang_js_drv.so not found"])
               ],
               [ERLANG_ERLANGJS_MESSAGE="erlang_js erlang library not found"])

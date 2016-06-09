@@ -9,13 +9,18 @@ call "%~dp0"\bin\find_erlang.bat
 ::replace @EMAKEFILEDEFINES@ from Emakefile.in and write Emakefile
 ::(this is what autoconf on *nix would do)
 :: depending on your config, you might need to add one or more of the following options:
-::  {d, have_toke}
+::  {d, enable_debug}
 ::  {d, have_ctline_support}
 ::  {d, have_callback_support}
 ::  {d, with_crypto_hash}
+::  {d, with_rand}
+::  {d, with_maps}
 :: refer to configure.ac for the appropriate checks for necessity
 ::if yaws should use the file:sendfile/5 functionality, set @YAWS_OPTIONS@ to
 ::  {d, 'HAVE_ERLANG_SENDFILE'}
+::similarly for yaws, add to @YAWS_OPTIONS@ if required:
+::  {d, 'HAVE_CRYPTO_HASH'}
+::  {d, 'HAVE_ERLANG_NOW'}
 ::but note the issues in R15 & R16 mentioned at http://erlang.org/pipermail/erlang-questions/2013-October/075676.html
 :: Note: Search & Replace functionality from http://www.dostips.com
 if not exist Emakefile (

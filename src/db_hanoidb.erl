@@ -88,7 +88,7 @@ new_db(DBName, HanoiOptions) ->
     _ = case file:make_dir(BaseDir) of
             ok -> ok;
             {error, eexist} -> ok;
-            {error, Error0} -> erlang:exit({db_toke, 'cannot create dir', BaseDir, Error0})
+            {error, Error0} -> erlang:exit({?MODULE, 'cannot create dir', BaseDir, Error0})
         end,
     
     % HanoiDB stores not in a file but a dir store
@@ -123,8 +123,8 @@ close_and_delete({_DB, DBName} = State) ->
                           case file:delete(FullFileName) of
                               ok -> ok;
                               {error, Reason} ->
-                                  log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
-                                          [self(), FileName, Reason])
+                                  log:log(error, "[ Node ~w:~w ] deleting ~.0p failed: ~.0p",
+                                          [self(), ?MODULE, FileName, Reason])
                           end
                   end, Files),
     

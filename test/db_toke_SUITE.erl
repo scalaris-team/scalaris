@@ -29,11 +29,11 @@
 
 -include("db_backend_SUITE.hrl").
 
--ifdef(have_toke).
-all() -> lists:append(tests_avail(), [tester_reopen]).
--else.
-all() -> [].
--endif.
+all() ->
+    case code:which(toke_drv) of
+        non_existing -> lists:append(tests_avail(), [tester_reopen]);
+        _            -> []
+    end.
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 

@@ -6851,11 +6851,7 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_toke}"
-                 EDOCMACROS="${EDOCMACROS}, {have_toke, true}"
-                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_toke"
-                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
-
+  ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
 else
   ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
 fi
@@ -6966,12 +6962,7 @@ ERLANG_LIB_VER_hanoidb=$ac_cv_erlang_lib_ver_hanoidb
 if test "$ac_cv_erlang_lib_dir_hanoidb" = "not found"; then :
   ERLANG_HANOIDB_MESSAGE="hanoidb erlang not found"
 else
-
-                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
-                EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
-                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"
-                ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"
-
+  ERLANG_HANOIDB_FLAGS="-pa $ERLANG_LIB_DIR_hanoidb/ebin"
 fi
 
             if test "x$HANOIDBPREFIX" != x; then :
@@ -6979,7 +6970,7 @@ fi
 fi
             if test "x$ERLANG_HANOIDB_MESSAGE" != x; then :
   if test "x$ENABLE_HANOIDB" != xyes; then :
-  ERLANG_TOKE_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
+  ERLANG_HANOIDB_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
                  { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_HANOIDB_MESSAGE" >&5
 $as_echo "$as_me: $ERLANG_HANOIDB_MESSAGE" >&6;}
 else
@@ -7095,13 +7086,9 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
-                 EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
-                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
-                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
-
+  ERLANG_ERLANGJS_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
 else
-  ERLANG_TOKE_MESSAGE="erlang_js library erlang_js_drv.so not found"
+  ERLANG_ERLANGJS_MESSAGE="erlang_js library erlang_js_drv.so not found"
 fi
 
 

@@ -29,11 +29,11 @@
 
 -include("db_backend_SUITE.hrl").
 
--ifdef(have_hanoidb).
-all() -> lists:append(tests_avail(), [tester_reopen]).
--else.
-all() -> [].
--endif.
+all() ->
+    case code:which(hanoidb) of
+        non_existing -> lists:append(tests_avail(), [tester_reopen]);
+        _            -> []
+    end.
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 

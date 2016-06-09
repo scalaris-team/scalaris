@@ -86,18 +86,18 @@ new_db(DBName, TokeOptions) ->
     _ = case file:make_dir(FullDir) of
         ok -> ok;
         {error, eexist} -> ok;
-        {error, Error0} -> erlang:exit({db_toke, 'cannot create dir', FullDir, Error0})
+        {error, Error0} -> erlang:exit({?MODULE, 'cannot create dir', FullDir, Error0})
     end,
     FileBaseName = util:make_filename(io_lib:format("~s.tch", [DBName])),
     FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
     DB = case toke_drv:start_link() of
         {ok, Pid} -> Pid;
         ignore ->
-            log:log(error, "[ Node ~w:db_toke ] process start returned
-                    'ignore'", [self()]),
+            log:log(error, "[ Node ~w:~w ] process start returned
+                    'ignore'", [self(), ?MODULE]),
             erlang:error({toke_failed, drv_start_ignore});
         {error, Error} ->
-            log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error]),
+            log:log(error, "[ Node ~w:~w ] ~.0p", [self(), ?MODULE, Error]),
             erlang:error({toke_failed, Error})
     end,
     case toke_drv:new(DB) of
@@ -105,11 +105,11 @@ new_db(DBName, TokeOptions) ->
             case toke_drv:open(DB, FullFileName, TokeOptions) of
                 ok -> {DB, DBName};
                 Error2 ->
-                    log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
+                    log:log(error, "[ Node ~w:~w ] ~.0p", [self(), ?MODULE, Error2]),
                     erlang:error({toke_failed, Error2})
             end;
         Error1 ->
-            log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error1]),
+            log:log(error, "[ Node ~w:~w ] ~.0p", [self(), ?MODULE, Error1]),
             erlang:error({toke_failed, Error1})
     end.
 
@@ -129,8 +129,8 @@ close_and_delete({_DB, DBName} = State) ->
     case file:delete(FileName) of
         ok -> ok;
         {error, Reason} ->
-            log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
-                    [self(), FileName, Reason])
+            log:log(error, "[ Node ~w:~w ] deleting ~.0p failed: ~.0p",
+                    [self(), ?MODULE, FileName, Reason])
     end.
 
 %% @doc Gets a list of persisted tables.
