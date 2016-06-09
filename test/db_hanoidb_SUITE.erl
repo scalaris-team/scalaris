@@ -31,8 +31,8 @@
 
 all() ->
     case code:which(hanoidb) of
-        non_existing -> lists:append(tests_avail(), [tester_reopen]);
-        _            -> []
+        non_existing -> [];
+        _            -> lists:append(tests_avail(), [tester_reopen])
     end.
 
 suite() -> [ {timetrap, {seconds, 30}} ].
