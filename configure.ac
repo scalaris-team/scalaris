@@ -345,7 +345,7 @@ AS_IF([test "x$HANOIDBPREFIX" != xno],
             AS_IF([test "x$HANOIDBPREFIX" != x], [export ERL_LIBS=""])
             AS_IF([test "x$ERLANG_HANOIDB_MESSAGE" != x],
               [AS_IF([test "x$ENABLE_HANOIDB" != xyes],
-                [ERLANG_TOKE_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
+                [ERLANG_HANOIDB_MESSAGE="$ERLANG_HANOIDB_MESSAGE, disabling hanoidb support..."
                  AC_MSG_NOTICE($ERLANG_HANOIDB_MESSAGE)],
                 AC_MSG_FAILURE($ERLANG_HANOIDB_MESSAGE))])
             ])
@@ -362,9 +362,9 @@ AS_IF([test "x$ERLANGJSPREFIX" != xno],
                 [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_js}"
                  EDOCMACROS="${EDOCMACROS}, {have_erlang_js, true}"
                  DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_erlang_js"
-                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
+                 ERLANG_ERLANGJS_FLAGS="-pa $ERLANG_LIB_DIR_erlang_js/ebin"
                 ],
-                [ERLANG_TOKE_MESSAGE="erlang_js library erlang_js_drv.so not found"])
+                [ERLANG_ERLANGJS_MESSAGE="erlang_js library erlang_js_drv.so not found"])
               ],
               [ERLANG_ERLANGJS_MESSAGE="erlang_js erlang library not found"])
             AS_IF([test "x$ERLANGJSPREFIX" != x], [export ERL_LIBS=""])
