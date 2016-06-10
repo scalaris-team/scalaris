@@ -112,7 +112,7 @@ get_persisted_tables() ->
 %%      The key is expected to be the first element of Entry.
 -spec put(db(), Entry::entry()) -> db().
 put({DB, _DBName} = State, Entry) ->
-    bitcask:put(DB, term_to_binary(element(1, Entry)), term_to_binary(Entry)),
+    _ = bitcask:put(DB, term_to_binary(element(1, Entry)), term_to_binary(Entry)),
     State.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
