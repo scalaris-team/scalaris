@@ -94,6 +94,20 @@ AC_ARG_ENABLE([hanoidb],
 
 ###########################################################
 #
+# check bitcask
+#
+###########################################################
+
+ENABLE_BITCASK=
+BITCASKPREFIX=
+AC_ARG_ENABLE([bitcask],
+              AS_HELP_STRING([--enable-bitcask@<:@=DIR@:>@],
+                 [enable support for bitcask]),
+              [ENABLE_BITCASK=yes
+               BITCASKPREFIX=$enableval])
+
+###########################################################
+#
 # check erlang_js
 #
 ###########################################################
@@ -341,6 +355,29 @@ AS_IF([test "x$HANOIDBPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_HANOIDB_MESSAGE))])
             ])
 AC_SUBST([ERLANG_HANOIDB_FLAGS])
+
+# bitcask
+ERLANG_BITCASK_FLAGS=
+AS_IF([test "x$BITCASKPREFIX" != xno],
+            [
+            ERLANG_BITCASK_MESSAGE=
+            AS_IF([test "x$BITCASKPREFIX" != x], [export ERL_LIBS="$BITCASKPREFIX"])
+            AC_ERLANG_CHECK_LIB(bitcask,
+              [
+                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_bitcask}"
+                EDOCMACROS="${EDOCMACROS}, {have_bitcask, true}"
+                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_bitcask"
+                ERLANG_BITCASK_FLAGS="-pa $ERLANG_LIB_DIR_bitcask/ebin"
+              ],
+              [ERLANG_BITCASK_MESSAGE="bitcask erlang not found"])
+            AS_IF([test "x$BITCASKPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_BITCASK_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_BITCASK" != xyes],
+                [ERLANG_BITCASK_MESSAGE="$ERLANG_BITCASK_MESSAGE, disabling bitcask support..."
+                 AC_MSG_NOTICE($ERLANG_BITCASK_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_BITCASK_MESSAGE))])
+            ])
+AC_SUBST([ERLANG_BITCASK_FLAGS])
 
 # erlang_js
 ERLANG_ERLANGJS_FLAGS=

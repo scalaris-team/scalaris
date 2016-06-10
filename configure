@@ -609,6 +609,9 @@ EMAKEFILEDEFINES
 ERLANG_ERLANGJS_FLAGS
 ERLANG_LIB_VER_erlang_js
 ERLANG_LIB_DIR_erlang_js
+ERLANG_BITCASK_FLAGS
+ERLANG_LIB_VER_bitcask
+ERLANG_LIB_DIR_bitcask
 ERLANG_HANOIDB_FLAGS
 ERLANG_LIB_VER_hanoidb
 ERLANG_LIB_DIR_hanoidb
@@ -734,6 +737,7 @@ with_boost_program_options
 with_boost_unit_test_framework
 enable_toke
 enable_hanoidb
+enable_bitcask
 enable_erlang_js
 with_browser
 enable_runuser
@@ -1375,6 +1379,7 @@ Optional Features:
   --disable-cpp           disable support for the C++ bindings
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
   --enable-hanoidb[=DIR]  enable support for hanoidb
+  --enable-bitcask[=DIR]  enable support for bitcask
   --enable-erlang-js[=DIR]
                           enable support for erlang_js
   --disable-runuser       disable support for runuser (use sudo instead)
@@ -4854,6 +4859,21 @@ fi
 
 ###########################################################
 #
+# check bitcask
+#
+###########################################################
+
+ENABLE_BITCASK=
+BITCASKPREFIX=
+# Check whether --enable-bitcask was given.
+if test "${enable_bitcask+set}" = set; then :
+  enableval=$enable_bitcask; ENABLE_BITCASK=yes
+               BITCASKPREFIX=$enableval
+fi
+
+
+###########################################################
+#
 # check erlang_js
 #
 ###########################################################
@@ -6977,6 +6997,117 @@ else
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "$ERLANG_HANOIDB_MESSAGE
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+fi
+
+fi
+
+
+# bitcask
+ERLANG_BITCASK_FLAGS=
+if test "x$BITCASKPREFIX" != xno; then :
+
+            ERLANG_BITCASK_MESSAGE=
+            if test "x$BITCASKPREFIX" != x; then :
+  export ERL_LIBS="$BITCASKPREFIX"
+fi
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'bitcask' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'bitcask' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_bitcask+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("bitcask") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_bitcask=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_bitcask="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_bitcask" >&5
+$as_echo "$ac_cv_erlang_lib_dir_bitcask" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'bitcask' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'bitcask' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_bitcask+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_bitcask" = "not found"; then :
+  ac_cv_erlang_lib_ver_bitcask="not found"
+else
+  ac_cv_erlang_lib_ver_bitcask=`$as_echo "$ac_cv_erlang_lib_dir_bitcask" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_bitcask" >&5
+$as_echo "$ac_cv_erlang_lib_ver_bitcask" >&6; }
+ERLANG_LIB_DIR_bitcask=$ac_cv_erlang_lib_dir_bitcask
+
+ERLANG_LIB_VER_bitcask=$ac_cv_erlang_lib_ver_bitcask
+
+if test "$ac_cv_erlang_lib_dir_bitcask" = "not found"; then :
+  ERLANG_BITCASK_MESSAGE="bitcask erlang not found"
+else
+
+                EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_bitcask}"
+                EDOCMACROS="${EDOCMACROS}, {have_bitcask, true}"
+                DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_bitcask"
+                ERLANG_BITCASK_FLAGS="-pa $ERLANG_LIB_DIR_bitcask/ebin"
+
+fi
+
+            if test "x$BITCASKPREFIX" != x; then :
+  export ERL_LIBS=""
+fi
+            if test "x$ERLANG_BITCASK_MESSAGE" != x; then :
+  if test "x$ENABLE_BITCASK" != xyes; then :
+  ERLANG_BITCASK_MESSAGE="$ERLANG_BITCASK_MESSAGE, disabling bitcask support..."
+                 { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_BITCASK_MESSAGE" >&5
+$as_echo "$as_me: $ERLANG_BITCASK_MESSAGE" >&6;}
+else
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "$ERLANG_BITCASK_MESSAGE
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 fi
