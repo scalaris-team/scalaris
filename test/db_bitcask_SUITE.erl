@@ -66,5 +66,5 @@ rw_suite_runs(N) ->
 cleanup(Path) ->
     Re = ".*",
     Files = filelib:fold_files(Path, Re, true, fun(File, Acc) -> [File | Acc] end, []),
-    [file:delete(File) || File <- Files],
+    _ = [file:delete(File) || File <- Files],
     ok.

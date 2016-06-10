@@ -45,7 +45,7 @@
 -export([foldl_unordered/3]).
 -export([tab2list/1]).
 
--type db() :: {DB::pid(), DBName::nonempty_string()}.
+-type db() :: {DB::reference(), DBName::nonempty_string()}.
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
 -type entry() :: db_backend_beh:entry().
 
@@ -96,7 +96,7 @@ close({DB, _DBName}) ->
 close_and_delete({_DB, DBName} = State) ->
     close(State),
     FullDir = lists:flatten([config:read(db_directory), "/", atom_to_list(node()), "/", DBName]),
-    cleanup(FullDir).
+    cleanup(FullDir), true.
 
 %% @doc Gets a list of persisted tables.
 -spec get_persisted_tables() -> [nonempty_string()].
@@ -246,11 +246,10 @@ foldl_unordered(State, Fun, Acc) ->
 -spec get_all_keys(reference(), db_backend_beh:interval(), -1 | non_neg_integer()) ->
     [key()].
 get_all_keys(DB, Interval, MaxNum) ->
-    Keys =
-        case [ binary_to_term(BinaryKey) || BinaryKey <- bitcask:list_keys(DB)] of
-            {error, _Term} -> [];
-            L -> L
-        end,
+    Keys = case bitcask:list_keys(DB) of
+               {error, _Term} -> [];
+               BinaryKeys -> [ binary_to_term(BinaryKey) || BinaryKey <- BinaryKeys]
+           end,
     {_, In} = lists:foldl(fun(_, {0, _} = AccIn) ->
                                   AccIn;
                              (Key, {Max, KeyAcc} = AccIn) ->
@@ -280,5 +279,5 @@ tab2list(_Table_name) ->
 cleanup(Path) ->
     Re = ".*",
     Files = filelib:fold_files(Path, Re, true, fun(File, Acc) -> [File | Acc] end, []),
-    [file:delete(File) || File <- Files],
+    _ = [file:delete(File) || File <- Files],
     ok.
