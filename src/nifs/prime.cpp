@@ -59,7 +59,7 @@ static ERL_NIF_TERM get_nearest(ErlNifEnv* env, int argc,
   }
   free(const_cast<uint32_t *>(sieve));
   // this should not happen ever!
-  return enif_make_badarg(env, enif_make_atom(env, "no_prime_found"));
+  return enif_make_badarg(env);
 }
 
 /**
