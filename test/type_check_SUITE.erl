@@ -247,8 +247,6 @@ tester_type_check_math(_Config) ->
     tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval, []}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
-    tester:register_value_creator({typedef, prime, prime_list, []}, prime, tester_create_prime_list, 1),
-    tester:register_value_creator({typedef, prime, rev_prime_list, []}, prime, tester_create_rev_prime_list, 1),
     Modules =
         [ {intervals,
            [ {get_bounds, 1}, %% throws exception on []
@@ -277,15 +275,14 @@ tester_type_check_math(_Config) ->
            ]},
           %% {math_pos, [], []}, %% needs valid pos fields
           {prime,
-           [ {get, 1}, %% too slow for large integers, tested via feeder
-             {get_nearest, 1}, %% too slow for large integers, tested via feeder
-             {is_prime, 1}, %% too slow for large integers, tested via feeder
-             {prime_cache, 0} %% there really is no point in testing this function!
+           [ {get_nearest, 1}, %% too slow for large integers, tested via feeder
+             {is_prime, 1} %% too slow for large integers, tested via feeder
            ],
-           [ {sieve_num, 3}, %% throws if no prime is found
-             {sieve, 3}, %% properly tested via get/1
+           [ {init, 0}, %% only once for initialisation
+             {sieve_num, 3}, %% throws if no prime is found
              {sieve_filter, 3}, %% slow for large gaps between integers in the list
-             {find_in_cache, 2} %% pre-condition between parameters must be met
+             {find_in_cache, 2}, %% pre-condition between parameters must be met
+             {prime_cache, 0} %% there really is no point in testing this function!
            ]},
           {randoms,
            [ {start, 0},
@@ -306,8 +303,6 @@ tester_type_check_math(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval, []}),
     tester:unregister_value_creator({typedef, intervals, simple_interval, []}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
-    tester:unregister_value_creator({typedef, prime, prime_list, []}),
-    tester:unregister_value_creator({typedef, prime, rev_prime_list, []}),
     true.
 
 tester_type_check_node(_Config) ->

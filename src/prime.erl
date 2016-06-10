@@ -28,21 +28,48 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([get/1, get_nearest/1, is_prime/1]).
--export([prime_cache/0]).
+-export([get_nearest/1, is_prime/1]).
 
 % feeder for tester
--export([is_prime_feeder/1, get_nearest_feeder/1, get_feeder/1]).
--export([tester_create_prime_list/1, tester_create_rev_prime_list/1,
-         tester_is_prime_list/1]).
+-export([is_prime_feeder/1, get_nearest_feeder/1]).
 
 -type prime() :: pos_integer().
--type prime_list() :: [prime()].
--type rev_prime_list() :: [prime()].
 
 % last prime in prime_cache/0
 -define(PrimeCache, 5003).
 -define(TESTER_MAX_PRIME, 5250).
+
+-on_load(init/0).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec init() -> ok | {error, term()}.
+init() ->
+    %% loads the shared library
+    SoName =
+        case code:priv_dir(scalaris) of
+            {error, bad_name} ->
+                case filelib:is_dir(filename:join(["..", priv])) of
+                    true ->
+                        filename:join(["..", priv, ?MODULE]);
+                    _ ->
+                        filename:join(
+                          [filename:dirname(code:where_is_file("scalaris.beam")),
+                           "..", priv, ?MODULE])
+                end;
+            Dir ->
+                filename:join(Dir, ?MODULE)
+        end,
+    % tolerate some errors trying to load the library:
+    case erlang:load_nif(SoName, 0) of
+        ok -> ok;
+        {error, {load_failed, Text}} ->
+            log:log(warn,
+                    "~s - falling back to the (considerably) slower Erlang native code",
+                    [Text]),
+            ok;
+        Error -> Error
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -69,7 +96,7 @@ get_nearest(N) when N =< ?PrimeCache ->
 
 %% @doc Finds a number at least as large as N in the given prime list.
 %%      Such a number must exist!
--spec find_in_cache(pos_integer(), prime_list()) -> prime().
+-spec find_in_cache(pos_integer(), [pos_integer()]) -> prime().
 find_in_cache(N, [P | _Cache]) when P >= N ->
     P;
 find_in_cache(N, [_ | Cache]) ->
@@ -88,42 +115,6 @@ sieve_num([], [H | _TL], Num) when H >= Num ->
 sieve_num([], [H | TL], Num) ->
     sieve_num([], sieve_filter(TL, H*H, H), Num).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec is_prime_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
-is_prime_feeder(N) -> {N}.
-
--spec is_prime(pos_integer()) -> boolean().
-is_prime(V) when V =< ?PrimeCache ->
-    is_prime_p(V, prime_cache());
-is_prime(V) ->
-    is_prime_p(V, ?MODULE:get(V)).
-
--spec is_prime_p(pos_integer(), prime_list() | rev_prime_list()) -> boolean().
-is_prime_p(V, Primes) ->
-    lists:member(V, Primes).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec get_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
-get_feeder(N) -> {N}.
-
-% @doc returns all primes less than or equal to N
--spec get(pos_integer()) -> prime_list().
-get(N) when N =< ?PrimeCache ->
-    lists:takewhile(fun(P) -> P =< N end, prime_cache());
-get(N) ->
-    sieve(tl(prime_cache()), lists:seq(?PrimeCache + 2, N, 2), [2]).
-
-%% @doc Sieves out all non-primes of the given list.
--spec sieve(Primes::Numbers, Candidates::Numbers, Acc::Numbers)
-        -> Primes::Numbers when is_subtype(Numbers, [non_neg_integer()]).
-sieve([H | TL], Candidates, Acc) ->
-    sieve(TL, sieve_filter(Candidates, H*H, H), [H | Acc]);
-sieve([], [], Acc) -> lists:reverse(Acc);
-sieve([], [H | TL], Acc) ->
-    sieve([], sieve_filter(TL, H*H, H), [H | Acc]).
-
 %% @doc Removes all factors of Inc from List, starting with Num.
 -spec sieve_filter(List::[non_neg_integer()], Num::non_neg_integer(),
                    Inc::non_neg_integer()) -> [non_neg_integer()].
@@ -138,9 +129,20 @@ sieve_filter([H | TL], Num, Inc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec is_prime_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
+is_prime_feeder(N) -> {N}.
+
+-spec is_prime(pos_integer()) -> boolean().
+is_prime(V) when V =< ?PrimeCache ->
+    lists:member(V, prime_cache());
+is_prime(V) ->
+    get_nearest(V-1) =:= V.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc list of all primes less than 5003 from
 %      http://primes.utm.edu/lists/small/10000.txt
--spec prime_cache() -> prime_list().
+-spec prime_cache() -> [pos_integer()].
 prime_cache() ->
     [ 2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
      31,     37,     41,     43,     47,     53,     59,     61,     67,     71,
@@ -209,18 +211,3 @@ prime_cache() ->
    4759,   4783,   4787,   4789,   4793,   4799,   4801,   4813,   4817,   4831,
    4861,   4871,   4877,   4889,   4903,   4909,   4919,   4931,   4933,   4937,
    4943,   4951,   4957,   4967,   4969,   4973,   4987,   4993,   4999,   5003].
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec tester_create_prime_list(1..2500) -> prime_list().
-tester_create_prime_list(N) -> ?MODULE:get(N).
-
--spec tester_create_rev_prime_list(1..2500) -> rev_prime_list().
-tester_create_rev_prime_list(N) -> lists:reverse(tester_create_prime_list(N)).
-
--spec tester_is_prime_list(prime_list()) -> boolean().
-tester_is_prime_list([_|_] = List) ->
-    Largest = lists:max(List),
-    PrimeList = ?MODULE:get(Largest),
-    lists:all(fun(X) -> is_prime_p(X, PrimeList) end, List);
-tester_is_prime_list([]) -> true.
