@@ -52,14 +52,18 @@ get_nearest_feeder(N) -> {N}.
 %% @doc Returns the first prime larger than or equal to N.
 -spec get_nearest(pos_integer()) -> prime().
 get_nearest(N) when N > ?PrimeCache ->
-    ?DBG_ASSERT(N >= 396738),
-    % for x >= 396738 there is at least one prime between x and (1 + 1/(25ln^2(x)))x
-    % Dusart, Pierre (2010). "Estimates of Some Functions Over Primes without R.H.". arXiv:1002.0442
-    LogN = math:log(N),
-    sieve_num(tl(prime_cache()),
-              lists:seq(?PrimeCache + 2,
-                        util:ceil((1 + 1 / (25 * LogN*LogN)) * N), 2),
-              N);
+    MaxN =
+        if N >= 396738 ->
+               % for x >= 396738 there is at least one prime between x and (1 + 1/(25ln^2(x)))x
+               % Dusart, Pierre (2010). "Estimates of Some Functions Over Primes without R.H.". arXiv:1002.0442
+               LogN = math:log(N),
+               util:ceil((1 + 1 / (25 * LogN*LogN)) * N);
+           N >= 25 ->
+             % x >= 25, there is always a prime between n and (1 + 1/5)n
+             % Nagura, J. "On the interval containing at least one prime number." Proceedings of the Japan Academy, Series A 28 (1952), pp. 177-181.
+             N + (N + 4) div 5
+        end,
+    sieve_num(tl(prime_cache()), lists:seq(?PrimeCache + 2, MaxN, 2), N);
 get_nearest(N) when N =< ?PrimeCache ->
     find_in_cache(N, prime_cache()).
 
