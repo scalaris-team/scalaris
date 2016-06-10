@@ -126,7 +126,7 @@ SCALARIS_UNITTEST_YAWS_PORT ?= 8000
 SCALARIS_JTEST_NAME ?= jtest_boot
 
 NIFS_SRC_CPP=$(wildcard src/nifs/*.cpp)
-NIFS_SO=$(subst src/nifs,bin,$(NIFS_SRC_CPP:.cpp=.so))
+NIFS_SO=$(subst src/nifs,priv,$(NIFS_SRC_CPP:.cpp=.so))
 
 all: Makefile nifs compile tags
 #all: compile dialyzer java test docs
@@ -610,7 +610,7 @@ rrd-init:
 
 nifs: $(NIFS_SO)
 
-bin/%.so: src/nifs/%.cpp Makefile
+priv/%.so: src/nifs/%.cpp Makefile
 	@CXX@ @NIFFLAGS@ -I@ERLANG_ROOT_DIR@/erts-@ERLANG_LIB_VER_erts@/include @CXXFLAGS@ -fPIC -o $@ $<
 
 install-doc: doc

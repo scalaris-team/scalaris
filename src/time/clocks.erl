@@ -34,7 +34,20 @@
 -spec init() -> ok.
 init() ->
     %% loads the shared library
-    SoName = filename:join(filename:join(code:lib_dir(scalaris), bin), ?MODULE),
+    SoName =
+        case code:priv_dir(scalaris) of
+            {error, bad_name} ->
+                case filelib:is_dir(filename:join(["..", priv])) of
+                    true ->
+                        filename:join(["..", priv, ?MODULE]);
+                    _ ->
+                        filename:join(
+                          [filename:dirname(code:where_is_file("scalaris.beam")),
+                           "..", priv, ?MODULE])
+                end;
+            Dir ->
+                filename:join(Dir, ?MODULE)
+        end,
     erlang:load_nif(SoName, 0).
 
 -spec get_monotonic_clock() -> failed | {non_neg_integer(), non_neg_integer()}.
