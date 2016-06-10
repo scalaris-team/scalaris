@@ -32,7 +32,7 @@
 wrap(Extension, Message) ->
     {extensions, {Extension, Message}}.
 
--spec on({extensions, {extension(), comm:message()}}, dht_node:state()) -> dht_node:state().
+-spec on({extensions, {extension(), comm:message()}}, dht_node_state:state()) -> dht_node_state:state().
 on({extensions, {Extension, Message}}, State) ->
     Extension:on(Message, State).
 
