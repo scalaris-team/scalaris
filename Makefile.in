@@ -542,7 +542,7 @@ log-clean:
 clean: erlang-clean tags-clean cpp-clean java-clean python-clean python3-clean
 
 # delete all files related to our erlang sources
-erlang-clean:
+erlang-clean: nifs-clean
 	-rm -f .make-doc
 	-rm -f bin/*.beam
 	-rm -f ebin/*.beam
@@ -609,6 +609,9 @@ rrd-init:
 	@echo This target is deprecated
 
 nifs: $(NIFS_SO)
+
+nifs-clean:
+	-rm -f $(NIFS_SO)
 
 priv/%.so: src/nifs/%.cpp Makefile
 	@CXX@ @NIFFLAGS@ -I@ERLANG_ROOT_DIR@/erts-@ERLANG_LIB_VER_erts@/include @CXXFLAGS@ -fPIC -o $@ $<
