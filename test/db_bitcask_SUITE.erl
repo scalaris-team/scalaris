@@ -28,7 +28,11 @@
 
 -include("db_backend_SUITE.hrl").
 
-all() -> tests_avail().
+all() ->
+    case code:which(bitcask) of
+        non_existing -> [];
+        _            -> tests_avail()
+    end.
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
