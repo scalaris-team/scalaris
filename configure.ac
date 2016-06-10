@@ -358,6 +358,7 @@ AC_SUBST([ERLANG_HANOIDB_FLAGS])
 
 # bitcask
 ERLANG_BITCASK_FLAGS=
+BITCASK_LIBS=
 AS_IF([test "x$BITCASKPREFIX" != xno],
             [
             ERLANG_BITCASK_MESSAGE=
@@ -368,6 +369,7 @@ AS_IF([test "x$BITCASKPREFIX" != xno],
                 EDOCMACROS="${EDOCMACROS}, {have_bitcask, true}"
                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_bitcask"
                 ERLANG_BITCASK_FLAGS="-pa $ERLANG_LIB_DIR_bitcask/ebin"
+                BITCASK_LIBS="$ERLANG_LIB_DIR_bitcask"
               ],
               [ERLANG_BITCASK_MESSAGE="bitcask erlang not found"])
             AS_IF([test "x$BITCASKPREFIX" != x], [export ERL_LIBS=""])
@@ -378,6 +380,7 @@ AS_IF([test "x$BITCASKPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_BITCASK_MESSAGE))])
             ])
 AC_SUBST([ERLANG_BITCASK_FLAGS])
+AC_SUBST([BITCASK_LIBS])
 
 # erlang_js
 ERLANG_ERLANGJS_FLAGS=

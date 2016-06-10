@@ -113,6 +113,7 @@ DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/wx-*/ebin)
 DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/xmerl-*/ebin)
 DIALYZER_PLT_LIBS += $(wildcard contrib/log4erl/ebin)
 DIALYZER_PLT_LIBS += $(wildcard contrib/yaws/ebin)
+DIALYZER_PLT_LIBS += $(wildcard @BITCASK_LIBS@/ebin)
 
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
 DIALYZER_FLAGS ?=

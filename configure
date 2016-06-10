@@ -609,6 +609,7 @@ EMAKEFILEDEFINES
 ERLANG_ERLANGJS_FLAGS
 ERLANG_LIB_VER_erlang_js
 ERLANG_LIB_DIR_erlang_js
+BITCASK_LIBS
 ERLANG_BITCASK_FLAGS
 ERLANG_LIB_VER_bitcask
 ERLANG_LIB_DIR_bitcask
@@ -7006,6 +7007,7 @@ fi
 
 # bitcask
 ERLANG_BITCASK_FLAGS=
+BITCASK_LIBS=
 if test "x$BITCASKPREFIX" != xno; then :
 
             ERLANG_BITCASK_MESSAGE=
@@ -7093,6 +7095,7 @@ else
                 EDOCMACROS="${EDOCMACROS}, {have_bitcask, true}"
                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_bitcask"
                 ERLANG_BITCASK_FLAGS="-pa $ERLANG_LIB_DIR_bitcask/ebin"
+                BITCASK_LIBS="$ERLANG_LIB_DIR_bitcask"
 
 fi
 
@@ -7113,6 +7116,7 @@ fi
 fi
 
 fi
+
 
 
 # erlang_js
