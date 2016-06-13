@@ -1,4 +1,4 @@
-%  @copyright 2010-2015 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                              fun erlang:is_atom/1, no_atom);
         {atom, _Atom} ->
             check_atom(Value, Type, CheckStack, ParseState);
-        binary ->
+        {binary, []} ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_binary/1, no_binary);
         {builtin_type, bitstring} ->

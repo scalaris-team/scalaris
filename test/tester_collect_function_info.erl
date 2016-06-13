@@ -264,8 +264,8 @@ parse_type({type, _Line, atom, []}, _Module, ParseState) ->
     {atom, ParseState};
 parse_type({type, _Line, arity, []}, _Module, ParseState) ->
     {arity, ParseState};
-parse_type({type, _Line, binary, []}, _Module, ParseState) ->
-    {binary, ParseState};
+parse_type({type, _Line, binary, L}, _Module, ParseState) ->
+    {{binary, L}, ParseState};
 parse_type({type, _Line, pid, []}, _Module, ParseState) ->
     {pid, ParseState};
 parse_type({type, _Line, port, []}, _Module, ParseState) ->

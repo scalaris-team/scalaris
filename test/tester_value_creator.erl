@@ -78,12 +78,12 @@ create_value_(atom, _Size, ParseState) ->
       fun() -> lists:nth(crypto:rand_uniform(1, 5), [one, two, three, four]) end);
 create_value_({atom, Value}, _Size, _ParseState) ->
     Value;
-create_value_(binary, Size, ParseState) ->
+create_value_({binary, []}, Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_binaries/1,
       fun() -> list_to_binary(create_value({list, {range, {integer, 0}, {integer, 16#ff}}}, Size, ParseState)) end);
 create_value_({builtin_type, bitstring}, Size, ParseState) ->
-    Binary = create_value_(binary, Size, ParseState),
+    Binary = create_value_({binary, []}, Size, ParseState),
     RandByte = crypto:rand_uniform(0, 256),
     RandBits = crypto:rand_uniform(0, 8),
     <<Binary/binary,RandByte:RandBits>>;
