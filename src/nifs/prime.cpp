@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "erl_nif.h"
+#include <erl_nif.h>
 
 // adapted from http://www.algorithmist.com/index.php/Prime_Sieve_of_Eratosthenes.c
 
@@ -44,7 +44,7 @@ bool sieve_is_prime(const uint32_t *sieve, int p) {
  */
 static ERL_NIF_TERM get_nearest(ErlNifEnv* env, int argc,
                                 const ERL_NIF_TERM argv[]) {
-  uint64_t i;
+  ErlNifUInt64 i;
   enif_get_uint64(env, argv[0], &i);
   // from https://en.wikipedia.org/wiki/Bertrand%27s_postulate#Better_results
   // Lowell Schoenfeld showed that for n ≥ 2010760, there is always a prime between n and (1 + 1/16597)n.
@@ -73,7 +73,7 @@ static ERL_NIF_TERM get_nearest(ErlNifEnv* env, int argc,
  */
 static ERL_NIF_TERM is_prime(ErlNifEnv* env, int argc,
                              const ERL_NIF_TERM argv[]) {
-  uint64_t i;
+  ErlNifUInt64 i;
   enif_get_uint64(env, argv[0], &i);
   const uint32_t *sieve = make_sieve(i);
   const bool isprime = sieve_is_prime(sieve, i);
