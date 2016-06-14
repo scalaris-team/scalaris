@@ -423,7 +423,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            % note: the actual P1E(phase1) may be different from what the non-initiator expected
            P1E_p1_real =
                shash_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
-           P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
+           P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1_real),
            Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
            CKidxSize = mymaps:size(OtherDBChunk1),
            StartResolve = NewKVList =/= [] orelse CKidxSize > 0,
@@ -597,7 +597,7 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     % P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
     P1E_p1_real = P1E_p1_bf_I_real + P1E_p1_bf_NI_real - P1E_p1_bf_I_real * P1E_p1_bf_NI_real,
     % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-    P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
+    P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1_real),
     ?ALG_DEBUG("I:~.0p, P1E_bf=~p~n"
                "  Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
                "  Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p~n"
@@ -704,22 +704,23 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                  [?MODULE, pid_groups:my_groupname(), self(),
                   EffectiveP1E_I, EffectiveP1E_L]),
          ok),
-    NextP0E = PrevP0E * math:pow(1 - EffectiveP1E_I, HashCmpI)
+    % TODO: can we get a higher sensitivity with floats near 1?
+    NextP1E = 1 - PrevP0E * math:pow(1 - EffectiveP1E_I, HashCmpI)
                   * math:pow(1 - EffectiveP1E_L, HashCmpL),
-    NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
+    NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), 1 - PrevP0E, 1 - NextP0E]),
+               [length(RTree), 1 - PrevP0E, NextP1E]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
-           merkle_resolve_leaves_send(NewState, NextP0E);
+           merkle_resolve_leaves_send(NewState, NextP1E);
        true ->
            ?DBG_ASSERT(NextLvlNodesAct >= 0),
            % calculate the remaining trees' failure prob based on the already
            % used failure prob
-           P1E_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP0E),
+           P1E_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP1E),
            NewState#rr_recon_state{stats = NStats,
                                    misc = [{p1e, P1E_I_2},
                                            {p1e_phase_x, P1EPhaseX},
@@ -750,21 +751,22 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                  [?MODULE, pid_groups:my_groupname(), self(),
                   EffectiveP1ETotal_I, EffectiveP1ETotal_L]),
          ok),
-    NextP0E = PrevP0E * math:pow(1 - EffectiveP1ETotal_I, HashCmpI)
+    % TODO: can we get a higher sensitivity with floats near 1?
+    NextP1E = 1 - PrevP0E * math:pow(1 - EffectiveP1ETotal_I, HashCmpI)
                   * math:pow(1 - EffectiveP1ETotal_L, HashCmpL),
-    NStats = rr_recon_stats:set([{p1e_phase1, 1 - NextP0E}], NStats0),
+    NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
+               [length(RTree), PrevP1E, rr_recon_stats:get(p1e_phase1, NStats)]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
-           merkle_resolve_leaves_send(NewState, NextP0E);
+           merkle_resolve_leaves_send(NewState, NextP1E);
        true ->
            ?DBG_ASSERT(NextLvlNodesAct >= 0),
            % calculate the remaining trees' failure prob based on the already
            % used failure prob
-           P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP0E),
+           P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP1E),
            {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
                merkle_next_signature_sizes(Params, P1ETotal_I_2, MyMaxItemsCount,
                                            OtherMaxItemsCount),
@@ -1030,7 +1032,7 @@ begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = tr
                 end,
             Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
             % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
-            P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1)),
+            P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1),
             
             Stats3 = rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                          {tree_compareSkipped, NSkip},
@@ -2061,18 +2063,18 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
 -spec merkle_resolve_add_leaf_hash(
         Bucket::merkle_tree:mt_bucket(), P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         OtherMaxItemsCount::non_neg_integer(), BucketSizeBits::pos_integer(),
-        ExpDelta::number(), HashesK::Bin, HashesV::Bin, PrevP0E::float())
-        -> {HashesK::Bin, HashesV::Bin, PrevP0E::float(),
+        ExpDelta::number(), HashesK::Bin, HashesV::Bin, PrevP1E::float())
+        -> {HashesK::Bin, HashesV::Bin, NextP1E::float(),
             ResortedBucket::merkle_tree:mt_bucket()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_add_leaf_hash(
   Bucket, P1EAllLeaves, NumRestLeaves, OtherMaxItemsCount, BucketSizeBits,
-  ExpDelta, HashesK, HashesV, PrevP0E) ->
+  ExpDelta, HashesK, HashesV, PrevP1E) ->
     BucketSize = length(Bucket),
     ?DBG_ASSERT(BucketSize > 0),
     ?DBG_ASSERT(BucketSize =< util:pow(2, BucketSizeBits)),
     HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
-    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
+    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP1E),
 %%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
     {SigSize, VSize} =
@@ -2083,33 +2085,35 @@ merkle_resolve_add_leaf_hash(
     %       individual trivial syncs' signatures!)
     ThisP1E_upper_bound =
         trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
-    NextP0E = PrevP0E * (1 - ThisP1E_upper_bound),
+    % pay attention to floating point issues near 1:
+%%     NextP1E = 1 - (1 - PrevP1E) * (1 - ThisP1E_upper_bound),
+    NextP1E = PrevP1E + ThisP1E_upper_bound - PrevP1E * ThisP1E_upper_bound,
 %%     log:pal("merkle_send [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     {HashesKNew, HashesVNew, ResortedBucket} =
         compress_kv_list(Bucket, {HashesK1, HashesV}, SigSize, VSize,
                          fun trivial_compress_key/2),
-    {HashesKNew, HashesVNew, NextP0E, ResortedBucket}.
+    {HashesKNew, HashesVNew, NextP1E, ResortedBucket}.
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
 %%      returned by merkle_resolve_add_leaf_hash/9 during merkle sync.
 %% @see merkle_resolve_add_leaf_hash/9
 -spec merkle_resolve_retrieve_leaf_hashes(
         HashesK::Bin, HashesV::Bin, P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
-        PrevP0E::float(), MyMaxItemsCount::non_neg_integer(),
+        PrevP1E::float(), MyMaxItemsCount::non_neg_integer(),
         PrevP1E_real::float(), MyActualItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer(), ExpDelta::number())
         -> {NewHashesK::Bin, NewHashesV::Bin, OtherBucketTree::kvi_tree(),
             OrigDBChunkLen::non_neg_integer(),
             SigSize::signature_size(), VSize::signature_size(),
-            NextP0E::float(), NextP1E_real::float()}
+            NextP1E::float(), NextP1E_real::float()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_retrieve_leaf_hashes(
-  HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount,
+  HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP1E, MyMaxItemsCount,
   PrevP1E_real, MyActualItemsCount, BucketSizeBits, ExpDelta) ->
     <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
     BucketSize = BucketSize0 + 1,
-    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
+    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP1E),
 %%     log:pal("merkle_receive [ ~p ]:~n  ~p~n  ~p",
 %%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
 %%              {BucketSize, MyMaxItemsCount, P1E_next}]),
@@ -2117,7 +2121,9 @@ merkle_resolve_retrieve_leaf_hashes(
         trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
     ThisP1E =
         trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
-    NextP0E = PrevP0E * (1 - ThisP1E),
+    % pay attention to floating point issues near 1:
+%%     NextP1E = 1 - (1 - PrevP1E) * (1 - ThisP1E),
+    NextP1E = PrevP1E + ThisP1E - PrevP1E * ThisP1E,
     ThisP1E_real =
         trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
     % pay attention to floating point issues near 1:
@@ -2137,18 +2143,18 @@ merkle_resolve_retrieve_leaf_hashes(
     {OBucketTree, _OrigDBChunkLen, VSize} =
         decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize),
     {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize,
-     NextP0E, NextP1E_real}.
+     NextP1E, NextP1E_real}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
--spec merkle_resolve_leaves_send(State::state(), NextP0E::float()) -> NewState::state().
+-spec merkle_resolve_leaves_send(State::state(), NextP1E::float()) -> NewState::state().
 merkle_resolve_leaves_send(
   State = #rr_recon_state{params = Params, initiator = IsInitiator,
                           stats = Stats, dest_recon_pid = DestReconPid,
                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                           merkle_sync = {SyncSend, SyncRcv, SyncRcvLeafCount,
                                          {MySyncDRK, MySyncDRLCount, OtherSyncDRLCount}}},
-  NextP0E) ->
+  NextP1E) ->
 %%     log:pal("Sync (~s):~n  send:~.2p~n  rcv:~.2p",
 %%             [?IIF(IsInitiator, "I", "NI"), SyncSend, SyncRcv]),
     % resolve items from emptyLeaf-* comparisons with empty leaves on any node as key_upd:
@@ -2162,7 +2168,7 @@ merkle_resolve_leaves_send(
     SyncSendL = length(SyncSend),
     SyncRcvL = length(SyncRcv),
     TrivialProcs = SyncSendL + SyncRcvL,
-    P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP0E),
+    P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP1E),
     ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tP1EAllLeaves: ~g\t"
                "ItemsToSend: ~B (~g per leaf)",
                [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
@@ -2183,19 +2189,19 @@ merkle_resolve_leaves_send(
            BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
            ExpDelta = Params#merkle_params.exp_delta,
            % note: 1 trivial proc contains 1 leaf
-           {HashesK, HashesV, NewSyncSend_rev, _ThisP0E_upper_bound, LeafCount} =
+           {HashesK, HashesV, NewSyncSend_rev, _ThisP1E_upper_bound, LeafCount} =
                lists:foldl(
                  fun({OtherMaxItemsCount, MyKVItems},
-                     {HashesKAcc, HashesVAcc, SyncAcc, PrevP0E, LeafNAcc}) ->
-                         {HashesKAcc1, HashesVAcc1, CurP0E, MyKVItems1} =
+                     {HashesKAcc, HashesVAcc, SyncAcc, PrevP1E, LeafNAcc}) ->
+                         {HashesKAcc1, HashesVAcc1, CurP1E, MyKVItems1} =
                              merkle_resolve_add_leaf_hash(
                                MyKVItems, P1EAllLeaves, TrivialProcs - LeafNAcc,
                                OtherMaxItemsCount, BucketSizeBits, ExpDelta,
-                               HashesKAcc, HashesVAcc, PrevP0E),
+                               HashesKAcc, HashesVAcc, PrevP1E),
                          {HashesKAcc1, HashesVAcc1,
                           [{OtherMaxItemsCount, MyKVItems1} | SyncAcc],
-                          CurP0E, LeafNAcc + 1}
-                 end, {<<>>, <<>>, [], 1.0, 0}, SyncSend),
+                          CurP1E, LeafNAcc + 1}
+                 end, {<<>>, <<>>, [], 0.0, 0}, SyncSend),
            % the other node will send its items from this CKV list - increase rs_expected, too
            NStats3 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
                                          {rs_expected, 1}], NStats2),
@@ -2247,16 +2253,16 @@ merkle_resolve_leaves_receive(
     % * at non-initiator: inner(NI)-leaf(I)
     % note: 1 trivial proc may contain more than 1 leaf!
     {<<>>, <<>>, ToSend, ToResolve, ResolveNonEmpty, _TrivialProcsRest,
-     _ThisP0E_upper_bound, ThisP1E_real} =
+     _ThisP1E_upper_bound, ThisP1E_real} =
         lists:foldl(
           fun({MyMaxItemsCount, MyKVItems},
               {HashesKAcc, HashesVAcc, ToSend, ToResolve, ResolveNonEmpty,
-               TProcsAcc, P0EIn, P1EIn_real}) ->
+               TProcsAcc, P1EIn, P1EIn_real}) ->
                   {NHashesKAcc, NHashesVAcc, OBucketTree, _OrigDBChunkLen,
-                   SigSize, VSize, ThisP0E, ThisP1E_real} =
+                   SigSize, VSize, ThisP1E, ThisP1E_real} =
                       merkle_resolve_retrieve_leaf_hashes(
                         HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc,
-                        P0EIn, MyMaxItemsCount, P1EIn_real, length(MyKVItems),
+                        P1EIn, MyMaxItemsCount, P1EIn_real, length(MyKVItems),
                         BucketSizeBits, ExpDelta),
                   % calc diff (trivial sync)
                   ?DBG_ASSERT(MyKVItems =/= []),
@@ -2270,8 +2276,8 @@ merkle_resolve_leaves_receive(
                                                 Params#merkle_params.bucket_size),
                   {NHashesKAcc, NHashesVAcc, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   TProcsAcc - 1, ThisP0E, ThisP1E_real}
-          end, {HashesK, HashesV, [], [], false, TrivialProcs, 1.0, 0.0}, SyncRcv),
+                   TProcsAcc - 1, ThisP1E, ThisP1E_real}
+          end, {HashesK, HashesV, [], [], false, TrivialProcs, 0.0, 0.0}, SyncRcv),
 
     % send resolve message:
     % resolve items we should send as key_upd:
@@ -2420,23 +2426,31 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 %%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
 -spec calc_n_subparts_p1e(N::number(), P1E::float(), PrevP0::float())
         -> P1E_sub::float().
-calc_n_subparts_p1e(N, P1E, 1.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
+calc_n_subparts_p1e(N, P1E, 0.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
     % special case with e.g. no items in the first/previous phase
     P1E;
-calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1.0e-8 andalso
-                                              PrevP0E > 0 andalso PrevP0E =< 1 ->
+calc_n_subparts_p1e(N, P1E, PrevP1E) when P1E > 0 andalso P1E < 1.0e-8 andalso
+                                              PrevP1E >= 0 andalso PrevP1E < 1 ->
     % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
     %         point representation is sub-optimal!
     % => use Taylor expansion of 1 - ((1 - p1e) / PrevP0E)^(1/n)  at P1E = 0
     % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%28%281+-+p%29%2Fq%29^%281%2Fn%29++at+p+%3D+0
     N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
     P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
-    Q1 = math:pow(1 / PrevP0E, 1 / N),
-    VP = (1 - Q1) + (P1E * Q1) / N +
+    % find a (somewhat) better representation of Q1 and Q0=1-Q1:
+%%  Q1 = math:pow(1 / (1 - PrevP1E), 1 / N),
+%%  Q0 = 1 - Q1,
+    P2 = PrevP1E * PrevP1E, P3 = P2 * PrevP1E, P4 = P3 * PrevP1E, P5 = P4 * PrevP1E,
+    Q0 = -PrevP1E / N - (P2 * (N+1)) / (2 * N2) -
+             (P3 * (2 * N2 + 3 * N + 1)) / (6 * N3) -
+             (P4 * (6 * N3 + 11 * N2 + 6 * N + 1)) / (24 * N4) -
+             (P5 * (24 * N4 + 50 * N3 + 35 * N2 + 10 * N + 1)) / (120 * N5), %+O[p^6]
+    Q1 = 1 - Q0,
+    VP = Q0 + (P1E * Q1) / N +
               ((N-1) * P1E2 * Q1) / (2 * N2) +
               ((N-1) * (2 * N - 1) * P1E3 * Q1) / (6 * N3) +
               ((N-1) * (2 * N - 1) * (3 * N - 1) * P1E4 * Q1) / (24 * N4) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q1) / (120 * N5), % +O[p^6]
+              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q1) / (120 * N5), % +O[P1E^6]
     if VP > 0 andalso VP < 1 ->
            VP;
        VP =< 0 ->
@@ -2446,9 +2460,10 @@ calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1.0e-8 andalso
                    [?MODULE, pid_groups:my_groupname(), self(), VP]),
            1.0e-16 % do not go below this so that the opposite probability is possible as a float!
     end;
-calc_n_subparts_p1e(N, P1E, PrevP0E) when P1E > 0 andalso P1E < 1 andalso
-                                              PrevP0E > 0 andalso PrevP0E =< 1 ->
-    VP = 1 - math:pow((1 - P1E) / PrevP0E, 1 / N),
+calc_n_subparts_p1e(N, P1E, PrevP1E) when P1E > 0 andalso P1E < 1 andalso
+                                              PrevP1E >= 0 andalso PrevP1E < 1 ->
+    % TODO: this may also be close to 1 if N is large!
+    VP = 1 - math:pow((1 - P1E) / (1 - PrevP1E), 1 / N),
     if VP > 0 andalso VP < 1 ->
            VP;
        VP =< 0 ->
