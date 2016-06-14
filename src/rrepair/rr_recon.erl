@@ -208,7 +208,7 @@
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer()} |
     {resolve_req, HashesK::bitstring(), HashesV::bitstring()} |
-    {resolve_req, BinKeyList::bitstring(), SyncSendP0E_real::float()} |
+    {resolve_req, BinKeyList::bitstring(), SyncSendP1E_real::float()} |
     % dht node response
     {create_struct2, SenderI::intervals:interval(), {get_state_response, MyI::intervals:interval()}} |
     {process_db, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
@@ -593,7 +593,9 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     P1E_p1_bf_I_real = bloom_worst_case_failprob(BF, OtherBFCount, ExpDelta),
     MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyItemCount),
     P1E_p1_bf_NI_real = bloom_worst_case_failprob(OtherBF, MyNrChecks, ExpDelta),
-    P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
+    % pay attention to floating point issues near 1:
+    % P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
+    P1E_p1_real = P1E_p1_bf_I_real + P1E_p1_bf_NI_real - P1E_p1_bf_I_real * P1E_p1_bf_NI_real,
     % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
     P1E_p2 = calc_n_subparts_p1e(1, P1E, (1 - P1E_p1_real)),
     ?ALG_DEBUG("I:~.0p, P1E_bf=~p~n"
@@ -784,7 +786,7 @@ on({resolve_req, HashesK, HashesV} = _Msg,
     %       received after the {resolve_req, Hashes} message from the other node!
     merkle_resolve_leaves_receive(State, HashesK, HashesV);
 
-on({resolve_req, BinKeyList, SyncSendP0E_real} = _Msg,
+on({resolve_req, BinKeyList, SyncSendP1E_real} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = merkle_tree,
                            merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
@@ -800,8 +802,10 @@ on({resolve_req, BinKeyList, SyncSendP0E_real} = _Msg,
                 erlang:byte_size(
                   erlang:term_to_binary(BinKeyList, [compressed]))]),
     PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, Stats), % from sync_receive
-    Stats1  = rr_recon_stats:set(
-                [{p1e_phase2, 1 - (1 - PrevP1E_p2) * SyncSendP0E_real}], Stats),
+    % pay attention to floating point issues near 1:
+%%     NextP1E_p2 = 1 - (1 - PrevP1E_p2) * (1 - SyncSendP1E_real),
+    NextP1E_p2 = PrevP1E_p2 + SyncSendP1E_real - PrevP1E_p2 * SyncSendP1E_real,
+    Stats1  = rr_recon_stats:set([{p1e_phase2, NextP1E_p2}], Stats),
     NStats = if BinKeyList =:= <<>> ->
                     Stats1;
                 true ->
@@ -2093,16 +2097,16 @@ merkle_resolve_add_leaf_hash(
 -spec merkle_resolve_retrieve_leaf_hashes(
         HashesK::Bin, HashesV::Bin, P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
         PrevP0E::float(), MyMaxItemsCount::non_neg_integer(),
-        PrevP0E_real::float(), MyActualItemsCount::non_neg_integer(),
+        PrevP1E_real::float(), MyActualItemsCount::non_neg_integer(),
         BucketSizeBits::pos_integer(), ExpDelta::number())
         -> {NewHashesK::Bin, NewHashesV::Bin, OtherBucketTree::kvi_tree(),
             OrigDBChunkLen::non_neg_integer(),
             SigSize::signature_size(), VSize::signature_size(),
-            NextP0E::float(), NextP0E_real::float()}
+            NextP0E::float(), NextP1E_real::float()}
     when is_subtype(Bin, bitstring()).
 merkle_resolve_retrieve_leaf_hashes(
   HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP0E, MyMaxItemsCount,
-  PrevP0E_real, MyActualItemsCount, BucketSizeBits, ExpDelta) ->
+  PrevP1E_real, MyActualItemsCount, BucketSizeBits, ExpDelta) ->
     <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
     BucketSize = BucketSize0 + 1,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP0E),
@@ -2116,7 +2120,9 @@ merkle_resolve_retrieve_leaf_hashes(
     NextP0E = PrevP0E * (1 - ThisP1E),
     ThisP1E_real =
         trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
-    NextP0E_real = PrevP0E_real * (1 - ThisP1E_real),
+    % pay attention to floating point issues near 1:
+%%     NextP1E_real = 1 - (1 - PrevP1E_real) * (1 - ThisP1E_real),
+    NextP1E_real = PrevP1E_real + ThisP1E_real - PrevP1E_real * ThisP1E_real,
 %%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
 %%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
     % we need to know how large a piece is
@@ -2131,7 +2137,7 @@ merkle_resolve_retrieve_leaf_hashes(
     {OBucketTree, _OrigDBChunkLen, VSize} =
         decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize),
     {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize,
-     NextP0E, NextP0E_real}.
+     NextP0E, NextP1E_real}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
@@ -2241,16 +2247,16 @@ merkle_resolve_leaves_receive(
     % * at non-initiator: inner(NI)-leaf(I)
     % note: 1 trivial proc may contain more than 1 leaf!
     {<<>>, <<>>, ToSend, ToResolve, ResolveNonEmpty, _TrivialProcsRest,
-     _ThisP0E_upper_bound, ThisP0E_real} =
+     _ThisP0E_upper_bound, ThisP1E_real} =
         lists:foldl(
           fun({MyMaxItemsCount, MyKVItems},
               {HashesKAcc, HashesVAcc, ToSend, ToResolve, ResolveNonEmpty,
-               TProcsAcc, P0EIn, P0EIn_real}) ->
+               TProcsAcc, P0EIn, P1EIn_real}) ->
                   {NHashesKAcc, NHashesVAcc, OBucketTree, _OrigDBChunkLen,
-                   SigSize, VSize, ThisP0E, ThisP0E_real} =
+                   SigSize, VSize, ThisP0E, ThisP1E_real} =
                       merkle_resolve_retrieve_leaf_hashes(
                         HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc,
-                        P0EIn, MyMaxItemsCount, P0EIn_real, length(MyKVItems),
+                        P0EIn, MyMaxItemsCount, P1EIn_real, length(MyKVItems),
                         BucketSizeBits, ExpDelta),
                   % calc diff (trivial sync)
                   ?DBG_ASSERT(MyKVItems =/= []),
@@ -2264,8 +2270,8 @@ merkle_resolve_leaves_receive(
                                                 Params#merkle_params.bucket_size),
                   {NHashesKAcc, NHashesVAcc, ToSend1, ToResolve1,
                    ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   TProcsAcc - 1, ThisP0E, ThisP0E_real}
-          end, {HashesK, HashesV, [], [], false, TrivialProcs, 1.0, 1.0}, SyncRcv),
+                   TProcsAcc - 1, ThisP0E, ThisP1E_real}
+          end, {HashesK, HashesV, [], [], false, TrivialProcs, 1.0, 0.0}, SyncRcv),
 
     % send resolve message:
     % resolve items we should send as key_upd:
@@ -2285,12 +2291,12 @@ merkle_resolve_leaves_receive(
     Stats2 = rr_recon_stats:inc([{tree_leavesSynced, SyncRcvLeafCount},
                                  {rs_expected, MerkleResReqs}], Stats1),
     ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, Stats2) =:= 0.0),
-    NStats  = rr_recon_stats:set([{p1e_phase2, 1 - ThisP0E_real}], Stats2),
+    NStats  = rr_recon_stats:set([{p1e_phase2, ThisP1E_real}], Stats2),
     ?ALG_DEBUG("resolve_req Merkle~n  Session=~.0p ; resolve expexted=~B",
                [rr_recon_stats:get(session_id, NStats),
                 rr_recon_stats:get(rs_expected, NStats)]),
 
-    comm:send(DestRCPid, {resolve_req, ToResolve1, ThisP0E_real}),
+    comm:send(DestRCPid, {resolve_req, ToResolve1, ThisP1E_real}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
                                     stats = NStats},
@@ -2723,8 +2729,11 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
                  bloom:calc_FPR(M2, MyMaxItems, K2), MyMaxItems, InitiatorMaxItems, ExpDelta),
     FP2_OtherFP = bloom_worst_case_failprob_(
                     bloom:calc_FPR(M2, InitiatorMaxItems, K2), InitiatorMaxItems, MyMaxItems, ExpDelta),
-    FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
-    FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
+    % pay attention to floating point issues near 1:
+%%     FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
+%%     FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
+    FP1_P1E_p1 = FP1_MyFP + FP1_OtherFP - FP1_MyFP * FP1_OtherFP,
+    FP2_P1E_p1 = FP2_MyFP + FP2_OtherFP - FP2_MyFP * FP2_OtherFP,
     BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 ->
                  if M1 < M2 ->
                         bloom:new(M1, K1);
