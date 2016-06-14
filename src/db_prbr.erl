@@ -613,13 +613,13 @@ entry_key(E) -> element(1, E).
 
 -spec check_config() -> boolean().
 check_config() ->
-    All_DBs = [db_ets, db_mnesia, db_toke, db_hanoidb],
+    All_DBs = [db_ets, db_mnesia, db_toke, db_hanoidb, db_bitcask],
     Current_DB = config:read(db_backend),
-    
+
     config:cfg_is_module(db_backend) and
     config:cfg_is_in(db_backend, All_DBs) and
     case Current_DB:is_available() of
-        true -> 
+        true ->
             true;
         Missing ->
             error_logger:error_msg("Modules ~p for selected DB backend ~p are missing.~n",
@@ -628,7 +628,7 @@ check_config() ->
     end and
     case config:read(ensure_recover) of
         true ->
-            % ensure_recovery is enabled which means we must check if 
+            % ensure_recovery is enabled which means we must check if
             % leases are enabled and the chosen DB supports recovery
             case config:read(leases) of
                 true ->

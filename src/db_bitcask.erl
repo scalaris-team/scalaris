@@ -141,11 +141,10 @@ get_name({_DB, DBName}) ->
 %%      modules are missing, or else a list of missing modules
 -spec is_available() -> boolean() | [atom()].
 is_available() ->
-    erlang:error(nyi).
-    %% case code:which(toke_drv) of
-    %%     non_existing -> [toke_drv];
-    %%     _ -> true
-    %% end.
+    case code:which(bitcask) of
+        non_existing -> [bitcask];
+        _ -> true
+    end.
 
 %% @doc Returns true if the DB support a specific feature (e.g. recovery), false otherwise.
 -spec supports_feature(Feature::atom()) -> boolean().
