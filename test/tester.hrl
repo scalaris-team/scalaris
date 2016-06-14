@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@
     | neg_integer
     | non_neg_integer
     | bool
-    | binary
+    | {binary, list()}
     | iolist
     | node
     | pid
