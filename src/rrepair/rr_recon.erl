@@ -2093,7 +2093,7 @@ merkle_resolve_add_leaf_hash(
     HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
     P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP1E),
 %%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
-%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
+%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP1E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
     {SigSize, VSize} =
         trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
     % note: we can only estimate the real P1E of this part here - the other
@@ -2438,10 +2438,9 @@ calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
 
 %% @doc Splits P1E into N further (equal) independent sub-processes and returns
 %%      the P1E to use for the next of these sub-processes with the previous
-%%      sub-processes having a success probability of PrevP0 (a product of
-%%      all (1-P1E_sub)).
+%%      sub-processes having a (combined) failure probability of PrevP1.
 %%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
--spec calc_n_subparts_p1e(N::number(), P1E::float(), PrevP0::float())
+-spec calc_n_subparts_p1e(N::number(), P1E::float(), PrevP1::float())
         -> P1E_sub::float().
 calc_n_subparts_p1e(N, P1E, 0.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
     % special case with e.g. no items in the first/previous phase
