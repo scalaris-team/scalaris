@@ -757,7 +757,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
     NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), PrevP1E, rr_recon_stats:get(p1e_phase1, NStats)]),
+               [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
