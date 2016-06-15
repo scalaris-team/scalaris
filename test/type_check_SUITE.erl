@@ -505,6 +505,7 @@ tester_type_check_rrepair(_Config) ->
              {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
              {merkle_check_node, 22}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 21}, %% needs matching result and merkle nodes
+             {merkle_calc_next_p1e, 5}, %% needs floats >= 0, =< 1
              {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 10}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list

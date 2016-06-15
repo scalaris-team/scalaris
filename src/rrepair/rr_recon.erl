@@ -690,7 +690,6 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
         merkle_next_signature_sizes(Params, LastP1ETotal, MyLastMaxItemsCount,
                                     OtherMaxItemsCount),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
-    PrevP0E = 1 - rr_recon_stats:get(p1e_phase1, Stats),
     {FlagsBin, RTree, SyncNew, NStats0, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_check_node(ToCheck, TreeNodes, SigSizeI, SigSizeL,
@@ -704,13 +703,13 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                  [?MODULE, pid_groups:my_groupname(), self(),
                   EffectiveP1E_I, EffectiveP1E_L]),
          ok),
-    % TODO: can we get a higher sensitivity with floats near 1?
-    NextP1E = 1 - PrevP0E * math:pow(1 - EffectiveP1E_I, HashCmpI)
-                  * math:pow(1 - EffectiveP1E_L, HashCmpL),
+    PrevP1E = rr_recon_stats:get(p1e_phase1, Stats),
+    NextP1E = merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I,
+                                   EffectiveP1E_L, HashCmpI, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), 1 - PrevP0E, NextP1E]),
+               [length(RTree), PrevP1E, NextP1E]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
     if RTree =:= [] ->
@@ -734,30 +733,29 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                            struct = TreeNodes,            stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, {SigSizeI, SigSizeL}},
-                                   {p1e, {EffectiveP1ETotal_I, EffectiveP1ETotal_L}},
+                                   {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
                                    {p1e_phase_x, P1EPhaseX},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
-    PrevP0E = 1 - rr_recon_stats:get(p1e_phase1, Stats),
     {RTree, SyncNew, NStats0, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_cmp_result(FlagsBin, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherLastMaxItemsCount,
                           Sync, Params, Stats, [], [], [], 0, [], 0, 0, 0, 0, 0,
                           0, 0),
-    ?IIF((1 - EffectiveP1ETotal_I >= 1) orelse (1 - EffectiveP1ETotal_L >= 1),
+    ?IIF((1 - EffectiveP1E_I >= 1) orelse (1 - EffectiveP1E_L >= 1),
          log:log("~w: [ ~.0p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
                  " P1E_I = ~g, P1E_L = ~g",
                  [?MODULE, pid_groups:my_groupname(), self(),
-                  EffectiveP1ETotal_I, EffectiveP1ETotal_L]),
+                  EffectiveP1E_I, EffectiveP1E_L]),
          ok),
-    % TODO: can we get a higher sensitivity with floats near 1?
-    NextP1E = 1 - PrevP0E * math:pow(1 - EffectiveP1ETotal_I, HashCmpI)
-                  * math:pow(1 - EffectiveP1ETotal_L, HashCmpL),
+    PrevP1E = rr_recon_stats:get(p1e_phase1, Stats),
+    NextP1E = merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I,
+                                   EffectiveP1E_L, HashCmpI, HashCmpL),
     NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew},
     ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), 1 - PrevP0E, rr_recon_stats:get(p1e_phase1, NStats)]),
+               [length(RTree), PrevP1E, rr_recon_stats:get(p1e_phase1, NStats)]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
@@ -767,14 +765,14 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
            % calculate the remaining trees' failure prob based on the already
            % used failure prob
            P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP1E),
-           {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
+           {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, NextEffectiveP1E_I, NextEffectiveP1E_L} =
                merkle_next_signature_sizes(Params, P1ETotal_I_2, MyMaxItemsCount,
                                            OtherMaxItemsCount),
            Req = merkle_compress_hashlist(RTree, <<>>, NextSigSizeI, NextSigSizeL),
            send(DestReconPid, {?check_nodes, Req, MyMaxItemsCount}),
            NewState#rr_recon_state{stats = NStats,
                                    misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
-                                           {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
+                                           {p1e, {NextEffectiveP1E_I, NextEffectiveP1E_L}},
                                            {p1e_phase_x, P1EPhaseX},
                                            {icount, MyMaxItemsCount},
                                            {oicount, OtherMaxItemsCount}]}
@@ -2054,6 +2052,27 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                       MySyncAccDRK, MySyncAccDRLCount, OtherSyncAccDRLCount1,
                       AccCmp + 1, AccSkip,
                       NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN).
+
+%% @doc Helper for calculating the actual failure probability during merkle
+%%      hash comparisons.
+-spec merkle_calc_next_p1e(PrevP1E::float(), EffectiveP1E_I::float(),
+                           EffectiveP1E_L::float(), HashCmpI::non_neg_integer(),
+                           HashCmpL::non_neg_integer()) -> float().
+merkle_calc_next_p1e(PrevP1E, _EffectiveP1E_I, _EffectiveP1E_L, 0, 0) ->
+    % mostly during the start and end of the reconciliation
+    PrevP1E;
+merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, EffectiveP1E_L, 1, 1) ->
+    PrevP1E + EffectiveP1E_I + EffectiveP1E_L
+        - PrevP1E * EffectiveP1E_I - PrevP1E * EffectiveP1E_L - EffectiveP1E_I * EffectiveP1E_L
+        + PrevP1E * EffectiveP1E_I * EffectiveP1E_L;
+merkle_calc_next_p1e(PrevP1E, _EffectiveP1E_I, EffectiveP1E_L, 0, 1) ->
+    PrevP1E + EffectiveP1E_L - PrevP1E * EffectiveP1E_L;
+merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, _EffectiveP1E_L, 1, 0) ->
+    PrevP1E + EffectiveP1E_I - PrevP1E * EffectiveP1E_I;
+merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, EffectiveP1E_L, HashCmpI, HashCmpL) ->
+    % TODO: can we get a higher sensitivity with floats near 1?
+    1 - (1 - PrevP1E) * math:pow(1 - EffectiveP1E_I, HashCmpI)
+        * math:pow(1 - EffectiveP1E_L, HashCmpL).
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
