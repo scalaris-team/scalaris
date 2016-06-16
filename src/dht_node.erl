@@ -329,6 +329,12 @@ on({drop_data, Data, Sender}, State) ->
     DB = db_dht:add_data(dht_node_state:get(State, db), Data),
     dht_node_state:set_db(State, DB);
 
+on({get_split_key, DB, Begin, End, TargetLoad, Direction, Sender}, State) ->
+    comm:send_local(Sender, {get_split_key_response,
+                             db_dht:get_split_key(DB, Begin, End,
+                                                  TargetLoad, Direction)}),
+    State;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bulk owner messages (see bulkowner.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
