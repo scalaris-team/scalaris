@@ -489,7 +489,7 @@ tester_type_check_rrepair(_Config) ->
              {calc_max_different_hashes, 4}, %% needs 0 =< ExpDelta =< 100
              {compress_kv_list, 5}, %% needs a fun
              {compress_kv_list_p1e, 7}, %% needs float > 0, < 1 and a fun
-             {bloom_calc_max_nr_checks, 3}, %% needs 0 =< ExpDelta =< 100
+             {bloom_calc_max_fp_checks, 3}, %% needs 0 =< ExpDelta =< 100
              {bloom_worst_case_failprob, 3}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
              {bloom_worst_case_failprob_, 4}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
              {bloom_fp, 4}, %% needs float > 0, < 1
@@ -506,6 +506,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_check_node, 22}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 21}, %% needs matching result and merkle nodes
              {merkle_calc_next_p1e, 5}, %% needs floats >= 0, =< 1
+             {merkle_calc_max_affected_items, 3}, %% needs 0 =< ExpDelta =< 100
              {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
              {merkle_resolve_retrieve_leaf_hashes, 10}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list

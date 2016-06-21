@@ -41,7 +41,7 @@
 %% -export([calc_max_different_hashes/4,
 %%          trivial_signature_sizes/4, trivial_worst_case_failprob/4,
 %%          shash_signature_sizes/4, shash_worst_case_failprob/4,
-%%          bloom_calc_max_nr_checks/3,
+%%          bloom_calc_max_fp_checks/3,
 %%          bloom_fp/4, bloom_worst_case_failprob_/4]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
@@ -1617,6 +1617,30 @@ merkle_next_p1e(BranchFactor, P1ETotal) ->
 %%             [self(), P1ETotal, P1E_I, P1E_L]),
     {P1E_I, P1E_L}.
 
+%% @doc Helper for merkle_next_signature_sizes/4 calculating the maximum number
+%%      of affected items in case of hash collisions, when an upper bound on
+%%      the delta is known.
+-spec merkle_calc_max_affected_items(
+        MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer(),
+        ExpDelta::number()) -> non_neg_integer().
+merkle_calc_max_affected_items(MyMaxItemsCount, OtherMaxItemsCount, ExpDelta) ->
+    % similarly to Bloom, the worst case number of affected items is when this
+    % node has all ExpDelta items missing
+    % -> calculate the (expected) original item count
+    % -> have ExpDelta percent affected items
+    % (if items are only outdated, there are ExpDelta percent affected items
+    % from this item count which is less than the worst case above)
+    MaxItems = calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, key, ExpDelta),
+    if ExpDelta == 0   -> 0;
+       ExpDelta == 100 -> MaxItems; % special case of the one below
+       is_float(ExpDelta) ->
+           % worst case: we have all the ExpDelta percent items the other node does not have
+           util:ceil(MaxItems * ExpDelta / 100);
+       is_integer(ExpDelta) ->
+           % -> use integer division (and round up) for higher precision:
+           (MaxItems * ExpDelta + 99) div 100
+    end.
+
 %% @doc Calculates the new signature sizes based on the next P1E as in
 %%      merkle_next_p1e/2
 -spec merkle_next_signature_sizes(
@@ -1634,8 +1658,8 @@ merkle_next_signature_sizes(
     % note: we need to use the same P1E for this level's signature
     %       comparison as a children's tree has in total!
     if MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
-           AffectedItemsI =
-               calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, key, ExpDelta),
+           AffectedItemsI = merkle_calc_max_affected_items(
+                              MyMaxItemsCount, OtherMaxItemsCount, ExpDelta),
            NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / P1E_I)),
                                   get_min_hash_bits(), 160),
            EffectiveP1E_I = float(AffectedItemsI / util:pow(2, NextSigSizeI));
@@ -1645,7 +1669,8 @@ merkle_next_signature_sizes(
     end,
     ?DBG_ASSERT2(EffectiveP1E_I >= 0 andalso EffectiveP1E_I < 1, EffectiveP1E_I),
 
-    AffectedItemsL = 2 * BucketSize,
+    AffectedItemsL = merkle_calc_max_affected_items(
+                       BucketSize, BucketSize, ExpDelta),
     NextSigSizeL = min_max(util:ceil(util:log2(AffectedItemsL / P1E_L)),
                            get_min_hash_bits(), 160),
     EffectiveP1E_L = float(AffectedItemsL / util:pow(2, NextSigSizeL)),
@@ -2635,7 +2660,7 @@ shash_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
 -spec bloom_fp(BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
                ExpDelta::number(), P1E::float()) -> float().
 bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
-    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
+    NrChecksNotInBF = bloom_calc_max_fp_checks(BFCount, NrChecks, ExpDelta),
     % 1 - math:pow(1 - P1E, 1 / erlang:max(NrChecksNotInBF, 1)).
     % more precise:
     calc_n_subparts_p1e(erlang:max(NrChecksNotInBF, 1), P1E).
@@ -2643,10 +2668,10 @@ bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
 %% @doc Helper for bloom_fp/3 calculating the maximum number of item checks
 %%      that could yield false positives, i.e. items not originally encoded
 %%      in the Bloom filter, when an upper bound on the delta is known.
--spec bloom_calc_max_nr_checks(
+-spec bloom_calc_max_fp_checks(
         BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
         ExpDelta::number()) -> non_neg_integer().
-bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
+bloom_calc_max_fp_checks(BFCount, NrChecks, ExpDelta) ->
     % the worst case with the maximal number of item checks is when
     % this node has all ExpDelta items missing
     % -> calculate the (expected) original item count
@@ -2690,7 +2715,7 @@ bloom_worst_case_failprob_(_Fpr, _BFCount, 0, _ExpDelta) ->
     0.0;
 bloom_worst_case_failprob_(Fpr, BFCount, NrChecks, ExpDelta) ->
     ?DBG_ASSERT2(Fpr >= 0 andalso Fpr =< 1, Fpr),
-    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
+    NrChecksNotInBF = bloom_calc_max_fp_checks(BFCount, NrChecks, ExpDelta),
     % 1 - math:pow(1 - Fpr, NrChecksNotInBF).
     % more precise:
     if Fpr == 0.0 -> 0.0;
