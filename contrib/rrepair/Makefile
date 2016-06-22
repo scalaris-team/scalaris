@@ -333,12 +333,12 @@ merkle_scale_expD$(1)-all/$(2)/Makefile: Makefile_scale.tmpl2 merkle_scale_expD$
       sed -e 's|<sys_size>|$(SYSTEM_SIZE_SCALE)|g' \
           -e "s|<dat1>|../v$$$${V}_b1_p$$$${P}/merkle_scale.dat|g" \
           -e "s|<dat2>|../v$$$${V}_b3_p$$$${P}/merkle_scale.dat|g" \
-          -e "s|<dat3>|../v$$$${V}_b15_p$$$${P}/merkle_scale.dat|g" \
+          -e "s|<dat3>|../v$$$${V}_b8_p$$$${P}/merkle_scale.dat|g" \
           -e 's|<dat4>||g' \
           -e 's|<dat5>||g' \
           -e "s|<title1>|merkle_{v$$$${V}, b1, P_{1e}$$$${P}}|g" \
           -e "s|<title2>|merkle_{v$$$${V}, b3, P_{1e}$$$${P}}|g" \
-          -e "s|<title3>|merkle_{v$$$${V}, b15, P_{1e}$$$${P}}|g" \
+          -e "s|<title3>|merkle_{v$$$${V}, b8, P_{1e}$$$${P}}|g" \
           -e 's|<title4>||g' \
           -e 's|<title5>||g' \
           -e 's|<morecommands>|absoluteRedundancy=1;|g' \
