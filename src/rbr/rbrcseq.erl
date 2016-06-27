@@ -960,8 +960,9 @@ add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
             Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
             E4 = entry_set_val(E3, Constructed),
 
-            Done = case entry_num_newest(E4) of
-                     E3NumAcks -> true; %% done
+            Done = case entry_num_newest(E4) =:= E3NumAcks orelse
+                            ?REDUNDANCY:skip_write_through(Constructed) of
+                     true -> true; %% done
                      _ -> write_through
                    end,
             {Done, E4};

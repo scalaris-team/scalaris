@@ -30,6 +30,7 @@
 -export([collect_newer_read_value/3]).
 -export([collect_older_read_value/3]).
 -export([get_read_value/2]).
+-export([skip_write_through/1]).
 
 %% @doc Returns the replicas of the given key.
 -spec get_keys(?RT:key()) -> [?RT:key()].
@@ -110,3 +111,8 @@ collect_read_value(Collected, NewValue, DataType) ->
 %% @doc Returns the read value base on all previously collected read replies
 -spec get_read_value(client_value(), prbr:read_filter()) -> client_value().
 get_read_value(ReadValue, _ReadFilter) -> ReadValue.
+
+%% @doc Decide whether to skip a write through based on the read value
+-spec skip_write_through(client_value()) -> boolean().
+skip_write_through(_ReadValue) -> false.
+
