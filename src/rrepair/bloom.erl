@@ -29,9 +29,12 @@
 -define(REP_HFS, hfs_plain). %HashFunctionSet selection for usage by bloom filter
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
-         add/2, add_list/2, is_element/2, item_count/1,
-         calc_HF_num_Size_opt/2, calc_FPR/3]).
+         add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
+
+% needed by other Bloom filter implementations or rr_recon:
+-export([calc_least_size/3,
+         calc_HF_num_Size_opt/2, calc_FPR/3]).
 
 % for tests:
 -export([get_property/2]).
@@ -204,7 +207,8 @@ item_count(#bloom{items_count = ItemsCount}) -> ItemsCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc joins two bloom filter, returned bloom filter represents their union
+%% @doc Joins two bloom filter so that the returned bloom filter represents
+%%      their union.
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
 join(#bloom{items_count = 0, hfs = Hfs1} = _BF1,
      #bloom{hfs = Hfs2} = BF2) ->
@@ -271,8 +275,9 @@ get_property(#bloom{items_count = X}, items_count) -> X.
 %% bit operations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Sets all filter-bits at given positions to 1
--spec set_bits(bitstring(), Size::non_neg_integer(), [non_neg_integer()]) -> bitstring().
+% @doc Sets all filter-bits at the given positions to 1.
+-spec set_bits(bitstring(), Size::non_neg_integer(),
+               Positions::[non_neg_integer()]) -> bitstring().
 set_bits(Filter, BFSize, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
     PosInByte = Pos rem 8,
@@ -301,8 +306,8 @@ set_bits(Filter, _BFSize, []) ->
 %% set_bits(Filter, _BFSize, []) ->
 %%     Filter.
 
-% @doc Checks if all bits are set on a given position list
--spec check_bits(bitstring(), [non_neg_integer()]) -> boolean().
+% @doc Checks whether all bits are set at the given positions.
+-spec check_bits(bitstring(), Positions::[non_neg_integer()]) -> boolean().
 % V1
 %% check_bits(Filter, [Pos | Positions]) ->
 %%     PreBytes = Pos div 8,
