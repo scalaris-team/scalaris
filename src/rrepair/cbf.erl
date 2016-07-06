@@ -115,27 +115,39 @@ add_list(#bloom{hfs = Hfs,
     F = p_add_list(Hfs, BFSize, Filter, Items),
     Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
--compile({inline, [p_add_list/4, p_change_list_/5]}).
+-compile({inline, [p_add_list/4, p_change_list_/6]}).
 
-% faster than lists:foldl
+%% @doc Helper to add items to the counting bloom filter.
 -spec p_add_list(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
                  BF1::array:array(integer()), Items::[key()])
 -> BF2::array:array(integer()).
 p_add_list(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list(_Hfs, 1, BF, _Items = [_|_]) -> array:set(0, 1, BF);
+p_add_list(Hfs, 1, BF, _Items = [_|_]) -> array:set(0, ?REP_HFS:size(Hfs), BF);
 p_add_list(Hfs, BFSize, BF, Items = [_|_]) ->
-    p_change_list_(Hfs, BFSize, BF, Items, fun inc_counters/2).
+    Positions = lists:flatmap(fun(Item) ->
+                                      ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
+                              end, Items),
+    [Pos | Rest] = lists:sort(Positions),
+    p_change_list_(Rest, Pos, [1 | lists:duplicate(Pos, 0)],
+                   BFSize, BF, fun erlang:'+'/2).
 
--spec p_change_list_(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                     BF1::array:array(integer()), Items::[key()],
-                     ChangeFun::fun((array:array(integer()), Positions::[non_neg_integer()])
-                                   -> array:array(integer())))
+%% @doc Helper increasing or decreasing counters by first accumulating all
+%%      counters in a list and merging it with the old list.
+-spec p_change_list_(Positions::[non_neg_integer()], CurPos::non_neg_integer(),
+                     Counters::[non_neg_integer(),...], BFSize::non_neg_integer(),
+                     BF::array:array(integer()),
+                     ChangeFun::fun((non_neg_integer(), non_neg_integer())
+                                   -> integer()))
 -> BF2::array:array(integer()).
-p_change_list_(Hfs, BFSize, BF, [Item | Items], ChangeFun) ->
-    Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
-    p_change_list_(Hfs, BFSize, ChangeFun(BF, Positions), Items, ChangeFun);
-p_change_list_(_Hfs, _BFSize, BF, [], _ChangeFun) ->
-    BF.
+p_change_list_([], CurPos, Counters, BFSize, BF, ChangeFun) ->
+    Counters1 = lists:reverse(Counters, lists:duplicate(erlang:max(0, BFSize - CurPos - 1), 0)),
+    Counters2 = lists:zipwith(ChangeFun, array:to_list(BF), Counters1),
+    array:from_list(Counters2);
+p_change_list_([CurPos | Positions], CurPos, [CurCount | Counters], BFSize, BF, ChangeFun) ->
+    p_change_list_(Positions, CurPos, [CurCount + 1 | Counters], BFSize, BF, ChangeFun);
+p_change_list_([NewPos | Positions], CurPos, Counters, BFSize, BF, ChangeFun) ->
+    Counters1 = lists:duplicate(NewPos - CurPos - 1, 0) ++ Counters,
+    p_change_list_(Positions, NewPos, [1 | Counters1], BFSize, BF, ChangeFun).
 
 %% @doc Removes one item from the bloom filter.
 %%      (may introduce false negatives if removing an item not added previously)
@@ -160,14 +172,19 @@ remove_list(#bloom{hfs = Hfs,
 
 -compile({inline, [p_remove_list/4]}).
 
-% faster than lists:foldl
+%% @doc Helper to remove items from the counting bloom filter.
 -spec p_remove_list(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
                     BF1::array:array(integer()), Items::[key()])
         -> BF2::array:array(integer()).
 p_remove_list(_Hfs, _BFSize, BF, []) -> BF;
 p_remove_list(_Hfs, 1, BF, _Items = [_|_]) -> array:set(0, 0, BF);
 p_remove_list(Hfs, BFSize, BF, Items = [_|_]) ->
-    p_change_list_(Hfs, BFSize, BF, Items, fun dec_counters/2).
+    Positions = lists:flatmap(fun(Item) ->
+                                      ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
+                              end, Items),
+    [Pos | Rest] = lists:sort(Positions),
+    p_change_list_(Rest, Pos, [1 | lists:duplicate(Pos, 0)],
+                   BFSize, BF, fun erlang:'-'/2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -288,26 +305,8 @@ get_property(#bloom{items_count = X}, items_count) -> X.
 %% bit/counter position operations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Increases all filter-counters at the given positions by 1.
--spec inc_counters(array:array(integer()), Positions::[non_neg_integer()])
-        -> array:array(integer()).
-inc_counters(Filter, [Pos | Positions]) ->
-    Filter1 = array:set(Pos, array:get(Pos, Filter) + 1, Filter),
-    inc_counters(Filter1, Positions);
-inc_counters(Filter, []) ->
-    Filter.
-
-% @doc Decreases all filter-counters at the given positions by 1.
--spec dec_counters(array:array(integer()), Positions::[non_neg_integer()])
-        -> array:array(integer()).
-dec_counters(Filter, [Pos | Positions]) ->
-    Filter1 = array:set(Pos, array:get(Pos, Filter) - 1, Filter),
-    dec_counters(Filter1, Positions);
-dec_counters(Filter, []) ->
-    Filter.
-
 % @doc Checks whether all counters are non-zero at the given positions.
--spec check_counters(bitstring(), Positions::[non_neg_integer()]) -> boolean().
+-spec check_counters(array:array(integer()), Positions::[non_neg_integer()]) -> boolean().
 check_counters(Filter, [Pos | Positions]) ->
     array:get(Pos, Filter) =/= 0 andalso check_counters(Filter, Positions);
 check_counters(_, []) ->
