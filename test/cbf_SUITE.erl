@@ -1,4 +1,4 @@
-%  @copyright 2010-2016 Zuse Institute Berlin
+%  @copyright 2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +12,16 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
+%% @author Nico Kruber <kruber@zib.de>
 %% @author Maik Lange <MLange@informatik.hu-berlin.de>
 %% @doc    Tests for bloom filter module.
 %% @end
 %% @version $Id$
--module(bloom_SUITE).
+-module(cbf_SUITE).
+-author('kruber@zib.de').
 -author('mlange@informatik.hu-berlin.de').
 
--define(BLOOM, bloom).
+-define(BLOOM, cbf).
 -define(Fpr_Test_NumTests, 25).
 
 -include("bloom_SUITE.hrl").
