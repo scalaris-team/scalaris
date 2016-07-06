@@ -1,4 +1,4 @@
-% @copyright 2011-2012 Zuse Institute Berlin
+% @copyright 2011-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,15 +30,12 @@
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
          add/2, add_list/2, is_element/2, item_count/1]).
--export([equals/2, join/2, print/1]).
+-export([equals/2, join/2, get_property/2, print/1]).
 
 % needed by other Bloom filter implementations or rr_recon:
 -export([calc_least_size/3,
-         calc_HF_num_Size_opt/2, calc_FPR/3]).
-
-% for tests:
--export([get_property/2]).
--export([p_add_list_v1/4, p_add_list_v2/4, resize/2]).
+         calc_HF_num_Size_opt/2, calc_FPR/3,
+         resize/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
@@ -103,7 +100,7 @@ new(BitSize, Hfs) ->
 add(#bloom{hfs = Hfs, items_count = FilledCount,
            filter = Filter} = Bloom, Item) ->
     BFSize = erlang:bit_size(Filter),
-    Bloom#bloom{filter = p_add_list_v1(Hfs, BFSize, Filter, [Item]),
+    Bloom#bloom{filter = p_add_list(Hfs, BFSize, Filter, [Item]),
                 items_count = FilledCount + 1}.
 
 %% @doc Adds multiple items to the bloom filter.
@@ -113,36 +110,19 @@ add_list(#bloom{hfs = Hfs,
                 filter = Filter
                } = Bloom, Items) ->
     BFSize = erlang:bit_size(Filter),
-    F = p_add_list_v2(Hfs, BFSize, Filter, Items),
+    F = p_add_list(Hfs, BFSize, Filter, Items),
     ItemsL = length(Items),
     Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
--compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
-                   p_add_list_v2/4]}).
+-compile({inline, [p_add_list/4]}).
 
-% V1 - good for few items / positions to set
-% faster than lists:foldl
--spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v1(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v1(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
-p_add_list_v1(Hfs, BFSize, BF, Items = [_|_]) ->
-    p_add_list_v1_(Hfs, BFSize, BF, Items).
-
--spec p_add_list_v1_(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v1_(Hfs, BFSize, BF, [Item | Items]) ->
-    Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
-    p_add_list_v1_(Hfs, BFSize, set_bits(BF, BFSize, Positions), Items);
-p_add_list_v1_(_Hfs, _BFSize, BF, []) ->
-    BF.
-
-% V2 - good for large number of items / positions to set
--spec p_add_list_v2(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v2(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v2(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
-p_add_list_v2(Hfs, BFSize, BF, Items = [_|_]) ->
+%% @doc Helper to set item bits, optimised for a large number of items /
+%%      positions to set.
+-spec p_add_list(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
+                 BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
+p_add_list(_Hfs, _BFSize, BF, []) -> BF;
+p_add_list(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
+p_add_list(Hfs, BFSize, BF, Items = [_|_]) ->
     Positions = lists:flatmap(fun(Item) ->
                                       ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
                               end, Items),
@@ -150,14 +130,14 @@ p_add_list_v2(Hfs, BFSize, BF, Items = [_|_]) ->
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,
     AccPosBF = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF, [<<0:PreBitsNum>>], PreBitsNum, BF, BFSize).
+    p_add_list_(Rest, AccPosBF, [<<0:PreBitsNum>>], PreBitsNum, BF, BFSize).
 
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - AccBFSize < 8 ->
+p_add_list_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - AccBFSize < 8 ->
     % Pos in same byte
     PosInByte = Pos rem 8,
     AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    p_add_list_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
+p_add_list_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     % Pos in next byte
     PosInByte = Pos rem 8,
     PreBitsNum2 = Pos - PosInByte,
@@ -166,8 +146,8 @@ p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     AccBF2 = [<<AccPosBF:8, 0:DiffBits>> | AccBF],
     % make new AccPosBF
     AccPosBF2 = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF2, AccBFSize + 8 + DiffBits, BF, BFSize);
-p_add_list_v2_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    p_add_list_(Rest, AccPosBF2, AccBF2, AccBFSize + 8 + DiffBits, BF, BFSize);
+p_add_list_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     RestBits = BFSize - AccBFSize,
     LastBitString = if RestBits >= 8 ->
                            <<AccPosBF:RestBits/little>>;
@@ -274,37 +254,6 @@ get_property(#bloom{items_count = X}, items_count) -> X.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% bit operations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% @doc Sets all filter-bits at the given positions to 1.
--spec set_bits(bitstring(), Size::non_neg_integer(),
-               Positions::[non_neg_integer()]) -> bitstring().
-set_bits(Filter, BFSize, [Pos | Positions]) ->
-    PreByteNum = Pos div 8,
-    PosInByte = Pos rem 8,
-    OldByteBits = erlang:min(BFSize - PreByteNum * 8, 8),
-    <<PreBin:PreByteNum/binary, OldByte:OldByteBits, PostBin/bitstring>> = Filter,
-    % be careful with non-byte sizes for OldByteBits and get the position right
-    NewBinary =
-        case (OldByte bor ((1 bsl (OldByteBits - 1)) bsr PosInByte)) of
-            OldByte -> Filter;
-            NewByte ->
-%%                 log:pal("~p", [{PreBin, NewByte, OldByteBits, PostBin}]),
-                <<PreBin/binary, NewByte:OldByteBits, PostBin/bitstring>>
-        end,
-    set_bits(NewBinary, BFSize, Positions);
-set_bits(Filter, _BFSize, []) ->
-    Filter.
-
-%% V2 -> 1/3 slower than V1
-%% set_bits(Filter, BFSize, [Pos | Positions]) ->
-%%     <<A:Pos/bitstring, B:1/bitstring, C/bitstring>> = Filter,
-%%     NewBinary = case B of
-%%                     0 -> Filter;
-%%                     _ -> <<A:Pos/bitstring, 1:1, C/bitstring>>
-%%                 end,
-%%     set_bits(NewBinary, BFSize, Positions);
-%% set_bits(Filter, _BFSize, []) ->
-%%     Filter.
 
 % @doc Checks whether all bits are set at the given positions.
 -spec check_bits(bitstring(), Positions::[non_neg_integer()]) -> boolean().

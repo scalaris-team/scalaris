@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -57,12 +57,9 @@ end_per_suite(_Config) ->
 prop_p_add_list(BF0Items, Items) ->
     BF0 = newBloom(erlang:max(10, erlang:length(Items)), 0.1),
     BF = ?BLOOM:add_list(BF0, BF0Items),
-    Hfs = ?BLOOM:get_property(BF, hfs),
-    BFSize = ?BLOOM:get_property(BF, size),
-    BFBin = ?BLOOM:get_property(BF, filter),
     
-    ?equals(?BLOOM:p_add_list_v1(Hfs, BFSize, BFBin, Items),
-            ?BLOOM:p_add_list_v2(Hfs, BFSize, BFBin, Items)).
+    ?equals(lists:foldl(fun(Item, Acc) -> bloom:add(Acc, Item) end, BF, Items),
+            ?BLOOM:add_list(BF, Items)).
 
 tester_p_add_list(_) ->
     prop_p_add_list([], []),
