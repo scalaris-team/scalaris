@@ -170,7 +170,7 @@ p_add_list_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns true if the bloom filter contains item
+%% @doc Returns true if the bloom filter contains this item.
 -spec is_element(bloom_filter(), key()) -> boolean().
 is_element(#bloom{items_count = 0}, _Item) ->
     false;
@@ -221,7 +221,7 @@ equals(#bloom{ items_count = Items1, filter = Filter1 },
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Return bloom filter debug information.
+%% @doc Returns bloom filter debug information.
 -spec print(bloom_filter()) -> [{atom(), any()}].
 print(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
     Size = erlang:bit_size(Filter),

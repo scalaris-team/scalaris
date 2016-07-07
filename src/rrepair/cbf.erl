@@ -42,78 +42,78 @@
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--record(bloom, {
-                filter        = ?required(bloom, filter) :: array:array(integer()),
-                hfs           = ?required(bloom, hfs)    :: ?REP_HFS:hfs(),    %HashFunctionSet
-                items_count   = 0                        :: non_neg_integer()  %number of inserted items
+-record(cbf, {
+                filter        = ?required(cbf, filter) :: array:array(integer()),
+                hfs           = ?required(cbf, hfs)    :: ?REP_HFS:hfs(),    %HashFunctionSet
+                items_count   = 0                      :: non_neg_integer()  %number of inserted items
                }).
--opaque bloom_filter() :: #bloom{}.
+-opaque cbf() :: #cbf{}.
 -type key() :: any().
 
--export_type([bloom_filter/0, key/0]).
+-export_type([cbf/0, key/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Creates a new bloom filter with the default (optimal) hash function set
-%%      based on the given false positive rate.
--spec new_fpr(MaxItems::non_neg_integer(), FPR::float()) -> bloom_filter().
+%% @doc Creates a new counting bloom filter with the default (optimal) hash
+%%      function set based on the given false positive rate.
+-spec new_fpr(MaxItems::non_neg_integer(), FPR::float()) -> cbf().
 new_fpr(MaxItems, FPR) ->
     {K, Size} = bloom:calc_HF_num_Size_opt(MaxItems, FPR),
     new(Size, ?REP_HFS:new(K)).
 
-%% @doc Creates a new bloom filter with the given hash function set
+%% @doc Creates a new counting bloom filter with the given hash function set
 %%      based on the given false positive rate.
 -spec new_fpr(MaxItems::non_neg_integer(), FPR::float(), ?REP_HFS:hfs() | non_neg_integer())
-        -> bloom_filter().
+        -> cbf().
 new_fpr(MaxItems, FPR, Hfs) ->
     Size = bloom:calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)),
     new(Size, Hfs).
 
-%% @doc Creates a new bloom filter with the given hash function set and a fixed
-%%      number of positions (bits in standard bloom filters) per item.
+%% @doc Creates a new counting bloom filter with the given hash function set and
+%%      a fixed number of positions (bits in standard bloom filters) per item.
 -spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::number(), ?REP_HFS:hfs() | non_neg_integer())
-        -> bloom_filter().
+        -> cbf().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
     new(util:ceil(BitPerItem * MaxItems), Hfs).
 
-%% @doc Creates a new bloom filter with the given binary, hash function set and
-%%      item count.
+%% @doc Creates a new counting bloom filter with the given binary, hash
+%%      function set and item count.
 -spec new_bin(Filter::array:array(integer()), ?REP_HFS:hfs() | non_neg_integer(), ItemsCount::non_neg_integer())
-        -> bloom_filter().
+        -> cbf().
 new_bin(Filter, HfCount, ItemsCount) when is_integer(HfCount) ->
     new_bin(Filter, ?REP_HFS:new(HfCount), ItemsCount);
 new_bin(Filter, Hfs, ItemsCount) ->
-    #bloom{filter = Filter, hfs = Hfs, items_count = ItemsCount}.
+    #cbf{filter = Filter, hfs = Hfs, items_count = ItemsCount}.
 
-%% @doc Creates a new bloom filter.
--spec new(BitSize::pos_integer(), ?REP_HFS:hfs() | non_neg_integer()) -> bloom_filter().
+%% @doc Creates a new counting bloom filter.
+-spec new(BitSize::pos_integer(), ?REP_HFS:hfs() | non_neg_integer()) -> cbf().
 new(BitSize, HfCount) when is_integer(HfCount) ->
     new(BitSize, ?REP_HFS:new(HfCount));
 new(BitSize, Hfs) ->
-    #bloom{filter = array:new(BitSize, {default,0}), hfs = Hfs, items_count = 0}.
+    #cbf{filter = array:new(BitSize, {default,0}), hfs = Hfs, items_count = 0}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Adds one item to the bloom filter.
--spec add(bloom_filter(), key()) -> bloom_filter().
-add(#bloom{hfs = Hfs, items_count = FilledCount,
-           filter = Filter} = Bloom, Item) ->
+%% @doc Adds one item to the counting bloom filter.
+-spec add(cbf(), key()) -> cbf().
+add(#cbf{hfs = Hfs, items_count = FilledCount,
+         filter = Filter} = Bloom, Item) ->
     BFSize = array:size(Filter),
-    Bloom#bloom{filter = p_add_list(Hfs, BFSize, Filter, [Item]),
-                items_count = FilledCount + 1}.
+    Bloom#cbf{filter = p_add_list(Hfs, BFSize, Filter, [Item]),
+              items_count = FilledCount + 1}.
 
-%% @doc Adds multiple items to the bloom filter.
--spec add_list(bloom_filter(), [key()]) -> bloom_filter().
-add_list(#bloom{hfs = Hfs,
-                items_count = FilledCount,
-                filter = Filter
-               } = Bloom, Items) ->
+%% @doc Adds multiple items to the counting bloom filter.
+-spec add_list(cbf(), [key()]) -> cbf().
+add_list(#cbf{hfs = Hfs,
+              items_count = FilledCount,
+              filter = Filter
+             } = Bloom, Items) ->
     BFSize = array:size(Filter),
     ItemsL = length(Items),
     F = p_add_list(Hfs, BFSize, Filter, Items),
-    Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
+    Bloom#cbf{filter = F, items_count = FilledCount + ItemsL}.
 
 -compile({inline, [p_add_list/4, p_change_list_/6]}).
 
@@ -149,26 +149,26 @@ p_change_list_([NewPos | Positions], CurPos, Counters, BFSize, BF, ChangeFun) ->
     Counters1 = lists:duplicate(NewPos - CurPos - 1, 0) ++ Counters,
     p_change_list_(Positions, NewPos, [1 | Counters1], BFSize, BF, ChangeFun).
 
-%% @doc Removes one item from the bloom filter.
+%% @doc Removes one item from the counting bloom filter.
 %%      (may introduce false negatives if removing an item not added previously)
--spec remove(bloom_filter(), key()) -> bloom_filter().
-remove(#bloom{hfs = Hfs, items_count = FilledCount,
+-spec remove(cbf(), key()) -> cbf().
+remove(#cbf{hfs = Hfs, items_count = FilledCount,
               filter = Filter} = Bloom, Item) ->
     BFSize = array:size(Filter),
-    Bloom#bloom{filter = p_remove_list(Hfs, BFSize, Filter, [Item]),
-                items_count = FilledCount + 1}.
+    Bloom#cbf{filter = p_remove_list(Hfs, BFSize, Filter, [Item]),
+              items_count = FilledCount + 1}.
 
-%% @doc Removes multiple items from the bloom filter.
+%% @doc Removes multiple items from the counting bloom filter.
 %%      (may introduce false negatives if removing an item not added previously)
--spec remove_list(bloom_filter(), [key()]) -> bloom_filter().
-remove_list(#bloom{hfs = Hfs,
-                   items_count = FilledCount,
-                   filter = Filter
-                  } = Bloom, Items) ->
+-spec remove_list(cbf(), [key()]) -> cbf().
+remove_list(#cbf{hfs = Hfs,
+                 items_count = FilledCount,
+                 filter = Filter
+                } = Bloom, Items) ->
     BFSize = array:size(Filter),
     ItemsL = length(Items),
     F = p_remove_list(Hfs, BFSize, Filter, Items),
-    Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
+    Bloom#cbf{filter = F, items_count = FilledCount + ItemsL}.
 
 -compile({inline, [p_remove_list/4]}).
 
@@ -188,38 +188,38 @@ p_remove_list(Hfs, BFSize, BF, Items = [_|_]) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns true if the bloom filter contains item
--spec is_element(bloom_filter(), key()) -> boolean().
-is_element(#bloom{items_count = 0}, _Item) ->
+%% @doc Returns true if the counting bloom filter contains this item.
+-spec is_element(cbf(), key()) -> boolean().
+is_element(#cbf{items_count = 0}, _Item) ->
     false;
-is_element(#bloom{hfs = Hfs, filter = Filter}, Item) ->
+is_element(#cbf{hfs = Hfs, filter = Filter}, Item) ->
     BFSize = array:size(Filter),
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_counters(Filter, Positions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Gets the number of items inserted into this bloom filter.
--spec item_count(bloom_filter()) -> non_neg_integer().
-item_count(#bloom{items_count = ItemsCount}) -> ItemsCount.
+%% @doc Gets the number of items inserted into this counting bloom filter.
+-spec item_count(cbf()) -> non_neg_integer().
+item_count(#cbf{items_count = ItemsCount}) -> ItemsCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Joins two counting bloom filters so that the returned counting bloom
 %%      filter represents their union.
--spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
-join(#bloom{items_count = 0, hfs = Hfs1} = _BF1,
-     #bloom{hfs = Hfs2} = BF2) ->
+-spec join(cbf(), cbf()) -> cbf().
+join(#cbf{items_count = 0, hfs = Hfs1} = _BF1,
+     #cbf{hfs = Hfs2} = BF2) ->
     ?ASSERT(?REP_HFS:size(Hfs1) =:= ?REP_HFS:size(Hfs2)),
     ?ASSERT(get_property(BF2, size) =:= get_property(_BF1, size)),
     BF2;
-join(#bloom{hfs = Hfs1} = BF1,
-     #bloom{items_count = 0, hfs = Hfs2} = _BF2) ->
+join(#cbf{hfs = Hfs1} = BF1,
+     #cbf{items_count = 0, hfs = Hfs2} = _BF2) ->
     ?ASSERT(?REP_HFS:size(Hfs1) =:= ?REP_HFS:size(Hfs2)),
     ?ASSERT(get_property(BF1, size) =:= get_property(_BF2, size)),
     BF1;
-join(#bloom{items_count = Items1, filter = F1, hfs = Hfs},
-     #bloom{items_count = Items2, filter = F2}) ->
+join(#cbf{items_count = Items1, filter = F1, hfs = Hfs},
+     #cbf{items_count = Items2, filter = F2}) ->
     Size = array:size(F1),
     ?ASSERT(Size =:= array:size(F2)),
     if Items1 > Items2 ->
@@ -230,49 +230,49 @@ join(#bloom{items_count = Items1, filter = F1, hfs = Hfs},
     NewF = array:sparse_foldl(fun(I, X, Acc) ->
                                       array:set(I, array:get(I, Acc) + X, Acc)
                               end, FBig, FSmall),
-    #bloom{filter = NewF, hfs = Hfs,
-           items_count = Items1 + Items2 %approximation
-           }.
+    #cbf{filter = NewF, hfs = Hfs,
+         items_count = Items1 + Items2 %approximation
+        }.
 
 %% @doc Subtracts counting bloom filter A from B so that the returned
 %%      counting bloom filter that approximates the set difference (with false
 %%      positives and false negatives!).
--spec minus(A::bloom_filter(), B::bloom_filter()) -> bloom_filter().
-minus(#bloom{items_count = 0, hfs = Hfs1} = BF1,
-      #bloom{hfs = Hfs2} = _BF2) ->
+-spec minus(A::cbf(), B::cbf()) -> cbf().
+minus(#cbf{items_count = 0, hfs = Hfs1} = BF1,
+      #cbf{hfs = Hfs2} = _BF2) ->
     ?ASSERT(?REP_HFS:size(Hfs1) =:= ?REP_HFS:size(Hfs2)),
     ?ASSERT(get_property(_BF2, size) =:= get_property(BF1, size)),
     BF1;
-minus(#bloom{hfs = Hfs1} = BF1,
-      #bloom{items_count = 0, hfs = Hfs2} = _BF2) ->
+minus(#cbf{hfs = Hfs1} = BF1,
+      #cbf{items_count = 0, hfs = Hfs2} = _BF2) ->
     ?ASSERT(?REP_HFS:size(Hfs1) =:= ?REP_HFS:size(Hfs2)),
     ?ASSERT(get_property(BF1, size) =:= get_property(_BF2, size)),
     BF1;
-minus(#bloom{items_count = Items1, filter = F1, hfs = Hfs},
-      #bloom{items_count = Items2, filter = F2}) ->
+minus(#cbf{items_count = Items1, filter = F1, hfs = Hfs},
+      #cbf{items_count = Items2, filter = F2}) ->
     Size = array:size(F1),
     ?ASSERT(Size =:= array:size(F2)),
     NewF = array:sparse_foldl(fun(I, X, Acc) ->
                                       array:set(I, array:get(I, Acc) - X, Acc)
                               end, F1, F2),
-    #bloom{filter = NewF, hfs = Hfs,
-           items_count = Items1 - Items2 %approximation
-           }.
+    #cbf{filter = NewF, hfs = Hfs,
+         items_count = Items1 - Items2 %approximation
+        }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Checks whether two bloom filters are equal.
--spec equals(bloom_filter(), bloom_filter()) -> boolean().
-equals(#bloom{ items_count = Items1, filter = Filter1 },
-       #bloom{ items_count = Items2, filter = Filter2 }) ->
+%% @doc Checks whether two counting bloom filters are equal.
+-spec equals(cbf(), cbf()) -> boolean().
+equals(#cbf{ items_count = Items1, filter = Filter1 },
+       #cbf{ items_count = Items2, filter = Filter2 }) ->
     Items1 =:= Items2 andalso
         Filter1 =:= Filter2.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Return bloom filter debug information.
--spec print(bloom_filter()) -> [{atom(), any()}].
-print(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
+%% @doc Returns counting bloom filter debug information.
+-spec print(cbf()) -> [{atom(), any()}].
+print(#cbf{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
     Size = array:size(Filter),
     HCount = ?REP_HFS:size(Hfs),
     [{filter_size, Size},
@@ -285,21 +285,21 @@ print(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_property(bloom_filter(), fpr) -> float();
-                  (bloom_filter(), size) -> non_neg_integer();
-                  (bloom_filter(), filter) -> array:array(integer());
-                  (bloom_filter(), hfs_size) -> non_neg_integer();
-                  (bloom_filter(), hfs) -> ?REP_HFS:hfs();
-                  (bloom_filter(), items_count) -> non_neg_integer().
-get_property(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems}, fpr) ->
+-spec get_property(cbf(), fpr) -> float();
+                  (cbf(), size) -> non_neg_integer();
+                  (cbf(), filter) -> array:array(integer());
+                  (cbf(), hfs_size) -> non_neg_integer();
+                  (cbf(), hfs) -> ?REP_HFS:hfs();
+                  (cbf(), items_count) -> non_neg_integer().
+get_property(#cbf{filter = Filter, hfs = Hfs, items_count = NumItems}, fpr) ->
     Size = array:size(Filter),
     bloom:calc_FPR(Size, NumItems, ?REP_HFS:size(Hfs));
-get_property(#bloom{filter = Filter}, size)        ->
+get_property(#cbf{filter = Filter}, size)        ->
     array:size(Filter);
-get_property(#bloom{filter = X}     , filter)      -> X;
-get_property(#bloom{hfs = X}        , hfs_size)    -> ?REP_HFS:size(X);
-get_property(#bloom{hfs = X}        , hfs)         -> X;
-get_property(#bloom{items_count = X}, items_count) -> X.
+get_property(#cbf{filter = X}     , filter)      -> X;
+get_property(#cbf{hfs = X}        , hfs_size)    -> ?REP_HFS:size(X);
+get_property(#cbf{hfs = X}        , hfs)         -> X;
+get_property(#cbf{items_count = X}, items_count) -> X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% bit/counter position operations
