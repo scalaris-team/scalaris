@@ -31,7 +31,8 @@
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
          add/2, add_list/2, remove/2, remove_list/2,
-         is_element/2, item_count/1]).
+         is_element/2, item_count/1,
+         to_bloom/1]).
 -export([equals/2, join/2, minus/2, print/1]).
 
 % for tests:
@@ -258,6 +259,27 @@ minus(#cbf{items_count = Items1, filter = F1, hfs = Hfs},
     #cbf{filter = NewF, hfs = Hfs,
          items_count = Items1 - Items2 %approximation
         }.
+
+-spec to_bloom(cbf()) -> bloom:bloom_filter().
+to_bloom(#cbf{items_count = 0, filter = F, hfs = Hfs}) ->
+    bloom:new(array:size(F), Hfs);
+to_bloom(#cbf{items_count = ItemsCount, filter = F, hfs = Hfs}) ->
+%%     % note: this is faster than using array:sparse_fold[r,l]/3 to get the positions
+%%     Positions0 = array:sparse_to_list(array:sparse_map(fun(I, _) -> I end, F)),
+%%     % position 0 may be missing since 0 is the default value, too
+%%     Positions = case array:get(0, F) of
+%%                     0 -> Positions0;
+%%                     _ -> [0 | Positions0]
+%%                 end,
+    % this seems even faster:
+    Positions = lists:reverse(
+                  element(2, lists:foldl(
+                            fun(0, {N, L}) -> {N+1, L};
+                               (_, {N, L}) -> {N+1, [N | L]}
+                            end, {0, []}, array:to_list(F)))),
+    BFSize = array:size(F),
+    BFBits = bloom:p_add_positions(Positions, <<0:BFSize>>, BFSize),
+    bloom:new_bin(BFBits, Hfs, ItemsCount).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

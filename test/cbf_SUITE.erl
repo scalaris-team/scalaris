@@ -31,7 +31,8 @@ all() -> [
           tester_add,
           tester_add_list,
           tester_join,
-          tester_equals
+          tester_equals,
+          tester_to_bloom
           %tester_fpr
           %eprof
           %fprof
@@ -47,3 +48,16 @@ init_per_suite(Config) ->
 
 end_per_suite(_Config) ->
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_to_bloom([?BLOOM:key(),...]) -> true.
+prop_to_bloom(Items) ->
+    CBF1 = newBloom(erlang:length(Items), 0.1),
+    CBF2 = ?BLOOM:add_list(CBF1, Items),
+    BF2 = ?BLOOM:to_bloom(CBF2),
+    lists:foreach(fun(X) -> ?assert(bloom:is_element(BF2, X)) end, Items),
+    ?equals(bloom:get_property(BF2, items_count), length(Items)).
+
+tester_to_bloom(_) ->
+    tester:test(?MODULE, prop_to_bloom, 1, 10, [{threads, 2}]).

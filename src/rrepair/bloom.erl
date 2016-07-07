@@ -35,6 +35,7 @@
 % needed by other Bloom filter implementations or rr_recon:
 -export([calc_least_size/3,
          calc_HF_num_Size_opt/2, calc_FPR/3,
+         p_add_positions/3,
          resize/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,7 +115,7 @@ add_list(#bloom{hfs = Hfs,
     ItemsL = length(Items),
     Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
--compile({inline, [p_add_list/4]}).
+-compile({inline, [p_add_list/4, p_add_positions/3]}).
 
 %% @doc Helper to set item bits, optimised for a large number of items /
 %%      positions to set.
@@ -126,6 +127,11 @@ p_add_list(Hfs, BFSize, BF, Items = [_|_]) ->
     Positions = lists:flatmap(fun(Item) ->
                                       ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
                               end, Items),
+    p_add_positions(Positions, BF, BFSize).
+
+-spec p_add_positions(Positions::[non_neg_integer(),...], BF1::bitstring(),
+                      BFSize::pos_integer()) -> BF2::bitstring().
+p_add_positions(Positions, BF, BFSize) ->
     [Pos | Rest] = lists:usort(Positions),
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,
