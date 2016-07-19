@@ -53,13 +53,17 @@ if test "x$ENABLE_CPP" != xno ; then
   # C++ and boost checks
   AX_CXX_COMPILE_STDCXX_11([noext],[optional])
   if test "x$HAVE_CXX11" = "x1" ; then
-    AX_BOOST_BASE([1.47])
+    have_boost_147=
+    AX_BOOST_BASE([1.47], [have_boost_147=yes], [have_boost_147=no])
     AX_BOOST_SYSTEM
     AX_BOOST_REGEX
     AX_BOOST_ASIO
     AX_BOOST_PROGRAM_OPTIONS
     AX_BOOST_UNIT_TEST_FRAMEWORK
-    enabled_cxx=1
+
+    if test "x$have_boost_147" = "xyes" -a "x$ax_cv_boost_system" = "xyes" -a "x$ax_cv_boost_regex" = "xyes"  -a "x$ax_cv_boost_program_options" = "xyes"  -a "x$ax_cv_boost_unit_test_framework" = "xyes" ; then
+      enabled_cxx=1
+    fi
   fi
 fi
 
