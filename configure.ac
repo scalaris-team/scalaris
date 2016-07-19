@@ -37,6 +37,7 @@ AC_ARG_ENABLE([cpp],
               [ENABLE_CPP=$enableval],
               [ENABLE_CPP=$enableval])
 
+enabled_cxx=0
 if test "x$ENABLE_CPP" != xno ; then
   # fake automake scripts (config.guess, install-sh, ...)
   #              Homebrew                     Ubuntu
@@ -50,14 +51,19 @@ if test "x$ENABLE_CPP" != xno ; then
     fi
   done
   # C++ and boost checks
-  AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
-  AX_BOOST_BASE([1.47])
-  AX_BOOST_SYSTEM
-  AX_BOOST_REGEX
-  AX_BOOST_ASIO
-  AX_BOOST_PROGRAM_OPTIONS
-  AX_BOOST_UNIT_TEST_FRAMEWORK
-else
+  AX_CXX_COMPILE_STDCXX_11([noext],[optional])
+  if test "x$HAVE_CXX11" = "x1" ; then
+    AX_BOOST_BASE([1.47])
+    AX_BOOST_SYSTEM
+    AX_BOOST_REGEX
+    AX_BOOST_ASIO
+    AX_BOOST_PROGRAM_OPTIONS
+    AX_BOOST_UNIT_TEST_FRAMEWORK
+    enabled_cxx=1
+  fi
+fi
+
+if test "x$enabled_cxx" = "x0" ; then
   AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
 fi
 
