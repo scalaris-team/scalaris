@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015-2016 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ namespace scalaris {
       return reqlist.size();
     }
 
-    operator Json::Value() const { return reqlist; }
+    Json::Value get_json_value() const { return reqlist; }
 
   private:
     Json::Value as_is(const std::string& val) {
