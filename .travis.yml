@@ -1,19 +1,36 @@
-language: erlang
+language: generic
 
-otp_release:
-   - 17.4
+matrix:
+  include:
+    - os: osx
+      env:
+        - OSX_PACKAGES="boost erlang python python3 ant bash gnu-sed coreutils"
+    - os: linux
+      sudo: false
+      addons:
+        apt:
+          sources:
+            - boost-latest
+          packages:
+            - automake
+            - clang
+            - libboost1.55-all-dev
+            - python3
 
-addons:
-  apt:
-    sources:
-      - boost-latest
-    packages:
-      - automake
-      - clang
-      - libboost1.55-all-dev
-      - python3
+install:
+  - |
+     if [[ $TRAVIS ]] && [[ "X$TRAVIS_OS_NAME" = "Xosx" ]]; then
+         brew update > /dev/null
+
+         for pkg in $OSX_PACKAGES; do
+           [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
+           brew outdated $pkg || brew upgrade --force-bottle $pkg
+         done
+     fi
 
 script:
+  - export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+  - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - CXX=clang++ ./configure
   - touch TAGS.root
   - make
