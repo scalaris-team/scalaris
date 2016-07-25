@@ -72,8 +72,16 @@ if test "x$enabled_cxx" = "x0" ; then
   AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
 fi
 
+CXXSHELL=$SHELL
+if test -f /usr/local/bin/bash; then
+  CXXSHELL=/usr/local/bin/bash
+elif test -f /bin/bash; then
+  CXXSHELL=/bin/bash
+fi
+
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(CXXSHELL)
 
 ###########################################################
 #

@@ -660,6 +660,7 @@ RUNUSER
 SUDO
 SCREEN
 BROWSER
+CXXSHELL
 BOOST_UNIT_TEST_FRAMEWORK_LIB
 BOOST_PROGRAM_OPTIONS_LIB
 BOOST_ASIO_LIB
@@ -4905,6 +4906,14 @@ if test "x$enabled_cxx" = "x0" ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: c++ bindings disabled ('make cpp' will fail)" >&5
 $as_echo "$as_me: c++ bindings disabled ('make cpp' will fail)" >&6;}
 fi
+
+CXXSHELL=$SHELL
+if test -f /usr/local/bin/bash; then
+  CXXSHELL=/usr/local/bin/bash
+elif test -f /bin/bash; then
+  CXXSHELL=/bin/bash
+fi
+
 
 
 
