@@ -23,6 +23,7 @@ AC_PATH_PROG(FALSE, false)
 AC_SUBST(FALSE)
 AC_PATH_PROG(TRUE, true)
 AC_SUBST(TRUE)
+AC_PROG_SED
 
 ###########################################################
 #
@@ -258,7 +259,7 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
 # split erlang erts version:
-set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
+set `echo $erlang_cv_erts_ver | $SED 's/\./ /g'`
 ERTS_MAJOR=$1
 ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
@@ -672,7 +673,7 @@ mkdir -p ~/.yaws 2> /dev/null
 
 mkdir -p python3-api
 cp python-api/scalaris.in python3-api/
-sed -i -e "s|python-api|python3-api|g" \
+$SED -i -e "s|python-api|python3-api|g" \
        -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
        -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
