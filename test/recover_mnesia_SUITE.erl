@@ -35,7 +35,7 @@ repeater_num_executions() ->
     10.
 
 ring_size() ->
-    4.
+    config:read(replication_factor).
 
 all() -> [
           {group, make_ring_group},
@@ -86,10 +86,11 @@ init_per_group(Group, Config) ->
     WorkingDir = string:sub_string(PWD, 1, string:len(PWD) - 1) ++
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     _ = file:delete(WorkingDir ++ "schema.DAT"),
+    RingSize = ring_size(),
     Config3 = unittest_helper:stop_minimal_procs(Config2),
 
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
-    unittest_helper:make_ring(ring_size(), [{config, [{log_path, PrivDir},
+    unittest_helper:make_ring(RingSize, [{config, [{log_path, PrivDir},
                                                       {leases, true},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
@@ -133,7 +134,7 @@ test_make_ring(Config) ->
                                                  {leases, true},
                                                  {db_backend, db_mnesia},
                                                  {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -159,7 +160,7 @@ read(Config) ->
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     %% ring restored -> checking KV data integrity
     _ = check_data_integrity(),
     true.
@@ -169,7 +170,7 @@ read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(_Config) ->
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     %% delete random node from ring
     RandomNode = comm:make_local(lease_checker:get_random_save_node()),
     io:format("show prbr statistics for the ring~n"),
@@ -186,7 +187,7 @@ remove_node(_Config) ->
     timer:sleep(11000),
     _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, 3}]),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
     %% check data integrity
     ct:pal("check data integrity"),
     _ = check_data_integrity(),
@@ -201,7 +202,7 @@ remove_node(_Config) ->
     ct:pal("check_ring_size_fully_joined"),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
     ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, 4}]),
+    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     true.
 
 check_data_integrity() ->
