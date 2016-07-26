@@ -153,27 +153,28 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
-    ReadEntry = case erlang:function_exported(DataType, prbr_read_handler, 3) of
-                   true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
-                   _    -> KeyEntry
-               end,
+    {NewKeyEntryVal, ReadVal} =
+        case erlang:function_exported(DataType, prbr_read_handler, 3) of
+            true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
+            _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry))}
+        end,
 
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
     trace_mpath:log_info(self(), {'prbr:on(read)',
                                   %% key, Key,
                                   round, AssignedReadRound,
-                                  val, entry_val(KeyEntry),
+                                  val, NewKeyEntryVal,
                                   read_filter, ReadFilter}),
     msg_read_reply(Proposer, Cons, AssignedReadRound,
-                   ReadFilter(entry_val(ReadEntry)),
-                   entry_r_write(KeyEntry)),
+                   ReadVal, entry_r_write(KeyEntry)),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
+    NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
 %%    log:log("read~n"
 %%            "Key: ~p~n"
 %%            "Val: ~p", [Key, NewKeyEntry]),
-    _ = set_entry(NewKeyEntry, TableName),
+    _ = set_entry(NewKeyEntry2, TableName),
     TableName;
 
 on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
