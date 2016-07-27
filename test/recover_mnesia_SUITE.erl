@@ -59,7 +59,7 @@ groups() ->
 
     ].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
     Config.
