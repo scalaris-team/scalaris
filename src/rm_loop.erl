@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -405,9 +405,13 @@ fd_notify(State, Event, DeadPid, Data) ->
                     case intervals:in(node:id(OldPred), nodelist:node_range(NewNeighb)) of
                         true ->
                             CrashInterval = node:mk_interval_between_nodes(NewPred, OldPred),
-                            comm:send_local(
-                              pid_groups:get_my(rrepair),
-                              {request_resolve, {interval_upd_my, CrashInterval}, []});
+                            case is_process_alive(pid_groups:get_my(rrepair)) of
+                                true ->
+                                    comm:send_local(
+                                      pid_groups:get_my(rrepair),
+                                      {request_resolve, {interval_upd_my, CrashInterval}, []});
+                                false -> ok
+                            end;
                         false ->
                             ok
                     end
