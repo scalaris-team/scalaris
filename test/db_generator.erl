@@ -181,7 +181,7 @@ uniform_key_list_no_split([{_I, 0} | R], Acc, AccType) ->
     uniform_key_list(R, Acc, AccType);
 uniform_key_list_no_split([{I, Add} | R], Acc, AccType) ->
     {LBr, IL, IR, RBr} = intervals:get_bounds(I),
-    Denom = Add + ?IIF(RBr =:= ')', 1, 0),
+    Denom = Add + ?IIF(RBr =:= ')' andalso LBr =:= '(', 1, 0),
     ToAddKeys = lists:usort(
                   util:for_to_ex(
                     ?IIF(LBr =:= '(', 1, 0),
@@ -189,6 +189,8 @@ uniform_key_list_no_split([{I, Add} | R], Acc, AccType) ->
                     fun(Index) ->
                             ?RT:get_split_key(IL, IR, {Index, Denom})
                     end)),
+    % note: ?RT:get_split_key/3 considers the interval (IL, IR] which may not
+    %       be correct here
     ToAdd =
         case AccType of
             list_key ->
