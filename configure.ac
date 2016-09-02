@@ -695,3 +695,39 @@ chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
 chmod u+x contrib/init.d/scalaris-monitor
 
+echo "Erlang"
+if test "x$BITCASK_LIBS" = "x" ; then
+  echo "  Bitcask              : no"
+else
+  echo "  Bitcask              : yes"
+fi
+
+if test "x$ERLANG_HANOIDB_FLAGS" = "x" ; then
+  echo "  hanoidb              : no"
+else
+  echo "  hanoidb              : yes"
+fi
+
+if test "x$ERLANG_TOKE_FLAGS" = "x" ; then
+  echo "  toke                 : no"
+else
+  echo "  toke                 : yes"
+fi
+
+if test "x$enabled_cxx" = "x0" ; then
+  echo "C++ API                : no"
+else
+  echo "C++ API                : yes"
+fi
+
+if test "x$ENABLEPYTHON2INSTALL" = "xinstall-python" ; then
+  echo "Python API             : yes"
+else
+  echo "Python API             : no"
+fi
+
+if test "x$ENABLEPYTHON3" = "xpython3-compile" ; then
+  echo "Python3 API            : yes"
+else
+  echo "Python3 API            : no"
+fi
