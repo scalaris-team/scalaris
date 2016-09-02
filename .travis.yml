@@ -4,7 +4,7 @@ matrix:
   include:
     - os: osx
       env:
-        - OSX_PACKAGES="boost erlang python python3 ant bash gnu-sed coreutils"
+        - OSX_PACKAGES="boost erlang python python3 ant bash coreutils"
     - os: linux
       sudo: false
       addons:
@@ -29,7 +29,6 @@ install:
      fi
 
 script:
-  - export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - CXX=clang++ ./configure
   - touch TAGS.root
