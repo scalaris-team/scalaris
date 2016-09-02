@@ -680,10 +680,9 @@ AC_SUBST(NIFFLAGS)
 mkdir -p ~/.yaws 2> /dev/null
 
 mkdir -p python3-api
-cp python-api/scalaris.in python3-api/
-$SED -i -e "s|python-api|python3-api|g" \
-       -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
-       -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
+$SED -e "s|python-api|python3-api|g" \
+     -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
+     -e "s|PYTHON2|PYTHON3|g" python-api/scalaris.in > python3-api/scalaris.in
 
 AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl cpp-api/Makefile java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
