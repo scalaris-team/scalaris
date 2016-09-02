@@ -680,10 +680,9 @@ AC_SUBST(NIFFLAGS)
 mkdir -p ~/.yaws 2> /dev/null
 
 mkdir -p python3-api
-cp python-api/scalaris.in python3-api/
-$SED -i -e "s|python-api|python3-api|g" \
-       -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
-       -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
+$SED -e "s|python-api|python3-api|g" \
+     -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
+     -e "s|PYTHON2|PYTHON3|g" python-api/scalaris.in > python3-api/scalaris.in
 
 AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl cpp-api/Makefile java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
@@ -696,3 +695,39 @@ chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
 chmod u+x contrib/init.d/scalaris-monitor
 
+echo "Erlang"
+if test "x$BITCASK_LIBS" = "x" ; then
+  echo "  Bitcask              : no"
+else
+  echo "  Bitcask              : yes"
+fi
+
+if test "x$ERLANG_HANOIDB_FLAGS" = "x" ; then
+  echo "  hanoidb              : no"
+else
+  echo "  hanoidb              : yes"
+fi
+
+if test "x$ERLANG_TOKE_FLAGS" = "x" ; then
+  echo "  toke                 : no"
+else
+  echo "  toke                 : yes"
+fi
+
+if test "x$enabled_cxx" = "x0" ; then
+  echo "C++ API                : no"
+else
+  echo "C++ API                : yes"
+fi
+
+if test "x$ENABLEPYTHON2INSTALL" = "xinstall-python" ; then
+  echo "Python API             : yes"
+else
+  echo "Python API             : no"
+fi
+
+if test "x$ENABLEPYTHON3" = "xpython3-compile" ; then
+  echo "Python3 API            : yes"
+else
+  echo "Python3 API            : no"
+fi
