@@ -211,7 +211,11 @@ if (acc_upd_max > 0.5 && acc_upd_max <= 1) {
     if (acc_upd_max > 6 && acc_upd_max <= 12) {
       set ytics 2
     } else {
-      set ytics autofreq
+      if (acc_upd_max > 12 && acc_upd_max <= 30) {
+        set ytics 5
+      } else {
+        set ytics autofreq
+      }
     }
   }
 }
@@ -221,7 +225,7 @@ set ylabel "|Δ| missed " font ",16"
 set yrange [0:acc_upd_max]
 set format y " %4.1f"
 if (plotCount > 1) {
-  set key at screen 0.500,(acc_pos_y + 0.001) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.500,(acc_pos_y + 0.003) center center vertical Left reverse noopaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -239,16 +243,21 @@ if (regenAccInPercent == 1) {
   set y2tics mirror format "%-3.0f_{ }%%" offset 0 scale 0.8
   set y2range [(acc_reg_avg-acc_reg_max):(acc_reg_avg+acc_reg_max)]
 } else {
+  set y2tics mirror format "%-4.1f " scale 0.8
   if (acc_reg_max > 0.5 && acc_reg_max <= 1) {
-    set y2tics 0.2 mirror format "%-4.1f " scale 0.8
+    set y2tics 0.2
   } else {
     if (acc_reg_max > 3 && acc_reg_max <= 6) {
-      set y2tics 1 mirror format "%-4.1f " scale 0.8
+      set y2tics 1
     } else {
       if (acc_reg_max > 6 && acc_reg_max <= 12) {
-        set y2tics 2 mirror format "%-4.1f " scale 0.8
+        set y2tics 2
       } else {
-        set y2tics autofreq mirror format "%-4.1f " scale 0.8
+        if (acc_reg_max > 12 && acc_reg_max <= 30) {
+          set y2tics 5
+        } else {
+          set y2tics autofreq
+        }
       }
     }
   }
@@ -286,13 +295,8 @@ set ylabel "rel. Red." font ",16" # transferred / updated
 }
 set yrange [0:red_max]
 set y2range [0:red_max]
-if (red_max > 10) {
-  set format y "  %3.0f"
-  set format y2 "%-3.0f "
-} else {
-  set format y " %4.1f"
-  set format y2 "%-4.1f "
-}
+set format y "%5.1f"
+set format y2 "%-5.1f"
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
@@ -306,16 +310,17 @@ if (plotCount == 1) {
 unset ylabel
 unset ytics
 set grid y2tics
+set y2tics mirror scale 0.8
 if (red_max > 0.5 && red_max <= 1) {
-  set y2tics 0.2 mirror scale 0.8
+  set y2tics 0.2
 } else {
   if (red_max > 2 && red_max <= 6) {
-    set y2tics 1 mirror scale 0.8
+    set y2tics 1
   } else {
     if (red_max > 6 && red_max <= 12) {
-      set y2tics 2 mirror scale 0.8
+      set y2tics 2
     } else {
-      set y2tics autofreq mirror scale 0.8
+      set y2tics autofreq
     }
   }
 }
@@ -331,8 +336,8 @@ set grid noy2tics
 
 set size all_width_l,bw_height
 set origin -0.002,-0.025
-set xlabel "n in 10^3, update" font ",16"
-set ylabel sprintf("RC costs (%s) in KiB",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
+set xlabel "n in 10^3 (outdated δ)" font ",16"
+set ylabel sprintf("Transfer costs (%s) in KiB",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
 set yrange [bw_min:bw_max*1.2]
 set y2range [bw_min:bw_max*1.2]
 set logscale y 2
@@ -348,7 +353,7 @@ set format y "%5.0f"
 }
 set format x
 if (plotCount > 1) {
-  set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
+  set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse noopaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
   set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
@@ -369,7 +374,7 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i
 
 set size all_width_r,bw_height
 set origin 0.49,-0.025
-set xlabel "n in 10^3, regen" font ",16"
+set xlabel "n in 10^3 (missing δ)" font ",16"
 unset key
 unset ylabel
 unset ytics

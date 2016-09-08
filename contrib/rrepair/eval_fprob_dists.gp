@@ -202,9 +202,9 @@ set grid noy2tics
 
 set size all_width_l,bw_height
 set origin -0.002,0
-set xlabel "total δ, update" font ",16"
+set xlabel "total δ (outdated items)" font ",16"
 set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
-set ylabel sprintf("RC costs (%s)",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
+set ylabel sprintf("Transfer costs (%s)",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
 set yrange [bw_min:bw_max]
 set y2range [bw_min:bw_max]
 set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
@@ -219,7 +219,7 @@ plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_fprob . "][$" . col_
 
 set size all_width_r,bw_height
 set origin 0.49,0
-set xlabel "total δ, regen" font ",16"
+set xlabel "total δ (missing items)" font ",16"
 unset ylabel
 unset ytics
 set grid y2tics
