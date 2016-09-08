@@ -6,7 +6,8 @@
 #	destDir -> destination path for pdfs
 #	stepSize -> the stepSize parameter used
 #	plot_label -> additional label to print at the bottom left of the screen (optional)
-#	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the RC costs (optional)
+#	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the transfer costs (optional)
+#	filename -> defaults to "all_file" (no extension, .pdf will be appended)
 
 set macro
 
@@ -35,7 +36,9 @@ fileEx = "pdf"
 system "echo 'PLOT ".srcFile1."'"
 system "mkdir -p " .destDir
 
-filename = "file"
+if (!exists("filename")) {
+  filename = "all_file"
+}
 
 # --OPTION
 kvvSize0 = 16+4 # key+version size in bytes
@@ -105,7 +108,7 @@ set xtics scale 0.1
 set mxtics 2
 set grid noxtics mxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 
-set o destDir. "all_" .filename. "." .fileEx
+set o destDir . filename . "." . fileEx
 set multiplot
 
 all_width_r = 0.545
