@@ -177,14 +177,16 @@ abstract class ErlangValueJSONBase {
      * @throws ClassCastException
      *             if the key is not a valid key object
      */
-    protected String convertScalarisJSONtoJava_key(final OtpErlangObject key_erl) throws ClassCastException {
+    protected String convertScalarisJSONtoJava_key(
+            final OtpErlangObject key_erl) throws ClassCastException {
         if (key_erl instanceof OtpErlangAtom) {
             return ((OtpErlangAtom) key_erl).atomValue();
         } else {
             try {
                 return ErlangValue.otpObjectToString(key_erl);
             } catch (final ClassCastException e) {
-                throw new ClassCastException("Unsupported JSON key (" + key_erl.toString() + "): " + e.getMessage());
+                throw new ClassCastException("Unsupported JSON key ("
+                        + key_erl.toString() + "): " + e.getMessage());
             }
         }
     }

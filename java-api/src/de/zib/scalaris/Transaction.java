@@ -390,6 +390,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#merge(com.ericsson.otp.erlang.OtpErlangObject)
          */
+        @Override
         public Translog merge(final OtpErlangObject newTLog) {
             this.tlog = newTLog;
             return this;
@@ -398,6 +399,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#isEmpty()
          */
+        @Override
         public boolean isEmpty() {
             return this.tlog == null;
         }
@@ -405,6 +407,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#reset()
          */
+        @Override
         public void reset() {
             this.tlog = null;
         }
@@ -412,6 +415,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#filter(de.zib.scalaris.Transaction.RequestList)
          */
+        @Override
         public OtpErlangObject filter(final RequestList req) {
             return this.tlog;
         }
@@ -431,6 +435,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#merge(com.ericsson.otp.erlang.OtpErlangObject)
          */
+        @Override
         public Translog merge(final OtpErlangObject newTLog) {
             try {
                 final OtpErlangList newTLogL = (OtpErlangList) newTLog;
@@ -448,6 +453,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#isEmpty()
          */
+        @Override
         public boolean isEmpty() {
             return entries.isEmpty();
         }
@@ -455,6 +461,7 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#reset()
          */
+        @Override
         public void reset() {
             entries.clear();
         }
@@ -462,19 +469,23 @@ public class Transaction extends
         /* (non-Javadoc)
          * @see de.zib.scalaris.Translog#filter(de.zib.scalaris.Transaction.RequestList)
          */
+        @Override
         public OtpErlangObject filter(final RequestList req) {
             OtpErlangList result;
             if (req.isCommit()) {
-                result = new OtpErlangList(entries.values().toArray(new OtpErlangTuple[0]));
+                result = new OtpErlangList(entries.values()
+                        .toArray(new OtpErlangTuple[entries.size()]));
             } else {
-                final HashSet<OtpErlangTuple> resultJ = new HashSet<OtpErlangTuple>(req.size());
+                final HashSet<OtpErlangTuple> resultJ = new HashSet<OtpErlangTuple>(
+                        req.size());
                 for (final Operation op : req.getRequests()) {
                     final OtpErlangTuple entry = entries.get(op.getKey());
                     if (entry != null) {
                         resultJ.add(entry);
                     }
                 }
-                result = new OtpErlangList(resultJ.toArray(new OtpErlangTuple[0]));
+                result = new OtpErlangList(
+                        resultJ.toArray(new OtpErlangTuple[resultJ.size()]));
             }
             return result;
         }

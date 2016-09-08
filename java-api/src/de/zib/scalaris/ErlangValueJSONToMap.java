@@ -36,15 +36,19 @@ class ErlangValueJSONToMap extends ErlangValueJSONBase
     /* (non-Javadoc)
      * @see de.zib.scalaris.ErlangValueJSON#toScalarisJSON(T)
      */
-    public OtpErlangTuple toScalarisJSON(final Map<String, Object> value) throws ClassCastException {
+    @Override
+    public OtpErlangTuple toScalarisJSON(final Map<String, Object> value)
+            throws ClassCastException {
         return convertJavaToScalarisJSON_object(value);
     }
 
     /* (non-Javadoc)
      * @see de.zib.scalaris.ErlangValueJSON#toJava(com.ericsson.otp.erlang.OtpErlangList)
      */
+    @Override
     @SuppressWarnings("unchecked")
-    public Map<String, Object> toJava(final OtpErlangList value) throws ClassCastException {
+    public Map<String, Object> toJava(final OtpErlangList value)
+            throws ClassCastException {
         return (Map<String, Object>) convertScalarisJSONtoJava_object(value);
     }
 
@@ -108,7 +112,8 @@ class ErlangValueJSONToMap extends ErlangValueJSONBase
                 result.put(key,
                         convertScalarisJSONtoJava_value(iter_tpl.elementAt(1)));
             } else {
-                throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+                throw new ClassCastException("Unsupported JSON type (value: "
+                        + value.toString() + ")");
             }
         }
         return result;
