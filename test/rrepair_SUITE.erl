@@ -27,6 +27,9 @@
 
 -include("rrepair_SUITE.hrl").
 
+%% number of executions per test (sub-) group
+-define(NUM_EXECUTIONS, 1).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() ->
@@ -39,7 +42,7 @@ all() ->
 
 groups() ->
     [
-     {gsession_ttl,  [sequence], [session_ttl]},
+     {gsession_ttl,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], [session_ttl]},
      {tester_tests, [parallel], [
                            tester_map_key_to_interval,
                            tester_map_key_to_quadrant,
@@ -52,23 +55,24 @@ groups() ->
      {basic,  [parallel], [
                            check_quadrant_intervals
                           ]},
-     {repair, [sequence], [
-                           {upd_trivial,  [sequence], repair_default()},
-                           {upd_shash,    [sequence], repair_default()},
-                           {upd_bloom,    [sequence], repair_default()}, %{repeat_until_any_fail, 1000}
-                           {upd_merkle,   [sequence], repair_default()},
-                           {upd_art,      [sequence], repair_default()},
-                           {regen_trivial,[sequence], repair_default() ++ regen_special()},
-                           {regen_shash,  [sequence], repair_default() ++ regen_special()},
-                           {regen_bloom,  [sequence], repair_default() ++ regen_special()},
-                           {regen_merkle, [sequence], repair_default() ++ regen_special()},
-                           {regen_art,    [sequence], repair_default() ++ regen_special()},
-                           {mixed_trivial,[sequence], repair_default()},
-                           {mixed_shash,  [sequence], repair_default()},
-                           {mixed_bloom,  [sequence], repair_default()},
-                           {mixed_merkle, [sequence], repair_default()},
-                           {mixed_art,    [sequence], repair_default()}
-                          ]}
+     {repair, [sequence],
+      [
+       {upd_trivial,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_shash,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_bloom,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_merkle,   [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_art,      [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {regen_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_shash,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {mixed_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_shash,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()}
+      ]}
     ].
 
 suite() -> [{timetrap, {seconds, 15}}].
