@@ -479,7 +479,7 @@ tester_type_check_rrepair(_Config) ->
              {build_recon_struct, 5}, %% DB items must be in interval
              {begin_sync, 1}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
-             {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
+             {merkle_next_signature_sizes, 5}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
              {trivial_signature_sizes, 4}, %% needs float > 0, < 1
              {trivial_worst_case_failrate, 4}, %% needs 0 =< ExpDelta =< 100
