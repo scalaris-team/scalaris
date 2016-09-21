@@ -38,7 +38,7 @@
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
 -export([calc_n_subparts_FR/2, calc_n_subparts_FR/3]).
-%% -export([calc_max_different_hashes/4,
+%% -export([calc_max_different_hashes/3,
 %%          trivial_signature_sizes/4, trivial_worst_case_failrate/4,
 %%          shash_signature_sizes/4, shash_worst_case_failrate/4,
 %%          calc_max_different_items_node/3, calc_max_different_items_total/3,
@@ -1145,35 +1145,24 @@ calc_one_m_xpow_one_m_z(X, Z) ->
 %% @doc Helper for calculating the maximum number of different hashes when
 %%      an upper bound on the delta is known.
 -spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
-                                HashType::key | key_version,
                                 ExpDelta::number()) -> non_neg_integer().
-calc_max_different_hashes(N, M, HashType, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
     if ExpDelta == 0 ->
            % M and N may differ anyway if the actual delta is higher
            % -> target no collisions among items on any node!
            erlang:max(M, N);
        ExpDelta == 100 ->
            M + N; % special case of the ones below
-       HashType =:= key andalso is_float(ExpDelta) ->
+       is_float(ExpDelta) ->
            % assume the worst case, i.e. ExpDelta percent different hashes
            % on both nodes together due to missing items (out-dated items have
            % the same key!), and thus:
            % N = NT * (100 - ExpDelta * alpha) / 100 and
            % M = NT * (100 - ExpDelta * (1-alpha)) / 100
            util:ceil(((M + N) * 100) / (200 - ExpDelta));
-       HashType =:= key andalso is_integer(ExpDelta) ->
+       is_integer(ExpDelta) ->
            % -> use integer division (and round up) for higher precision:
-           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta);
-       HashType =:= key_version andalso is_float(ExpDelta) ->
-           % assume the worst case, i.e. ExpDelta percent different hashes
-           % on both nodes together due to outdated items which result in
-           % different key-version pairs (missing items would reduce the total
-           % number of hashes even under ExpDelta),
-           % and thus N = NT and M = NT - but just in case assume NT = (N + M) / 2
-           util:ceil(((M + N) * (100 + ExpDelta)) / 200);
-       HashType =:= key_version andalso is_integer(ExpDelta) ->
-           % -> use integer division (and round up) for higher precision:
-           ((M + N) * (100 + ExpDelta) + 199) div 200
+           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta)
     end.
 
 %% @doc Calculates the maximum number of different items on both nodes (with N
@@ -1188,7 +1177,7 @@ calc_max_different_items_total(N, M, ExpDelta) ->
     % -> have ExpDelta percent different items on either node
     % (if items are only outdated, there are ExpDelta differences from (N+M)/2
     % items which is less than the worst case above)
-    MaxItems = calc_max_different_hashes(N, M, key, ExpDelta),
+    MaxItems = calc_max_different_hashes(N, M, ExpDelta),
     Differences =
         if ExpDelta == 0   -> 0;
            ExpDelta == 100 -> MaxItems; % special case of the one below
@@ -2555,7 +2544,7 @@ trivial_signature_sizes(_ItemCountI, 0, _ExpDelta, FR) when FR > 0 ->
 trivial_signature_sizes(ItemCountI, ItemCountNI, ExpDelta, FR) when FR > 0 ->
     MaxKeySize = 128, % see compress_key/2
     VSize = get_min_version_bits(),
-    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, key, ExpDelta),
+    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, ExpDelta),
     SigSize =
         if NT > 1 ->
            %% log_2(1 / (1 - (1 - FR / (2*NT))^(1 / (NT-1))))
@@ -2586,7 +2575,7 @@ trivial_worst_case_failrate(0, _ItemCountI, 0, _ExpDelta) ->
     0.0;
 trivial_worst_case_failrate(SigSize, ItemCountI, ItemCountNI, ExpDelta) ->
     BK2 = util:pow(2, SigSize),
-    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, key, ExpDelta),
+    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, ExpDelta),
     % exact but with problems for small 1 / BK2:
 %%     2 * NT * (1 - math:pow(1 - 1 / BK2, NT - 1)).
     2 * NT * calc_one_m_xpow_one_m_z(NT - 1, 1 / BK2).
