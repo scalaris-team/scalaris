@@ -2562,7 +2562,18 @@ calc_n_subparts_FR(N, FR) when FR > 0 andalso N >= 1 ->
         -> FR_sub::float().
 calc_n_subparts_FR(N, FR, PrevFr)
   when FR > 0 andalso PrevFr >= 0 andalso N >= 1 ->
-    _FR_sub = (FR - PrevFr) / N.
+    FR_sub = (FR - PrevFr) / N,
+    % a previous phase may overstep (if item counts change during the setup)
+    % -> allow that and print a warning
+    if FR_sub > 0 ->
+           FR_sub;
+       true ->
+           log:log("~w: [ ~.0p:~.0p ] FR constraint broken (phase 1 overstepped?)~n"
+                   "  continuing with ~p instead (~p, ~p, ~B)",
+                   [?MODULE, pid_groups:my_groupname(), self(), 1.0e-16,
+                    FR, PrevFr, N]),
+           1.0e-16
+    end.
 
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
