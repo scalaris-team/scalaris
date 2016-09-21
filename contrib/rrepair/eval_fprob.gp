@@ -218,7 +218,7 @@ if (plotCount > 1) {
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)):(stderrSum(column(col_sd_regen),column(col_sd_updated))) t get_title(i) ls i
+ u (plotShift(column(col_failrate), i)):(column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)):(stderrSum(column(col_sd_regen),column(col_sd_updated))) t get_title(i) ls i
 
 set origin 0.49,acc_pos_y
 set rmargin at screen 0.924
@@ -255,7 +255,7 @@ if (regenAccInPercent == 1) {
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(regenAcc(column(col_regen)+column(col_updated), column(col_missing)+column(col_outdated))):(regenAccErr(column(col_sd_regen),column(col_sd_updated),(column(col_missing)+column(col_outdated)))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
+ u (plotShift(column(col_failrate), i)):(regenAcc(column(col_regen)+column(col_updated), column(col_missing)+column(col_outdated))):(regenAccErr(column(col_sd_regen),column(col_sd_updated),(column(col_missing)+column(col_outdated)))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
 
 set ytics autofreq scale 0.8
 unset y2tics
@@ -295,7 +295,7 @@ set format y2 "%-4.1f"
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls i
+ u (plotShift(column(col_failrate), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls i
 
 set size all_width_r,red_height
 set origin 0.49,red_pos_y
@@ -326,7 +326,7 @@ if (red_max > 0.5 && red_max <= 1) {
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
+ u (plotShift(column(col_failrate), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
 
 set ytics autofreq scale 0.8
 unset y2tics
@@ -360,11 +360,11 @@ if (plotCount > 1) {
 # set label 10 at graph 0.5,0.96 LABEL front center font ",12"
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100
 
 set size all_width_r,bw_height
 set origin 0.49,0
@@ -386,8 +386,8 @@ set label 100 at char 1,char 1 plot_label front left font ",12"
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_fprob), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100
+ u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100

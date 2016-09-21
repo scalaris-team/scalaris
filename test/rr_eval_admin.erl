@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <lakedaimon300@googlemail.com>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc    Administrative helper functions for replica repair evaluation
 %%         through the provided methods.
 %% @version $Id:  $
@@ -119,32 +120,32 @@ gen_setup(DDists, FTypes, FDists, Scen, Ring, RCList) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
-              EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+              EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
               StepSize::step_size() | power) -> ok.
-trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, [random], [random], StepSize).
+trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec trivial_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                            EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+                            EvalRepeats::pos_integer(), FR::fail_rate(), Delta::number() | as_fprob,
                             StepSize::step_size() | power) -> ok.
-trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
+trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
-              EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+              EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
               DDists::[data_distribution()], FDists::[fail_distribution()],
               StepSize::step_size() | power) -> ok.
-trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
+trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Trivial = #rc_config{ recon_method = trivial, recon_p1e = P1E,
+    Trivial = #rc_config{ recon_method = trivial, recon_fail_rate = FR,
                           expected_delta = ExpDelta },
     
     eval(pair,
@@ -153,18 +154,18 @@ trivial(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) 
     ok.
 
 -spec trivial_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                    EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob) -> ok.
-trivial_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
+                    EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
+trivial_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Trivial = #rc_config{ recon_method = trivial, recon_p1e = P1E,
+    Trivial = #rc_config{ recon_method = trivial, recon_fail_rate = FR,
                           expected_delta = ExpDelta },
 
     eval(pair,
@@ -178,32 +179,32 @@ trivial_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+            EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             StepSize::step_size() | power) -> ok.
-shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, [random], [random], StepSize).
+shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec shash_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                          EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+                          EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
                           StepSize::step_size() | power) -> ok.
-shash_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
+shash_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+            EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             DDists::[data_distribution()], FDists::[fail_distribution()],
             StepSize::step_size() | power) -> ok.
-shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
+shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    SHash = #rc_config{ recon_method = shash, recon_p1e = P1E,
+    SHash = #rc_config{ recon_method = shash, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
     
     eval(pair,
@@ -212,18 +213,18 @@ shash(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
     ok.
 
 -spec shash_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                  EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob) -> ok.
-shash_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
+                  EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
+shash_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    SHash = #rc_config{ recon_method = shash, recon_p1e = P1E,
+    SHash = #rc_config{ recon_method = shash, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
 
     eval(pair,
@@ -237,32 +238,32 @@ shash_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+            EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             StepSize::step_size() | power) -> ok.
-bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, [random], [random], StepSize).
+bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec bloom_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
-                          EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+                          EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
                           StepSize::step_size() | power) -> ok.
-bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, StepSize) ->
-    bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
+bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
+    bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
-            EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+            EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             DDists::[data_distribution()], FDists::[fail_distribution()],
             StepSize::step_size() | power) -> ok.
-bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
+bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Bloom = #rc_config{ recon_method = bloom, recon_p1e = P1E,
+    Bloom = #rc_config{ recon_method = bloom, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
     
     eval(pair,
@@ -271,18 +272,18 @@ bloom(Dir, FileName, N, EvalRepeats, P1E, ExpDelta, DDists, FDists, StepSize) ->
     ok.
 
 -spec bloom_scale(DestDir::string(), FileName::string(), N::pos_integer(),
-                  EvalRepeats::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob) -> ok.
-bloom_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
+                  EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
+bloom_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Bloom = #rc_config{ recon_method = bloom, recon_p1e = P1E,
+    Bloom = #rc_config{ recon_method = bloom, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
 
     eval(pair,
@@ -297,39 +298,39 @@ bloom_scale(Dir, FileName, N, EvalRepeats, P1E, ExpDelta) ->
 
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
-             MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+             MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
              StepSize::step_size() | power) -> ok.
-merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta, StepSize) ->
-    merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
+merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta, StepSize) ->
+    merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
            [random], [random], StepSize).
 
 -spec merkle_ddists_fdists(DestDir::string(), FileName::string(),
                            N::pos_integer(), EvalRepeats::pos_integer(),
                            MBranch::pos_integer(), MBucket::pos_integer(),
-                           P1E::p1e(), ExpDelta::number() | as_fprob,
+                           FR::fail_rate(), ExpDelta::number() | as_fprob,
                            StepSize::step_size() | power) -> ok.
-merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E,
+merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR,
                      ExpDelta, StepSize) ->
-    merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
+    merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
            ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
-             MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+             MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
              DDists::[data_distribution()], FDists::[fail_distribution()],
              StepSize::step_size() | power) -> ok.
-merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
+merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
        DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Merkle = #rc_config{ recon_method = merkle_tree, recon_p1e = P1E,
+    Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
                          merkle_branch = MBranch, merkle_bucket = MBucket },
     
@@ -340,29 +341,29 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
 
 -spec merkle_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                    EvalRepeats::pos_integer(), MBranch::pos_integer(),
-                   MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob) -> ok.
-merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta) ->
-    merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
+                   MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
+merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta) ->
+    merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
                   power, 5, ?EVAL_FTYPES, 3, data_count).
 
 -spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), MBranch::pos_integer(),
-                    MBucket::pos_integer(), P1E::p1e(), ExpDelta::number() | as_fprob,
+                    MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
                     StepSize::step_size() | power, Steps::pos_integer(),
                     FTypes::[update | regen], Delta::pos_integer(),
                     step_param()) -> ok.
-merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, P1E, ExpDelta,
+merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
               StepSize, Steps, FTypes, Delta, StepParam) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = Delta,
+                             data_failure_rate = Delta,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
-    Merkle = #rc_config{ recon_method = merkle_tree, recon_p1e = P1E,
+    Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
                          merkle_branch = MBranch, merkle_bucket = MBucket },
     
@@ -387,7 +388,7 @@ art(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta) ->
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
@@ -412,7 +413,7 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta
     PairRing = #ring_config{ data_count = N,
                              node_count = 4,
                              fquadrants = [1,3],
-                             data_failure_prob = 3,
+                             data_failure_rate = 3,
                              round = 1 },
     Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
     
@@ -438,14 +439,14 @@ system(Dir, N, EvalRepeats, EvalName) ->
     Ring = #ring_config{ data_count = N,
                          node_count = Nodes,
                          fquadrants = all,
-                         data_failure_prob = 4*3,
+                         data_failure_rate = 4*3,
                          round = 1 },
     
-    Bloom0 = #rc_config{ recon_method = bloom, recon_p1e = 0.01,
+    Bloom0 = #rc_config{ recon_method = bloom, recon_fail_rate = 0.01,
                          expected_delta = 100 },
-    %Bloom = #rc_config{ recon_method = bloom, recon_p1e = 0.1 },
-    %Merkle1 = #rc_config{ recon_method = merkle_tree, recon_p1e = 0.01, merkle_branch = 4, merkle_bucket = 4 },
-    %Merkle2 = #rc_config{ recon_method = merkle_tree, recon_p1e = 0.01, merkle_branch = 4, merkle_bucket = 1 },
+    %Bloom = #rc_config{ recon_method = bloom, recon_fail_rate = 0.1 },
+    %Merkle1 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 4 },
+    %Merkle2 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 1 },
     %Art1 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 4, merkle_branch = 16, art_inner_fpr = 0.001, art_leaf_fpr = 0.01 },
     %Art2 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 2, merkle_branch = 32, art_inner_fpr = 0.01, art_leaf_fpr = 0.2 },
 
@@ -750,7 +751,7 @@ build_dht({#scenario{ ring_type = RingType,
                       trigger_prob = TProb
                      },
            #ring_config{ data_count = DBSize,
-                         data_failure_prob = FProb,
+                         data_failure_rate = FProb,
                          node_count = NodeCount,
                          fquadrants = FDest },
            RCParams}) ->
@@ -900,7 +901,7 @@ wait_for_sync_round_end2(Req, [Node | Nodes]) ->
 
 -spec set_config(rc_config(), 0..100) -> ok | {error, term()}.
 set_config(#rc_config{ recon_method = Method,
-                       recon_p1e = P1E,
+                       recon_fail_rate = FR,
                        expected_delta = ExpDelta,
                        art_corr_factor = ArtCorrF,
                        art_inner_fpr = ArtInnerFpr,
@@ -915,16 +916,16 @@ set_config(#rc_config{ recon_method = Method,
     
     config:write(rr_trigger_probability, TriggerProb),
     config:write(rr_recon_method, Method),
-    % interpret the algorithm's max hash sizes set as P1E as a fixed signature size:
-    case {Method, P1E} of
+    % interpret the algorithm's parameter FR as the max hash size:
+    case {Method, FR} of
         {merkle_tree, 160} ->
-            config:write(rr_recon_min_sig_size, P1E),
-            config:write(rr_recon_p1e, 1.0e-128);
+            config:write(rr_recon_min_sig_size, FR),
+            config:write(rr_recon_failure_rate, 1.0e-128);
         {_, 128} ->
-            config:write(rr_recon_min_sig_size, P1E),
-            config:write(rr_recon_p1e, 1.0e-128);
+            config:write(rr_recon_min_sig_size, FR),
+            config:write(rr_recon_failure_rate, 1.0e-128);
         _ ->
-            config:write(rr_recon_p1e, P1E)
+            config:write(rr_recon_failure_rate, FR)
     end,
     config:write(rr_recon_expected_delta, ExpDelta),
     config:write(rr_art_inner_fpr, ArtInnerFpr),
@@ -945,9 +946,9 @@ get_param_value({Ring, Recon}, Param) ->
     case Param of
         node_count -> Ring#ring_config.node_count;
         data_count -> Ring#ring_config.data_count;
-        fprob -> Ring#ring_config.data_failure_prob;
+        fprob -> Ring#ring_config.data_failure_rate;
         rounds -> Ring#ring_config.round;
-        recon_p1e -> Recon#rc_config.recon_p1e;
+        recon_fail_rate -> Recon#rc_config.recon_fail_rate;
         expected_delta -> Recon#rc_config.expected_delta;
         art_corr_factor -> Recon#rc_config.art_corr_factor;
         art_inner_fpr -> Recon#rc_config.art_inner_fpr;
@@ -961,12 +962,12 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
     NRC = case Param of
               node_count -> RC#ring_config{node_count = Value};
               data_count -> RC#ring_config{data_count = Value};
-              fprob      -> RC#ring_config{data_failure_prob = Value};
+              fprob      -> RC#ring_config{data_failure_rate = Value};
               rounds     -> RC#ring_config{round = Value};
               _          -> RC
           end,
     RCC1 = case Param of
-               recon_p1e       -> RCC#rc_config{recon_p1e = Value};
+               recon_fail_rate -> RCC#rc_config{recon_fail_rate = Value};
                expected_delta  -> RCC#rc_config{expected_delta = Value};
                art_corr_factor -> RCC#rc_config{art_corr_factor = Value};
                art_inner_fpr   -> RCC#rc_config{art_inner_fpr = Value};
@@ -976,7 +977,7 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
                _               -> RCC
            end,
     NRCC = if ExpDelta =:= as_fprob ->
-                   RCC1#rc_config{expected_delta = NRC#ring_config.data_failure_prob};
+                   RCC1#rc_config{expected_delta = NRC#ring_config.data_failure_rate};
               true -> RCC1
            end,
     {NRC, NRCC}.
@@ -984,7 +985,7 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
 -spec init_rc_conf(rc_config(), step_param(), any()) -> rc_config().
 init_rc_conf(RC, StepP, Init) ->
     case StepP of
-        recon_p1e       -> RC#rc_config{recon_p1e = Init};
+        recon_fail_rate -> RC#rc_config{recon_fail_rate = Init};
         expected_delta  -> RC#rc_config{expected_delta = Init};
         art_corr_factor -> RC#rc_config{art_corr_factor = Init};
         art_inner_fpr   -> RC#rc_config{art_inner_fpr = Init};
@@ -998,7 +999,7 @@ init_ring_conf(RC, StepP, Init) ->
     case StepP of
         node_count -> RC#ring_config{node_count = Init};
         data_count -> RC#ring_config{data_count = Init};
-        fprob      -> RC#ring_config{data_failure_prob = Init};
+        fprob      -> RC#ring_config{data_failure_rate = Init};
         rounds     -> RC#ring_config{round = Init};
         _          -> RC
     end.
@@ -1023,7 +1024,7 @@ eval_setup_comment(#scenario{ ring_type = RType,
                    #ring_config{ node_count = Nodes,
                                  data_count = DBSize,
                                  fquadrants = FQuadrants,
-                                 data_failure_prob = FProb,
+                                 data_failure_rate = FProb,
                                  round = Rounds}, StepParam, StepSize, Runs) ->
     [io_lib:format("Scenario: Ring=~p~cDataDist=~p~cFailType=~p~cFailDist=~p~cDataType=~p~cTriggerProb=~p",
                    [RType, ?TAB, Dist, ?TAB, FType, ?TAB, FDist, ?TAB, DType, ?TAB, TProb]),
@@ -1033,21 +1034,21 @@ eval_setup_comment(#scenario{ ring_type = RType,
                    [StepParam, ?TAB, StepSize, ?TAB, Runs])].
 
 -spec rc_conf_comment(rc_config()) -> string().
-rc_conf_comment(#rc_config{ recon_method = trivial, recon_p1e = P1E,
+rc_conf_comment(#rc_config{ recon_method = trivial, recon_fail_rate = FR,
                             expected_delta = ExpDelta }) ->
-    io_lib:format("Trivial: P1E=~p~cexpectedDelta=~p", [P1E, ?TAB, ExpDelta]);
-rc_conf_comment(#rc_config{ recon_method = shash, recon_p1e = P1E,
+    io_lib:format("Trivial: FR=~p~cexpectedDelta=~p", [FR, ?TAB, ExpDelta]);
+rc_conf_comment(#rc_config{ recon_method = shash, recon_fail_rate = FR,
                             expected_delta = ExpDelta }) ->
-    io_lib:format("SHash: P1E=~p~cexpectedDelta=~p", [P1E, ?TAB, ExpDelta]);
-rc_conf_comment(#rc_config{ recon_method = bloom, recon_p1e = P1E,
+    io_lib:format("SHash: FR=~p~cexpectedDelta=~p", [FR, ?TAB, ExpDelta]);
+rc_conf_comment(#rc_config{ recon_method = bloom, recon_fail_rate = FR,
                             expected_delta = ExpDelta }) ->
-    io_lib:format("Bloom: P1E=~p~cexpectedDelta=~p", [P1E, ?TAB, ExpDelta]);
+    io_lib:format("Bloom: FR=~p~cexpectedDelta=~p", [FR, ?TAB, ExpDelta]);
 rc_conf_comment(#rc_config{ recon_method = merkle_tree,
-                            recon_p1e = P1E, expected_delta = ExpDelta,
+                            recon_fail_rate = FR, expected_delta = ExpDelta,
                             merkle_branch = Branch,
                             merkle_bucket = Bucket }) ->
-    io_lib:format("Merkle: P1E=~p~cexpectedDelta=~p~cBranchSize=~p~cBucketSize=~p",
-                  [P1E, ?TAB, ExpDelta, ?TAB, Branch, ?TAB, Bucket]);
+    io_lib:format("Merkle: FR=~p~cexpectedDelta=~p~cBranchSize=~p~cBucketSize=~p",
+                  [FR, ?TAB, ExpDelta, ?TAB, Branch, ?TAB, Bucket]);
 rc_conf_comment(#rc_config{ recon_method = art, expected_delta = ExpDelta,
                             art_corr_factor = Corr,
                             art_inner_fpr = InnerFpr,
@@ -1307,15 +1308,15 @@ get_measure_point(Id, Iter, Round, {Miss, Outd}, Trace, NodeList, SessionStats) 
     
     % TODO: use and verify stats for plausibility
     RCStats = rrepair:session_get(rc_stats, SessionStats),
-    P1E_p1 = rr_recon_stats:get(p1e_phase1, RCStats),
-    P1E_p2 = rr_recon_stats:get(p1e_phase2, RCStats),
-    P1E = rr_recon_stats:get(p1e_total, RCStats),
+    Fr_p1 = rr_recon_stats:get(fail_rate_p1, RCStats),
+    Fr_p2 = rr_recon_stats:get(fail_rate_p2, RCStats),
+    Fr = rr_recon_stats:get(fail_rate, RCStats),
 %%     log:pal(" Stats: ~p", [rr_recon_stats:print(RCStats)]),
     
     {Id, Iter, Round,
      Miss, Miss - M,
      Outd, Outd - O,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, P1E_p1, P1E_p2, P1E}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, Fr_p1, Fr_p2, Fr}.
 
 -spec get_mp_round(rr_eval_point:point_id(), Iteration::non_neg_integer(),
                    Round::non_neg_integer(), init_mp(),

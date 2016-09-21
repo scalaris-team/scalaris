@@ -411,4 +411,4 @@ plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i)
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
  u (plotShift(column(col_dbsize)/4/1000, i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100, \
      "<awk '$" . col_ftype . " == \"update\"' " . get_file(1) \
- u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)*(1-column(col_fprob)/100.0)/4*(128+32)/8)) with linespoints notitle ls 6 lw 2
+ u (plotShift(column(col_dbsize)/4/1000, 1)):(kB(column(col_dbsize)*(1-column(col_failrate)/100.0)/4*(128+32)/8)) with linespoints notitle ls 6 lw 2

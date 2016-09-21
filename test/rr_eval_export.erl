@@ -1,4 +1,4 @@
-% @copyright 2010-2015 Zuse Institute Berlin
+% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Export helper functions for replica repair evaluation.
 %% @see    rr_eval_admin
-%% @version $Id $
 -module(rr_eval_export).
 
 -author('malange@informatik.hu-berlin.de').

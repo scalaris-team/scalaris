@@ -54,7 +54,7 @@ max3(x,y,z) = max(max(x,y),z)
 
 acc_min=-0.25
 acc_max=0.25
-stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {Acc[$" . col_ftype . "][$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{for (i in Acc) {for (j in Acc[i]) {for (k in Acc[i][j]) {print i,j,Acc[i][j][\"random,random\"],Acc[i][j][k]}}} }' " . srcFile1 using (($7+$8 - $9-$10)-($3+$4 - $5-$6)) nooutput
+stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {Acc[$" . col_ftype . "][$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{for (i in Acc) {for (j in Acc[i]) {for (k in Acc[i][j]) {print i,j,Acc[i][j][\"random,random\"],Acc[i][j][k]}}} }' " . srcFile1 using (($7+$8 - $9-$10)-($3+$4 - $5-$6)) nooutput
 if (STATS_min < acc_min) {acc_min = STATS_min}
 if (STATS_max > acc_max) {acc_max = STATS_max}
 acc_max_abs=max(acc_max, -acc_min)
@@ -62,7 +62,7 @@ if (acc_max_abs > 0.25) {acc_max_abs=acc_max_abs*1.05}
 
 red_min=-0.25
 red_max=0.25
-stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {Red[$" . col_ftype . "][$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{for (i in Red) {for (j in Red[i]) {for (k in Red[i][j]) {print i,j,Red[i][j][\"random,random\"],Red[i][j][k]}}} }' " . srcFile1 using (redundancy($6, $7, $8)-redundancy($3, $4, $5)) nooutput
+stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {Red[$" . col_ftype . "][$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{for (i in Red) {for (j in Red[i]) {for (k in Red[i][j]) {print i,j,Red[i][j][\"random,random\"],Red[i][j][k]}}} }' " . srcFile1 using (redundancy($6, $7, $8)-redundancy($3, $4, $5)) nooutput
 if (STATS_min < red_min) {red_min = STATS_min}
 if (STATS_max > red_max) {red_max = STATS_max}
 red_max_abs=max(red_max, -red_min)
@@ -70,7 +70,7 @@ if (red_max_abs > 0.25) {red_max_abs=red_max_abs*1.05}
 
 bw_min=-0.5
 bw_max=0.5
-stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {BwRc[$" . col_ftype . "][$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]+=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{for (i in BwRc) {for (j in BwRc[i]) {for (k in BwRc[i][j]) {print i,100*(BwRc[i][j][k]/BwRc[i][j][\"random,random\"])-100}}} }' " . srcFile1 using 2 nooutput
+stats "<awk '($" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\") {BwRc[$" . col_ftype . "][$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]+=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{for (i in BwRc) {for (j in BwRc[i]) {for (k in BwRc[i][j]) {print i,100*(BwRc[i][j][k]/BwRc[i][j][\"random,random\"])-100}}} }' " . srcFile1 using 2 nooutput
 if (STATS_min < bw_min) {bw_min = STATS_min}
 if (STATS_max > bw_max) {bw_max = STATS_max}
 bw_max_abs=max(bw_max, -bw_min)
@@ -132,7 +132,7 @@ set yrange [-acc_max_abs:acc_max_abs]
 set ytics mirror offset -2,0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") scale 0.8
 unset key
 
-plot "<awk '$" . col_ftype . " == \"update\" {Acc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"update\" {Acc[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
  u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
@@ -148,7 +148,7 @@ set size all_width_r,acc_height
 set y2tics mirror offset (largeRCdiff ? 5 : 4),0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") scale 0.8
 set y2range [-acc_max_abs:acc_max_abs]
 
-plot "<awk '$" . col_ftype . " == \"regen\" {Acc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"regen\" {Acc[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_missing . "\" \"$" . col_outdated . "\" \"$" . col_regen . "\" \"$" . col_updated . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Acc) {print i,Acc[i][\"random,random\"],Acc[i][\"random,'\\''binomial_0.200000'\\''\"],Acc[i][\"'\\''binomial_0.200000'\\'',random\"],Acc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(($6+$7 - $8-$9)-($2+$3 - $4-$5)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 1, \
      "" \
  u (plotShift($1,2)):(($10+$11 - $12-$13)-($2+$3 - $4-$5)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 2, \
@@ -172,7 +172,7 @@ set y2range [-red_max_abs:red_max_abs]
 set ytics mirror offset -2,0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f")
 unset key
 
-plot "<awk '$" . col_ftype . " == \"update\" {Red[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"update\" {Red[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
  u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
@@ -188,7 +188,7 @@ unset ytics
 set grid y2tics
 set y2tics mirror offset (largeRCdiff ? 5 : 4),0 right format (largeRCdiff ? "%+7.1f" : "%+6.1f") scale 0.8
 
-plot "<awk '$" . col_ftype . " == \"regen\" {Red[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"regen\" {Red[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rs_kvv . "\" \"$" . col_updated . "\" \"$" . col_regen . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in Red) {print i,Red[i][\"random,random\"],Red[i][\"random,'\\''binomial_0.200000'\\''\"],Red[i][\"'\\''binomial_0.200000'\\'',random\"],Red[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(redundancy($5, $6, $7)-redundancy($2, $3, $4)) t "data_{rand}   , fail_{bin_{0.2 }}" axes x1y2 with boxes ls 1, \
      "" \
  u (plotShift($1,2)):(redundancy($8, $9, $10)-redundancy($2, $3, $4)) t "data_{bin_{0.2 }} , fail_{rand}  " axes x1y2 with boxes ls 2, \
@@ -210,7 +210,7 @@ set y2range [bw_min:bw_max]
 set ytics mirror offset 0,0 right format "%+1.1f_{ }%%" scale 0.8
 set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse opaque enhanced autotitles nobox maxrows 1 width -4 samplen 1.75 font ",14" spacing 1.4
 
-plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"update\" {BwRc[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(100*($3/$2)-100) t "data_{rand}   , fail_{bin_{0.2 }}" with boxes ls 1, \
      "" \
  u (plotShift($1,2)):(100*($4/$2)-100) t "data_{bin_{0.2 }} , fail_{rand}  " with boxes ls 2, \
@@ -233,7 +233,7 @@ unset label 100
 set label 100 at char 1,char 1 plot_label front left font ",12"
 }
 
-plot "<awk '$" . col_ftype . " == \"regen\" {BwRc[$" . col_fprob . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
+plot "<awk '$" . col_ftype . " == \"regen\" {BwRc[$" . col_failrate . "][$" . col_ddist . "\",\"$" . col_fdist . "]=$" . col_bw_rc_size . "+$" . col_bw_rc2_size . "} END{print \"#fprob rand,rand rand,bin_0.2 bin_0.2,rand bin_0.2,bin_0.2\" ; for (i in BwRc) {print i,BwRc[i][\"random,random\"],BwRc[i][\"random,'\\''binomial_0.200000'\\''\"],BwRc[i][\"'\\''binomial_0.200000'\\'',random\"],BwRc[i][\"'\\''binomial_0.200000'\\'','\\''binomial_0.200000'\\''\"]} }' " . srcFile1 \
  u (plotShift($1,1)):(100*($3/$2)-100) axes x1y2 with boxes t "data_{rand}   , fail_{bin_{0.2 }}" ls 1, \
      "" \
  u (plotShift($1,2)):(100*($4/$2)-100) axes x1y2 with boxes t "data_{bin_{0.2 }} , fail_{rand}  " ls 2, \

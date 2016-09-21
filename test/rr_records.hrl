@@ -1,4 +1,4 @@
-%  @copyright 2015 Zuse Institute Berlin
+%  @copyright 2015-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,16 +34,16 @@
 -type scenario() :: #scenario{}.
 
 -type step_param() :: node_count | data_count | fprob | rounds |
-                      recon_p1e | expected_delta |
+                      recon_fail_rate | expected_delta |
                       merkle_bucket | merkle_branch |
                       art_corr_factor | art_leaf_fpr | art_inner_fpr.
 -type step_size() :: pos_integer() | float().
--type p1e() :: float() | pos_integer().
+-type fail_rate() :: float() | pos_integer().
 
 -record(ring_config, {
                       node_count        = ?required(rc_config, node_count) :: integer(),
                       data_count        = ?required(rc_config, data_count) :: integer(),
-                      data_failure_prob = ?required(rc_config, fprob)      :: 0..100,       % probability of data failures
+                      data_failure_rate = ?required(rc_config, fprob)      :: 0..100,       % probability of data failures
                       fquadrants        = all                              :: all | [rt_beh:segment()],
                       round             = 1                                :: integer()
                      }).
@@ -51,7 +51,7 @@
 
 -record(rc_config, {
                     recon_method    = ?required(rc_config, recon_method) :: rr_recon:method(),
-                    recon_p1e       = 0.1                                :: p1e(),
+                    recon_fail_rate = 0.1                                :: fail_rate(),
                     expected_delta  = 100                                :: number() | as_fprob,
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art

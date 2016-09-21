@@ -1,4 +1,4 @@
-% @copyright 2011-2012 Zuse Institute Berlin
+% @copyright 2011-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc    Replica Repair Reconciliation Statistics
 %% @end
 %% @version $Id$
@@ -42,8 +43,8 @@
          tree_nodesCompared = 0       :: non_neg_integer(),
          tree_compareSkipped= 0       :: non_neg_integer(),
          tree_leavesSynced  = 0       :: non_neg_integer(),
-         p1e_phase1         = 0.0     :: float(),
-         p1e_phase2         = 0.0     :: float(),
+         fail_rate_p1       = 0.0     :: float(),
+         fail_rate_p2       = 0.0     :: float(),
          build_time         = 0       :: non_neg_integer(),      %in us
          recon_time         = 0       :: non_neg_integer(),      %in us
          rs_expected        = 0       :: non_neg_integer(),      %number of resolve expected requests
@@ -61,7 +62,7 @@
                {rs_expected, non_neg_integer()}].
 
 -type field_list2()  ::
-          [{status, status()} | {p1e_phase1, float()} | {p1e_phase2, float()}]
+          [{status, status()} | {fail_rate_p1, float()} | {fail_rate_p2, float()}]
             | field_list1().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -119,8 +120,8 @@ set([{K, V} | L], Stats) ->
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
-             p1e_phase1          -> Stats#rr_recon_stats{p1e_phase1 = V};
-             p1e_phase2          -> Stats#rr_recon_stats{p1e_phase2 = V};
+             fail_rate_p1          -> Stats#rr_recon_stats{fail_rate_p1 = V};
+             fail_rate_p2          -> Stats#rr_recon_stats{fail_rate_p2 = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
              rs_expected         -> Stats#rr_recon_stats{rs_expected = V};
@@ -133,7 +134,7 @@ set([{K, V} | L], Stats) ->
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
          (tree_leavesSynced, stats())  -> non_neg_integer();
-         (p1e_phase1 | p1e_phase2 | p1e_total, stats()) -> float();
+         (fail_rate_p1 | fail_rate_p2 | fail_rate, stats()) -> float();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
          (rs_expected, stats())        -> non_neg_integer();
@@ -143,14 +144,14 @@ get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
 get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
 get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
-get(p1e_phase1         , #rr_recon_stats{p1e_phase1          = X}) -> X;
-get(p1e_phase2         , #rr_recon_stats{p1e_phase2          = X}) -> X;
+get(fail_rate_p1       , #rr_recon_stats{fail_rate_p1        = X}) -> X;
+get(fail_rate_p2       , #rr_recon_stats{fail_rate_p2        = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
 get(rs_expected        , #rr_recon_stats{rs_expected         = X}) -> X;
 get(status             , #rr_recon_stats{status              = X}) -> X;
-get(p1e_total          , #rr_recon_stats{p1e_phase1 = P1E_p1, p1e_phase2 = P1E_p2}) ->
-    1 - (1 - P1E_p1) * (1 - P1E_p2).
+get(fail_rate          , #rr_recon_stats{fail_rate_p1 = Fr_p1, fail_rate_p2 = Fr_p2}) ->
+    Fr_p1 + Fr_p2.
 
 -spec print(stats()) -> [any()].
 print(Stats) ->
