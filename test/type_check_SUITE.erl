@@ -497,9 +497,9 @@ tester_type_check_rrepair(_Config) ->
              {merkle_next_fr_targets, 2}, %% needs float > 0, < 1
              {get_diff_with_dupes, 7}, %% needs a function
              {calc_items_in_chunk, 2}, %% needs special input
-             {decompress_kv_list, 2}, %% needs a special binary to correspond to a number of bits
-             {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
-             {decompress_idx_list, 2}, %% needs a special binary to correspond to a number of bits
+             {decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
+             {compress_idx_list, 6}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
+             {decompress_idx_list, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_list_, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list_, 3}, %% needs a special binary to correspond to a number of bits
@@ -508,8 +508,8 @@ tester_type_check_rrepair(_Config) ->
              {merkle_check_node, 22}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 21}, %% needs matching result and merkle nodes
              {merkle_calc_used_fr, 5}, %% needs floats >= 0, =< 1
-             {merkle_resolve_add_leaf_hashes, 12}, %% needs KV-List merkle buckets
-             {merkle_resolve_retrieve_leaf_hashes, 15}, %% needs special bitstring
+             {merkle_resolve_add_leaf_hashes, 14}, %% needs KV-List merkle buckets
+             {merkle_resolve_retrieve_leaf_hashes, 17}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_receive, 2}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists
