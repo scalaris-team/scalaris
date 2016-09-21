@@ -24,7 +24,6 @@ install:
 
          for pkg in $OSX_PACKAGES; do
            [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
-           brew outdated $pkg || brew upgrade --force-bottle $pkg
          done
      fi
 
