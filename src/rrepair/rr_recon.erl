@@ -2550,7 +2550,7 @@ bits_for_number(Number) ->
 %%      each of them: FR_sub = FR / N.
 %%      This is based on the linearity of the expected number of failures.
 -spec calc_n_subparts_FR(N::pos_integer(), FR::float()) -> FR_sub::float().
-calc_n_subparts_FR(N, FR) when FR >= 0 andalso N >= 1 ->
+calc_n_subparts_FR(N, FR) when FR > 0 andalso N >= 1 ->
     _FR_sub = FR / N.
 
 %% @doc Splits the target failure rate FR into N further almost equal (not
@@ -2561,7 +2561,7 @@ calc_n_subparts_FR(N, FR) when FR >= 0 andalso N >= 1 ->
 -spec calc_n_subparts_FR(N::pos_integer(), FR::float(), PrevFr::float())
         -> FR_sub::float().
 calc_n_subparts_FR(N, FR, PrevFr)
-  when FR >= 0 andalso PrevFr >= 0 andalso N >= 1 ->
+  when FR > 0 andalso PrevFr >= 0 andalso N >= 1 ->
     _FR_sub = (FR - PrevFr) / N.
 
 %% @doc Calculates the signature sizes for comparing every item in Items
