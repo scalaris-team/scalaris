@@ -2594,14 +2594,14 @@ trivial_signature_sizes(ItemCountI, ItemCountNI, ExpDelta, FR) when FR > 0 ->
     NT = calc_max_different_hashes(ItemCountI, ItemCountNI, ExpDelta),
     SigSize =
         if NT > 1 ->
-           %% log_2(1 / (1 - (1 - FR / (2*NT))^(1 / (NT-1))))
-           Y = calc_one_m_xpow_one_m_z(1 / (NT - 1), FR / (2 * NT)),
-           min_max(util:ceil(util:log2(1 / Y)), get_min_hash_bits(), MaxKeySize);
-       NT =:= 1 ->
-           % should only happen for ExpDelta == 0, but may occur in other
-           % cases due to floating point issues
-           get_min_hash_bits()
-    end,
+               %% log_2(1 / (1 - (1 - FR / (2*NT))^(1 / (NT-1))))
+               Y = calc_one_m_xpow_one_m_z(1 / (NT - 1), FR / (2 * NT)),
+               min_max(util:ceil(util:log2(1 / Y)), get_min_hash_bits(), MaxKeySize);
+           NT =:= 1 ->
+               % should only happen for ExpDelta == 0, but may occur in other
+               % cases due to floating point issues
+               get_min_hash_bits()
+        end,
 %%     log:pal("trivial [ ~p ] - FR: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
 %%             "IC@I: ~B, \tIC@NI: ~B",
 %%             [self(), FR, SigSize, VSize, ItemCountI, ItemCountNI]),
@@ -2679,7 +2679,7 @@ shash_signature_sizes(ItemCountI, ItemCountNI, ExpDelta, FR) when FR > 0 ->
     N_delta_NI = calc_max_different_items_node(ItemCountNI, ItemCountI, ExpDelta),
     SigSize0 = util:ceil(
                  util:log2(
-                   % if the delta low and/or FR is high, this term is negative
+                   % if the delta is low and/or FR is high, this term is negative
                    % and we cannot apply the logarithm - here, any signature
                    % size suffices and we choose the lowest non-zero value
                    erlang:max(1,
