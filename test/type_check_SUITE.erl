@@ -486,6 +486,7 @@ tester_type_check_rrepair(_Config) ->
              {shash_signature_sizes, 4}, %% needs float > 0, < 1
              {shash_worst_case_failrate, 4}, %% needs 0 =< ExpDelta =< 100
              {calc_one_m_xpow_one_m_z, 2}, %% needs X =/= 0
+             {calc_max_different_hashes_, 3}, %% needs 0 =< ExpDelta =< 100
              {calc_max_different_hashes, 3}, %% needs 0 =< ExpDelta =< 100
              {calc_max_different_items_total, 3}, %% needs 0 =< ExpDelta =< 100
              {calc_max_different_items_node, 3}, %% needs 0 =< ExpDelta =< 100

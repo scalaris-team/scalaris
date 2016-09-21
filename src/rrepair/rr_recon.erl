@@ -1143,10 +1143,11 @@ calc_one_m_xpow_one_m_z(X, Z) ->
     1 - math:pow(1 - Z, X).
 
 %% @doc Helper for calculating the maximum number of different hashes when
-%%      an upper bound on the delta is known.
--spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
-                                ExpDelta::number()) -> non_neg_integer().
-calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+%%      an upper bound on the delta is known, ignoring cases where it is
+%%      known to be wrong based on N and M.
+-spec calc_max_different_hashes_(N::non_neg_integer(), M::non_neg_integer(),
+                                 ExpDelta::number()) -> non_neg_integer().
+calc_max_different_hashes_(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
     if ExpDelta == 0 ->
            % M and N may differ anyway if the actual delta is higher
            % -> target no collisions among items on any node!
@@ -1165,6 +1166,25 @@ calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =<
            ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta)
     end.
 
+%% @doc Helper for calculating the maximum number of different hashes when
+%%      an upper bound on the delta is known. This method also handles cases
+%%      where ExpDelta is known to be wrong and sets the minimum known value
+%%      after printing a warning.
+-spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
+                                ExpDelta::number()) -> non_neg_integer().
+calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+    Differences0 = calc_max_different_hashes_(N, M, ExpDelta),
+    % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
+    MinDiff = erlang:abs(N - M),
+    if MinDiff < Differences0 ->
+           Differences0;
+       true ->
+           log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+                   "  continuing with the minimum number of differences we know: ~B",
+                   [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+           MinDiff
+    end.
+
 %% @doc Calculates the maximum number of different items on both nodes (with N
 %%      and M items each) which may differ, i.e. which may not exist on either
 %%      node when an upper bound on the delta is known.
@@ -1177,8 +1197,12 @@ calc_max_different_items_total(N, M, ExpDelta) ->
     % -> have ExpDelta percent different items on either node
     % (if items are only outdated, there are ExpDelta differences from (N+M)/2
     % items which is less than the worst case above)
-    MaxItems = calc_max_different_hashes(N, M, ExpDelta),
-    Differences =
+
+    % note: avoid duplicate warnings if ExpDelta is wrong - if it is wrong here,
+    %       we do not need to fix MaxItems because the actual Differences are
+    %       set below either way:
+    MaxItems = calc_max_different_hashes_(N, M, ExpDelta),
+    Differences0 =
         if ExpDelta == 0   -> 0;
            ExpDelta == 100 -> MaxItems; % special case of the one below
            is_float(ExpDelta) ->
@@ -1188,7 +1212,18 @@ calc_max_different_items_total(N, M, ExpDelta) ->
                % -> use integer division (and round up) for higher precision:
                (MaxItems * ExpDelta + 99) div 100
         end,
-%%     log:pal("[ ~p ] MaxItems: ~B Differences: ~B", [self(), MaxItems, Differences]),
+    % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
+    MinDiff = erlang:abs(N - M),
+    Differences =
+        if MinDiff < Differences0 ->
+               Differences0;
+           true ->
+               log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+                       "  continuing with the minimum number of differences we know: ~B",
+                       [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+               MinDiff
+        end,
+%%     log:pal("[ ~p ] MaxItems: ~B Differences: ~B -> ~B", [self(), MaxItems, Differences0, Differences]),
     Differences.
 
 %% @doc Calculates the maximum number of items on the first node (N items)
