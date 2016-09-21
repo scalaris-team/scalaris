@@ -685,6 +685,7 @@ on({?check_nodes, SenderPid, ToCheck, OtherItemsCount},
    State = #rr_recon_state{params = #merkle_params{exp_delta = ExpDelta},
                            misc = [{fail_rate_target_per_node, LastFRPerNode},
                                    {fail_rate_target_phase1, FR_p1},
+                                   {pref_used_fr, PrevUsedFr},
                                    {icount, MyItemCount}]}) ->
     % this is the first check_nodes message from the initiator and we finally
     % learn about the exact number of items to synchronise with
@@ -695,6 +696,7 @@ on({?check_nodes, SenderPid, ToCheck, OtherItemsCount},
                             misc = [{max_affected_items, MaxAffectedItems},
                                     {fail_rate_target_per_node, LastFRPerNode},
                                     {fail_rate_target_phase1, FR_p1},
+                                    {pref_used_fr, PrevUsedFr},
                                     {icount, MyItemCount}]});
 
 on({?check_nodes, ToCheck0, OtherMaxItemsCount},
@@ -706,23 +708,21 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                            misc = [{max_affected_items, MaxAffectedItems},
                                    {fail_rate_target_per_node, LastFRPerNode},
                                    {fail_rate_target_phase1, FR_p1},
+                                   {pref_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount}]}) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
     {_FR_I, _FR_L, SigSizeI, SigSizeL, EffectiveFr_I, EffectiveFr_L} =
         merkle_next_signature_sizes(Params, LastFRPerNode, MyLastMaxItemsCount,
                                     OtherMaxItemsCount, MaxAffectedItems),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
-    {FlagsBin, RTree, SyncNew, NStats0, MyMaxItemsCount,
+    {FlagsBin, RTree, SyncNew, NStats, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_check_node(ToCheck, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherMaxItemsCount, Params, Stats,
                           <<>>, [], [], [], 0, [], 0, 0, Sync, 0, 0, 0,
                           0, 0),
-    PrevUsedFr = rr_recon_stats:get(fail_rate_p1, Stats),
-    % TODO: use Kahan summation for PrevUsedFr -> UsedFr
     UsedFr = merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I,
                                  EffectiveFr_L, HashCmpI, HashCmpL),
-    NStats = rr_recon_stats:set([{fail_rate_p1, UsedFr}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
     ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate: ~g -> ~g",
@@ -735,10 +735,11 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
        true ->
            % calculate the remaining trees' target failure rate based on the
            % already used failure prob
-           FRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, UsedFr),
+           FRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, element(1, UsedFr)),
            NewState#rr_recon_state{misc = [{max_affected_items, MaxAffectedItems},
                                            {fail_rate_target_per_node, FRPerNode},
                                            {fail_rate_target_phase1, FR_p1},
+                                           {pref_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount}]}
     end;
 
@@ -752,19 +753,17 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                    {max_affected_items, MaxAffectedItems},
                                    {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
                                    {fail_rate_target_phase1, FR_p1},
+                                   {pref_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
-    {RTree, SyncNew, NStats0, MyMaxItemsCount,
+    {RTree, SyncNew, NStats, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_cmp_result(FlagsBin, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherLastMaxItemsCount,
                           Sync, Params, Stats, [], [], [], 0, [], 0, 0, 0, 0, 0,
                           0, 0),
-    PrevUsedFr = rr_recon_stats:get(fail_rate_p1, Stats),
-    % TODO: use Kahan summation for PrevUsedFr -> UsedFr
     UsedFr = merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I,
                                  EffectiveFr_L, HashCmpI, HashCmpL),
-    NStats = rr_recon_stats:set([{fail_rate_p1, UsedFr}], NStats0),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
     ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate: ~g -> ~g",
@@ -776,7 +775,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
        true ->
            % calculate the remaining trees' failure prob based on the already
            % used failure prob
-           NextFRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, UsedFr),
+           NextFRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, element(1, UsedFr)),
            {_FR_I, _FR_L, NextSigSizeI, NextSigSizeL, NextEffectiveFr_I, NextEffectiveFr_L} =
                merkle_next_signature_sizes(Params, NextFRPerNode, MyMaxItemsCount,
                                            OtherMaxItemsCount, MaxAffectedItems),
@@ -786,6 +785,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                            {max_affected_items, MaxAffectedItems},
                                            {fail_rate_target_per_node, {NextEffectiveFr_I, NextEffectiveFr_L}},
                                            {fail_rate_target_phase1, FR_p1},
+                                           {pref_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount},
                                            {oicount, OtherMaxItemsCount}]}
     end;
@@ -975,6 +975,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                          stats = Stats2, params = MySyncParams,
                          misc = [{fail_rate_target_per_node, FRTotal_p1_perNode},
                                  {fail_rate_target_phase1, FRTotal_p1},
+                                 {pref_used_fr, {0.0, 0.0}},
                                  {icount, ItemCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
@@ -1008,6 +1009,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
                                  {max_affected_items, MaxAffectedItems},
                                  {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
                                  {fail_rate_target_phase1, FRTotal_p1},
+                                 {pref_used_fr, {0.0, 0.0}},
                                  {icount, MyItemCount},
                                  {oicount, OtherItemsCount}],
                          kv_list = []};
@@ -1122,10 +1124,21 @@ calc_one_m_xpow_one_m_z(X, Z) when Z < 1.0e-8 ->
     X2 = X * X, X3 = X2 * X, X4 = X3 * X, X5 = X4 * X,
     Z2 = Z * Z, Z3 = Z2* Z, Z4 = Z3 * Z, Z5 = Z4 * Z,
     % small terms first:
-    Z5 * (X5 - 10*X4 + 35*X3 - 50*X2 + 24*X) / 120
-        + Z4 * (X4 - 6*X3 + 11*X2 - 6*X) / 24
-        + Z3 * (X3 - 3*X2 + 2*X) / 6
-        + Z2 * (X2 - X) / 2 + Z * X; % +O[p^6]
+%%     Z5 * (X5 - 10*X4 + 35*X3 - 50*X2 + 24*X) / 120
+%%         + Z4 * (X4 - 6*X3 + 11*X2 - 6*X) / 24
+%%         + Z3 * (X3 - 3*X2 + 2*X) / 6
+%%         + Z2 * (X2 - X) / 2 + Z * X; % +O[p^6]
+    {S5, C5} = util:kahan_sum([X5, -10*X4, 35*X3, -50*X2, 24*X], 0.0, 0.0),
+    {S4, C4} = util:kahan_sum([X4, -6*X3, 11*X2, -6*X], 0.0, 0.0),
+    {S3, C3} = util:kahan_sum([X3, -3*X2, 2*X], 0.0, 0.0),
+    {S2, C2} = util:kahan_sum([X2, -X], 0.0, 0.0),
+    
+    {Sum, _C} = util:kahan_sum(
+                  [Z5 * C5 / 120, Z4 * C4 / 24, Z3 * C3 / 6, Z2 * C2 / 2,
+                   Z5 * S5 / 120, Z4 * S4 / 24, Z3 * S3 / 6, Z2 * S2 / 2,
+                   Z * X % +O[z^6]
+                  ], 0.0, 0.0),
+    Sum;
 calc_one_m_xpow_one_m_z(X, Z) ->
     1 - math:pow(1 - Z, X).
 
@@ -2124,12 +2137,15 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
 
 %% @doc Helper for calculating the actual used failure rate during merkle
 %%      hash comparisons.
--spec merkle_calc_used_fr(PrevUsedFr::float(), EffectiveFr_I::float(),
+-spec merkle_calc_used_fr(PrevUsedFr::UsedFrSum, EffectiveFr_I::float(),
                           EffectiveFr_L::float(), HashCmpI::non_neg_integer(),
-                          HashCmpL::non_neg_integer()) -> float().
-merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I, EffectiveFr_L, HashCmpI, HashCmpL) ->
-    % TODO: use Kahan summation for a higher sensitivity with small floats
-    PrevUsedFr + HashCmpI * EffectiveFr_I +  HashCmpL * EffectiveFr_L.
+                          HashCmpL::non_neg_integer()) -> UsedFrSum
+        when is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
+merkle_calc_used_fr({PrevUsedFr, PrevCompensation}, EffectiveFr_I,
+                    EffectiveFr_L, HashCmpI, HashCmpL) ->
+    % PrevUsedFr + HashCmpI * EffectiveFr_I +  HashCmpL * EffectiveFr_L
+    util:kahan_sum([HashCmpI * EffectiveFr_I,  HashCmpL * EffectiveFr_L],
+                   PrevUsedFr, PrevCompensation).
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
@@ -2137,17 +2153,19 @@ merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I, EffectiveFr_L, HashCmpI, HashCmpL
 -spec merkle_resolve_add_leaf_hashes(
         [SyncSend], FRAllLeaves::float(), NumRestLeaves::non_neg_integer(),
         BucketSizeBits::non_neg_integer(), DupesSizeBits::pos_integer(),
-        Params::#merkle_params{}, PrevFR::float(),
+        Params::#merkle_params{}, PrevFR::UsedFrSum,
         HashesK::Bin, HashesV::Bin, DupesCount::Bin, NewSyncAcc::[SyncSend],
         Dupes::[db_chunk_kv()])
         -> {{HashesK::Bin, HashesV::Bin, DupesCount::Bin},
             NewSyncSend::[SyncSend], Dupes::db_chunk_kv()}
     when is_subtype(Bin, bitstring()),
          is_subtype(SyncSend, {OtherMaxItemsCount::non_neg_integer(),
-                               Bucket::merkle_tree:mt_bucket()}).
-merkle_resolve_add_leaf_hashes([{OtherMaxItemsCount, Bucket} | Rest],
-                               FRAllLeaves, NumRestLeaves, BucketSizeBits, DupesSizeBits,
-                               Params, PrevFR, HashesK, HashesV, DupesCount, SyncAcc, Dupes) ->
+                               Bucket::merkle_tree:mt_bucket()}),
+         is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
+merkle_resolve_add_leaf_hashes(
+  [{OtherMaxItemsCount, Bucket} | Rest], FRAllLeaves, NumRestLeaves,
+  BucketSizeBits, DupesSizeBits, Params, {PrevFRSum, PrevFrC} = _PrevFR,
+  HashesK, HashesV, DupesCount, SyncAcc, Dupes) ->
     BucketSize = length(Bucket),
     ExpDelta = 100, % TODO: establish a bound of maximum MaxAffectedItems items for very low (initial) ExpDelta?
     ?DBG_ASSERT(BucketSize > 0),
@@ -2155,7 +2173,7 @@ merkle_resolve_add_leaf_hashes([{OtherMaxItemsCount, Bucket} | Rest],
     % note: this includes duplicates which are actually not encoded!
     ?DBG_ASSERT(?implies(BucketSizeBits =:= 0, BucketSize =:= 1)),
     HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
-    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFR),
+    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFRSum),
     {SigSize, VSize} =
         trivial_signature_sizes(OtherMaxItemsCount, BucketSize, ExpDelta, FR_next),
     % note: we can only estimate the real FR of this part here - the other
@@ -2164,23 +2182,23 @@ merkle_resolve_add_leaf_hashes([{OtherMaxItemsCount, Bucket} | Rest],
     %       individual trivial syncs' signatures!)
     ThisFR_upper_bound =
         trivial_worst_case_failrate(SigSize, OtherMaxItemsCount, BucketSize, ExpDelta),
-    % TODO: use Kahan summation for PrevFR -> NextFR
-    NextFR = PrevFR + ThisFR_upper_bound,
+    NextFR = util:kahan_sum([ThisFR_upper_bound], PrevFRSum, PrevFrC),
 %%     log:pal("merkle_send [ ~p ] (rest: ~B):~n  bits: ~p, FR: ~p vs. ~p~n  acc total: ~p -> ~p",
-%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, FR_p1, PrevFR, NextFR]),
+%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, FR_p1, _PrevFR, NextFR]),
     {HashesKNew, HashesVNew, ResortedBucket, AddDupes} =
         compress_kv_list(Bucket, {HashesK1, HashesV}, SigSize, VSize,
                          fun trivial_compress_key/2),
 %%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
-%%             [self(), {NumRestLeaves, FRAllLeaves, PrevFR},
+%%             [self(), {NumRestLeaves, FRAllLeaves, _PrevFR},
 %%              {BucketSize, length(Dupes), OtherMaxItemsCount, FR_next}]),
     DupesCountNew = <<DupesCount/bitstring, (length(AddDupes)):DupesSizeBits>>,
     merkle_resolve_add_leaf_hashes(
       Rest, FRAllLeaves, NumRestLeaves - 1, BucketSizeBits, DupesSizeBits, Params, NextFR,
       HashesKNew, HashesVNew, DupesCountNew, [{OtherMaxItemsCount, ResortedBucket} | SyncAcc],
       [AddDupes | Dupes]);
-merkle_resolve_add_leaf_hashes([], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits, _DupesSizeBits,
-                               _Params, _PrevFR, HashesK, HashesV, DupesCount, SyncAcc, Dupes) ->
+merkle_resolve_add_leaf_hashes(
+    [], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits, _DupesSizeBits,
+    _Params, _PrevFR, HashesK, HashesV, DupesCount, SyncAcc, Dupes) ->
     ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
     {{HashesK, HashesV, DupesCount}, lists:reverse(SyncAcc), lists:flatten(Dupes)}.
 
@@ -2189,7 +2207,7 @@ merkle_resolve_add_leaf_hashes([], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits
 %% @see merkle_resolve_add_leaf_hashes/9
 -spec merkle_resolve_retrieve_leaf_hashes(
         [SyncRcv], HashesK::Bin, HashesV::Bin, DupesCount::Bin, FRAllLeaves::float(),
-        NumRestLeaves::non_neg_integer(), PrevFR::float(), PrevFR_real::float(),
+        NumRestLeaves::non_neg_integer(), PrevFR::UsedFrSum, PrevFR_real::UsedFrSum,
         BucketSizeBits::non_neg_integer(), DupesSizeBits::pos_integer(), Params::#merkle_params{},
         ToSendKeysAcc::[?RT:key()], ToResolveIdxAcc::[bitstring()],
         ResolveNonEmpty::boolean(), DupesCountTotal::non_neg_integer())
@@ -2197,11 +2215,13 @@ merkle_resolve_add_leaf_hashes([], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits
             OtherHasResolve::boolean(), ThisFR_real::float()}
     when is_subtype(Bin, bitstring()),
          is_subtype(SyncRcv, {MyMaxItemsCount::non_neg_integer(),
-                              Bucket::merkle_tree:mt_bucket()}).
+                              Bucket::merkle_tree:mt_bucket()}),
+         is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
 merkle_resolve_retrieve_leaf_hashes(
   [{MyMaxItemsCount, MyKVItems} | Rest],
-  HashesK, HashesV, DupesCount, FRAllLeaves, NumRestLeaves, PrevFR,
-  PrevFR_real, BucketSizeBits, DupesSizeBits, Params, ToSendKeys, ToResolveIdx,
+  HashesK, HashesV, DupesCount, FRAllLeaves, NumRestLeaves,
+  {PrevFRSum, PrevFrC} = _PrevFR, {PrevFR_real_Sum, PrevFr_real_C} = _PrevFR_real,
+  BucketSizeBits, DupesSizeBits, Params, ToSendKeys, ToResolveIdx,
   ResolveNonEmpty, DupesCountTotal) ->
     MyActualItemsCount = length(MyKVItems),
     ExpDelta = 100, % TODO: establish a bound of maximum MaxAffectedItems items for very low (initial) ExpDelta?
@@ -2209,22 +2229,20 @@ merkle_resolve_retrieve_leaf_hashes(
     <<Dupes:DupesSizeBits/integer-unit:1, NDupesCount/bitstring>> = DupesCount,
     OtherActualItemsCount = BucketSize0 + 1,
     BucketSize = OtherActualItemsCount - Dupes,
-    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFR),
+    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFRSum),
 %%     log:pal("merkle_receive [ ~p ]:~n  ~p~n  ~p",
-%%             [self(), {NumRestLeaves, FRAllLeaves, PrevFR},
+%%             [self(), {NumRestLeaves, FRAllLeaves, _PrevFR},
 %%              {BucketSize, Dupes, MyMaxItemsCount, FR_next}]),
     {SigSize, VSize} =
         trivial_signature_sizes(MyMaxItemsCount, OtherActualItemsCount, ExpDelta, FR_next),
-    ThisFR =
+    ThisFR_upper_bound =
         trivial_worst_case_failrate(SigSize, MyMaxItemsCount, OtherActualItemsCount, ExpDelta),
-    % TODO: use Kahan summation for PrevFR -> NextFR
-    NextFR = PrevFR + ThisFR,
+    NextFR = util:kahan_sum([ThisFR_upper_bound], PrevFRSum, PrevFrC),
     ThisFR_real =
         trivial_worst_case_failrate(SigSize, MyActualItemsCount, OtherActualItemsCount, ExpDelta),
-    % TODO: use Kahan summation for PrevFR -> NextFR
-    NextFR_real = PrevFR_real + ThisFR_real,
+    NextFR_real = util:kahan_sum([ThisFR_real], PrevFR_real_Sum, PrevFr_real_C),
 %%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n  bits: ~p, acc: ~p vs. ~p~n  acc total: ~p -> ~p",
-%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, ThisFR, PrevFR, NextFR]),
+%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, ThisFR_upper_bound, _PrevFR, NextFR]),
     % we need to know how large a piece is
     % -> peak into the binary (using the format in decompress_idx_list/3):
     % beware: buckets with 0 encoded items are optimised to <<>>
@@ -2279,22 +2297,26 @@ merkle_resolve_retrieve_leaf_hashes(
                % (also ref. the calls of merkle_resolve_leaves_ckidx/8)
                <<>>
         end,
-    {ToSendKeys, ToResolveIdx1, DupesCountTotal > 0 orelse ResolveNonEmpty, PrevFR_real}.
+    {ToSendKeys, ToResolveIdx1, DupesCountTotal > 0 orelse ResolveNonEmpty,
+     element(1, PrevFR_real)}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
--spec merkle_resolve_leaves_send(State::state(), UsedFr::float()) -> NewState::state().
+-spec merkle_resolve_leaves_send(
+        State::state(), UsedFr::{Sum::float(), Compensation::float()})
+    -> NewState::state().
 merkle_resolve_leaves_send(
   State = #rr_recon_state{params = Params, initiator = IsInitiator,
                           stats = Stats, dest_recon_pid = DestReconPid,
                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                           merkle_sync = {SyncSend, SyncRcv, SyncRcvLeafCount,
                                          {MySyncDRK, MySyncDRLCount, OtherSyncDRLCount}}},
-  UsedFr) ->
+  {UsedFrSum, _UsedFrC}) ->
 %%     log:pal("Sync (~s):~n  send:~.2p~n  rcv:~.2p",
 %%             [?IIF(IsInitiator, "I", "NI"), SyncSend, SyncRcv]),
     % resolve items from emptyLeaf-* comparisons with empty leaves on any node as key_upd:
-    NStats1 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
+    NStats0 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
+    NStats1 = rr_recon_stats:set([{fail_rate_p1, UsedFrSum}], NStats0),
     NStats2 = rr_recon_stats:inc(
                 [{tree_leavesSynced, MySyncDRLCount + OtherSyncDRLCount},
                  {rs_expected, ?IIF(OtherSyncDRLCount > 0, 1, 0)}], NStats1),
@@ -2304,7 +2326,7 @@ merkle_resolve_leaves_send(
     SyncSendL = length(SyncSend),
     SyncRcvL = length(SyncRcv),
     TrivialProcs = SyncSendL + SyncRcvL,
-    FRAllLeaves = calc_n_subparts_FR(1, Params#merkle_params.fail_rate, UsedFr),
+    FRAllLeaves = calc_n_subparts_FR(1, Params#merkle_params.fail_rate, UsedFrSum),
     ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tFRAllLeaves: ~g\t"
                "ItemsToSend: ~B (~g per leaf)",
                [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
@@ -2328,7 +2350,7 @@ merkle_resolve_leaves_send(
            {SyncStruct, NewSyncSend, Dupes} =
                merkle_resolve_add_leaf_hashes(
                  SyncSend, FRAllLeaves, TrivialProcs, BucketSizeBits, DupesSizeBits,
-                 Params, 0.0, <<>>, <<>>, <<>>, [], []),
+                 Params, {0.0, 0.0}, <<>>, <<>>, <<>>, [], []),
            % note: 1 trivial proc contains 1 leaf
            % the other node will send its items from this CKV list - increase rs_expected, too
            NStats3 = rr_recon_stats:inc([{tree_leavesSynced, SyncSendL},
@@ -2381,7 +2403,8 @@ merkle_resolve_leaves_receive(
     % note: 1 trivial proc may thus contain more than 1 leaf!
     {ToSend, ToResolve, OtherHasResolve, ThisFR_real} =
         merkle_resolve_retrieve_leaf_hashes(
-          SyncRcv, HashesK, HashesV, DupesCount, FRAllLeaves, TrivialProcs, 0.0, 0.0,
+          SyncRcv, HashesK, HashesV, DupesCount, FRAllLeaves, TrivialProcs,
+          {0.0, 0.0}, {0.0, 0.0},
           BucketSizeBits, DupesSizeBits, Params, [], [], false, 0),
 
     % send resolve message:
@@ -2514,7 +2537,6 @@ calc_n_subparts_FR(N, FR) when FR >= 0 andalso N >= 1 ->
         -> FR_sub::float().
 calc_n_subparts_FR(N, FR, PrevFr)
   when FR >= 0 andalso PrevFr >= 0 andalso N >= 1 ->
-    % TODO: use Kahan Summation to circumvent floating point issues
     _FR_sub = (FR - PrevFr) / N.
 
 %% @doc Calculates the signature sizes for comparing every item in Items

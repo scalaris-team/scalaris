@@ -26,6 +26,7 @@
 -export_type([time_utc/0, us_timestamp/0]).
 
 -export([escape_quotes/1,
+         kahan_sum/3,
          min/2, max/2, log/2, log2/1, log1p/1, ceil/1, floor/1, pow1p/2,
          logged_exec/1,
          randomelem/1, randomelem_and_length/1,
@@ -211,6 +212,18 @@ min(?PLUS_INFINITY, X) -> X;
 min(X, ?PLUS_INFINITY) -> X;
 min(A, B) when A < B -> A;
 min(_A, B) -> B.
+
+%% @doc Implements the Kahan summation algorithm for a low numerical error
+%%      when adding a sequence of finite precision floating point numbers.
+%%      (ref. [https://en.wikipedia.org/wiki/Kahan_summation_algorithm])
+-spec kahan_sum([number()], AccSum::float(), AccCompensation::float()) ->
+          {Sum::float(), Compensation::float()}.
+kahan_sum([], AccSum, AccCompensation) ->
+    {AccSum, AccCompensation};
+kahan_sum([X | Rest], Sum, C) ->
+    Y = X - C,
+    T = Sum + Y,
+    kahan_sum(Rest, T, (T - Sum) - Y).
 
 -spec pow(integer(), non_neg_integer()) -> integer();
          (float(), non_neg_integer()) -> number().
