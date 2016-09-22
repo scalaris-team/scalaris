@@ -374,10 +374,10 @@ merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 
 MERKLE_2_EXTRACT_V='v\([0-9][0-9]*\)'
 
-merkle_2_fr0.1_expDas_fprob/%/merkle_custom.dat: merkle_2_fr0.01_expDas_fprob/Makefile
-	@echo " executing merkle_2_fr0.01_expDas_fprob $*"
+merkle_2_fr0.1_expDas_fprob/%/merkle_custom.dat: merkle_2_fr0.1_expDas_fprob/Makefile
+	@echo " executing merkle_2_fr0.1_expDas_fprob $*"
 	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_2_EXTRACT_V)) ; FR=0.1 ; D=2 ; STEPSIZE=1 ; STEPS=15 ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE)" -c "$$V,1,$$FR,as_fprob,$$STEPSIZE,$$STEPS,[update,regen],$$D,merkle_bucket" -t "merkle_{v$$V, FR0.01}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+	V=$(shell expr match "$*" $(MERKLE_2_EXTRACT_V)) ; FR=0.1 ; D=2 ; STEPSIZE=1 ; STEPS=15 ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE)" -c "$$V,1,$$FR,as_fprob,$$STEPSIZE,$$STEPS,[update,regen],$$D,merkle_bucket" -t "merkle_{v$$V, FR0.1}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
 merkle_2_fr0.1_expDas_fprob-all: merkle_2_fr0.1_expDas_fprob/Makefile $(foreach V, $(shell seq -s" " 2 16), merkle_2_fr0.1_expDas_fprob/v$(V)/merkle_custom.dat)
 	
