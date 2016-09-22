@@ -3,6 +3,7 @@ language: generic
 matrix:
   include:
     - os: osx
+      osx_image: xcode8
       env:
         - OSX_PACKAGES="boost erlang python python3 ant bash coreutils"
     - os: linux
@@ -24,7 +25,6 @@ install:
 
          for pkg in $OSX_PACKAGES; do
            [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
-           brew outdated $pkg || brew upgrade --force-bottle $pkg
          done
      fi
 
