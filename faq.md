@@ -228,7 +228,7 @@ No. Well, maybe.
 
   0. install Erlang ([http://www.erlang.org/download.html](http://www.erlang.org/download.html))
   0. install OpenSSL (for crypto module) ([http://www.slproweb.com/products/Win32OpenSSL.html](http://www.slproweb.com/products/Win32OpenSSL.html))
-  0. checkout Scalaris code from SVN
+  0. checkout Scalaris code from the git repository
   0. adapt the path to your Erlang installation in build.bat
   0. start a `cmd.exe`
   0. go to the Scalaris directory
