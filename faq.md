@@ -269,7 +269,7 @@ The epmd is a Erlang daemon which always listens on port 4369. It provides means
 
 `scalarisctl -e "-kernel inet_dist_listen_min 14194 inet_dist_listen_max 14194"`
 
-`scalarisctl` from svn trunk contains `the --dist-erl-port` to ease this procedure:
+`scalarisctl` contains the `--dist-erl-port` parameter to ease this procedure:
 
 `scalarisctl --dist-erl-port 14194`
 
@@ -305,7 +305,7 @@ For a fault-tolerant setup, Scalaris is able to select the first node by itself 
 ### How do I start a ring?
 
 {% highlight sh %}
-./bin/firstnode.sh`
+./bin/firstnode.sh
 {% endhighlight %}
 
 starts both a boot server and a Scalaris node - a ring of size 1.
