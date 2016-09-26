@@ -370,7 +370,7 @@ MERKLE_EFF_PROB_EXTRACT_STEPSIZE='v[0-9][0-9]*_b[0-9][0-9]*_fr[0-9][.0-9]*_d[0-9
 merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@echo " executing merkle_eff_prob $*"
 	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; FR=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_FR)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$FR,as_fprob,$$STEPSIZE,$$STEPS,[update],$$D,data_count" -t "merkle_{v$$V, b$$B, FR$$FR}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
+	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; FR=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_FR)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$FR,as_fprob,$$STEPSIZE,$$STEPS,[update,regen],$$D,data_count" -t "merkle_{v$$V, b$$B, FR$$FR}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
 MERKLE_2_EXTRACT_V='v\([0-9][0-9]*\)'
 
