@@ -1946,7 +1946,7 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
        (not IsLeafNode) andalso NonEmptyLeafHash ->
            % inner node here, non-empty leaf there
            % no need to compare hashes - this is an exact process based on the tags
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            Sync = {MyMaxItemsCount, MyKVItems},
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
                              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
@@ -1980,7 +1980,7 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            ResultCode = if not IsLeafNode -> ?recon_fail_stop_inner; % stop_empty_leaf1
                            NonEmptyLeafNode -> ?recon_fail_stop_leaf % stop_empty_leaf2
                         end,
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
                              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
@@ -2134,7 +2134,7 @@ merkle_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN],
            % -> resolve directly here, i.e. without a trivial sub process
            SyncAccSend1 = SyncAccSend,
            OtherSyncAccDRLCount1 = OtherSyncAccDRLCount,
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
            MySyncAccDRLCount1 = MySyncAccDRLCount + LeafCount
     end,
@@ -2168,7 +2168,7 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                     OtherSyncAccDRLCount1 = OtherSyncAccDRLCount + 1
             end;
         false -> % stop_leaf
-            {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+            {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
             SyncAccRcv1 =
                 [{MyMaxItemsCount, MyKVItems} | SyncAccRcv],
             SyncAccRcvLeafCount1 = SyncAccRcvLeafCount + LeafCount,
