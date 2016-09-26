@@ -223,7 +223,7 @@ get_item_count({_H, ICnt, _Bkt, _I}) -> ICnt.
         -> {Items::mt_bucket(), LeafCount::non_neg_integer()}.
 get_items({merkle_tree, _, Root}) -> get_items(Root);
 get_items({_H, _Cnt, _ICnt, _I, _CL} = N) -> get_items_([N], [], 0);
-get_items({_H, _ICnt, _Bkt, _I} = N) -> [N];
+get_items({_H, _ICnt, Bkt, _I}) -> {Bkt, 1};
 get_items(Nodes) when is_list(Nodes) -> get_items_(Nodes, [], 0).
 
 %% @doc Helper for get_items/1.
