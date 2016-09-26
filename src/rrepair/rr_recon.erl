@@ -2256,7 +2256,7 @@ merkle_resolve_add_leaf_hashes(
 merkle_resolve_add_leaf_hashes(
     [], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits, _DupesSizeBits,
     _Params, _PrevFR, HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, SyncAcc, Dupes) ->
-    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
+    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>> orelse DupesCount > 0),
     {{HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount},
      lists:reverse(SyncAcc), lists:flatten(Dupes)}.
 
@@ -2452,7 +2452,7 @@ merkle_resolve_leaves_receive(
                           misc = [{all_leaf_acc, FRAllLeaves},
                                   {trivial_procs, TrivialProcs}]},
   {HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount}) ->
-    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
+    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>> orelse DupesCount > 0),
     % note: we do not have empty buckets here and thus always store (BucketSize - 1)
     BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
     % note: duplicates can be 0 up to BucketSize
