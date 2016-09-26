@@ -204,24 +204,6 @@ Now install scalaris and scalaris-bindings:
 pacman -Syy scalaris scalaris-bindings
 {% endhighlight %}
 
-### How to build an rpm?
-On openSUSE, for example, do the following:
-{% highlight sh %}
-export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
-for package in main bindings ; do
-  mkdir -p ${package}
-  cd ${package}
-  svn export ${SCALARIS_SVN}/contrib/packages/${package}/checkout.sh
-  ./checkout.sh
-  cp * /usr/src/packages/SOURCES/
-  rpmbuild -ba scalaris*.spec
-  cd ..
-done
-{% endhighlight %}
-
-If any additional packages are required in order to build an RPM, rpmbuild will print an error.
-Your source and binary RPMs will be generated in `/usr/src/packages/SRPMS` and `RPMS`.
-
 ### Does Scalaris run on Windows?
 
 No. Well, maybe.
