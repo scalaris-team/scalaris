@@ -685,7 +685,7 @@ on({?check_nodes, SenderPid, ToCheck, OtherItemsCount},
    State = #rr_recon_state{params = #merkle_params{exp_delta = ExpDelta},
                            misc = [{fail_rate_target_per_node, LastFRPerNode},
                                    {fail_rate_target_phase1, FR_p1},
-                                   {pref_used_fr, PrevUsedFr},
+                                   {prev_used_fr, PrevUsedFr},
                                    {icount, MyItemCount}]}) ->
     % this is the first check_nodes message from the initiator and we finally
     % learn about the exact number of items to synchronise with
@@ -696,7 +696,7 @@ on({?check_nodes, SenderPid, ToCheck, OtherItemsCount},
                             misc = [{max_affected_items, MaxAffectedItems},
                                     {fail_rate_target_per_node, LastFRPerNode},
                                     {fail_rate_target_phase1, FR_p1},
-                                    {pref_used_fr, PrevUsedFr},
+                                    {prev_used_fr, PrevUsedFr},
                                     {icount, MyItemCount}]});
 
 on({?check_nodes, ToCheck0, OtherMaxItemsCount},
@@ -708,7 +708,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                            misc = [{max_affected_items, MaxAffectedItems},
                                    {fail_rate_target_per_node, LastFRPerNode},
                                    {fail_rate_target_phase1, FR_p1},
-                                   {pref_used_fr, PrevUsedFr},
+                                   {prev_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount}]}) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
     {_FR_I, _FR_L, SigSizeI, SigSizeL, EffectiveFr_I, EffectiveFr_L} =
@@ -739,7 +739,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
            NewState#rr_recon_state{misc = [{max_affected_items, MaxAffectedItems},
                                            {fail_rate_target_per_node, FRPerNode},
                                            {fail_rate_target_phase1, FR_p1},
-                                           {pref_used_fr, UsedFr},
+                                           {prev_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount}]}
     end;
 
@@ -753,7 +753,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                    {max_affected_items, MaxAffectedItems},
                                    {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
                                    {fail_rate_target_phase1, FR_p1},
-                                   {pref_used_fr, PrevUsedFr},
+                                   {prev_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
     {RTree, SyncNew, NStats, MyMaxItemsCount,
@@ -785,7 +785,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                            {max_affected_items, MaxAffectedItems},
                                            {fail_rate_target_per_node, {NextEffectiveFr_I, NextEffectiveFr_L}},
                                            {fail_rate_target_phase1, FR_p1},
-                                           {pref_used_fr, UsedFr},
+                                           {prev_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount},
                                            {oicount, OtherMaxItemsCount}]}
     end;
@@ -975,7 +975,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                          stats = Stats2, params = MySyncParams,
                          misc = [{fail_rate_target_per_node, FRTotal_p1_perNode},
                                  {fail_rate_target_phase1, FRTotal_p1},
-                                 {pref_used_fr, {0.0, 0.0}},
+                                 {prev_used_fr, {0.0, 0.0}},
                                  {icount, ItemCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
@@ -1009,7 +1009,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
                                  {max_affected_items, MaxAffectedItems},
                                  {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
                                  {fail_rate_target_phase1, FRTotal_p1},
-                                 {pref_used_fr, {0.0, 0.0}},
+                                 {prev_used_fr, {0.0, 0.0}},
                                  {icount, MyItemCount},
                                  {oicount, OtherItemsCount}],
                          kv_list = []};
