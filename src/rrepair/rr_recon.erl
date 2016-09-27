@@ -725,7 +725,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate: ~p -> ~p",
+    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate(p1): ~p -> ~p",
                [length(RTree), PrevUsedFr, UsedFr]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
@@ -766,7 +766,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate: ~p -> ~p",
+    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate(p1): ~p -> ~p",
                [length(RTree), PrevUsedFr, UsedFr]),
 
     if RTree =:= [] ->
@@ -809,12 +809,14 @@ on({resolve_req, BinKeyList, SyncSendFr_real} = _Msg,
     %       received after the {resolve_req, Hashes} message from the other node!
   when is_bitstring(BinKeyList) ->
     ?TRACE_RCV(_Msg, State),
-    ?ALG_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed",
-               [?IIF(IsInitiator, "I", "NI"),
-                erlang:byte_size(
-                  erlang:term_to_binary(BinKeyList, [compressed]))]),
     PrevFr_p2 = rr_recon_stats:get(fail_rate_p2, Stats), % from sync_receive
     NextFr_p2 = PrevFr_p2 + SyncSendFr_real,
+    ?ALG_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed~n"
+               "  fail_rate(p2): ~p (rcv) + ~p (send) = ~p",
+               [?IIF(IsInitiator, "I", "NI"),
+                erlang:byte_size(
+                  erlang:term_to_binary(BinKeyList, [compressed])),
+                PrevFr_p2, SyncSendFr_real, NextFr_p2]),
     Stats1  = rr_recon_stats:set([{fail_rate_p2, NextFr_p2}], Stats),
     ToSendKeys = [K || {K, _V} <- ToSend],
     NStats = if BinKeyList =:= <<>> andalso ToSendKeys =:= [] ->
