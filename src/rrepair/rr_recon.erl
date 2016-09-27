@@ -3207,7 +3207,15 @@ check_percent(Atom) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(rr_recon_method, [trivial, shash, bloom, merkle_tree, art]) andalso
+     % deprecated, old, and unused config parameter
+    case config:read(rr_recon_p1e) of
+        failed -> true;
+        _ -> error_logger:error_msg("rr_recon_p1e parameter exists - "
+                                    "please migrate to rr_recon_failure_rate "
+                                    "(see scalaris.cfg and scalaris.local.cfg)~n"),
+             false
+    end andalso
+        config:cfg_is_in(rr_recon_method, [trivial, shash, bloom, merkle_tree, art]) andalso
         config:cfg_is_number(rr_recon_failure_rate) andalso
         config:cfg_is_greater_than(rr_recon_failure_rate, 0) andalso
         config:cfg_is_number(rr_recon_expected_delta) andalso
