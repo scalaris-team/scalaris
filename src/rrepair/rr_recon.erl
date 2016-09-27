@@ -1777,10 +1777,10 @@ merkle_next_signature_sizes(
            EffectiveFr_L = EffectiveFr_I = 0.0
     end,
 
-    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B,\tMaxDiff: ~B"
+    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B,\tMaxAffected: ~B"
                "\tFR_I: ~g,\tFR_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
                "  -> eff. FR_I: ~g,\teff. FR_L: ~g",
-               [MyMaxItemsCount, OtherMaxItemsCount,
+               [MyMaxItemsCount, OtherMaxItemsCount, MaxAffectedItems,
                 FR_I, FR_L, NextSigSizeI, NextSigSizeL,
                 EffectiveFr_I, EffectiveFr_L]),
     {FR_I, FR_L, NextSigSizeI, NextSigSizeL, EffectiveFr_I, EffectiveFr_L}.
