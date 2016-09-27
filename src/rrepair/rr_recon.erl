@@ -725,7 +725,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate: ~g -> ~g",
+    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate: ~p -> ~p",
                [length(RTree), PrevUsedFr, UsedFr]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
@@ -766,7 +766,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate: ~g -> ~g",
+    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate: ~p -> ~p",
                [length(RTree), PrevUsedFr, UsedFr]),
 
     if RTree =:= [] ->
