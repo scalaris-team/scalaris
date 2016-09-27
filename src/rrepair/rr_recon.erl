@@ -2235,13 +2235,16 @@ merkle_resolve_add_leaf_hashes(
 %%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, FR_p1, _PrevFR, NextFR]),
     {{HashesKBucket, IdxBitsSize, DiffSigSize1}, HashesVBucket, ResortedBucket, AddDupes} =
         compress_kv_list(Bucket, SigSize, VSize, fun trivial_compress_key/2, return_size),
+    AddDupesL = length(AddDupes),
     % beware: buckets with 0 encoded items are optimised to <<>>
-    if BucketSize > 0 ->
+    if (BucketSize - AddDupesL) > 0 ->
            DiffSigSizesBinNew = <<DiffSigSizesBin/bitstring, DiffSigSize1:IdxBitsSize/integer-unit:1>>,
            HashesKNew = <<HashesK/bitstring, HashesKBucket/bitstring>>,
            HashesVNew = <<HashesV/bitstring, HashesVBucket/bitstring>>,
            ok;
        true ->
+           ?DBG_ASSERT(HashesKBucket =:= <<>>),
+           ?DBG_ASSERT(HashesVBucket =:= <<>>),
            DiffSigSizesBinNew = DiffSigSizesBin,
            HashesKNew = HashesK,
            HashesVNew = HashesV,
@@ -2249,8 +2252,8 @@ merkle_resolve_add_leaf_hashes(
     end,
 %%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
 %%             [self(), {NumRestLeaves, FRAllLeaves, _PrevFR},
-%%              {BucketSize, length(Dupes), OtherMaxItemsCount, FR_next}]),
-    DupesCountNew = <<DupesCount/bitstring, (length(AddDupes)):DupesSizeBits>>,
+%%              {BucketSize, AddDupesL, OtherMaxItemsCount, FR_next}]),
+    DupesCountNew = <<DupesCount/bitstring, AddDupesL:DupesSizeBits>>,
     merkle_resolve_add_leaf_hashes(
       Rest, FRAllLeaves, NumRestLeaves - 1, BucketSizeBits, DupesSizeBits, Params, NextFR,
       HashesKNew, HashesVNew, BucketSizesBinNew, DiffSigSizesBinNew, DupesCountNew, [{OtherMaxItemsCount, ResortedBucket} | SyncAcc],
