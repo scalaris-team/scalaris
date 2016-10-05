@@ -122,7 +122,8 @@
          num_trees      = ?required(merkle_param, num_trees)      :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
          fail_rate      = ?required(merkle_param, fail_rate)      :: float(),
-         ni_item_count  = ?required(merkle_param, ni_item_count)  :: non_neg_integer()
+         ni_item_count  = ?required(merkle_param, ni_item_count)  :: non_neg_integer(),
+         ni_max_ic      = ?required(merkle_param, ni_max_ic)      :: non_neg_integer()
         }).
 
 -record(art_recon_struct,
@@ -681,23 +682,24 @@ on({resolve_req, BinReqIdxPos} = _Msg,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?check_nodes, SenderPid, ToCheck, OtherItemsCount},
+on({?check_nodes, SenderPid, ToCheck, OtherItemsCount, OtherMaxItemsCount},
    State = #rr_recon_state{params = #merkle_params{exp_delta = ExpDelta},
                            misc = [{fail_rate_target_per_node, LastFRPerNode},
                                    {fail_rate_target_phase1, FR_p1},
                                    {prev_used_fr, PrevUsedFr},
-                                   {icount, MyItemCount}]}) ->
+                                   {icount, MyMaxItemCount},
+                                   {total_icount, MyItemCount}]}) ->
     % this is the first check_nodes message from the initiator and we finally
     % learn about the exact number of items to synchronise with
     MaxAffectedItems = calc_max_different_items_total(
                          MyItemCount, OtherItemsCount, ExpDelta),
-    on({?check_nodes, ToCheck, OtherItemsCount},
+    on({?check_nodes, ToCheck, OtherMaxItemsCount},
        State#rr_recon_state{dest_recon_pid = SenderPid,
                             misc = [{max_affected_items, MaxAffectedItems},
                                     {fail_rate_target_per_node, LastFRPerNode},
                                     {fail_rate_target_phase1, FR_p1},
                                     {prev_used_fr, PrevUsedFr},
-                                    {icount, MyItemCount}]});
+                                    {icount, MyMaxItemCount}]});
 
 on({?check_nodes, ToCheck0, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
@@ -938,7 +940,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                         merkle_tree:keys_to_intervals(
                           DBItems, intervals:split(MerkleI, NumTrees))
                 end),
-    ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
+    ItemCount = lists:sum([Count || {_SubI, Count, _Bucket} <- ICBList]),
+    MaxItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
     FRTotal_p1_perNode = calc_n_subparts_FR(NumTrees, FRTotal_p1),
     
     MySyncParams = #merkle_params{exp_delta = get_max_expected_delta(),
@@ -947,7 +950,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                                   bucket_size = MerkleB,
                                   num_trees = NumTrees,
                                   fail_rate = FRTotal,
-                                  ni_item_count = ItemCount},
+                                  ni_item_count = ItemCount,
+                                  ni_max_ic = MaxItemCount},
     SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
@@ -978,7 +982,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                          misc = [{fail_rate_target_per_node, FRTotal_p1_perNode},
                                  {fail_rate_target_phase1, FRTotal_p1},
                                  {prev_used_fr, {0.0, 0.0}},
-                                 {icount, ItemCount}],
+                                 {icount, MaxItemCount},
+                                 {total_icount, ItemCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
@@ -987,8 +992,10 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
     MTSize = merkle_tree:size_detail(MySyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     #merkle_params{fail_rate = FRTotal, num_trees = NumTrees, exp_delta = ExpDelta,
-                   ni_item_count = OtherItemsCount} = Params,
+                   ni_item_count = OtherItemsCount, ni_max_ic = OtherMaxItemsCount} = Params,
     MyItemCount =
+        lists:sum([merkle_tree:get_item_count(Node) || Node <- MySyncStruct]),
+    MyMaxItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
     ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n"
                "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
@@ -1001,19 +1008,19 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
                          MyItemCount, OtherItemsCount, ExpDelta),
     
     {_FR_I, _FR_L, NextSigSizeI, NextSigSizeL, EffectiveFr_I, EffectiveFr_L} =
-        merkle_next_signature_sizes(Params, FRTotal_p1_perNode, MyItemCount,
-                                    OtherItemsCount, MaxAffectedItems),
+        merkle_next_signature_sizes(Params, FRTotal_p1_perNode, MyMaxItemCount,
+                                    OtherMaxItemsCount, MaxAffectedItems),
     
     Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
-    send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount}),
+    send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount, MyMaxItemCount}),
     State#rr_recon_state{stats = Stats1,
                          misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
                                  {max_affected_items, MaxAffectedItems},
                                  {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
                                  {fail_rate_target_phase1, FRTotal_p1},
                                  {prev_used_fr, {0.0, 0.0}},
-                                 {icount, MyItemCount},
-                                 {oicount, OtherItemsCount}],
+                                 {icount, MyMaxItemCount},
+                                 {oicount, OtherMaxItemsCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = art, params = {}, initiator = false,
                                    struct = MySyncStruct,
@@ -1761,28 +1768,32 @@ merkle_next_signature_sizes(
     %       comparison as a children's tree has in total!
     if MaxAffectedItems =:= 0 ->
            NextSigSizeL = NextSigSizeI = get_min_hash_bits(),
+           _AffectedItemsI = _AffectedItemsL = 0,
            EffectiveFr_L = EffectiveFr_I = float(0 / util:pow(2, NextSigSizeI));
        MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
-           AffectedItemsI = erlang:min(MyMaxItemsCount + OtherMaxItemsCount,
-                                       MaxAffectedItems),
+           _AffectedItemsI =
+               AffectedItemsI = erlang:min(MyMaxItemsCount + OtherMaxItemsCount,
+                                           MaxAffectedItems),
            NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / FR_I)),
                                   get_min_hash_bits(), 160),
            EffectiveFr_I = float(AffectedItemsI / util:pow(2, NextSigSizeI)),
-           AffectedItemsL = lists:min([MyMaxItemsCount + OtherMaxItemsCount,
-                                       2 * BucketSize, MaxAffectedItems]),
+           _AffectedItemsL =
+               AffectedItemsL = lists:min([MyMaxItemsCount + OtherMaxItemsCount,
+                                           2 * BucketSize, MaxAffectedItems]),
            NextSigSizeL = min_max(util:ceil(util:log2(AffectedItemsL / FR_L)),
                                   get_min_hash_bits(), 160),
            EffectiveFr_L = float(AffectedItemsL / util:pow(2, NextSigSizeL));
        true ->
            % should only occur during the reconciliation initiation in begin_sync/1
            NextSigSizeL = NextSigSizeI = 0,
+           _AffectedItemsI = _AffectedItemsL = 0,
            EffectiveFr_L = EffectiveFr_I = 0.0
     end,
 
-    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B,\tMaxAffected: ~B"
-               "\tFR_I: ~g,\tFR_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
+    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B,\tMaxAffected: ~B,\tMaxAffectedI: ~B,\tMaxAffectedL: ~B~n"
+               "  FR_I: ~g,\tFR_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
                "  -> eff. FR_I: ~g,\teff. FR_L: ~g",
-               [MyMaxItemsCount, OtherMaxItemsCount, MaxAffectedItems,
+               [MyMaxItemsCount, OtherMaxItemsCount, MaxAffectedItems, _AffectedItemsI, _AffectedItemsL,
                 FR_I, FR_L, NextSigSizeI, NextSigSizeL,
                 EffectiveFr_I, EffectiveFr_L]),
     {FR_I, FR_L, NextSigSizeI, NextSigSizeL, EffectiveFr_I, EffectiveFr_L}.
