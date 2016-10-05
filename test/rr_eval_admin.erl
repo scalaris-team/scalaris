@@ -332,7 +332,8 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
     
     Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
-                         merkle_branch = MBranch, merkle_bucket = MBucket },
+                         merkle_branch = MBranch, merkle_bucket = MBucket,
+                         merkle_num_trees = 1 },
     
     eval(pair,
          gen_setup(DDists, ?EVAL_FTYPES, FDists, Scenario, PairRing, [Merkle]),
@@ -365,7 +366,8 @@ merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
     
     Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
-                         merkle_branch = MBranch, merkle_bucket = MBucket },
+                         merkle_branch = MBranch, merkle_bucket = MBucket,
+                         merkle_num_trees = 1 },
     
     Init = get_param_value({PairRing, Merkle}, StepParam),
     eval(pair,
@@ -394,6 +396,7 @@ art(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta) ->
     
     Art = #rc_config{recon_method = art, expected_delta = ExpDelta,
                      merkle_bucket = MBucket, merkle_branch = MBranch,
+                     merkle_num_trees = 1,
                      art_corr_factor = ACorrFactor,
                      art_inner_fpr = 0.01, art_leaf_fpr = 0.01},
     StepSize = 2,
@@ -419,6 +422,7 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta
     
     Art = #rc_config{recon_method = art, expected_delta = ExpDelta,
                      merkle_bucket = MBucket, merkle_branch = MBranch,
+                     merkle_num_trees = 1,
                      art_corr_factor = ACorrFactor, art_inner_fpr = 0.01, art_leaf_fpr = 0.01},  
 
     eval(pair,
@@ -445,10 +449,10 @@ system(Dir, N, EvalRepeats, EvalName) ->
     Bloom0 = #rc_config{ recon_method = bloom, recon_fail_rate = 0.01,
                          expected_delta = 100 },
     %Bloom = #rc_config{ recon_method = bloom, recon_fail_rate = 0.1 },
-    %Merkle1 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 4 },
-    %Merkle2 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 1 },
-    %Art1 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 4, merkle_branch = 16, art_inner_fpr = 0.001, art_leaf_fpr = 0.01 },
-    %Art2 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 2, merkle_branch = 32, art_inner_fpr = 0.01, art_leaf_fpr = 0.2 },
+    %Merkle1 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 4, merkle_num_trees = 1 },
+    %Merkle2 = #rc_config{ recon_method = merkle_tree, recon_fail_rate = 0.01, merkle_branch = 4, merkle_bucket = 1, merkle_num_trees = 1 },
+    %Art1 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 4, merkle_branch = 16, merkle_num_trees = 1, art_inner_fpr = 0.001, art_leaf_fpr = 0.01 },
+    %Art2 = #rc_config{ recon_method = art, art_corr_factor = 3, merkle_bucket = 2, merkle_branch = 32, merkle_num_trees = 1, art_inner_fpr = 0.01, art_leaf_fpr = 0.2 },
 
     case EvalName of
         a0 -> eval(sys,
@@ -907,7 +911,8 @@ set_config(#rc_config{ recon_method = Method,
                        art_inner_fpr = ArtInnerFpr,
                        art_leaf_fpr = ArtLeafFpr,
                        merkle_branch = MerkleBranch,
-                       merkle_bucket = MerkleBucket }, TriggerProb) ->
+                       merkle_bucket = MerkleBucket,
+                       merkle_num_trees = MerkleNumTrees }, TriggerProb) ->
     config:write(rrepair_enabled, true),
     config:write(rrepair_after_crash, false), % disable (just in case)
     config:write(rr_trigger_interval, 0), % disabled (we trigger manually!)
@@ -933,6 +938,7 @@ set_config(#rc_config{ recon_method = Method,
     config:write(rr_art_correction_factor, ArtCorrF),
     config:write(rr_merkle_branch_factor, MerkleBranch),
     config:write(rr_merkle_bucket_size, MerkleBucket),
+    config:write(rr_merkle_num_trees, MerkleNumTrees),
     RM = config:read(rr_recon_method),
     case RM =:= Method of
         true -> ok;
@@ -954,7 +960,8 @@ get_param_value({Ring, Recon}, Param) ->
         art_inner_fpr -> Recon#rc_config.art_inner_fpr;
         art_leaf_fpr -> Recon#rc_config.art_leaf_fpr;
         merkle_branch -> Recon#rc_config.merkle_branch;
-        merkle_bucket -> Recon#rc_config.merkle_bucket
+        merkle_bucket -> Recon#rc_config.merkle_bucket;
+        merkle_num_trees -> Recon#rc_config.merkle_num_trees
     end.
 
 -spec set_params({ring_config(), rc_config()}, Param::step_param(), Value::any()) -> {ring_config(), rc_config()}.
@@ -974,6 +981,7 @@ set_params({RC, RCC = #rc_config{expected_delta = ExpDelta}}, Param, Value) ->
                art_leaf_fpr    -> RCC#rc_config{art_leaf_fpr = Value};
                merkle_branch   -> RCC#rc_config{merkle_branch = Value};
                merkle_bucket   -> RCC#rc_config{merkle_bucket = Value};
+               merkle_num_trees-> RCC#rc_config{merkle_num_trees = Value};
                _               -> RCC
            end,
     NRCC = if ExpDelta =:= as_fprob ->
@@ -992,6 +1000,7 @@ init_rc_conf(RC, StepP, Init) ->
         art_leaf_fpr    -> RC#rc_config{art_leaf_fpr = Init};
         merkle_branch   -> RC#rc_config{merkle_branch = Init};
         merkle_bucket   -> RC#rc_config{merkle_bucket = Init};
+        merkle_num_trees-> RC#rc_config{merkle_num_trees = Init};
         _               -> RC
     end.
 
@@ -1046,9 +1055,10 @@ rc_conf_comment(#rc_config{ recon_method = bloom, recon_fail_rate = FR,
 rc_conf_comment(#rc_config{ recon_method = merkle_tree,
                             recon_fail_rate = FR, expected_delta = ExpDelta,
                             merkle_branch = Branch,
-                            merkle_bucket = Bucket }) ->
-    io_lib:format("Merkle: FR=~p~cexpectedDelta=~p~cBranchSize=~p~cBucketSize=~p",
-                  [FR, ?TAB, ExpDelta, ?TAB, Branch, ?TAB, Bucket]);
+                            merkle_bucket = Bucket,
+                            merkle_num_trees = NumTrees }) ->
+    io_lib:format("Merkle: FR=~p~cexpectedDelta=~p~cBranchSize=~p~cBucketSize=~p~cNumTrees=~p",
+                  [FR, ?TAB, ExpDelta, ?TAB, Branch, ?TAB, Bucket, ?TAB, NumTrees]);
 rc_conf_comment(#rc_config{ recon_method = art, expected_delta = ExpDelta,
                             art_corr_factor = Corr,
                             art_inner_fpr = InnerFpr,

@@ -35,7 +35,7 @@
 
 -type step_param() :: node_count | data_count | fprob | rounds |
                       recon_fail_rate | expected_delta |
-                      merkle_bucket | merkle_branch |
+                      merkle_bucket | merkle_branch | merkle_num_trees |
                       art_corr_factor | art_leaf_fpr | art_inner_fpr.
 -type step_size() :: pos_integer() | float().
 -type fail_rate() :: float() | pos_integer().
@@ -55,7 +55,7 @@
                     expected_delta  = 100                                :: number() | as_fprob,
                     merkle_bucket   = 25                                 :: pos_integer(), %shared with art
                     merkle_branch   = 4                                  :: pos_integer(), %shared with art
-                    merkle_num_trees= config:read(rr_merkle_num_trees)   :: pos_integer(),
+                    merkle_num_trees= 1                                  :: pos_integer(),
                     art_corr_factor = 2                                  :: non_neg_integer(),
                     art_leaf_fpr    = 0.1                                :: float(),
                     art_inner_fpr   = 0.01                               :: float()
