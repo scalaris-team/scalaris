@@ -727,8 +727,8 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  fail_rate(p1): ~p -> ~p",
-               [length(RTree), PrevUsedFr, UsedFr]),
+    ?ALG_DEBUG("merkle (NI) - fail_rate(p1): ~p -> ~p~n  NextNodes: ~B",
+               [PrevUsedFr, UsedFr, NextLvlNodesAct]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
     if RTree =:= [] ->
@@ -768,8 +768,8 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  fail_rate(p1): ~p -> ~p",
-               [length(RTree), PrevUsedFr, UsedFr]),
+    ?ALG_DEBUG("merkle (I) - fail_rate(p1): ~p -> ~p~n  NextNodes: ~B",
+               [PrevUsedFr, UsedFr, NextLvlNodesAct]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
@@ -971,7 +971,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     MTSize = merkle_tree:size_detail(SyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
+    ?ALG_DEBUG("merkle (NI) - NextNodes: ~B~n"
                "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
                [length(SyncStruct), MTSize,
                 length([ok || L <- merkle_tree:get_leaves(SyncStruct),
@@ -997,7 +997,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
         lists:sum([merkle_tree:get_item_count(Node) || Node <- MySyncStruct]),
     MyMaxItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n"
+    ?ALG_DEBUG("merkle (I) - NextNodes: ~B~n"
                "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
                [length(MySyncStruct), MTSize,
                 length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
