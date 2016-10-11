@@ -17,6 +17,7 @@
 #	plot_label -> additional label to print at the bottom left of the screen (optional)
 #	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the transfer costs (optional)
 #	filename -> defaults to "all_file" (no extension, .pdf will be appended)
+#	systemSize -> lower system size (upper system size: systemSize * 4**5)
 
 set macro
 
@@ -170,9 +171,9 @@ set logscale x 2
 set xrange [((systemSize/1000.0)/2):((systemSize/1000.0)*4**5*2)] # TODO: adapt if number of data points changes!
 set grid layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
-arrow_dx=.166666666667 # grid spacing in x
 arrow_di=0 # added to each i in loop - arrows drawn at (i+arrow_di)*arrow_dx
 arrow_xpoints=6 # TODO: adapt if number of data points changes!
+arrow_dx=1.0/arrow_xpoints # grid spacing in x
 
 set style line 100 lw 2 lc -1 pt 0 lt 1
 
