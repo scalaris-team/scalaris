@@ -62,14 +62,14 @@ $(eval $(call FPROB_MAKEFILE,$(ALG),$(EXP_DELTA),$(VARIANT)))\
 
 # fprob analysis (different delta) for different recon parameters
 define MAX_DELTA_TARGETS
-.PRECIOUS: $(1)_0-$(2)_expD$(3)-all/Makefile
-$(1)_0-$(2)_expD$(3)-all/%/$(1).dat: $(1)_0-$(2)_expD$(3)-all/Makefile
+.PRECIOUS: $(1)_$(2)_expD$(3)-all/Makefile
+$(1)_$(2)_expD$(3)-all/%/$(1).dat: $(1)_$(2)_expD$(3)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
 	+STEP_SIZE=0$$(shell bc <<< "scale=2; $(2)/5") ; ./rr_eval.sh -a $(1) -n "$(SYSTEM_SIZE)" -c "$$*,$(3),$$$$STEP_SIZE" -g eval_fprob.gp -t "$(1)_{FR$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
 endef
-$(foreach ALG, trivial shash bloom, $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
-$(eval $(call MAX_DELTA_TARGETS,$(ALG),$(MAX_DELTA),$(EXP_DELTA)))\
+$(foreach ALG, trivial shash bloom, $(foreach DELTA_RANGE, 0-1 0-10 0-100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
+$(eval $(call MAX_DELTA_TARGETS,$(ALG),$(DELTA_RANGE),$(EXP_DELTA)))\
 )))
 
 define OTHER_TARGETS
@@ -79,6 +79,12 @@ $(1)_ddists_fdists_expD$(2)-all/%/$(1)_ddists_fdists.dat: $(1)_ddists_fdists_exp
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
 	+STEP_SIZE=2 ; ./rr_eval.sh -a $(1)_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$*,$(2),$$$$STEP_SIZE" -g eval_fprob_dists.gp -t "$(1)_{FR$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
+
+# scalability analysis (increasing failure rate)
+$(1)_scale_fr_expD$(2)-all/n%/$(1)_custom.dat: $(1)_scale_fr_expD$(2)-all/Makefile
+	@echo " executing $$(@D) (start at FR=10 with N=$$*)"
+	@mkdir -p "$$(@D)"
+	+./rr_eval.sh -a $(1)_custom -n "$$*" -c "0.0001,$(2),{power,10},6,[update,regen],3,recon_fail_rate" -g eval_frate_inc.gp -t "$(1)" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
 
 # scalability analysis (increasing data size) for different recon parameters
 # keep in sync with ALL_FR
@@ -110,10 +116,10 @@ $(eval $(call OTHER_TARGETS,$(ALG),$(EXP_DELTA)))\
 # define summary targets for groups of the ones above:
 define SUM_1
 # fprob analysis (different delta)
-$(1)_0-$(2)-all: $(foreach FR, $(ALL_FR), $(1)_0-$(2)-all/$(FR)/$(1).dat)
+$(1)_$(2)-all: $(foreach FR, $(ALL_FR), $(1)_$(2)-all/$(FR)/$(1).dat)
 	
 endef
-$(foreach ALG, trivial shash bloom, $(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD1 10_expD1 100_expD1,\
+$(foreach ALG, trivial shash bloom, $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD1 0-10_expD1 0-100_expD1,\
 $(eval $(call SUM_1,$(ALG),$(PAR)))\
 ))
 
@@ -131,7 +137,9 @@ $(1)_dists-all: $(1)_ddists_fdists_expDas_fprob-all/0.1/$(1)_ddists_fdists.dat
 # scalability analysis (increasing data size)
 $(1)_scale-all: $(foreach FR, $(ALL_FR), $(1)_scale_expDas_fprob-all/$(FR)/$(1)_scale.dat)
 	
-$(1): $(1)-all $(1)_dists-all $(1)_scale-all
+$(1)_scale_fr-all: $(1)_scale_fr_expDas_fprob-all/n$(SYSTEM_SIZE)/$(1)_custom.dat
+	
+$(1): $(1)-all $(1)_dists-all $(1)_scale_fr-all $(1)_scale-all
 	
 endef
 $(foreach ALG, trivial shash bloom, $(eval $(call SUM_3,$(ALG))))
@@ -140,6 +148,10 @@ $(foreach ALG, trivial shash bloom, $(eval $(call SUM_3,$(ALG))))
 MERKLE_EXTRACT_V='v\([0-9][0-9]*\)_b[0-9][0-9]*_fr[0-9][.0-9]*'
 MERKLE_EXTRACT_B='v[0-9][0-9]*_b\([0-9][0-9]*\)_fr[0-9][.0-9]*'
 MERKLE_EXTRACT_FR='v[0-9][0-9]*_b[0-9][0-9]*_fr\([0-9][.0-9]*\)'
+
+MERKLE_SCALE_FR_EXTRACT_V='v\([0-9][0-9]*\)_b[0-9][0-9]*_n[0-9][0-9]*'
+MERKLE_SCALE_FR_EXTRACT_B='v[0-9][0-9]*_b\([0-9][0-9]*\)_n[0-9][0-9]*'
+MERKLE_SCALE_FR_EXTRACT_N='v[0-9][0-9]*_b[0-9][0-9]*_n\([0-9][0-9]*\)'
 
 define MERKLE_FPROB_TARGETS
 # fprob analysis (different delta) for different merkle recon parameters
@@ -161,6 +173,11 @@ merkle_ddists_fdists_expD$(1)-all/%/merkle_ddists_fdists.dat: merkle_ddists_fdis
 	@mkdir -p "$$(@D)"
 	+STEP_SIZE=2 ; V=$$(shell expr match "$$*" $(MERKLE_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_EXTRACT_B)) ; FR=$$(shell expr match "$$*" $(MERKLE_EXTRACT_FR)) ; ./rr_eval.sh -a merkle_ddists_fdists -n "$(SYSTEM_SIZE)" -c "$$$${V},$$$${B},$$$${FR},$(1),$$$$STEP_SIZE" -g eval_fprob_dists.gp -t "merkle_{v$$$${V}, b$$$${B}, FR$$$${FR}}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
 
+merkle_scale_fr_expD$(1)-all/%/merkle_custom.dat: merkle_scale_fr_expD$(1)-all/Makefile
+	@echo " executing $$(@D) (start at FR=10 with N=$$*)"
+	@mkdir -p "$$(@D)"
+	+V=$$(shell expr match "$$*" $(MERKLE_SCALE_FR_EXTRACT_V)) ; B=$$(shell expr match "$$*" $(MERKLE_SCALE_FR_EXTRACT_B)) ; N=$$(shell expr match "$$*" $(MERKLE_SCALE_FR_EXTRACT_N)) ; ./rr_eval.sh -a merkle_custom -n "$$$${N}" -c "$$$${V},$$$${B},0.0001,$(1),{power,10},6,[update,regen],3,recon_fail_rate" -g eval_frate_inc.gp -t "merkle_{v$$$${V}, b$$$${B}}" -d "$$(@D)" -r $(EVAL_REPEATS) > "$$(@D)/eval.log"
+
 # scalability analysis (increasing data size) for different recon parameters
 .PRECIOUS: merkle_scale_expD$(1)-all/Makefile
 merkle_scale_expD$(1)-all/%/merkle_scale.dat: merkle_scale_expD$(1)-all/Makefile
@@ -181,16 +198,20 @@ ALL_B=1 2 3 4 8
 # define summary targets for groups of the ones above:
 define MERKLE_SUM_1
 # fprob analysis (different delta)
-merkle_0-$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_0-$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_B_FR), merkle_0-$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_V_FR), merkle_0-$(1)-all/$(PAR))
+merkle_$(1)-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_B_FR), merkle_$(1)-all/$(PAR)) $(foreach PAR, $(MERKLE_DEFAULT_V_FR), merkle_$(1)-all/$(PAR))
 	
 endef
-$(foreach PAR, 1_expDas_fprob 10_expDas_fprob 100_expDas_fprob 1_expD1 10_expD1 100_expD1,$(eval $(call MERKLE_SUM_1,$(PAR))))
+$(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-1_expD1 0-10_expD1 0-100_expD1,$(eval $(call MERKLE_SUM_1,$(PAR))))
 
 merkle-all: $(foreach PAR, 0-1_expDas_fprob 0-10_expDas_fprob 0-100_expDas_fprob 0-10_expD1 0-100_expD1, merkle_$(PAR)-all)
 	
 
 # ddist+fdist analysis (different data and failure distributions)
 merkle_dists-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_ddists_fdists_expDas_fprob-all/$(PAR)_fr0.1/merkle_ddists_fdists.dat)
+	
+
+# scalability analysis (increasing failure rate)
+merkle_scale_fr-all: $(foreach PAR, $(MERKLE_DEFAULT_V_B), merkle_scale_fr_expDas_fprob-all/$(PAR)_n$(SYSTEM_SIZE)/merkle_custom.dat)
 	
 
 # scalability analysis (increasing data size)
@@ -355,7 +376,7 @@ $(foreach EXP_DELTA, as_fprob, $(foreach V, $(ALL_V), $(foreach FR, $(ALL_FR),\
 $(eval $(call MERKLE_SCALE_SUM_V_FR,$(EXP_DELTA),v$(V)_fr$(FR)))\
 )))
 
-merkle: merkle-all merkle_dists-all merkle_scale-all
+merkle: merkle-all merkle_dists-all merkle_scale_fr-all merkle_scale-all
 	
 
 # v4_b3_fr0.1_d10_n32000-60000,4000
