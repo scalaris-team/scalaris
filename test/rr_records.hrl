@@ -38,6 +38,7 @@
                       merkle_bucket | merkle_branch | merkle_num_trees |
                       art_corr_factor | art_leaf_fpr | art_inner_fpr.
 -type step_size() :: pos_integer() | float().
+-type step_inc() :: step_size() | {power, Base::pos_integer()}.
 -type fail_rate() :: float() | pos_integer().
 
 -record(ring_config, {

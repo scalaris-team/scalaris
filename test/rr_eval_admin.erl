@@ -24,10 +24,13 @@
 % for external scripts
 -export([% trivial
          trivial/7, trivial_ddists_fdists/7, trivial_scale/6,
+         trivial_custom/11,
          % shash
          shash/7, shash_ddists_fdists/7, shash_scale/6,
+         shash_custom/11,
          % bloom
          bloom/7, bloom_ddists_fdists/7, bloom_scale/6,
+         bloom_custom/11,
          % merkle
          merkle/9, merkle_ddists_fdists/9, merkle_scale/8,
          merkle_custom/13,
@@ -121,20 +124,20 @@ gen_setup(DDists, FTypes, FDists, Scen, Ring, RCList) ->
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
               EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-              StepSize::step_size() | power) -> ok.
+              StepSize::step_size()) -> ok.
 trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec trivial_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                             EvalRepeats::pos_integer(), FR::fail_rate(), Delta::number() | as_fprob,
-                            StepSize::step_size() | power) -> ok.
+                            StepSize::step_size()) -> ok.
 trivial_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec trivial(DestDir::string(), FileName::string(), N::pos_integer(),
               EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
               DDists::[data_distribution()], FDists::[fail_distribution()],
-              StepSize::step_size() | power) -> ok.
+              StepSize::step_size()) -> ok.
 trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
@@ -156,23 +159,20 @@ trivial(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) -
 -spec trivial_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
 trivial_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
-    Scenario = #scenario{ ring_type = uniform,
-                          data_type = random },
-    PairRing = #ring_config{ data_count = N,
-                             node_count = 4,
-                             fquadrants = [1,3],
-                             data_failure_rate = 3,
-                             round = 1 },
-    Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
-    
+    trivial_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+                 {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
+
+-spec trivial_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                     EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
+                     StepInc::step_inc(), Steps::pos_integer(),
+                     FTypes::[update | regen], Delta::pos_integer(),
+                     step_param()) -> ok.
+trivial_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+               StepInc, Steps, FTypes, Delta, StepParam) ->
     Trivial = #rc_config{ recon_method = trivial, recon_fail_rate = FR,
                           expected_delta = ExpDelta },
-
-    eval(pair,
-         gen_setup([random], ?EVAL_FTYPES, [random],
-                   Scenario, PairRing, [Trivial]),
-         data_count, 5, power, N, Options),
-    ok.
+    alg_custom(Dir, FileName, N, EvalRepeats, Trivial,
+               StepInc, Steps, FTypes, Delta, StepParam).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SHASH EVAL
@@ -180,20 +180,20 @@ trivial_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-            StepSize::step_size() | power) -> ok.
+            StepSize::step_size()) -> ok.
 shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec shash_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                           EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-                          StepSize::step_size() | power) -> ok.
+                          StepSize::step_size()) -> ok.
 shash_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec shash(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             DDists::[data_distribution()], FDists::[fail_distribution()],
-            StepSize::step_size() | power) -> ok.
+            StepSize::step_size()) -> ok.
 shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
@@ -215,23 +215,20 @@ shash(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
 -spec shash_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                   EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
 shash_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
-    Scenario = #scenario{ ring_type = uniform,
-                          data_type = random },
-    PairRing = #ring_config{ data_count = N,
-                             node_count = 4,
-                             fquadrants = [1,3],
-                             data_failure_rate = 3,
-                             round = 1 },
-    Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
-    
+    shash_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+                 {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
+
+-spec shash_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                   EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
+                   StepInc::step_inc(), Steps::pos_integer(),
+                   FTypes::[update | regen], Delta::pos_integer(),
+                   step_param()) -> ok.
+shash_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+             StepInc, Steps, FTypes, Delta, StepParam) ->
     SHash = #rc_config{ recon_method = shash, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
-
-    eval(pair,
-         gen_setup([random], ?EVAL_FTYPES, [random],
-                   Scenario, PairRing, [SHash]),
-         data_count, 5, power, N, Options),
-    ok.
+    alg_custom(Dir, FileName, N, EvalRepeats, SHash,
+               StepInc, Steps, FTypes, Delta, StepParam).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% BLOOM EVAL
@@ -239,20 +236,20 @@ shash_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-            StepSize::step_size() | power) -> ok.
+            StepSize::step_size()) -> ok.
 bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, [random], [random], StepSize).
 
 -spec bloom_ddists_fdists(DestDir::string(), FileName::string(), N::pos_integer(),
                           EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-                          StepSize::step_size() | power) -> ok.
+                          StepSize::step_size()) -> ok.
 bloom_ddists_fdists(Dir, FileName, N, EvalRepeats, FR, ExpDelta, StepSize) ->
     bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, ?EVAL_DDISTS, ?EVAL_FDISTS, StepSize).
 
 -spec bloom(DestDir::string(), FileName::string(), N::pos_integer(),
             EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
             DDists::[data_distribution()], FDists::[fail_distribution()],
-            StepSize::step_size() | power) -> ok.
+            StepSize::step_size()) -> ok.
 bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
@@ -274,23 +271,20 @@ bloom(Dir, FileName, N, EvalRepeats, FR, ExpDelta, DDists, FDists, StepSize) ->
 -spec bloom_scale(DestDir::string(), FileName::string(), N::pos_integer(),
                   EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
 bloom_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
-    Scenario = #scenario{ ring_type = uniform,
-                          data_type = random },
-    PairRing = #ring_config{ data_count = N,
-                             node_count = 4,
-                             fquadrants = [1,3],
-                             data_failure_rate = 3,
-                             round = 1 },
-    Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
-    
+    bloom_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+                 {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
+
+-spec bloom_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                   EvalRepeats::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
+                   StepInc::step_inc(), Steps::pos_integer(),
+                   FTypes::[update | regen], Delta::pos_integer(),
+                   step_param()) -> ok.
+bloom_custom(Dir, FileName, N, EvalRepeats, FR, ExpDelta,
+             StepInc, Steps, FTypes, Delta, StepParam) ->
     Bloom = #rc_config{ recon_method = bloom, recon_fail_rate = FR,
                         expected_delta = ExpDelta },
-
-    eval(pair,
-         gen_setup([random], ?EVAL_FTYPES, [random],
-                   Scenario, PairRing, [Bloom]),
-         data_count, 5, power, N, Options),
-    ok.
+    alg_custom(Dir, FileName, N, EvalRepeats, Bloom,
+               StepInc, Steps, FTypes, Delta, StepParam).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% MERKLE EVAL
@@ -299,7 +293,7 @@ bloom_scale(Dir, FileName, N, EvalRepeats, FR, ExpDelta) ->
 -spec merkle(DestDir::string(), FileName::string(), N::pos_integer(),
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
              MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-             StepSize::step_size() | power) -> ok.
+             StepSize::step_size()) -> ok.
 merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta, StepSize) ->
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
            [random], [random], StepSize).
@@ -308,7 +302,7 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta, StepSize) 
                            N::pos_integer(), EvalRepeats::pos_integer(),
                            MBranch::pos_integer(), MBucket::pos_integer(),
                            FR::fail_rate(), ExpDelta::number() | as_fprob,
-                           StepSize::step_size() | power) -> ok.
+                           StepSize::step_size()) -> ok.
 merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR,
                      ExpDelta, StepSize) ->
     merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
@@ -318,7 +312,7 @@ merkle_ddists_fdists(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR,
              EvalRepeats::pos_integer(), MBranch::pos_integer(),
              MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
              DDists::[data_distribution()], FDists::[fail_distribution()],
-             StepSize::step_size() | power) -> ok.
+             StepSize::step_size()) -> ok.
 merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
        DDists, FDists, StepSize) ->
     Scenario = #scenario{ ring_type = uniform,
@@ -345,36 +339,22 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
                    MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta) ->
     merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
-                  power, 5, ?EVAL_FTYPES, 3, data_count).
+                  {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
 
 -spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), MBranch::pos_integer(),
                     MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
-                    StepSize::step_size() | power, Steps::pos_integer(),
+                    StepInc::step_inc(), Steps::pos_integer(),
                     FTypes::[update | regen], Delta::pos_integer(),
                     step_param()) -> ok.
 merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
-              StepSize, Steps, FTypes, Delta, StepParam) ->
-    Scenario = #scenario{ ring_type = uniform,
-                          data_type = random },
-    PairRing = #ring_config{ data_count = N,
-                             node_count = 4,
-                             fquadrants = [1,3],
-                             data_failure_rate = Delta,
-                             round = 1 },
-    Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
-    
+              StepInc, Steps, FTypes, Delta, StepParam) ->
     Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
                          merkle_branch = MBranch, merkle_bucket = MBucket,
                          merkle_num_trees = 1 },
-    
-    Init = get_param_value({PairRing, Merkle}, StepParam),
-    eval(pair,
-         gen_setup([random], FTypes, [random],
-                   Scenario, PairRing, [Merkle]),
-         StepParam, Steps, StepSize, Init, Options),
-    ok.
+    alg_custom(Dir, FileName, N, EvalRepeats, Merkle,
+               StepInc, Steps, FTypes, Delta, StepParam).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ART EVAL
@@ -427,7 +407,34 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta
 
     eval(pair,
          gen_setup([random], ?EVAL_FTYPES, [random], Scenario, PairRing, [Art]),
-         data_count, 5, power, N, Options),
+         data_count, 5, {power, 4}, N, Options),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec alg_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                 EvalRepeats::pos_integer(), Algorithm::rc_config(),
+                 StepInc::step_inc(), Steps::pos_integer(),
+                 FTypes::[update | regen], Delta::pos_integer(),
+                 step_param()) -> ok.
+alg_custom(Dir, FileName, N, EvalRepeats, RCConfig,
+           StepInc, Steps, FTypes, Delta, StepParam) ->
+    Scenario = #scenario{ ring_type = uniform,
+                          data_type = random },
+    PairRing = #ring_config{ data_count = N,
+                             node_count = 4,
+                             fquadrants = [1,3],
+                             data_failure_rate = Delta,
+                             round = 1 },
+    Options = [{eval_dir, Dir}, {filename, FileName}, {eval_repeats, EvalRepeats}],
+    
+    Init = get_param_value({PairRing, RCConfig}, StepParam),
+    eval(pair,
+         gen_setup([random], FTypes, [random],
+                   Scenario, PairRing, [RCConfig]),
+         StepParam, Steps, StepInc, Init, Options),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -469,9 +476,9 @@ system(Dir, N, EvalRepeats, EvalName) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec eval(Mode::pair | sys, [ring_setup(),...], StepP::step_param(),
-           StepCount::pos_integer(), StepSize::step_size() | power,
+           StepCount::pos_integer(), StepInc::step_inc(),
            StepInit::step_size(), Options::eval_options()) -> ok.
-eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
+eval(Mode, Setups, StepParam, StepCount, StepInc, Init, Options0) ->
     {{YY, MM, DD}, {Hour, Min, Sec}} = erlang:localtime(),
     Options = [{eval_time, {Hour, Min, Sec}} | Options0],
     
@@ -503,7 +510,7 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
               ReconP = init_rc_conf(ReconP0, StepParam, Init),
               RingP = init_ring_conf(RingP0, StepParam, Init),
 
-              SetupText = eval_setup_comment(Scenario, RingP, StepParam, StepSize, EvalRepeats),
+              SetupText = eval_setup_comment(Scenario, RingP, StepParam, StepInc, EvalRepeats),
               ReconText = rc_conf_comment(ReconP),
               rr_eval_export:write_ds(EPFileDevice, {[{comment, lists:append(SetupText, [ReconText])}], []}),
               rr_eval_export:write_ds(MPFileDevice, {[{comment, lists:append(SetupText, [ReconText])}], []}),
@@ -513,7 +520,7 @@ eval(Mode, Setups, StepParam, StepCount, StepSize, Init, Options0) ->
               %        Mode=Pair does not support StepParam=rounds
               {_EP, _MP, NextEPId} = case Mode of
                                          sys -> system_sync(RingSetup, NOptions, StepCount, EPId);
-                                         pair -> pair_sync(RingSetup, NOptions, StepParam, StepSize, StepCount, {[], [], EPId})
+                                         pair -> pair_sync(RingSetup, NOptions, StepParam, StepInc, StepCount, {[], [], EPId})
                                      end,
               NextEPId
       end, StartEPId, Setups),
@@ -555,7 +562,7 @@ get_db(NodePid) ->
 
 %% @doc Starts one sync between 2 nodes.
 -spec pair_sync(ring_setup(), eval_options(), step_param(),
-                IncSize::step_size() | power, Steps::pos_integer(),
+                IncSize::step_inc(), Steps::pos_integer(),
                 Acc::sync_result()) -> sync_result().
 pair_sync(_RingSetup, _Options, _IncParam, _IncSize, -1, Acc) ->
     Acc;
@@ -582,7 +589,7 @@ pair_sync(Setup = {Scen, RingP, ReconP}, Options, IncParam, IncSize, StepCount, 
     ?ASSERT(EvalRepeats =/= undefined),
     StepValue =
         case IncSize of
-            power -> erlang:round(get_param_value({RingP, ReconP}, IncParam) * math:pow(4, StepCount));
+            {power, Base} -> get_param_value({RingP, ReconP}, IncParam) * util:pow(Base, StepCount);
             _ -> (IncSize * StepCount) + get_param_value({RingP, ReconP}, IncParam)
         end,
     {StepRing, StepRC} = set_params({RingP, ReconP}, IncParam, StepValue),
