@@ -106,10 +106,7 @@ write_ds(IoDevice, {DSProp, Table}) ->
 
 -spec write_row(IoDevice::file:io_device(), Row::[any()]) -> ok.
 write_row(IoDevice, Row) ->
-    _ = [case type_of(Field) of
-             float -> io:fwrite(IoDevice, "~f~c", [Field, ?TAB]);
-             _     -> io:fwrite(IoDevice, "~p~c", [Field, ?TAB])
-         end || Field <- Row],
+    _ = [io:fwrite(IoDevice, "~p~c", [Field, ?TAB]) || Field <- Row],
     io:fwrite(IoDevice, "~n", []).
 
 -spec close_file(IoDevice::file:io_device()) -> ok.
@@ -149,9 +146,3 @@ write_raw(DataSet, Options) ->
         {_, _} ->
             io_error
     end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-type_of(X) when is_float(X) -> float;
-type_of(X) when is_integer(X) -> integer;
-type_of(_) -> some.
