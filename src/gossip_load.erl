@@ -439,7 +439,7 @@ integrate_data(QData, Round, {PrevState, CurState}=FullState) ->
                             {integrated_data, state_get(instance, PrevState1), prev_round}),
             {ok, {PrevState1, CurState}};
         _ ->
-            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
+            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round.", [?MODULE]),
             {send_back, FullState}
     end.
 
