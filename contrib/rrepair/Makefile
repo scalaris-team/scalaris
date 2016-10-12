@@ -62,14 +62,14 @@ $(eval $(call FPROB_MAKEFILE,$(ALG),$(EXP_DELTA),$(VARIANT)))\
 
 # fprob analysis (different delta) for different recon parameters
 define MAX_DELTA_TARGETS
-.PRECIOUS: $(1)_$(2)_expD$(3)-all/Makefile
-$(1)_$(2)_expD$(3)-all/%/$(1).dat: $(1)_$(2)_expD$(3)-all/Makefile
+.PRECIOUS: $(1)_0-$(2)_expD$(3)-all/Makefile
+$(1)_0-$(2)_expD$(3)-all/%/$(1).dat: $(1)_0-$(2)_expD$(3)-all/Makefile
 	@echo " executing $$(@D) (N=$(SYSTEM_SIZE))"
 	@mkdir -p "$$(@D)"
 	+STEP_SIZE=0$$(shell bc <<< "scale=2; $(2)/5") ; ./rr_eval.sh -a $(1) -n "$(SYSTEM_SIZE)" -c "$$*,$(3),$$$$STEP_SIZE" -g eval_fprob.gp -t "$(1)_{FR$$*}" -d "$$(@D)" -r $(EVAL_REPEATS) -s $$$$STEP_SIZE > "$$(@D)/eval.log"
 endef
-$(foreach ALG, trivial shash bloom, $(foreach DELTA_RANGE, 0-1 0-10 0-100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
-$(eval $(call MAX_DELTA_TARGETS,$(ALG),$(DELTA_RANGE),$(EXP_DELTA)))\
+$(foreach ALG, trivial shash bloom, $(foreach MAX_DELTA, 1 10 100, $(foreach EXP_DELTA, $(EXP_DELTA_LIST),\
+$(eval $(call MAX_DELTA_TARGETS,$(ALG),$(MAX_DELTA),$(EXP_DELTA)))\
 )))
 
 define OTHER_TARGETS
