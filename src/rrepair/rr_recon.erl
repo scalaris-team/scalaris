@@ -2870,50 +2870,21 @@ build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     ?ALG_DEBUG("Bloom My: ~B OtherMax: ~B FPt: ~p~n  bloom1: ~p~n  bloom2: ~p",
                [MyMaxItems, InitiatorMaxItems, FPt,
                 {K1, M1, FP1_I, FP1_NI}, {K2, M2, FP2_I, FP2_NI}]),
-    BF0 = if Fr1_p1 =< FR_p1 andalso Fr2_p1 =< FR_p1 ->
-                 if M1 < M2 ->
-                        Fr_p1 = Fr1_p1,
-                        bloom:new(M1, K1);
-                    M1 =:= M2 andalso Fr1_p1 < Fr2_p1 ->
-                        Fr_p1 = Fr1_p1,
-                        bloom:new(M1, K1);
-                    true ->
-                        Fr_p1 = Fr2_p1,
-                        bloom:new(M2, K2)
-                 end;
-             Fr1_p1 =< FR_p1 -> % andalso Fr2_p1 > FR_p1
-                 Fr_p1 = Fr1_p1,
-                 bloom:new(M1, K1);
-             Fr2_p1 =< FR_p1 -> % andalso Fr1_p1 > FR_p1
-                 Fr_p1 = Fr2_p1,
-                 bloom:new(M2, K2);
-             true -> % Fr1_p1 > FR_p1 andalso Fr2_p1 > FR_p1
-                 % all other cases are probably due to floating point inefficiencies
-                 log:log("~w: [ ~.0p:~.0p ] FR constraint for phase 1 probably broken",
-                         [?MODULE, pid_groups:my_groupname(), self()]),
-                 % use the one with the lowest error and size:
-                 if Fr1_p1 < Fr2_p1 ->
-                        Fr_p1 = Fr1_p1,
-                        bloom:new(M1, K1);
-                    Fr1_p1 == Fr2_p1 andalso M1 =< M2 ->
-                        Fr_p1 = Fr1_p1,
-                        bloom:new(M1, K1);
-                    true ->
-                        Fr_p1 = Fr2_p1,
-                        bloom:new(M2, K2)
-                 end
-          end,
+    {K, M, Fr_p1} = bloom:select_best(FR_p1, K1, M1, Fr1_p1, K2, M2, Fr2_p1),
+    BF0 = bloom:new(M, K),
+    if Fr_p1 > FR_p1 ->
+           log:log("~w: [ ~.0p:~.0p ] FR constraint for phase 1 probably broken",
+                   [?MODULE, pid_groups:my_groupname(), self()]);
+       true -> ok
+    end,
     ?ALG_DEBUG("NI:~.0p, FR(phase1)=~p, ExpDelta = ~p~n"
                "  m=~B k=~B NICount=~B ICount=~B~n"
                "  fr(phase1)=~p",
-               [comm:this(), FR_p1, ExpDelta, bloom:get_property(BF0, size),
-                bloom:get_property(BF0, hfs_size),
-                MyMaxItems, InitiatorMaxItems,
-                Fr_p1]),
-    HfCount = bloom:get_property(BF0, hfs_size),
+               [comm:this(), FR_p1, ExpDelta, M, K,
+                MyMaxItems, InitiatorMaxItems, Fr_p1]),
     BF = bloom:add_list(BF0, DBItems),
     {#bloom_sync{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
-                 bf = BF, item_count = MyMaxItems, hf_count = HfCount,
+                 bf = BF, item_count = MyMaxItems, hf_count = K,
                  fail_rate = FR},
      % Note: we can only guess the number of items of the initiator here, so
      %       this is not exactly the failure rate of phase 1!

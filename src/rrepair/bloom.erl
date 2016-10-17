@@ -35,6 +35,7 @@
 % needed by other Bloom filter implementations or rr_recon:
 -export([calc_least_size/3,
          calc_HF_num_Size_opt/2, calc_FPR/3,
+         select_best/7,
          p_add_positions/3,
          resize/2]).
 
@@ -314,25 +315,37 @@ calc_HF_num_Size_opt(N, FP) ->
     %?DBG_ASSERT(FPR_Max =< FP),
 %%     log:pal("Bloom (~g): K=~B, M=~B (FP=~g) vs. K=~B, M=~B (FP=~g)",
 %%             [FP, K_Min, M_Min, FPR_Min, K_Max, M_Max, FPR_Max]),
-    if FPR_Min =< FP andalso FPR_Max =< FP ->
-           if M_Min < M_Max ->
-                  {K_Min, M_Min};
-              M_Min =:= M_Max andalso FPR_Min < FPR_Max ->
-                  {K_Min, M_Min};
+    {K, M, _FPX} = select_best(FP, K_Min, M_Min, FPR_Min,
+                               K_Max, M_Max, FPR_Max),
+    {K, M}.
+
+%% @doc Given two different options to create a Bloom filter with false
+%%      positive rates (or any other measure, e.g. failure rate) FP1 and FP2
+%%      and a target false positive rate FP, selects the best option that has
+%%      FPX =&lt; FP and the lowest MX.
+-spec select_best(FP::float(), K1::pos_integer(), M1::pos_integer(), FP1::float(),
+                  K2::pos_integer(), M2::pos_integer(), FP2::float())
+        -> {K::pos_integer(), M::pos_integer(), FP::float()}.
+select_best(FP, K1, M1, FP1, K2, M2, FP2) ->
+    if FP1 =< FP andalso FP2 =< FP ->
+           if M1 < M2 ->
+                  {K1, M1, FP1};
+              M1 =:= M2 andalso FP1 < FP2 ->
+                  {K1, M1, FP1};
               true ->
-                  {K_Max, M_Max}
+                  {K2, M2, FP2}
            end;
-       FPR_Min =< FP -> % andalso FPR_Max > FP
-           {K_Min, M_Min};
-       FPR_Max =< FP -> % andalso FPR_Min > FP
-           {K_Max, M_Max};
-       % all below have FPR_Min > FP andalso FPR_Max > FP
-       FPR_Min < FPR_Max ->
-           {K_Min, M_Min};
-       FPR_Min == FPR_Max andalso M_Min =< M_Max ->
-           {K_Min, M_Min};
+       FP1 =< FP -> % andalso FP2 > FP
+           {K1, M1, FP1};
+       FP2 =< FP -> % andalso FP1 > FP
+           {K2, M2, FP2};
+       % all below have FP1 > FP andalso FP2 > FP
+       FP1 < FP2 ->
+           {K1, M1, FP1};
+       FP1 == FP2 andalso M1 =< M2 ->
+           {K1, M1, FP1};
        true ->
-           {K_Max, M_Max}
+           {K2, M2, FP2}
     end.
 
 %% @doc Calculates the number of bits needed by a bloom filter to have a false
