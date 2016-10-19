@@ -468,17 +468,14 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
     end,
     
     MyDBSize1 = MyDBSize + length(DBList),
-    MyBF1 = bloom:add_list(MyBF, DBList),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
     % get a subset of Delta without what is missing on this node:
-    % NOTE: The only errors which might occur are bloom:is_element/2 returning
-    %       true for an item which is not on the other node (with the filter's
+    % NOTE: The only errors which might occur are bloom:filter_neg_and_add/3
+    %       omitting items which are not on the other node (with the filter's
     %       false positive probability/rate). These are the items we would miss.
-    Diff = if BFCount =:= 0 -> DBList;
-              true -> [X || X <- DBList, not bloom:is_element(BF, X)]
-           end,
+    {Diff, MyBF1} = bloom:filter_neg_and_add(BF, DBList, MyBF),
     NewKVList = lists:append(KVList, Diff),
 
     if not SyncFinished ->
@@ -599,12 +596,10 @@ on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg
     OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
                                          DiffBFBin), MyHfCount, OtherBFCount),
     % get a subset of Delta without what is missing on this node:
-    % NOTE: The only errors which might occur are bloom:is_element/2 returning
-    %       true for an item which is not on the other node (with the filter's
+    % NOTE: The only errors which might occur are bloom:filter_neg/2
+    %       omitting items which are not on the other node (with the filter's
     %       false positive probability/rate). These are the items we would miss.
-    Diff = if OtherBFCount =:= 0 -> KVList;
-              true -> [X || X <- KVList, not bloom:is_element(OtherBF, X)]
-           end,
+    Diff = bloom:filter_neg(OtherBF, KVList),
     % allow the garbage collector to free the original Bloom filter
     Struct1 = Struct#bloom_sync{bf = <<>>},
     State1 = State#rr_recon_state{kv_list = Diff, struct = Struct1,

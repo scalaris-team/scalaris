@@ -29,7 +29,9 @@
 -define(REP_HFS, hfs_plain). %HashFunctionSet selection for usage by bloom filter
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
-         add/2, add_list/2, is_element/2, item_count/1]).
+         add/2, add_list/2, is_element/2, filter/2, filter_neg/2,
+         filter_neg_and_add/3,
+         item_count/1]).
 -export([equals/2, join/2, get_property/2, print/1]).
 
 % needed by other Bloom filter implementations or rr_recon:
@@ -185,6 +187,57 @@ is_element(#bloom{hfs = Hfs, filter = Filter}, Item) ->
     BFSize = erlang:bit_size(Filter),
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_bits(Filter, Positions).
+
+%% @doc Returns all items present in the bloom filter.
+-spec filter(bloom_filter(), Items::[key()]) -> [key()].
+filter(#bloom{items_count = 0}, _Items) ->
+    [];
+filter(#bloom{hfs = Hfs, filter = Filter}, Items) ->
+    BFSize = erlang:bit_size(Filter),
+    [Item || Item <- Items,
+             check_bits(Filter, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize))].
+
+%% @doc Returns all items not present in the bloom filter.
+-spec filter_neg(bloom_filter(), Items::[key()]) -> [key()].
+filter_neg(#bloom{items_count = 0}, Items) ->
+    Items;
+filter_neg(#bloom{hfs = Hfs, filter = Filter}, Items) ->
+    BFSize = erlang:bit_size(Filter),
+    [Item || Item <- Items,
+             not check_bits(Filter, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize))].
+
+%% @doc Returns all items not present in the bloom filter and adds all items
+%%      to a Bloom filter of the same structure in parallel.
+%%      This way, the bit positions do not need to be determined twice
+%%      (using costly hash functions) compared to executing these two
+%%      functions separately.
+%% @see filter_neg/2
+%% @see add_list/2
+-spec filter_neg_and_add(BFFilter::bloom_filter(), Items::[key()],
+                         BFAdd::bloom_filter()) -> [key()].
+filter_neg_and_add(#bloom{items_count = 0, hfs = Hfs, filter = Filter}, Items,
+                   BFAdd = #bloom{hfs = Hfs, filter = FilterAdd}) ->
+    ?ASSERT(erlang:bit_size(Filter) =:= erlang:bit_size(FilterAdd)),
+    {Items, bloom:add_list(BFAdd, Items)};
+filter_neg_and_add(#bloom{hfs = Hfs, filter = Filter}, Items,
+                   BFAdd = #bloom{hfs = Hfs, filter = FilterAdd, items_count = FilledCountAdd}) ->
+    BFSize = erlang:bit_size(Filter),
+    BFSize = erlang:bit_size(FilterAdd), % needs to be equal!
+    IPositions = [{Item, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)} || Item <- Items],
+    FilteredItems = [Item || {Item, Pos} <- IPositions,
+                             not check_bits(Filter, Pos)],
+    % from p_add_list/4:
+    FilterAdd2 =
+        if Items =:= [] -> FilterAdd;
+           BFSize =:= 1 -> <<1:1>>;
+           true ->
+               Positions = lists:flatmap(fun({_Item, Pos}) -> Pos end, IPositions),
+               p_add_positions(Positions, FilterAdd, BFSize)
+        end,
+    % from add_list/2:
+    ItemsL = length(Items),
+    BFAdd2 = BFAdd#bloom{filter = FilterAdd2, items_count = FilledCountAdd + ItemsL},
+    {FilteredItems, BFAdd2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
