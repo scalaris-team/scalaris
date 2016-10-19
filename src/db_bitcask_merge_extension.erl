@@ -48,7 +48,7 @@ init(BitcaskHandle, Dir) ->
     trigger_merge(BitcaskHandle, Dir, ?MERGE_INTERVAL),
     ok.
 
--spec on(comm:message(), State::dht_node:state()) -> dht_node:state().
+-spec on(comm:message(), State::dht_node_state:state()) -> dht_node_state:state().
 on({merge_trigger, BitcaskHandle, Dir}, State) ->
     %% merges if necessary
 
