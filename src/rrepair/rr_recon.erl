@@ -246,14 +246,14 @@ on({create_struct2, SenderI, {get_state_response, MyI}} = _Msg,
     SyncI = find_sync_interval(MyI, SenderI),
     case intervals:is_empty(SyncI) of
         false ->
+            send_chunk_req(pid_groups:get_my(dht_node), self(),
+                           SyncI, get_max_items()),
             case RMethod of
                 art -> ok; % legacy (no integrated trivial sync yet)
                 _   -> fd:subscribe(self(), [DestRRPid])
             end,
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
-            send_chunk_req(pid_groups:get_my(dht_node), self(),
-                           SyncI, get_max_items()),
             State#rr_recon_state{stage = build_struct,
                                  'sync_interval@I' = SenderSyncI};
         true ->
@@ -458,6 +458,15 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
     ?TRACE_RCV(_Msg, State),
+    % if rest interval is non empty start another sync
+    % (do this early to allow some parallelism)
+    SyncFinished = intervals:is_empty(RestI),
+    if not SyncFinished ->
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, get_max_items());
+       true -> ok
+    end,
+    
     MyDBSize1 = MyDBSize + length(DBList),
     MyBF1 = bloom:add_list(MyBF, DBList),
     % no need to map keys since the other node's bloom filter was created with
@@ -472,11 +481,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            end,
     NewKVList = lists:append(KVList, Diff),
 
-    %if rest interval is non empty start another sync
-    SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(pid_groups:get_my(dht_node), self(),
-                          RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
                                 misc = [{item_count, MyDBSize1}, {my_bf, MyBF1}]};
        BFCount =:= 0 ->
