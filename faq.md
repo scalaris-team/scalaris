@@ -204,31 +204,13 @@ Now install scalaris and scalaris-bindings:
 pacman -Syy scalaris scalaris-bindings
 {% endhighlight %}
 
-### How to build an rpm?
-On openSUSE, for example, do the following:
-{% highlight sh %}
-export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
-for package in main bindings ; do
-  mkdir -p ${package}
-  cd ${package}
-  svn export ${SCALARIS_SVN}/contrib/packages/${package}/checkout.sh
-  ./checkout.sh
-  cp * /usr/src/packages/SOURCES/
-  rpmbuild -ba scalaris*.spec
-  cd ..
-done
-{% endhighlight %}
-
-If any additional packages are required in order to build an RPM, rpmbuild will print an error.
-Your source and binary RPMs will be generated in `/usr/src/packages/SRPMS` and `RPMS`.
-
 ### Does Scalaris run on Windows?
 
 No. Well, maybe.
 
   0. install Erlang ([http://www.erlang.org/download.html](http://www.erlang.org/download.html))
   0. install OpenSSL (for crypto module) ([http://www.slproweb.com/products/Win32OpenSSL.html](http://www.slproweb.com/products/Win32OpenSSL.html))
-  0. checkout Scalaris code from SVN
+  0. checkout Scalaris code from the git repository
   0. adapt the path to your Erlang installation in build.bat
   0. start a `cmd.exe`
   0. go to the Scalaris directory
@@ -269,7 +251,7 @@ The epmd is a Erlang daemon which always listens on port 4369. It provides means
 
 `scalarisctl -e "-kernel inet_dist_listen_min 14194 inet_dist_listen_max 14194"`
 
-`scalarisctl` from svn trunk contains `the --dist-erl-port` to ease this procedure:
+`scalarisctl` contains the `--dist-erl-port` parameter to ease this procedure:
 
 `scalarisctl --dist-erl-port 14194`
 
@@ -305,7 +287,7 @@ For a fault-tolerant setup, Scalaris is able to select the first node by itself 
 ### How do I start a ring?
 
 {% highlight sh %}
-./bin/firstnode.sh`
+./bin/firstnode.sh
 {% endhighlight %}
 
 starts both a boot server and a Scalaris node - a ring of size 1.
