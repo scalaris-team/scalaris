@@ -214,7 +214,7 @@ filter_neg(#bloom{hfs = Hfs, filter = Filter}, Items) ->
 %% @see filter_neg/2
 %% @see add_list/2
 -spec filter_neg_and_add(BFFilter::bloom_filter(), Items::[key()],
-                         BFAdd::bloom_filter()) -> [key()].
+                         BFAdd::bloom_filter()) -> {[key()], BFAdd2::bloom_filter()}.
 filter_neg_and_add(#bloom{items_count = 0, hfs = Hfs, filter = Filter}, Items,
                    BFAdd = #bloom{hfs = Hfs, filter = FilterAdd}) ->
     ?ASSERT(erlang:bit_size(Filter) =:= erlang:bit_size(FilterAdd)),
