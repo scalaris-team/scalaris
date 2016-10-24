@@ -33,7 +33,7 @@
          bloom_custom/11,
          % merkle
          merkle/9, merkle_ddists_fdists/9, merkle_scale/8,
-         merkle_custom/13,
+         merkle_custom/15,
          % art
          art/8, art_scale/8,
          % system sync
@@ -339,22 +339,23 @@ merkle(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
                    MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob) -> ok.
 merkle_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta) ->
     merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
-                  {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
+                  [random], [random], {power, 4}, 5, ?EVAL_FTYPES, 3, data_count).
 
 -spec merkle_custom(DestDir::string(), FileName::string(), N::pos_integer(),
                     EvalRepeats::pos_integer(), MBranch::pos_integer(),
                     MBucket::pos_integer(), FR::fail_rate(), ExpDelta::number() | as_fprob,
+                    DDists::[data_distribution()], FDists::[fail_distribution()],
                     StepInc::step_inc(), Steps::pos_integer(),
                     FTypes::[update | regen], Delta::pos_integer(),
                     step_param()) -> ok.
 merkle_custom(Dir, FileName, N, EvalRepeats, MBranch, MBucket, FR, ExpDelta,
-              StepInc, Steps, FTypes, Delta, StepParam) ->
+              DDists, FDists, StepInc, Steps, FTypes, Delta, StepParam) ->
     Merkle = #rc_config{ recon_method = merkle_tree, recon_fail_rate = FR,
                          expected_delta = ExpDelta,
                          merkle_branch = MBranch, merkle_bucket = MBucket,
                          merkle_num_trees = 1 },
     alg_custom(Dir, FileName, N, EvalRepeats, Merkle,
-               StepInc, Steps, FTypes, Delta, StepParam).
+               DDists, FDists, StepInc, Steps, FTypes, Delta, StepParam).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ART EVAL
@@ -421,6 +422,17 @@ art_scale(Dir, FileName, N, EvalRepeats, MBranch, MBucket, ACorrFactor, ExpDelta
                  step_param()) -> ok.
 alg_custom(Dir, FileName, N, EvalRepeats, RCConfig,
            StepInc, Steps, FTypes, Delta, StepParam) ->
+    alg_custom(Dir, FileName, N, EvalRepeats, RCConfig,
+               [random], [random], StepInc, Steps, FTypes, Delta, StepParam).
+
+-spec alg_custom(DestDir::string(), FileName::string(), N::pos_integer(),
+                 EvalRepeats::pos_integer(), Algorithm::rc_config(),
+                 DDists::[data_distribution()], FDists::[fail_distribution()],
+                 StepInc::step_inc(), Steps::pos_integer(),
+                 FTypes::[update | regen], Delta::pos_integer(),
+                 step_param()) -> ok.
+alg_custom(Dir, FileName, N, EvalRepeats, RCConfig,
+           DDists, FDists, StepInc, Steps, FTypes, Delta, StepParam) ->
     Scenario = #scenario{ ring_type = uniform,
                           data_type = random },
     PairRing = #ring_config{ data_count = N,
@@ -432,7 +444,7 @@ alg_custom(Dir, FileName, N, EvalRepeats, RCConfig,
     
     Init = get_param_value({PairRing, RCConfig}, StepParam),
     eval(pair,
-         gen_setup([random], FTypes, [random],
+         gen_setup(DDists, FTypes, FDists,
                    Scenario, PairRing, [RCConfig]),
          StepParam, Steps, StepInc, Init, Options),
     ok.
