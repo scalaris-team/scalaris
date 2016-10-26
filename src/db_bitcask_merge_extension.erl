@@ -25,7 +25,7 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
--define(MERGE_INTERVAL, 10 * 60). % in seconds.
+-define(MERGE_INTERVAL, (10 * 60)). % in seconds.
 
 -export([init/1, init/2]).
 -export([on/2]).
@@ -45,10 +45,31 @@ init(_Options) ->
 -spec init(BitcaskHandle::reference(), Dir::string()) -> ok.
 init(BitcaskHandle, Dir) ->
     ?TRACE("bitcask_merge: init for DB directory ~p~n", [Dir]),
-    trigger_merge(BitcaskHandle, Dir, ?MERGE_INTERVAL),
+    send_trigger(merge_offset, BitcaskHandle, Dir, 60),
     ok.
 
 -spec on(comm:message(), State::dht_node_state:state()) -> dht_node_state:state().
+on({merge_offset, BitcaskHandle, Dir}, State) ->
+    %% calculate initial offset to prevent that all nodes are merging at the
+    %% same time.
+    mgmt_server:node_list(),
+    Nodes = receive
+                ?SCALARIS_RECV(
+                    {get_list_response, List},
+                    lists:usort([Pid || {_, _, Pid} <- List])
+                )
+            after 2000 ->
+                [self()]
+            end,
+
+    Slot = get_idx(self(), Nodes),
+    SlotLength = ?MERGE_INTERVAL / length(Nodes),
+    Offset = trunc(SlotLength * Slot),
+    log:pal("PIDs: ~p~n~nSlot choosen: ~p~n", [Nodes, Slot]),
+    send_trigger(merge_trigger, BitcaskHandle, Dir, Offset),
+
+    State;
+
 on({merge_trigger, BitcaskHandle, Dir}, State) ->
     %% merges if necessary
 
@@ -69,16 +90,26 @@ on({merge_trigger, BitcaskHandle, Dir}, State) ->
                 false ->
                     ok
             end,
-            trigger_merge(BitcaskHandle, Dir, ?MERGE_INTERVAL)
+            send_trigger(merge_trigger, BitcaskHandle, Dir, ?MERGE_INTERVAL)
     end,
     State.
 
-%% @doc Sends a merge_trigger message to itself
--spec trigger_merge(BitcaskHandle::reference(),
+%% @doc Sends a trigger message to itself
+-spec send_trigger(Message::atom(), BitcaskHandle::reference(),
     Dir::string(), Delay::integer()) -> ok.
-trigger_merge(BitcaskHandle, Dir, Delay) ->
+send_trigger(Message, BitcaskHandle, Dir, Delay) ->
     msg_delay:send_trigger(Delay,
-                           dht_node_extensions:wrap(?MODULE, {merge_trigger,
+                           dht_node_extensions:wrap(?MODULE, {Message,
                                                               BitcaskHandle,
                                                               Dir})),
     ok.
+
+%% @doc Helper to find the index of an element in a list.
+%% Returns length(List)+1 if List does not contain E.
+-spec get_idx(E::any(), List::any()) -> integer().
+get_idx(E, List) -> get_idx(E, List, 1).
+
+-spec get_idx(E::any(), List::any(), Idx::integer()) -> integer().
+get_idx(_, [], Idx) -> Idx;
+get_idx(E, [E | _], Idx) -> Idx;
+get_idx(E, [_ | T], Idx) -> get_idx(E, T, Idx+1).
