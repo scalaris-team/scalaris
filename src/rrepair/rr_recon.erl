@@ -727,7 +727,7 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (NI) - fail_rate(p1): ~p -> ~p~n  NextNodes: ~B",
+    ?ALG_DEBUG("merkle (NI)~n  fail_rate(p1): ~p -> ~p - NextNodes: ~B",
                [PrevUsedFr, UsedFr, NextLvlNodesAct]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
@@ -768,7 +768,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                                  EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (I) - fail_rate(p1): ~p -> ~p~n  NextNodes: ~B",
+    ?ALG_DEBUG("merkle (I)~n  fail_rate(p1): ~p -> ~p - NextNodes: ~B",
                [PrevUsedFr, UsedFr, NextLvlNodesAct]),
 
     if RTree =:= [] ->
@@ -2403,14 +2403,18 @@ merkle_resolve_leaves_send(
     TrivialProcs = SyncSendL + SyncRcvL,
     FRAllLeaves = calc_n_subparts_FR(1, Params#merkle_params.fail_rate, UsedFrSum),
     ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tFRAllLeaves: ~g\t"
-               "ItemsToSend: ~B (~g per leaf)",
+               "ItemsToSend: ~B (~g per leaf)~n  send: ~B (L-L) + ~B (L-I), receive: ~B (L-L) + ~B (I-L)",
                [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
                 MySyncDRLCount, ?IIF(IsInitiator, "in", "out"),
                 FRAllLeaves,
                 lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]),
                 ?IIF(SyncSend =/= [],
                      lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]) /
-                         SyncSendL, 0.0)]),
+                         SyncSendL, 0.0),
+                length([ok || {OtherMaxIC, _MyKVItems} <- SyncSend, OtherMaxIC =< Params#merkle_params.bucket_size]),
+                SyncSendL - length([ok || {OtherMaxIC, _MyKVItems} <- SyncSend, OtherMaxIC =< Params#merkle_params.bucket_size]),
+                length([ok || {MyMaxIC, _MyKVItems} <- SyncRcv, MyMaxIC =< Params#merkle_params.bucket_size]),
+                SyncRcvL - length([ok || {MyMaxIC, _MyKVItems} <- SyncRcv, MyMaxIC =< Params#merkle_params.bucket_size])]),
     
     if SyncSendL =:= 0 andalso SyncRcvL =:= 0 ->
            % nothing to do
