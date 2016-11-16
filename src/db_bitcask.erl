@@ -76,11 +76,13 @@ new_db(DBName, BitcaskOptions) ->
         {error, eexist} -> ok;
         {error, Error1} -> erlang:exit({db_bitcask, 'cannot create dir', FullDir, Error1})
     end,
-    case bitcask:open(filename:absname(lists:flatten(FullDir)), BitcaskOptions) of
+    BitcaskDir = filename:absname(lists:flatten(FullDir)),
+    case bitcask:open(BitcaskDir, BitcaskOptions) of
         {error, Error} ->
             log:log(error, "[ Node ~w:db_bitcask ] ~.0p", [self(), Error]),
             erlang:error({bitcask_failed, Error});
         Handle ->
+            db_bitcask_merge_extension:init(Handle, BitcaskDir),
             {Handle, DBName}
     end.
 

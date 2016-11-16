@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -237,13 +237,10 @@ bloom2(_) ->
     Fpr = 0.1,
 
     BaseBF = bloom:new_fpr(ToAdd, Fpr),
-    
-    Hfs = bloom:get_property(BaseBF, hfs),
     BFSize = bloom:get_property(BaseBF, size),
-    BFBin = bloom:get_property(BaseBF, filter),
     
     BloomAddListFunAdd =
-        fun(_BloomFun, ChunkSize) ->
+        fun(ChunkSize) ->
                 for_to_ex(
                   1, ToAdd div ChunkSize,
                   fun(I) -> I end,
@@ -253,57 +250,29 @@ bloom2(_) ->
                   BaseBF)
         end,
     BloomAddListFunNew =
-        fun(BloomFun, ChunkSize) ->
+        fun(ChunkSize) ->
                 for_to_ex(
                   1, ToAdd div ChunkSize,
                   fun(I) -> I end,
                   fun(_I, _B) ->
-                          BloomFun(Hfs, BFSize, BFBin, random_list(ChunkSize))
+                          bloom:add_list(BaseBF, random_list(ChunkSize))
                   end,
                   ok)
-        end,
-    BloomAddListFunFold =
-        fun(BloomFun, ChunkSize) ->
-                for_to_ex(
-                  1, ToAdd div ChunkSize,
-                  fun(I) -> I end,
-                  fun(_I, B) ->
-                          BloomFun(Hfs, BFSize, B, random_list(ChunkSize))
-                  end,
-                  BFBin)
         end,
     
     AddTimesAdd =
         [begin
              AvgV = measure_util:get(
                       measure_util:time_avg(
-                        fun() -> BloomAddListFunAdd(fun bloom:p_add_list_v1/4, I) end,
-                        ExecTimes, []), avg),
+                        fun() -> BloomAddListFunAdd(I) end, ExecTimes, []), avg),
              {I, AvgV}
          end || I <- [8, 16, 4096]],
     AddTimesNew =
         [begin
-             AvgV1 = measure_util:get(
-                       measure_util:time_avg(
-                         fun() -> BloomAddListFunNew(fun bloom:p_add_list_v1/4, I) end,
-                         ExecTimes, []), avg),
-             AvgV2 = measure_util:get(
-                       measure_util:time_avg(
-                         fun() -> BloomAddListFunNew(fun bloom:p_add_list_v2/4, I) end,
-                         ExecTimes, []), avg),
-             {I, AvgV1, AvgV2}
-         end || I <- [8, 16, 4096]],
-    AddTimesFold =
-        [begin
-             AvgV1 = measure_util:get(
-                       measure_util:time_avg(
-                         fun() -> BloomAddListFunFold(fun bloom:p_add_list_v1/4, I) end,
-                         ExecTimes, []), avg),
-             AvgV2 = measure_util:get(
-                       measure_util:time_avg(
-                         fun() -> BloomAddListFunFold(fun bloom:p_add_list_v2/4, I) end,
-                         ExecTimes, []), avg),
-             {I, AvgV1, AvgV2}
+             AvgV = measure_util:get(
+                      measure_util:time_avg(
+                        fun() -> BloomAddListFunNew(I) end, ExecTimes, []), avg),
+             {I, AvgV}
          end || I <- [8, 16, 4096]],
 
     %print results
@@ -315,15 +284,11 @@ bloom2(_) ->
                lists:append(lists:duplicate(length(AddTimesAdd), "
             Res: ~.2p")) ++ "
             --------------------------------------------------------------" ++ "
-            using bloom:add_list/2 (V1 vs. V2) on empty bloom filter:" ++
+            using bloom:add_list/2 on an empty bloom filter:" ++
                lists:append(lists:duplicate(length(AddTimesNew), "
-            Res: ~.2p")) ++ "
-            --------------------------------------------------------------" ++ "
-            using bloom:add_list/2 (V1 vs. V2) consecutively:" ++
-               lists:append(lists:duplicate(length(AddTimesFold), "
             Res: ~.2p")),
            [ToAdd, ExecTimes, BFSize, bloom:get_property(BaseBF, hfs_size)]
-               ++ AddTimesAdd ++ AddTimesNew ++ AddTimesFold),
+               ++ AddTimesAdd ++ AddTimesNew),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

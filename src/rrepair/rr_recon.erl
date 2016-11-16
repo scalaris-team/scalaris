@@ -13,12 +13,12 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc    replica reconcilication module
 %% @end
 %% @version $Id$
 -module(rr_recon).
 -author('malange@informatik.hu-berlin.de').
--vsn('$Id$').
 
 -behaviour(gen_component).
 
@@ -31,18 +31,18 @@
          map_interval/2,
          quadrant_intervals/0]).
 -export([get_chunk_kv/1, get_chunk_filter/1]).
-%-export([compress_kv_list/6]).
+%-export([compress_kv_list/5]).
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/4, merkle_decompress_hashlist/3]).
 -export([pos_to_bitstring/4, bitstring_to_k_list_k/3, bitstring_to_k_list_kv/3]).
--export([calc_signature_size_nm_pair/6, calc_n_subparts_p1e/2, calc_n_subparts_p1e/3]).
-%% -export([calc_max_different_hashes/4,
-%%          trivial_signature_sizes/4, trivial_worst_case_failprob/4,
-%%          shash_signature_sizes/4, shash_worst_case_failprob/4,
-%%          bloom_calc_max_nr_checks/3,
-%%          bloom_fp/4, bloom_worst_case_failprob_/4]).
+-export([calc_n_subparts_FR/2, calc_n_subparts_FR/3]).
+%% -export([calc_max_different_hashes/3,
+%%          trivial_signature_sizes/4, trivial_worst_case_failrate/4,
+%%          shash_signature_sizes/4, shash_worst_case_failrate/4,
+%%          calc_max_different_items_node/3, calc_max_different_items_total/3,
+%%          bloom_target_fp/4, bloom_worst_case_failrate_/5]).
 -export([tester_create_kvi_tree/1, tester_is_kvi_tree/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -81,34 +81,36 @@
 -type signature_size() :: 0..160. % use an upper bound of 160 (SHA-1) to limit automatic testing
 -type kvi_tree()       :: mymaps:mymap(). % KeyShort::non_neg_integer() => {VersionShort::non_neg_integer(), Idx::non_neg_integer()}
 
--record(trivial_recon_struct,
+-record(trivial_sync,
         {
-         interval  = intervals:empty()                          :: intervals:interval(),
-         reconPid  = undefined                                  :: comm:mypid() | undefined,
-         exp_delta = ?required(trivial_recon_struct, exp_delta) :: number(),
-         db_chunk  = ?required(trivial_recon_struct, db_chunk)  :: {bitstring(), bitstring()} | {bitstring(), bitstring(), db_chunk_kv()}, % two binaries for transfer, the three-tuple only temporarily (locally)
-         sig_size  = ?required(trivial_recon_struct, sig_size)  :: signature_size()
+         interval       = intervals:empty()                       :: intervals:interval(),
+         reconPid       = undefined                               :: comm:mypid() | undefined,
+         exp_delta      = ?required(trivial_sync, exp_delta)      :: number(),
+         db_chunk       = ?required(trivial_sync, db_chunk)       :: {bitstring(), bitstring()} | {bitstring(), bitstring(), ResortedKV::db_chunk_kv(), Dupes::db_chunk_kv()}, % two binaries for transfer, the four-tuple only temporarily (locally)
+         '+item_count'  = ?required(trivial_sync, '+item_count')  :: non_neg_integer(), % number of items not present in db_chunk
+         sig_size       = ?required(trivial_sync, sig_size)       :: signature_size()
         }).
 
--record(shash_recon_struct,
+-record(shash_sync,
         {
-         interval  = intervals:empty()                        :: intervals:interval(),
-         reconPid  = undefined                                :: comm:mypid() | undefined,
-         exp_delta = ?required(shash_recon_struct, exp_delta) :: number(),
-         db_chunk  = ?required(shash_recon_struct, db_chunk)  :: bitstring() | {bitstring(), db_chunk_kv()}, % binary for transfer, the pair only temporarily (locally)
-         sig_size  = ?required(shash_recon_struct, sig_size)  :: signature_size(),
-         p1e       = ?required(shash_recon_struct, p1e)       :: float()
+         interval       = intervals:empty()                       :: intervals:interval(),
+         reconPid       = undefined                               :: comm:mypid() | undefined,
+         exp_delta      = ?required(shash_sync, exp_delta)        :: number(),
+         db_chunk       = ?required(shash_sync, db_chunk)         :: bitstring() | {bitstring(), ResortedKV::db_chunk_kv(), Dupes::db_chunk_kv()}, % binary for transfer, the three-tuple only temporarily (locally)
+         '+item_count'  = ?required(shash_sync, '+item_count')    :: non_neg_integer(), % number of items not present in db_chunk
+         sig_size       = ?required(shash_sync, sig_size)         :: signature_size(),
+         fail_rate      = ?required(shash_sync, fail_rate)        :: float()
         }).
 
--record(bloom_recon_struct,
+-record(bloom_sync,
         {
-         interval   = intervals:empty()                         :: intervals:interval(),
-         reconPid   = undefined                                 :: comm:mypid() | undefined,
-         exp_delta  = ?required(bloom_recon_struct, exp_delta)  :: number(),
-         bf         = ?required(bloom_recon_struct, bloom)      :: bitstring() | bloom:bloom_filter(), % bitstring for transfer, the full filter locally
-         item_count = ?required(bloom_recon_struct, item_count) :: non_neg_integer(),
-         hf_count   = ?required(bloom_recon_struct, hf_count)   :: pos_integer(),
-         p1e        = ?required(bloom_recon_struct, p1e)        :: float()
+         interval       = intervals:empty()                       :: intervals:interval(),
+         reconPid       = undefined                               :: comm:mypid() | undefined,
+         exp_delta      = ?required(bloom_sync, exp_delta)        :: number(),
+         bf             = ?required(bloom_sync, bloom)            :: bitstring() | bloom:bloom_filter(), % bitstring for transfer, the full filter locally
+         item_count     = ?required(bloom_sync, item_count)       :: non_neg_integer(),
+         hf_count       = ?required(bloom_sync, hf_count)         :: pos_integer(),
+         fail_rate      = ?required(bloom_sync, fail_rate)        :: float()
         }).
 
 -record(merkle_params,
@@ -119,8 +121,9 @@
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
          num_trees      = ?required(merkle_param, num_trees)      :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer(),
-         p1e            = ?required(merkle_param, p1e)            :: float(),
-         ni_item_count  = ?required(merkle_param, ni_item_count)  :: non_neg_integer()
+         fail_rate      = ?required(merkle_param, fail_rate)      :: float(),
+         ni_item_count  = ?required(merkle_param, ni_item_count)  :: non_neg_integer(),
+         ni_max_ic      = ?required(merkle_param, ni_max_ic)      :: non_neg_integer()
         }).
 
 -record(art_recon_struct,
@@ -131,15 +134,15 @@
          bucket_size    = ?required(art_recon_struct, bucket_size)    :: pos_integer()
         }).
 
--type sync_struct() :: #trivial_recon_struct{} |
-                       #shash_recon_struct{} |
-                       #bloom_recon_struct{} |
+-type sync_struct() :: #trivial_sync{} |
+                       #shash_sync{} |
+                       #bloom_sync{} |
                        merkle_tree:merkle_tree() |
                        [merkle_tree:mt_node()] |
                        #art_recon_struct{}.
--type parameters() :: #trivial_recon_struct{} |
-                      #shash_recon_struct{} |
-                      #bloom_recon_struct{} |
+-type parameters() :: #trivial_sync{} |
+                      #shash_sync{} |
+                      #bloom_sync{} |
                       #merkle_params{} |
                       #art_recon_struct{}.
 -type recon_dest() :: ?RT:key() | random.
@@ -173,8 +176,8 @@
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          kv_list            = []                                     :: db_chunk_kv() | [db_chunk_kv()], % list of KV chunks only temporarily when retrieving the DB in pieces
          k_list             = []                                     :: [?RT:key()],
-         stats              = ?required(rr_recon_state, stats)       :: rr_recon_stats:stats(),
-         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReqIdx::[non_neg_integer()]}
+         next_phase_kv      = []                                     :: db_chunk_kv(), % KV items that go directly into the next phase, e.g. items from colliding hashes (dupes)
+         stats              = ?required(rr_recon_state, stats)       :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
 
@@ -189,7 +192,7 @@
 -type request() ::
     {start, method(), DestKey::recon_dest()} |
     {create_struct, method(), SenderI::intervals:interval(), SenderMaxItems::non_neg_integer()} | % from initiator
-    {start_recon, bloom, #bloom_recon_struct{}} | % to initiator
+    {start_recon, bloom, #bloom_sync{}} | % to initiator
     {start_recon, merkle_tree, #merkle_params{}} | % to initiator
     {start_recon, art, #art_recon_struct{}}. % to initiator
 
@@ -200,15 +203,15 @@
     {reconcile_req, DiffBFBin::bitstring(), OtherBFCount::non_neg_integer(),
      OtherDiffCount::non_neg_integer(), SenderPid::comm:mypid()} |
     {resolve_req, BinReqIdxPos::bitstring()} |
-    {resolve_req, DBChunk::{bitstring(), bitstring()}, Payload::any(),
-     SigSize::signature_size(), SenderPid::comm:mypid()} |
+    {resolve_req, DBChunk::{bitstring(), bitstring()}, DupesCount::non_neg_integer(),
+     Payload::any(), SigSize::signature_size(), SenderPid::comm:mypid()} |
     {resolve_req, shutdown, Payload::any()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes, ToCheck::bitstring(), MaxItemsCount::non_neg_integer()} |
     {?check_nodes_response, FlagsBin::bitstring(), MaxItemsCount::non_neg_integer()} |
     {resolve_req, HashesK::bitstring(), HashesV::bitstring()} |
-    {resolve_req, BinKeyList::bitstring(), SyncSendP1E_real::float()} |
+    {resolve_req, BinKeyList::bitstring(), SyncSendFr_real::float()} |
     % dht node response
     {create_struct2, SenderI::intervals:interval(), {get_state_response, MyI::intervals:interval()}} |
     {process_db, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
@@ -243,14 +246,14 @@ on({create_struct2, SenderI, {get_state_response, MyI}} = _Msg,
     SyncI = find_sync_interval(MyI, SenderI),
     case intervals:is_empty(SyncI) of
         false ->
+            send_chunk_req(pid_groups:get_my(dht_node), self(),
+                           SyncI, get_max_items()),
             case RMethod of
                 art -> ok; % legacy (no integrated trivial sync yet)
                 _   -> fd:subscribe(self(), [DestRRPid])
             end,
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
-            send_chunk_req(pid_groups:get_my(dht_node), self(),
-                           SyncI, get_max_items()),
             State#rr_recon_state{stage = build_struct,
                                  'sync_interval@I' = SenderSyncI};
         true ->
@@ -277,39 +280,35 @@ on({start_recon, RMethod, Params} = _Msg,
     %       (it could be outdated then even if we retrieved the current range now!)
     case RMethod of
         trivial ->
-            #trivial_recon_struct{interval = MySyncI, reconPid = DestReconPid,
-                                  db_chunk = DBChunk,
-                                  sig_size = SigSize} = Params,
-            Params1 = Params#trivial_recon_struct{db_chunk = {<<>>, <<>>}},
+            #trivial_sync{interval = MySyncI, reconPid = DestReconPid,
+                          db_chunk = CKV, sig_size = SigSize} = Params,
+            Params1 = Params#trivial_sync{db_chunk = {<<>>, <<>>}},
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             % convert db_chunk to a map for faster access checks
-            {DBChunkTree, OrigDBChunkLen, VSize} =
-                decompress_kv_list(DBChunk, SigSize),
+            {CKVTree, VSize} = decompress_kv_list(CKV, unknown, SigSize),
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkTree, OrigDBChunkLen, _MyDBSize = 0}},
+            Misc1 = [{db_chunk, CKVTree},
                      {ver_size, VSize}];
         shash ->
-            #shash_recon_struct{interval = MySyncI, reconPid = DestReconPid,
-                                db_chunk = DBChunk, sig_size = SigSize} = Params,
+            #shash_sync{interval = MySyncI, reconPid = DestReconPid,
+                        db_chunk = SH, sig_size = SigSize} = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
-            % convert db_chunk to a gb_set for faster access checks
-            {DBChunkSet, OrigDBChunkLen, 0} =
-                decompress_kv_list({DBChunk, <<>>}, SigSize),
-            %DBChunkSet = mymaps:from_list(DBChunkList),
-            Params1 = Params#shash_recon_struct{db_chunk = <<>>},
+            % convert db_chunk to a map for faster access checks
+            {SHTree, 0} = decompress_kv_list({SH, <<>>}, unknown, SigSize),
+            Params1 = Params#shash_sync{db_chunk = <<>>},
             ?DBG_ASSERT(Misc =:= []),
-            Misc1 = [{db_chunk, {DBChunkSet, OrigDBChunkLen, _MyDBSize = 0}}];
+            Misc1 = [{db_chunk, SHTree}];
         bloom ->
-            #bloom_recon_struct{interval = MySyncI, reconPid = DestReconPid,
-                                bf = BFBin, item_count = BFCount,
-                                hf_count = HfCount} = Params,
+            #bloom_sync{interval = MySyncI, reconPid = DestReconPid,
+                        bf = BFBin, item_count = BFCount,
+                        hf_count = HfCount} = Params,
             ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(self(), [DestRRPid]),
             ?DBG_ASSERT(Misc =:= []),
             BF = bloom:new_bin(BFBin, HfCount, BFCount),
-            Params1 = Params#bloom_recon_struct{bf = BF},
+            Params1 = Params#bloom_sync{bf = BF},
             Misc1 = [{item_count, 0},
                      {my_bf, bloom:new(erlang:max(1, erlang:bit_size(BFBin)), HfCount)}];
         merkle_tree ->
@@ -338,45 +337,52 @@ on({start_recon, RMethod, Params} = _Msg,
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,        initiator = true,
-                           method = trivial,
-                           params = #trivial_recon_struct{exp_delta = ExpDelta,
-                                                          sig_size = SigSize},
-                           dest_rr_pid = DestRRPid,    stats = Stats,
-                           ownerPid = OwnerL, to_resolve = {ToSend, ToReqIdx},
-                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}},
-                                   {ver_size, VSize}],
-                           dest_recon_pid = DestReconPid}) ->
+                           method = trivial,              kv_list = KVList}) ->
     ?TRACE_RCV(_Msg, State),
+    % we need all items first and the process them further (just as on the non-initiator)
+    % collect them in the 'kv_list' property of #rr_recon_state{}
 
-    MyDBSize1 = MyDBSize + length(DBList),
-    % identify items to send, request and the remaining (non-matched) DBChunk:
-    {ToSend1, ToReqIdx1, OtherDBChunk1} =
-        get_full_diff(DBList, OtherDBChunk, ToSend, ToReqIdx, SigSize,
-                      util:pow(2, VSize)),
-    ?DBG_ASSERT2(length(ToSend1) =:= length(lists:usort(ToSend1)),
-                 {non_unique_send_list, ToSend, ToSend1}),
-
-    %if rest interval is non empty get another chunk
+    % if rest interval is non-empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
-           State#rr_recon_state{to_resolve = {ToSend1, ToReqIdx1},
-                                misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}},
-                                        {ver_size, VSize}]};
+           State#rr_recon_state{kv_list = [DBList | KVList]};
        true ->
-           % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1_real =
-               trivial_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
-           NewStats = send_resolve_request(Stats1, ToSend1, OwnerL, DestRRPid,
+           #rr_recon_state{params = #trivial_sync{exp_delta = ExpDelta,
+                                                  sig_size = SigSize,
+                                                  '+item_count' = AddToChunkSize},
+                           dest_rr_pid = DestRRPid, stats = Stats,
+                           ownerPid = OwnerL,
+                           misc = [{db_chunk, CKVTree},
+                                   {ver_size, VSize}],
+                           dest_recon_pid = DestReconPid} = State,
+           FullKVList = lists:append([DBList | KVList]),
+           MyDBSize1 = length(FullKVList),
+           ChunkSize = mymaps:size(CKVTree),
+           % identify items to send, request and the remaining (non-matched) DBChunk:
+           % remove colliding hashes in DBList and add them to phase 2 (in turn,
+           % colliding items in CKV are also added to phase 2 on the non-initiator)
+           {ToSend, ToReqIdx, OtherDBChunk1, _Dupes} =
+               get_diff_with_dupes(FullKVList, CKVTree, [], [], SigSize, VSize,
+                                   fun get_full_diff/4),
+           ItemCountNI_p1 = ChunkSize + AddToChunkSize,
+           ?ALG_DEBUG("CheckCKV ~Bckv vs. ~Bcmp items, ~B dupes",
+                      [ItemCountNI_p1, MyDBSize1, length(_Dupes)]),
+           ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                        {non_unique_send_list, ToSend, _Dupes}),
+           % note: the actual acc(phase1) may be different from what the non-initiator expected
+           Fr_p1_real = trivial_worst_case_failrate(
+                          SigSize, MyDBSize1, ItemCountNI_p1, ExpDelta),
+           Stats1  = rr_recon_stats:set([{fail_rate_p1, Fr_p1_real}], Stats),
+           NewStats = send_resolve_request(Stats1, ToSend, OwnerL, DestRRPid,
                                            true, true),
            % let the non-initiator's rr_recon process identify the remaining keys
            ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]
-                                    ++ ToReqIdx1),
-           ToReq2 = compress_idx_list(ReqIdx, OrigDBChunkLen - 1, [], 0, 0),
+                                    ++ ToReqIdx),
+           ToReq2 = compress_idx_list(ReqIdx, ChunkSize - 1, [], 0, 0, integrate_size),
            NewStats2 =
-               if ReqIdx =/= [] ->
+               if ReqIdx =/= [] orelse AddToChunkSize > 0 ->
                       % the non-initiator will use key_upd_send and we must thus increase
                       % the number of resolve processes here!
                       rr_recon_stats:inc([{rs_expected, 1}], NewStats);
@@ -389,85 +395,90 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            comm:send(DestReconPid, {resolve_req, ToReq2}),
            
            shutdown(sync_finished,
-                    State#rr_recon_state{stats = NewStats2,
-                                         to_resolve = {[], []},
-                                         misc = []})
+                    State#rr_recon_state{stats = NewStats2, misc = []})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
-                           method = shash,            stats = Stats,
-                           params = #shash_recon_struct{exp_delta = ExpDelta,
-                                                        sig_size = SigSize,
-                                                        p1e = P1E},
-                           kv_list = KVList,
-                           misc = [{db_chunk, {OtherDBChunk, OrigDBChunkLen, MyDBSize}}]}) ->
+                           method = shash,            kv_list = KVList}) ->
     ?TRACE_RCV(_Msg, State),
-    % this is similar to the trivial sync above and the bloom sync below
-
-    MyDBSize1 = MyDBSize + length(DBList),
-    % identify differing items and the remaining (non-matched) DBChunk:
-    {NewKVList, OtherDBChunk1} =
-        shash_get_full_diff(DBList, OtherDBChunk, KVList, SigSize),
-    NewState =
-        State#rr_recon_state{kv_list = NewKVList,
-                             misc = [{db_chunk, {OtherDBChunk1, OrigDBChunkLen, MyDBSize1}}]},
+    % this is similar to the trivial sync above:
+    % we need all items first and the process them further (just as on the non-initiator)
+    % collect them in the 'kv_list' property of #rr_recon_state{}
 
     %if rest interval is non empty start another sync
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
            send_chunk_req(pid_groups:get_my(dht_node), self(),
                           RestI, get_max_items()),
-           NewState;
+           State#rr_recon_state{kv_list = [DBList | KVList]};
        true ->
-           % note: the actual P1E(phase1) may be different from what the non-initiator expected
-           P1E_p1_real =
-               shash_worst_case_failprob(SigSize, OrigDBChunkLen, MyDBSize1, ExpDelta),
-           P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1_real),
-           Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
-           CKidxSize = mymaps:size(OtherDBChunk1),
-           StartResolve = NewKVList =/= [] orelse CKidxSize > 0,
-           OtherDiffIdx =
-               if StartResolve andalso OrigDBChunkLen > 0 ->
-                      % let the non-initiator's rr_recon process identify the remaining keys
-                      ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]),
-                      compress_idx_list(ReqIdx, OrigDBChunkLen - 1, [], 0, 0);
-                  true ->
-                      % no need to create a real OtherDiffIdx if phase2_run_trivial_on_diff/7 is not using it
-                      <<>>
+           #rr_recon_state{params = #shash_sync{exp_delta = ExpDelta,
+                                                sig_size = SigSize,
+                                                fail_rate = FR,
+                                                '+item_count' = AddToChunkSize},
+                           stats = Stats, misc = [{db_chunk, SHTree}]} = State,
+           FullKVList = lists:append([DBList | KVList]),
+           MyDBSize1 = length(FullKVList),
+           ChunkSize = mymaps:size(SHTree),
+           % identify differing items and the remaining (non-matched) DBChunk:
+           % remove colliding hashes in DBList and add them to phase 2 (in turn,
+           % colliding items in SH are also added to phase 2 on the non-initiator)
+           {FullKVList1, Dupes0} =
+               if FullKVList =:= [] -> {[], []};
+                  true -> sort_extractdupes([{compress_key(KV, SigSize), KV}
+                                             || KV <- FullKVList])
                end,
+           ItemCountNI_p1 = ChunkSize + AddToChunkSize,
+           ?ALG_DEBUG("CheckSH ~Bckv vs. ~Bcmp items, ~B dupes",
+                      [ItemCountNI_p1, MyDBSize1, length(Dupes0)]),
+           {NewKVList, OtherDBChunk1} =
+               shash_get_full_diff(FullKVList1, SHTree,
+                                   [element(2, D) || D <- Dupes0], SigSize),
+           % note: the actual fr(phase1) may be different from what the non-initiator expected
+           Fr_p1_real =
+               shash_worst_case_failrate(SigSize, MyDBSize1, ItemCountNI_p1, ExpDelta),
+           FR_p2 = calc_n_subparts_FR(1, FR, Fr_p1_real),
+           Stats1  = rr_recon_stats:set([{fail_rate_p1, Fr_p1_real}], Stats),
+           CKidxSize = mymaps:size(OtherDBChunk1),
+           ItemCountNI_p2 = CKidxSize + AddToChunkSize,
+           ReqIdx = lists:usort([Idx || {_Version, Idx} <- mymaps:values(OtherDBChunk1)]),
+           OtherDiffIdx = compress_idx_list(ReqIdx, ChunkSize - 1, [], 0, 0, integrate_size),
            phase2_run_trivial_on_diff(
-             NewKVList, OtherDiffIdx, CKidxSize, OrigDBChunkLen =:= 0, P1E_p2,
-             CKidxSize, NewState#rr_recon_state{stats = Stats1})
+             NewKVList, OtherDiffIdx, ItemCountNI_p1 =:= 0, FR_p2,
+             ItemCountNI_p2,
+             State#rr_recon_state{kv_list = [], stats = Stats1, misc = []})
     end;
 
 on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = true,
                            method = bloom,            kv_list = KVList,
-                           params = #bloom_recon_struct{bf = BF} = Params,
+                           params = #bloom_sync{bf = BF} = Params,
                            dest_recon_pid = DestReconPid, stats = Stats,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            misc = [{item_count, MyDBSize}, {my_bf, MyBF}]}) ->
     ?TRACE_RCV(_Msg, State),
+    % if rest interval is non empty start another sync
+    % (do this early to allow some parallelism)
+    SyncFinished = intervals:is_empty(RestI),
+    if not SyncFinished ->
+           send_chunk_req(pid_groups:get_my(dht_node), self(),
+                          RestI, get_max_items());
+       true -> ok
+    end,
+    
     MyDBSize1 = MyDBSize + length(DBList),
-    MyBF1 = bloom:add_list(MyBF, DBList),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     BFCount = bloom:item_count(BF),
     % get a subset of Delta without what is missing on this node:
-    % NOTE: The only errors which might occur are bloom:is_element/2 returning
-    %       true for an item which is not on the other node (with the filter's
+    % NOTE: The only errors which might occur are bloom:filter_neg_and_add/3
+    %       omitting items which are not on the other node (with the filter's
     %       false positive probability/rate). These are the items we would miss.
-    Diff = if BFCount =:= 0 -> DBList;
-              true -> [X || X <- DBList, not bloom:is_element(BF, X)]
-           end,
+    {Diff, MyBF1} = bloom:filter_neg_and_add(BF, DBList, MyBF),
     NewKVList = lists:append(KVList, Diff),
 
-    %if rest interval is non empty start another sync
-    SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(pid_groups:get_my(dht_node), self(),
-                          RestI, get_max_items()),
            State#rr_recon_state{kv_list = NewKVList,
                                 misc = [{item_count, MyDBSize1}, {my_bf, MyBF1}]};
        BFCount =:= 0 ->
@@ -485,7 +496,7 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send(DestReconPid, {reconcile_req, DiffBF, MyDBSize1, length(NewKVList),
                                comm:this()}),
            % allow the garbage collector to free the original Bloom filter here
-           Params1 = Params#bloom_recon_struct{bf = <<>>},
+           Params1 = Params#bloom_sync{bf = <<>>},
            State#rr_recon_state{stage = resolve, params = Params1, kv_list = NewKVList}
     end;
 
@@ -523,147 +534,146 @@ on({resolve_req, shutdown, _Payload} = _Msg,
     ?DBG_ASSERT(?implies(RMethod =:= art, _Payload =:= none)),
     shutdown(sync_finished, State);
 
-on({resolve_req, shutdown, P1E_p1_real} = _Msg,
+on({resolve_req, shutdown, Fr_p1_real} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = true,
                            method = bloom,            stats = Stats}) ->
     % note: no real phase 2 since the other node has no items
-    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real},
-                                  {p1e_phase2, 0.0}], Stats),
+    Stats1  = rr_recon_stats:set([{fail_rate_p1, Fr_p1_real},
+                                  {fail_rate_p2, 0.0}], Stats),
     shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
 
 on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = trivial,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           k_list = KList,            stats = Stats}) ->
+                           k_list = KList,            next_phase_kv = AdditionalItems,
+                           stats = Stats}) ->
     ?TRACE_RCV(_Msg, State),
+    ToSend0 = decompress_idx_to_list(BinReqIdxPos, KList),
+    ToSend = [element(1, KV) || KV <- AdditionalItems] ++ ToSend0,
     NewStats =
-        send_resolve_request(Stats, decompress_idx_to_list(BinReqIdxPos, KList),
+        send_resolve_request(Stats, ToSend,
                              OwnerL, DestRRPid, _Initiator = false, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
 
-on({resolve_req, OtherDBChunk, MyDiffIdx, SigSize, DestReconPid} = _Msg,
+on({resolve_req, OtherDBChunk, DupesCount, MyDiffIdx, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = shash,            kv_list = KVList}) ->
+                           method = shash,            stats = Stats,
+                           kv_list = KVList,          next_phase_kv = AdditionalItems}) ->
     ?TRACE_RCV(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx1: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(MyDiffIdx),
 %%              erlang:byte_size(erlang:term_to_binary(MyDiffIdx, [compressed]))]),
     ?DBG_ASSERT(SigSize >= 0),
 
-    {DBChunkTree, _OrigDBChunkLen, VSize} =
-        decompress_kv_list(OtherDBChunk, SigSize),
-    MyDiffKV = decompress_idx_to_list(MyDiffIdx, KVList),
-    % items not in CKidx cannot be in the diff!
-    State1 = State#rr_recon_state{kv_list = MyDiffKV},
+    {DBChunkTree, VSize} = decompress_kv_list(OtherDBChunk, unknown, SigSize),
+    OrigDBChunkLen = mymaps:size(DBChunkTree),
+    % worst case diff here is 100% since both nodes now operate on the
+    % differences only and each node may have what the other node does not
+    Fr_p2_real = trivial_worst_case_failrate(
+                   % note: initiator and non-initiator are exchanged here (in phase 2)
+                   SigSize, length(KVList), OrigDBChunkLen + DupesCount, 100),
+    Stats1  = rr_recon_stats:set([{fail_rate_p2, Fr_p2_real}], Stats),
+
+    MyDiffKV = AdditionalItems ++ decompress_idx_to_list(MyDiffIdx, KVList),
+    % items not in CKidx cannot be in the diff! (except for the AdditionalItems)
+    State1 = State#rr_recon_state{kv_list = MyDiffKV, stats = Stats1},
     NewStats2 = shash_bloom_perform_resolve(
-                  State1, DBChunkTree, SigSize, VSize, DestReconPid,
-                  fun get_full_diff/6),
+                  State1, DBChunkTree, DupesCount, SigSize, VSize, DestReconPid,
+                  fun get_full_diff/4),
 
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
 on({reconcile_req, DiffBFBin, OtherBFCount, OtherDiffCount, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
                            method = bloom,            kv_list = KVList,
-                           struct = #bloom_recon_struct{bf = BF,
-                                                        hf_count = MyHfCount,
-                                                        exp_delta = ExpDelta,
-                                                        p1e = P1E} = Struct,
+                           struct = #bloom_sync{bf = BF, hf_count = MyHfCount,
+                                                exp_delta = ExpDelta,
+                                                fail_rate = FR} = Struct,
                            stats = Stats}) ->
     ?TRACE_RCV(_Msg, State),
     
     OtherBF = bloom:new_bin(util:bin_xor(bloom:get_property(BF, filter),
                                          DiffBFBin), MyHfCount, OtherBFCount),
     % get a subset of Delta without what is missing on this node:
-    % NOTE: The only errors which might occur are bloom:is_element/2 returning
-    %       true for an item which is not on the other node (with the filter's
+    % NOTE: The only errors which might occur are bloom:filter_neg/2
+    %       omitting items which are not on the other node (with the filter's
     %       false positive probability/rate). These are the items we would miss.
-    Diff = if OtherBFCount =:= 0 -> KVList;
-              true -> [X || X <- KVList, not bloom:is_element(OtherBF, X)]
-           end,
-    MyItemCount = length(KVList),
+    Diff = bloom:filter_neg(OtherBF, KVList),
     % allow the garbage collector to free the original Bloom filter
-    Struct1 = Struct#bloom_recon_struct{bf = <<>>},
+    Struct1 = Struct#bloom_sync{bf = <<>>},
     State1 = State#rr_recon_state{kv_list = Diff, struct = Struct1,
                                   dest_recon_pid = DestReconPid},
     
     % here, the failure probability is correct (in contrast to the
     % initiator) since we know the number of item checks and BF sizes of both
     % Bloom filters
-    P1E_p1_bf_I_real = bloom_worst_case_failprob(BF, OtherBFCount, ExpDelta),
-    MyNrChecks = ?IIF(OtherBFCount =:= 0, 0, MyItemCount),
-    P1E_p1_bf_NI_real = bloom_worst_case_failprob(OtherBF, MyNrChecks, ExpDelta),
-    % pay attention to floating point issues near 1:
-    % P1E_p1_real = 1 - (1 - P1E_p1_bf_I_real) * (1 - P1E_p1_bf_NI_real),
-    P1E_p1_real = P1E_p1_bf_I_real + P1E_p1_bf_NI_real - P1E_p1_bf_I_real * P1E_p1_bf_NI_real,
-    % NOTE: use left-over P1E after phase 1 (bloom) for phase 2 (trivial RC)
-    P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1_real),
-    ?ALG_DEBUG("I:~.0p, P1E_bf=~p~n"
-               "  Bloom1: m=~B k=~B BFCount=~B Checks=~B P1E_bf1=~p~n"
-               "  Bloom2: m=~B k=~B BFCount=~B Checks=~B P1E_bf2=~p~n"
-               "-> P1E(phase2): ~p",
+    Fr_p1_real = bloom_worst_case_failrate(BF, OtherBF, ExpDelta),
+    % NOTE: use left-over failure rate after phase 1 (bloom) for phase 2 (trivial RC)
+    FR_p2 = calc_n_subparts_FR(1, FR, Fr_p1_real),
+    ?ALG_DEBUG("I:~.0p, FR(phase1)=~p~n"
+               "  Bloom1: m=~B k=~B BFCount=~B Checks=~B"
+               "  Bloom2: m=~B k=~B BFCount=~B Checks=~B"
+               "->  fr(phase1)=~p, FR(phase2)=~p",
                [State1#rr_recon_state.dest_recon_pid,
-                calc_n_subparts_p1e(2, _P1E_p1 = calc_n_subparts_p1e(2, P1E)),
+                calc_n_subparts_FR(2, FR),
                 bloom:get_property(BF, size), bloom:get_property(BF, hfs_size),
-                bloom:item_count(BF), OtherBFCount, P1E_p1_bf_I_real,
+                bloom:item_count(BF), OtherBFCount,
                 bloom:get_property(OtherBF, size), bloom:get_property(OtherBF, hfs_size),
-                bloom:item_count(OtherBF), MyNrChecks, P1E_p1_bf_NI_real, P1E_p2]),
-    Stats1 = rr_recon_stats:set([{p1e_phase1, P1E_p1_real}], Stats),
+                bloom:item_count(OtherBF), length(KVList), Fr_p1_real, FR_p2]),
+    Stats1 = rr_recon_stats:set([{fail_rate_p1, Fr_p1_real}], Stats),
     phase2_run_trivial_on_diff(
-      Diff, P1E_p1_real, OtherDiffCount, false, P1E_p2, OtherDiffCount,
+      Diff, Fr_p1_real, false, FR_p2, OtherDiffCount,
       State1#rr_recon_state{params = {}, stats = Stats1});
 
-on({resolve_req, DBChunk, P1E_p1_real, SigSize, _DestReconPid} = _Msg,
+on({resolve_req, DBChunk, DupesCount, Fr_p1_real, SigSize, _DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = true,
                            method = bloom,            kv_list = KVList,
                            stats = Stats,
                            dest_recon_pid = DestReconPid}) ->
     ?TRACE_RCV(_Msg, State),
     
-    {DBChunkTree, OrigDBChunkLen, VSize} =
-        decompress_kv_list(DBChunk, SigSize),
-    
+    {DBChunkTree, VSize} = decompress_kv_list(DBChunk, unknown, SigSize),
+    OrigDBChunkLen = mymaps:size(DBChunkTree),
     % worst case diff here is 100% since both nodes now operate on the
     % differences only and each node may have what the other node does not
-    P1E_p2_real = trivial_worst_case_failprob(
-                    SigSize, length(KVList), OrigDBChunkLen, 100),
-    Stats1  = rr_recon_stats:set([{p1e_phase1, P1E_p1_real},
-                                  {p1e_phase2, P1E_p2_real}], Stats),
+    Fr_p2_real = trivial_worst_case_failrate(
+                   SigSize, length(KVList), OrigDBChunkLen + DupesCount, 100),
+    Stats1  = rr_recon_stats:set([{fail_rate_p1, Fr_p1_real},
+                                  {fail_rate_p2, Fr_p2_real}], Stats),
     State1 = State#rr_recon_state{stats = Stats1},
     NewStats2 = shash_bloom_perform_resolve(
-                  State1, DBChunkTree, SigSize, VSize, DestReconPid,
-                  fun get_full_diff/6),
+                  State1, DBChunkTree, DupesCount, SigSize, VSize, DestReconPid,
+                  fun get_full_diff/4),
     shutdown(sync_finished, State1#rr_recon_state{stats = NewStats2});
 
-on({resolve_req, DBChunk, none, SigSize, DestReconPid} = _Msg,
+on({resolve_req, DBChunk, DupesCount, none, SigSize, DestReconPid} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = art}) ->
     ?TRACE_RCV(_Msg, State),
     
-    {DBChunkTree, _OrigDBChunkLen, VSize} =
-        decompress_kv_list(DBChunk, SigSize),
+    {DBChunkTree, VSize} = decompress_kv_list(DBChunk, unknown, SigSize),
 
     NewStats2 = shash_bloom_perform_resolve(
-                  State, DBChunkTree, SigSize, VSize, DestReconPid,
-                  fun get_part_diff/6),
+                  State, DBChunkTree, DupesCount, SigSize, VSize, DestReconPid,
+                  fun get_part_diff/4),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
 on({resolve_req, BinReqIdxPos} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           k_list = KList,            stats = Stats,
-                           misc = [{my_bin_diff_empty, MyBinDiffEmpty}]})
+                           k_list = KList,            next_phase_kv = AdditionalItems,
+                           stats = Stats,
+                           misc = []})
   when (RMethod =:= bloom orelse RMethod =:= shash orelse RMethod =:= art) andalso
-           ((RMethod =:= bloom andalso not IsInitiator) orelse
-            (RMethod =/= bloom andalso IsInitiator)) ->
+           ((RMethod =/= bloom) =:= IsInitiator) -> % non-initiator with Bloom, otherwise initiator
     ?TRACE_RCV(_Msg, State),
 %%     log:pal("[ ~p ] CKIdx2: ~B (~B compressed)",
 %%             [self(), erlang:byte_size(BinReqIdxPos),
 %%              erlang:byte_size(erlang:term_to_binary(BinReqIdxPos, [compressed]))]),
-    ToSend = if MyBinDiffEmpty -> KList; % optimised away by using 0 bits -> sync all!
-                true           -> bitstring_to_k_list_k(BinReqIdxPos, KList, [])
-             end,
+    ToSend0 = bitstring_to_k_list_k(BinReqIdxPos, KList, []),
+    ToSend = [element(1, KV) || KV <- AdditionalItems] ++ ToSend0,
     NewStats = send_resolve_request(
                  Stats, ToSend, OwnerL, DestRRPid, IsInitiator, true),
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
@@ -672,9 +682,24 @@ on({resolve_req, BinReqIdxPos} = _Msg,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?check_nodes, SenderPid, ToCheck, OtherMaxItemsCount}, State) ->
-    NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
-    on({?check_nodes, ToCheck, OtherMaxItemsCount}, NewState);
+on({?check_nodes, SenderPid, ToCheck, OtherItemsCount, OtherMaxItemsCount},
+   State = #rr_recon_state{params = #merkle_params{exp_delta = ExpDelta},
+                           misc = [{fail_rate_target_per_node, LastFRPerNode},
+                                   {fail_rate_target_phase1, FR_p1},
+                                   {prev_used_fr, PrevUsedFr},
+                                   {icount, MyMaxItemCount},
+                                   {total_icount, MyItemCount}]}) ->
+    % this is the first check_nodes message from the initiator and we finally
+    % learn about the exact number of items to synchronise with
+    MaxAffectedItems = calc_max_different_items_total(
+                         MyItemCount, OtherItemsCount, ExpDelta),
+    on({?check_nodes, ToCheck, OtherMaxItemsCount},
+       State#rr_recon_state{dest_recon_pid = SenderPid,
+                            misc = [{max_affected_items, MaxAffectedItems},
+                                    {fail_rate_target_per_node, LastFRPerNode},
+                                    {fail_rate_target_phase1, FR_p1},
+                                    {prev_used_fr, PrevUsedFr},
+                                    {icount, MyMaxItemCount}]});
 
 on({?check_nodes, ToCheck0, OtherMaxItemsCount},
    State = #rr_recon_state{stage = reconciliation,    initiator = false,
@@ -682,47 +707,41 @@ on({?check_nodes, ToCheck0, OtherMaxItemsCount},
                            params = #merkle_params{} = Params,
                            struct = TreeNodes,        stats = Stats,
                            dest_recon_pid = DestReconPid,
-                           misc = [{p1e, LastP1ETotal},
-                                   {p1e_phase_x, P1EPhaseX},
+                           misc = [{max_affected_items, MaxAffectedItems},
+                                   {fail_rate_target_per_node, LastFRPerNode},
+                                   {fail_rate_target_phase1, FR_p1},
+                                   {prev_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount}]}) ->
     ?DBG_ASSERT(comm:is_valid(DestReconPid)),
-    {_P1E_I, _P1E_L, SigSizeI, SigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
-        merkle_next_signature_sizes(Params, LastP1ETotal, MyLastMaxItemsCount,
-                                    OtherMaxItemsCount),
+    {_FR_I, _FR_L, SigSizeI, SigSizeL, EffectiveFr_I, EffectiveFr_L} =
+        merkle_next_signature_sizes(Params, LastFRPerNode, MyLastMaxItemsCount,
+                                    OtherMaxItemsCount, MaxAffectedItems),
     ToCheck = merkle_decompress_hashlist(ToCheck0, SigSizeI, SigSizeL),
-    {FlagsBin, RTree, SyncNew, NStats0, MyMaxItemsCount,
+    {FlagsBin, RTree, SyncNew, NStats, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_check_node(ToCheck, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherMaxItemsCount, Params, Stats,
                           <<>>, [], [], [], 0, [], 0, 0, Sync, 0, 0, 0,
                           0, 0),
-    ?IIF((EffectiveP1E_I > 0 andalso (1 - EffectiveP1E_I >= 1)) orelse
-             (1 - EffectiveP1E_L >= 1), % EffectiveP1E_L is always greater than 0
-         log:log("~w: [ ~.0p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
-                 " P1E_I = ~g, P1E_L = ~g",
-                 [?MODULE, pid_groups:my_groupname(), self(),
-                  EffectiveP1E_I, EffectiveP1E_L]),
-         ok),
-    PrevP1E = rr_recon_stats:get(p1e_phase1, Stats),
-    NextP1E = merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I,
-                                   EffectiveP1E_L, HashCmpI, HashCmpL),
-    NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
+    UsedFr = merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I,
+                                 EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), PrevP1E, NextP1E]),
+    ?ALG_DEBUG("merkle (NI)~n  fail_rate(p1): ~p -> ~p - NextNodes: ~B",
+               [PrevUsedFr, UsedFr, NextLvlNodesAct]),
     send(DestReconPid, {?check_nodes_response, FlagsBin, MyMaxItemsCount}),
     
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
-           merkle_resolve_leaves_send(NewState, NextP1E);
+           merkle_resolve_leaves_send(NewState, UsedFr);
        true ->
-           ?DBG_ASSERT(NextLvlNodesAct >= 0),
-           % calculate the remaining trees' failure prob based on the already
-           % used failure prob
-           P1E_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP1E),
-           NewState#rr_recon_state{misc = [{p1e, P1E_I_2},
-                                           {p1e_phase_x, P1EPhaseX},
+           % calculate the remaining trees' target failure rate based on the
+           % already used failure prob
+           FRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, element(1, UsedFr)),
+           NewState#rr_recon_state{misc = [{max_affected_items, MaxAffectedItems},
+                                           {fail_rate_target_per_node, FRPerNode},
+                                           {fail_rate_target_phase1, FR_p1},
+                                           {prev_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount}]}
     end;
 
@@ -733,85 +752,85 @@ on({?check_nodes_response, FlagsBin, OtherMaxItemsCount},
                            struct = TreeNodes,            stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, {SigSizeI, SigSizeL}},
-                                   {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
-                                   {p1e_phase_x, P1EPhaseX},
+                                   {max_affected_items, MaxAffectedItems},
+                                   {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
+                                   {fail_rate_target_phase1, FR_p1},
+                                   {prev_used_fr, PrevUsedFr},
                                    {icount, MyLastMaxItemsCount},
                                    {oicount, OtherLastMaxItemsCount}]}) ->
-    {RTree, SyncNew, NStats0, MyMaxItemsCount,
+    {RTree, SyncNew, NStats, MyMaxItemsCount,
      NextLvlNodesAct, HashCmpI, HashCmpL} =
         merkle_cmp_result(FlagsBin, TreeNodes, SigSizeI, SigSizeL,
                           MyLastMaxItemsCount, OtherLastMaxItemsCount,
                           Sync, Params, Stats, [], [], [], 0, [], 0, 0, 0, 0, 0,
                           0, 0),
-    ?IIF((1 - EffectiveP1E_I >= 1) orelse (1 - EffectiveP1E_L >= 1),
-         log:log("~w: [ ~.0p:~.0p ] merkle_next_signature_sizes/4 precision warning:"
-                 " P1E_I = ~g, P1E_L = ~g",
-                 [?MODULE, pid_groups:my_groupname(), self(),
-                  EffectiveP1E_I, EffectiveP1E_L]),
-         ok),
-    PrevP1E = rr_recon_stats:get(p1e_phase1, Stats),
-    NextP1E = merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I,
-                                   EffectiveP1E_L, HashCmpI, HashCmpL),
-    NStats = rr_recon_stats:set([{p1e_phase1, NextP1E}], NStats0),
+    UsedFr = merkle_calc_used_fr(PrevUsedFr, EffectiveFr_I,
+                                 EffectiveFr_L, HashCmpI, HashCmpL),
     NewState = State#rr_recon_state{struct = RTree, merkle_sync = SyncNew,
                                     stats = NStats},
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n  P1E: ~g -> ~g",
-               [length(RTree), PrevP1E, NextP1E]),
+    ?ALG_DEBUG("merkle (I)~n  fail_rate(p1): ~p -> ~p - NextNodes: ~B",
+               [PrevUsedFr, UsedFr, NextLvlNodesAct]),
 
     if RTree =:= [] ->
            % start a (parallel) resolve (if items to resolve)
-           merkle_resolve_leaves_send(NewState, NextP1E);
+           merkle_resolve_leaves_send(NewState, UsedFr);
        true ->
-           ?DBG_ASSERT(NextLvlNodesAct >= 0),
            % calculate the remaining trees' failure prob based on the already
            % used failure prob
-           P1ETotal_I_2 = calc_n_subparts_p1e(NextLvlNodesAct, P1EPhaseX, NextP1E),
-           {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, NextEffectiveP1E_I, NextEffectiveP1E_L} =
-               merkle_next_signature_sizes(Params, P1ETotal_I_2, MyMaxItemsCount,
-                                           OtherMaxItemsCount),
+           NextFRPerNode = calc_n_subparts_FR(NextLvlNodesAct, FR_p1, element(1, UsedFr)),
+           {_FR_I, _FR_L, NextSigSizeI, NextSigSizeL, NextEffectiveFr_I, NextEffectiveFr_L} =
+               merkle_next_signature_sizes(Params, NextFRPerNode, MyMaxItemsCount,
+                                           OtherMaxItemsCount, MaxAffectedItems),
            Req = merkle_compress_hashlist(RTree, <<>>, NextSigSizeI, NextSigSizeL),
            send(DestReconPid, {?check_nodes, Req, MyMaxItemsCount}),
            NewState#rr_recon_state{misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
-                                           {p1e, {NextEffectiveP1E_I, NextEffectiveP1E_L}},
-                                           {p1e_phase_x, P1EPhaseX},
+                                           {max_affected_items, MaxAffectedItems},
+                                           {fail_rate_target_per_node, {NextEffectiveFr_I, NextEffectiveFr_L}},
+                                           {fail_rate_target_phase1, FR_p1},
+                                           {prev_used_fr, UsedFr},
                                            {icount, MyMaxItemsCount},
                                            {oicount, OtherMaxItemsCount}]}
     end;
 
-on({resolve_req, HashesK, HashesV} = _Msg,
+on({resolve_req, SyncStruct_p2} = _Msg,
    State = #rr_recon_state{stage = resolve,           method = merkle_tree})
-  when is_bitstring(HashesK) andalso is_bitstring(HashesV) ->
+  when is_tuple(SyncStruct_p2) ->
     ?TRACE_RCV(_Msg, State),
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
-    merkle_resolve_leaves_receive(State, HashesK, HashesV);
+    merkle_resolve_leaves_receive(State, SyncStruct_p2);
 
-on({resolve_req, BinKeyList, SyncSendP1E_real} = _Msg,
+on({resolve_req, BinKeyList, SyncSendFr_real} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = IsInitiator,
                            method = merkle_tree,
                            merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
-                           params = Params,
+                           params = Params,           next_phase_kv = ToSend,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            stats = Stats})
     % NOTE: FIFO channels ensure that the {resolve_req, BinKeyList} is always
     %       received after the {resolve_req, Hashes} message from the other node!
   when is_bitstring(BinKeyList) ->
     ?TRACE_RCV(_Msg, State),
-    ?ALG_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed",
+    PrevFr_p2 = rr_recon_stats:get(fail_rate_p2, Stats), % from sync_receive
+    NextFr_p2 = PrevFr_p2 + SyncSendFr_real,
+    ?ALG_DEBUG("merkle (~s) - BinKeyListSize: ~B compressed~n"
+               "  fail_rate(p2): ~p (rcv) + ~p (send) = ~p",
                [?IIF(IsInitiator, "I", "NI"),
                 erlang:byte_size(
-                  erlang:term_to_binary(BinKeyList, [compressed]))]),
-    PrevP1E_p2 = rr_recon_stats:get(p1e_phase2, Stats), % from sync_receive
-    % pay attention to floating point issues near 1:
-%%     NextP1E_p2 = 1 - (1 - PrevP1E_p2) * (1 - SyncSendP1E_real),
-    NextP1E_p2 = PrevP1E_p2 + SyncSendP1E_real - PrevP1E_p2 * SyncSendP1E_real,
-    Stats1  = rr_recon_stats:set([{p1e_phase2, NextP1E_p2}], Stats),
-    NStats = if BinKeyList =:= <<>> ->
+                  erlang:term_to_binary(BinKeyList, [compressed])),
+                PrevFr_p2, SyncSendFr_real, NextFr_p2]),
+    Stats1  = rr_recon_stats:set([{fail_rate_p2, NextFr_p2}], Stats),
+    ToSendKeys = [K || {K, _V} <- ToSend],
+    NStats = if BinKeyList =:= <<>> andalso ToSendKeys =:= [] ->
                     Stats1;
+                BinKeyList =:= <<>> ->
+                    merkle_resolve_leaves_ckidx(
+                      [], BinKeyList, DestRRPid, Stats1, OwnerL,
+                      Params, ToSendKeys, IsInitiator);
                 true ->
                     merkle_resolve_leaves_ckidx(
                       SyncSend, BinKeyList, DestRRPid, Stats1, OwnerL,
-                      Params, [], IsInitiator)
+                      Params, ToSendKeys, IsInitiator)
              end,
     NewState = State#rr_recon_state{merkle_sync = {[], [], SyncRcvLeafCount, DirectResolve},
                                     stats = NStats},
@@ -838,13 +857,13 @@ build_struct(DBList, RestI,
            ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
                         true -> RMethod
                      end,
-           {BuildTime, {SyncStruct, P1E_p1}} =
+           {BuildTime, {SyncStruct, Fr_p1}} =
                util:tc(
                  fun() -> build_recon_struct(ToBuild, SyncI, NewKVList,
                                              InitiatorMaxItems, Params)
                  end),
            Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
-           Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
+           Stats2  = rr_recon_stats:set([{fail_rate_p1, Fr_p1}], Stats1),
            NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats2,
                                            kv_list = NewKVList},
            begin_sync(NewState#rr_recon_state{stage = reconciliation});
@@ -862,25 +881,29 @@ begin_sync(State = #rr_recon_state{method = trivial, params = {}, initiator = fa
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
     ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    {KList, VList, ResortedKVOrigList} = MySyncStruct#trivial_recon_struct.db_chunk,
-    MySyncStruct1 = MySyncStruct#trivial_recon_struct{db_chunk = {KList, VList}},
+    {KList, VList, ResortedKVOrigList, Dupes} = MySyncStruct#trivial_sync.db_chunk,
+    MySyncStruct1 = MySyncStruct#trivial_sync{db_chunk = {KList, VList}},
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, trivial, MySyncStruct1}}),
     State#rr_recon_state{struct = {}, stage = resolve, kv_list = [],
-                         k_list = [K || {K, _V} <- ResortedKVOrigList]};
+                         k_list = [K || {K, _V} <- ResortedKVOrigList],
+                         next_phase_kv = Dupes};
 begin_sync(State = #rr_recon_state{method = shash, params = {}, initiator = false,
                                    struct = MySyncStruct,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid, kv_list = _KVList}) ->
     ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    {KList, ResortedKVOrigList} = MySyncStruct#shash_recon_struct.db_chunk,
-    MySyncStruct1 = MySyncStruct#shash_recon_struct{db_chunk = KList},
+    {KList, ResortedKVOrigList, Dupes} = MySyncStruct#shash_sync.db_chunk,
+    MySyncStruct1 = MySyncStruct#shash_sync{db_chunk = KList},
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, shash, MySyncStruct1}}),
-    case MySyncStruct1#shash_recon_struct.db_chunk of
-        <<>> -> shutdown(sync_finished, State#rr_recon_state{struct = {}, kv_list = []});
-        _    -> State#rr_recon_state{struct = {}, stage = resolve, kv_list = ResortedKVOrigList}
+    if KList =:= <<>> andalso Dupes =:= [] -> % no items on this node
+           shutdown(sync_finished, State#rr_recon_state{struct = {}, kv_list = []});
+       true ->
+           State#rr_recon_state{struct = {}, stage = resolve,
+                                kv_list = ResortedKVOrigList,
+                                next_phase_kv = Dupes}
     end;
 begin_sync(State = #rr_recon_state{method = bloom, params = {}, initiator = false,
                                    struct = MySyncStruct,
@@ -888,11 +911,11 @@ begin_sync(State = #rr_recon_state{method = bloom, params = {}, initiator = fals
                                    dest_rr_pid = DestRRPid}) ->
     ?ALG_DEBUG("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    BFBin = bloom:get_property(MySyncStruct#bloom_recon_struct.bf, filter),
-    MySyncStruct1 = MySyncStruct#bloom_recon_struct{bf = BFBin},
+    BFBin = bloom:get_property(MySyncStruct#bloom_sync.bf, filter),
+    MySyncStruct1 = MySyncStruct#bloom_sync{bf = BFBin},
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct1}}),
-    case MySyncStruct#bloom_recon_struct.item_count of
+    case MySyncStruct#bloom_sync.item_count of
         0 -> shutdown(sync_finished, State#rr_recon_state{kv_list = []});
         _ -> State#rr_recon_state{stage = reconciliation}
     end;
@@ -908,8 +931,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
     MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
     NumTrees = get_merkle_num_trees(),
-    P1ETotal = get_p1e(),
-    P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
+    FRTotal = get_failure_rate(),
+    FRTotal_p1 = calc_n_subparts_FR(2, FRTotal),
     
     % split interval first and create NumTrees merkle trees later
     {BuildTime1, ICBList} =
@@ -917,16 +940,18 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
                         merkle_tree:keys_to_intervals(
                           DBItems, intervals:split(MerkleI, NumTrees))
                 end),
-    ItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
-    P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+    ItemCount = lists:sum([Count || {_SubI, Count, _Bucket} <- ICBList]),
+    MaxItemCount = lists:max([0 | [Count || {_SubI, Count, _Bucket} <- ICBList]]),
+    FRTotal_p1_perNode = calc_n_subparts_FR(NumTrees, FRTotal_p1),
     
     MySyncParams = #merkle_params{exp_delta = get_max_expected_delta(),
                                   interval = MerkleI,
                                   branch_factor = MerkleV,
                                   bucket_size = MerkleB,
                                   num_trees = NumTrees,
-                                  p1e = P1ETotal,
-                                  ni_item_count = ItemCount},
+                                  fail_rate = FRTotal,
+                                  ni_item_count = ItemCount,
+                                  ni_max_ic = MaxItemCount},
     SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
@@ -946,7 +971,7 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     MTSize = merkle_tree:size_detail(SyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
-    ?ALG_DEBUG("merkle (NI) - CurrentNodes: ~B~n"
+    ?ALG_DEBUG("merkle (NI) - NextNodes: ~B~n"
                "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
                [length(SyncStruct), MTSize,
                 length([ok || L <- merkle_tree:get_leaves(SyncStruct),
@@ -954,9 +979,11 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     
     State#rr_recon_state{struct = SyncStruct,
                          stats = Stats2, params = MySyncParams,
-                         misc = [{p1e, P1ETotal3},
-                                 {p1e_phase_x, P1ETotal2},
-                                 {icount, ItemCount}],
+                         misc = [{fail_rate_target_per_node, FRTotal_p1_perNode},
+                                 {fail_rate_target_phase1, FRTotal_p1},
+                                 {prev_used_fr, {0.0, 0.0}},
+                                 {icount, MaxItemCount},
+                                 {total_icount, ItemCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initiator = true,
                                    struct = MySyncStruct, stats = Stats,
@@ -964,30 +991,36 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
     ?ALG_DEBUG("BEGIN SYNC", []),
     MTSize = merkle_tree:size_detail(MySyncStruct),
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
-    #merkle_params{p1e = P1ETotal, num_trees = NumTrees,
-                   ni_item_count = OtherItemsCount} = Params,
+    #merkle_params{fail_rate = FRTotal, num_trees = NumTrees, exp_delta = ExpDelta,
+                   ni_item_count = OtherItemsCount, ni_max_ic = OtherMaxItemsCount} = Params,
     MyItemCount =
+        lists:sum([merkle_tree:get_item_count(Node) || Node <- MySyncStruct]),
+    MyMaxItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
-    ?ALG_DEBUG("merkle (I) - CurrentNodes: ~B~n"
+    ?ALG_DEBUG("merkle (I) - NextNodes: ~B~n"
                "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
                [length(MySyncStruct), MTSize,
                 length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
                               merkle_tree:is_empty(L)])]),
-    P1ETotal2 = calc_n_subparts_p1e(2, P1ETotal),
-    P1ETotal3 = calc_n_subparts_p1e(NumTrees, P1ETotal2),
+    FRTotal_p1 = calc_n_subparts_FR(2, FRTotal),
+    FRTotal_p1_perNode = calc_n_subparts_FR(NumTrees, FRTotal_p1),
+    MaxAffectedItems = calc_max_different_items_total(
+                         MyItemCount, OtherItemsCount, ExpDelta),
     
-    {_P1E_I, _P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L} =
-        merkle_next_signature_sizes(Params, P1ETotal3, MyItemCount,
-                                    OtherItemsCount),
+    {_FR_I, _FR_L, NextSigSizeI, NextSigSizeL, EffectiveFr_I, EffectiveFr_L} =
+        merkle_next_signature_sizes(Params, FRTotal_p1_perNode, MyMaxItemCount,
+                                    OtherMaxItemsCount, MaxAffectedItems),
     
     Req = merkle_compress_hashlist(MySyncStruct, <<>>, NextSigSizeI, NextSigSizeL),
-    send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount}),
+    send(DestReconPid, {?check_nodes, comm:this(), Req, MyItemCount, MyMaxItemCount}),
     State#rr_recon_state{stats = Stats1,
                          misc = [{signature_size, {NextSigSizeI, NextSigSizeL}},
-                                 {p1e, {EffectiveP1E_I, EffectiveP1E_L}},
-                                 {p1e_phase_x, P1ETotal2},
-                                 {icount, MyItemCount},
-                                 {oicount, OtherItemsCount}],
+                                 {max_affected_items, MaxAffectedItems},
+                                 {fail_rate_target_per_node, {EffectiveFr_I, EffectiveFr_L}},
+                                 {fail_rate_target_phase1, FRTotal_p1},
+                                 {prev_used_fr, {0.0, 0.0}},
+                                 {icount, MyMaxItemCount},
+                                 {oicount, OtherMaxItemsCount}],
                          kv_list = []};
 begin_sync(State = #rr_recon_state{method = art, params = {}, initiator = false,
                                    struct = MySyncStruct,
@@ -1016,28 +1049,33 @@ begin_sync(State = #rr_recon_state{method = art, params = Params, initiator = tr
                                     [], 0, 0, 0),
             Diff = lists:append([merkle_tree:get_bucket(N) || N <- ASyncLeafs]),
             MyItemCount = merkle_tree:get_item_count(MySyncStruct),
-            P1E = get_p1e(),
+            FRTotal = get_failure_rate(),
             % TODO: correctly calculate the probabilities and select appropriate parameters beforehand
-            P1E_p1_0 = bloom_worst_case_failprob(
-                         art:get_property(ART, leaf_bf), MyItemCount, 100), % TODO: adapt ExpDelta
-            P1E_p1 =
-                if P1E_p1_0 == 1 ->
-                       log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
-                               "  continuing with smallest possible failure probability",
+            LeafBf = art:get_property(ART, leaf_bf),
+            LeafBfFpr = bloom:get_property(LeafBf, fpr),
+            NrChecksNotInBF =
+                calc_max_different_items_node(
+                  bloom:get_property(LeafBf, items_count),
+                  MyItemCount, get_max_expected_delta()),
+            EffectiveFr_p1 = NrChecksNotInBF * LeafBfFpr,
+            FR_p2 =
+                if EffectiveFr_p1 > FRTotal ->
+                       log:log("~w: [ ~.0p:~.0p ] FR constraint broken (phase 1 overstepped?)~n"
+                               "  continuing with smallest possible failure rate",
                                [?MODULE, pid_groups:my_groupname(), self()]),
-                       1 - 1.0e-16;
-                   true -> P1E_p1_0
+                       1.0e-16;
+                   true ->
+                       % NOTE: use left-over failure rate after phase 1 (ART) for phase 2 (trivial RC)
+                       calc_n_subparts_FR(1, FRTotal, EffectiveFr_p1)
                 end,
-            Stats2  = rr_recon_stats:set([{p1e_phase1, P1E_p1}], Stats1),
-            % NOTE: use left-over P1E after phase 1 (ART) for phase 2 (trivial RC)
-            P1E_p2 = calc_n_subparts_p1e(1, P1E, P1E_p1),
+            Stats2  = rr_recon_stats:set([{fail_rate_p1, EffectiveFr_p1}], Stats1),
             
             Stats3 = rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                          {tree_compareSkipped, NSkip},
                                          {tree_leavesSynced, NLSync}], Stats2),
             
-            phase2_run_trivial_on_diff(Diff, none, 0, OtherItemCount =:= 0,
-                                       P1E_p2, OtherItemCount,
+            phase2_run_trivial_on_diff(Diff, none, OtherItemCount =:= 0,
+                                       FR_p2, OtherItemCount,
                                        State#rr_recon_state{stats = Stats3});
         false when OtherItemCount =/= 0 ->
             % must send resolve_req message for the non-initiator to shut down
@@ -1079,72 +1117,133 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 % KV-List compression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Calculates the minimum number of bits needed to have a hash collision
-%%      probability of P1E, given we compare N hashes with M other hashes
-%%      pairwise with each other (assuming that ExpDelta percent of them are
-%%      different).
-%%      NOTE: if multiple items are affected by the collision, simply divide
-%%            P1E by the number of affected items!
--spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
-                                  HashType::key | key_version,
-                                  ExpDelta::number(), P1E::float(),
-                                  MaxSize::signature_size())
-        -> SigSize::signature_size().
-calc_signature_size_nm_pair(_, 0, _HashType, _ExpDelta, P1E, _MaxSize)
-  when P1E > 0 andalso P1E < 1 ->
-    0;
-calc_signature_size_nm_pair(0, _, _HashType, _ExpDelta, P1E, _MaxSize)
-  when P1E > 0 andalso P1E < 1 ->
-    0;
-calc_signature_size_nm_pair(N, M, HashType, ExpDelta, P1E, MaxSize)
-  when P1E > 0 andalso P1E < 1 ->
-    P = if P1E < 1.0e-8 ->
-               % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
-               %         point representation is sub-optimal!
-               % => use Taylor expansion of math:log(1 / (1-P1E))  at P1E = 0
-               %    (small terms first)
-               % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+log%281+%2F+%281-p%29%29++at+p+%3D+0
-               P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
-               P1E + P1E2/2 + P1E3/3 + P1E4/4 + P1E5/5; % +O[p^6]
-           true ->
-               math:log(1 / (1 - P1E))
-        end,
-    NT = calc_max_different_hashes(N, M, HashType, ExpDelta),
-    min_max(util:ceil(util:log2(NT * (NT - 1) / (2 * P))), get_min_hash_bits(), MaxSize).
+%% @doc Helper calculating 1 - (1 - Z)^X.
+-spec calc_one_m_xpow_one_m_z(X::number(), Z::float()) -> float().
+calc_one_m_xpow_one_m_z(X, _Z) when X == 0 ->
+    0.0;
+calc_one_m_xpow_one_m_z(_X, Z) when Z == 0 ->
+    0.0;
+calc_one_m_xpow_one_m_z(_X, Z) when Z == 1 ->
+    1.0;
+calc_one_m_xpow_one_m_z(X, Z) when Z < 1.0e-8 ->
+    % BEWARE: we cannot use (1-z) since it is near 1 and its floating
+    %         point representation is sub-optimal!
+    % => use Taylor expansion of 1 - (1 - z)^x  at z = 0
+    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+(1+-+z)%5Ex++at+z+%3D+0
+    X2 = X * X, X3 = X2 * X, X4 = X3 * X, X5 = X4 * X,
+    Z2 = Z * Z, Z3 = Z2* Z, Z4 = Z3 * Z, Z5 = Z4 * Z,
+    % small terms first:
+%%     Z5 * (X5 - 10*X4 + 35*X3 - 50*X2 + 24*X) / 120
+%%         + Z4 * (X4 - 6*X3 + 11*X2 - 6*X) / 24
+%%         + Z3 * (X3 - 3*X2 + 2*X) / 6
+%%         + Z2 * (X2 - X) / 2 + Z * X; % +O[p^6]
+    {S5, C5} = util:kahan_sum([X5, -10*X4, 35*X3, -50*X2, 24*X], 0.0, 0.0),
+    {S4, C4} = util:kahan_sum([X4, -6*X3, 11*X2, -6*X], 0.0, 0.0),
+    {S3, C3} = util:kahan_sum([X3, -3*X2, 2*X], 0.0, 0.0),
+    {S2, C2} = util:kahan_sum([X2, -X], 0.0, 0.0),
+    
+    {Sum, _C} = util:kahan_sum(
+                  [Z5 * C5 / 120, Z4 * C4 / 24, Z3 * C3 / 6, Z2 * C2 / 2,
+                   Z5 * S5 / 120, Z4 * S4 / 24, Z3 * S3 / 6, Z2 * S2 / 2,
+                   Z * X % +O[z^6]
+                  ], 0.0, 0.0),
+    Sum;
+calc_one_m_xpow_one_m_z(X, Z) ->
+    1 - math:pow(1 - Z, X).
 
-%% @doc Helper for calc_signature_size_nm_pair/5 calculating the maximum number
-%%      of different hashes when an upper bound on the delta is known.
--spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
-                                HashType::key | key_version,
-                                ExpDelta::number()) -> non_neg_integer().
-calc_max_different_hashes(N, M, HashType, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+%% @doc Helper for calculating the maximum number of different hashes when
+%%      an upper bound on the delta is known, ignoring cases where it is
+%%      known to be wrong based on N and M.
+-spec calc_max_different_hashes_(N::non_neg_integer(), M::non_neg_integer(),
+                                 ExpDelta::number()) -> non_neg_integer().
+calc_max_different_hashes_(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
     if ExpDelta == 0 ->
            % M and N may differ anyway if the actual delta is higher
            % -> target no collisions among items on any node!
            erlang:max(M, N);
        ExpDelta == 100 ->
            M + N; % special case of the ones below
-       HashType =:= key andalso is_float(ExpDelta) ->
+       is_float(ExpDelta) ->
            % assume the worst case, i.e. ExpDelta percent different hashes
            % on both nodes together due to missing items (out-dated items have
            % the same key!), and thus:
            % N = NT * (100 - ExpDelta * alpha) / 100 and
            % M = NT * (100 - ExpDelta * (1-alpha)) / 100
            util:ceil(((M + N) * 100) / (200 - ExpDelta));
-       HashType =:= key andalso is_integer(ExpDelta) ->
+       is_integer(ExpDelta) ->
            % -> use integer division (and round up) for higher precision:
-           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta);
-       HashType =:= key_version andalso is_float(ExpDelta) ->
-           % assume the worst case, i.e. ExpDelta percent different hashes
-           % on both nodes together due to outdated items which result in
-           % different key-version pairs (missing items would reduce the total
-           % number of hashes even under ExpDelta),
-           % and thus N = NT and M = NT - but just in case assume NT = (N + M) / 2
-           util:ceil(((M + N) * (100 + ExpDelta)) / 200);
-       HashType =:= key_version andalso is_integer(ExpDelta) ->
-           % -> use integer division (and round up) for higher precision:
-           ((M + N) * (100 + ExpDelta) + 199) div 200
+           ((M + N) * 100 + 200 - ExpDelta - 1) div (200 - ExpDelta)
     end.
+
+%% @doc Helper for calculating the maximum number of different hashes when
+%%      an upper bound on the delta is known. This method also handles cases
+%%      where ExpDelta is known to be wrong and sets the minimum known value
+%%      after printing a warning.
+-spec calc_max_different_hashes(N::non_neg_integer(), M::non_neg_integer(),
+                                ExpDelta::number()) -> non_neg_integer().
+calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =< 100 ->
+    Differences0 = calc_max_different_hashes_(N, M, ExpDelta),
+    % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
+    MinDiff = erlang:abs(N - M),
+    if MinDiff < Differences0 ->
+           Differences0;
+       true ->
+           log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+                   "  continuing with the minimum number of differences we know: ~B",
+                   [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+           MinDiff
+    end.
+
+%% @doc Calculates the maximum number of different items on both nodes (with N
+%%      and M items each) which may differ, i.e. which may not exist on either
+%%      node when an upper bound on the delta is known.
+-spec calc_max_different_items_total(N::non_neg_integer(), M::non_neg_integer(),
+                               ExpDelta::number()) -> non_neg_integer().
+calc_max_different_items_total(N, M, ExpDelta) ->
+    % the worst case with the maximal number of item checks is when
+    % this node has all ExpDelta items missing
+    % -> calculate the (expected) original item count
+    % -> have ExpDelta percent different items on either node
+    % (if items are only outdated, there are ExpDelta differences from (N+M)/2
+    % items which is less than the worst case above)
+
+    % note: avoid duplicate warnings if ExpDelta is wrong - if it is wrong here,
+    %       we do not need to fix MaxItems because the actual Differences are
+    %       set below either way:
+    MaxItems = calc_max_different_hashes_(N, M, ExpDelta),
+    Differences0 =
+        if ExpDelta == 0   -> 0;
+           ExpDelta == 100 -> MaxItems; % special case of the one below
+           is_float(ExpDelta) ->
+               % worst case: we have all the ExpDelta percent items the other node does not have
+               util:ceil(MaxItems * ExpDelta / 100);
+           is_integer(ExpDelta) ->
+               % -> use integer division (and round up) for higher precision:
+               (MaxItems * ExpDelta + 99) div 100
+        end,
+    % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
+    MinDiff = erlang:abs(N - M),
+    Differences =
+        if MinDiff < Differences0 ->
+               Differences0;
+           true ->
+               log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+                       "  continuing with the minimum number of differences we know: ~B",
+                       [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+               MinDiff
+        end,
+%%     log:pal("[ ~p ] MaxItems: ~B Differences: ~B -> ~B", [self(), MaxItems, Differences0, Differences]),
+    Differences.
+
+%% @doc Calculates the maximum number of items on the first node (N items)
+%%      which do not exist on the second node (M items) when an upper bound
+%%      on the delta is known. Note that the result is limited by N which
+%%      is the maximum number of differences on the first node.
+%% @see calc_max_different_items_total/3
+-spec calc_max_different_items_node(N::non_neg_integer(), M::non_neg_integer(),
+                               ExpDelta::number()) -> non_neg_integer().
+calc_max_different_items_node(N, M, ExpDelta) ->
+    erlang:min(calc_max_different_items_total(N, M, ExpDelta), N).
 
 -spec calc_items_in_chunk(DBChunk::bitstring(), BitsPerItem::non_neg_integer())
 -> NrItems::non_neg_integer().
@@ -1153,40 +1252,77 @@ calc_items_in_chunk(DBChunk, BitsPerItem) ->
     ?ASSERT(erlang:bit_size(DBChunk) rem BitsPerItem =:= 0),
     erlang:bit_size(DBChunk) div BitsPerItem.
 
+%% @doc Sorts the given list of tuples, and extracts duplicates (non-sorted)
+%%      based on the first tuple element.
+-spec sort_extractdupes(List::[Tuple,...])
+        -> {SortedList::[Tuple], Dupes::[Tuple]}
+   when is_subtype(Tuple, {term()} | {term(), term()} | {term(), term(), term()}).
+sort_extractdupes([_ | _] = List) ->
+    SortedList0 = lists:sort(List),
+    % detect and remove duplicates:
+    {Last, LastDup, Rest, Dupes0} =
+        lists:foldl(fun(X, {LastX, _, RestX, Dupes})
+                         when element(1, X) =:= element(1, LastX) ->
+                            {X, dup, RestX, [LastX | Dupes]};
+                       (X, {LastX, nodup, RestX, Dupes}) ->
+                            {X, nodup, [LastX | RestX], Dupes};
+                       (X, {LastX, dup, RestX, Dupes}) ->
+                            {X, nodup, RestX, [LastX | Dupes]}
+                    end, {hd(SortedList0), nodup, [], []}, tl(SortedList0)),
+    if LastDup =:= nodup ->
+           {lists:reverse(Rest, [Last]), Dupes0};
+       true ->
+           {lists:reverse(Rest),
+            % this is reversed but the order does not matter for duplicates:
+            [Last | Dupes0]}
+    end.
+
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
--spec compress_kv_list(
-        KVList::db_chunk_kv(), {KeyDiff::Bin, VBin::Bin},
-        SigSize, VSize::signature_size(),
-        KeyComprFun::fun(({?RT:key(), client_version()}, SigSize) -> bitstring()))
-        -> {KeyDiff::Bin, VBin::Bin, ResortedKOrigList::db_chunk_kv()}
+-spec compress_kv_list
+        (KVList::db_chunk_kv(), SigSize, VSize::signature_size(),
+         KeyComprFun::fun(({?RT:key(), client_version()}, SigSize) -> bitstring()),
+         integrate_size)
+    -> {KeyDiff::Bin, VBin::Bin, ResortedKOrigList::db_chunk_kv(), Dupes::db_chunk_kv()};
+        (KVList::db_chunk_kv(), SigSize, VSize::signature_size(),
+         KeyComprFun::fun(({?RT:key(), client_version()}, SigSize) -> bitstring()),
+         return_size)
+    -> {{KeyDiff::Bin, DeltaSigSizeBits::non_neg_integer(), DeltaSigSize::non_neg_integer()},
+        VBin::Bin, ResortedKOrigList::db_chunk_kv(), Dupes::db_chunk_kv()}
     when is_subtype(Bin, bitstring()),
          is_subtype(SigSize, signature_size()).
-compress_kv_list([_ | _], {AccDiff, AccV}, 0, 0, _KeyComprFun) ->
-    {AccDiff, AccV, []};
-compress_kv_list([_ | _] = KVList, {AccDiff, AccV}, SigSize, VSize, KeyComprFun) ->
-    SortedKVList = lists:sort([{KeyComprFun(X, SigSize), V, X}
-                              || X = {_K0, V} <- KVList]),
+compress_kv_list([_ | _], 0, 0, _KeyComprFun, integrate_size) ->
+    {<<>>, <<>>, [], []};
+compress_kv_list([_ | _], 0, 0, _KeyComprFun, return_size) ->
+    {{<<>>, 0, 0}, <<>>, [], []};
+compress_kv_list([_ | _] = KVList, SigSize, VSize, KeyComprFun, SizeOption) ->
+    {SortedKVList, Dupes0} =
+        sort_extractdupes([{KeyComprFun(X, SigSize), V, X}
+                           || X = {_K0, V} <- KVList]),
     {KList, VList, KV0List} = lists:unzip3(SortedKVList),
-    DiffKBin = compress_idx_list(KList, util:pow(2, SigSize) - 1, [], 0, 0),
-    DiffVBin = if VSize =:= 0 -> AccV;
+    DiffKStruct = compress_idx_list(KList, util:pow(2, SigSize) - 1, [], 0, 0, SizeOption),
+    DiffVBin = if VSize =:= 0 -> <<>>;
                   true -> lists:foldl(fun(V, Acc) ->
                                               <<Acc/bitstring, V:VSize>>
-                                      end, AccV, VList)
+                                      end, <<>>, VList)
                end,
-    {<<AccDiff/bitstring, DiffKBin/bitstring>>, DiffVBin, KV0List};
-compress_kv_list([], {AccDiff, AccV}, _SigSize, _VSize, _KeyComprFun) ->
-    {AccDiff, AccV, []}.
+    Dupes = [element(3, D) || D <- Dupes0],
+    {DiffKStruct, DiffVBin, KV0List, Dupes};
+compress_kv_list([], _SigSize, _VSize, _KeyComprFun, integrate_size) ->
+    {<<>>, <<>>, [], []};
+compress_kv_list([], _SigSize, _VSize, _KeyComprFun, return_size) ->
+    {{<<>>, 0, 0}, <<>>, [], []}.
 
-%% @doc De-compresses the binary from compress_kv_list/6 into a map with a
+%% @doc De-compresses the binary from compress_kv_list/5 into a map with a
 %%      binary key representation and the integer of the (shortened) version.
 -spec decompress_kv_list(CompressedBin::{KeyDiff::bitstring(), VBin::bitstring()},
+                         DeltaSigSize::signature_size() | unknown,
                          SigSize::signature_size())
-        -> {ResTree::kvi_tree(), NumKeys::non_neg_integer(), VSize::signature_size()}.
-decompress_kv_list({<<>>, <<>>}, _SigSize) ->
-    {mymaps:new(), 0, 0};
-decompress_kv_list({KeyDiff, VBin}, SigSize) ->
-    {KList, KListLen} = decompress_idx_list(KeyDiff, util:pow(2, SigSize) - 1),
+        -> {ResTree::kvi_tree(), VSize::signature_size()}.
+decompress_kv_list({<<>>, <<>>}, _DeltaSigSize, _SigSize) ->
+    {mymaps:new(), 0};
+decompress_kv_list({KeyDiff, VBin}, DeltaSigSize, SigSize) ->
+    {KList, KListLen} = decompress_idx_list(KeyDiff, DeltaSigSize, util:pow(2, SigSize) - 1),
     VBinSize = erlang:bit_size(VBin),
     VSize = VBinSize div KListLen,
     ?ASSERT(VBinSize rem KListLen =:= 0),
@@ -1196,62 +1332,65 @@ decompress_kv_list({KeyDiff, VBin}, SigSize) ->
                   {T, [{CurKeyX, {Version, CurPosX}} | AccX], CurPosX + 1}
           end, {VBin, [], 0}, KList),
     KVMap = mymaps:from_list(Res),
-    % deal with duplicates:
-    KVMap1 =
-        case mymaps:size(KVMap) of
-            KListLen -> KVMap;
-            KVMapSize ->
-                log:log("~w: [ ~.0p:~.0p ] hash collision detected"
-                        " (redundant item transfers expected)",
-                        [?MODULE, pid_groups:my_groupname(), self()]),
-                % there are duplicates! (items were mapped to the same key)
-                % -> remove them from the map so we send these items to the other node
-                % since every key must be in the map, we remove them one by one
-                % and check whether something was removed (ok) or not (duplicate)
-                element(3, lists:foldl(
-                          fun(CurKeyX, {UnprocessedX, OldSize, NewMapX}) ->
-                                  UnprocessedX1 = mymaps:remove(CurKeyX, UnprocessedX),
-                                  case mymaps:size(UnprocessedX1) of
-                                      OldSize -> % already removed -> duplicate
-                                          {UnprocessedX1, OldSize,
-                                           mymaps:remove(CurKeyX, NewMapX)};
-                                      NewSize -> % first occurence
-                                          {UnprocessedX1, NewSize, NewMapX}
-                                  end
-                          end, {KVMap, KVMapSize, KVMap}, KList))
-        end,
-    {KVMap1, KListLen, VSize}.
+    % hashes, i.e. compressed keys, should be unique in KeyDiff!
+    ?DBG_ASSERT(mymaps:size(KVMap) =:= KListLen),
+    {KVMap, VSize}.
+
+%% @doc Wrapper for GetDiffFun which also extracts items with colliding
+%%      hashes in MyEntries. These are added to the items to send and since
+%%      they are not matched with MyIOtherKvTree, colliding items there remain. 
+%% @see get_full_diff/4
+%% @see get_part_diff/4
+-spec get_diff_with_dupes(
+        MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
+        AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
+        SigSize::signature_size(), VSize::signature_size(),
+        GetDiffFun::fun((MyEntries::[EntryWithHash], MyIOtherKvTree::kvi_tree(),
+                         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()])
+                       -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+                           MyIOtherKvTree::kvi_tree()}))
+        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
+            MyIOtherKvTree::kvi_tree(), Dupes::[EntryWithHash]}
+    when is_subtype(EntryWithHash, {HashedKey::non_neg_integer(), Key::?RT:key(), VShort::integer()}).
+get_diff_with_dupes([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VSize, _GetDiffFun) ->
+    {FBItems, ReqItemsIdx, MyIOtKvTree, []};
+get_diff_with_dupes([_ | _] = KVList, MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VSize, GetDiffFun) ->
+    VMod = util:pow(2, VSize),
+    {KVList1, Dupes} =
+        sort_extractdupes([begin
+                               {KeyShort, VersionShort} =
+                                   compress_kv_pair(Key, Version, SigSize, VMod),
+                               {KeyShort, Key, VersionShort}
+                           end || {Key, Version} <- KVList]),
+    {ToSend1, ToReqIdx1, OtherDBChunk1} =
+        GetDiffFun(KVList1, MyIOtKvTree,
+                   [element(2, D) || D <- Dupes] ++ FBItems, ReqItemsIdx),
+    {ToSend1, ToReqIdx1, OtherDBChunk1, Dupes}.
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
 %%      or the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
-%%      VMod = 2^(number of bits)
-%% @see get_part_diff/6
--spec get_full_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                    AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                    SigSize::signature_size(), VMod::pos_integer())
+%% @see get_part_diff/4
+-spec get_full_diff(MyEntries::[{HashedKey::non_neg_integer(), Key::?RT:key(), VShort::integer()}],
+                    MyIOtherKvTree::kvi_tree(), AccFBItems::[?RT:key()],
+                    AccReqItems::[non_neg_integer()])
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
             MyIOtherKvTree::kvi_tree()}.
-get_full_diff([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+get_full_diff([], MyIOtKvTree, FBItems, ReqItemsIdx) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
-get_full_diff([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
-    {KeyShort, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
+get_full_diff([{KeyShort, Key, VersionShort} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx) ->
     case mymaps:find(KeyShort, MyIOtKvTree) of
         error ->
-            get_full_diff(Rest, MyIOtKvTree, [Key | FBItems],
-                          ReqItemsIdx, SigSize, VMod);
+            get_full_diff(Rest, MyIOtKvTree, [Key | FBItems], ReqItemsIdx);
         {ok, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = mymaps:remove(KeyShort, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_full_diff(Rest, MyIOtKvTree2, [Key | FBItems],
-                                 ReqItemsIdx, SigSize, VMod);
+                   get_full_diff(Rest, MyIOtKvTree2, [Key | FBItems], ReqItemsIdx);
                VersionShort =:= OtherVersionShort ->
-                   get_full_diff(Rest, MyIOtKvTree2, FBItems,
-                                 ReqItemsIdx, SigSize, VMod);
+                   get_full_diff(Rest, MyIOtKvTree2, FBItems, ReqItemsIdx);
                true -> % VersionShort < OtherVersionShort
-                   get_full_diff(Rest, MyIOtKvTree2, FBItems,
-                                 [Idx | ReqItemsIdx], SigSize, VMod)
+                   get_full_diff(Rest, MyIOtKvTree2, FBItems, [Idx | ReqItemsIdx])
             end
     end.
 
@@ -1259,38 +1398,32 @@ get_full_diff([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSiz
 %%      and the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
-%%      VMod = 2^(number of bits)
-%% @see get_full_diff/6
--spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                    AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                    SigSize::signature_size(), VMod::pos_integer())
+%% @see get_full_diff/4
+-spec get_part_diff(MyEntries::[{HashedKey::non_neg_integer(), Key::?RT:key(), VShort::integer()}],
+                    MyIOtherKvTree::kvi_tree(), AccFBItems::[?RT:key()],
+                    AccReqItems::[non_neg_integer()])
         -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
             MyIOtherKvTree::kvi_tree()}.
-get_part_diff([], MyIOtKvTree, FBItems, ReqItemsIdx, _SigSize, _VMod) ->
+get_part_diff([], MyIOtKvTree, FBItems, ReqItemsIdx) ->
     {FBItems, ReqItemsIdx, MyIOtKvTree};
-get_part_diff([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx, SigSize, VMod) ->
-    {KeyShort, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
+get_part_diff([{KeyShort, Key, VersionShort} | Rest], MyIOtKvTree, FBItems, ReqItemsIdx) ->
     case mymaps:find(KeyShort, MyIOtKvTree) of
         error ->
-            get_part_diff(Rest, MyIOtKvTree, FBItems,
-                          ReqItemsIdx, SigSize, VMod);
+            get_part_diff(Rest, MyIOtKvTree, FBItems, ReqItemsIdx);
         {ok, {OtherVersionShort, Idx}} ->
             MyIOtKvTree2 = mymaps:remove(KeyShort, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_part_diff(Rest, MyIOtKvTree2, [Key | FBItems],
-                                 ReqItemsIdx, SigSize, VMod);
+                   get_part_diff(Rest, MyIOtKvTree2, [Key | FBItems], ReqItemsIdx);
                VersionShort =:= OtherVersionShort ->
-                   get_part_diff(Rest, MyIOtKvTree2, FBItems,
-                                 ReqItemsIdx, SigSize, VMod);
+                   get_part_diff(Rest, MyIOtKvTree2, FBItems, ReqItemsIdx);
                true ->
-                   get_part_diff(Rest, MyIOtKvTree2, FBItems,
-                                 [Idx | ReqItemsIdx], SigSize, VMod)
+                   get_part_diff(Rest, MyIOtKvTree2, FBItems, [Idx | ReqItemsIdx])
             end
     end.
 
 %% @doc Transforms a single key and version into compact representations
 %%      based on the given size and VMod, respectively.
-%% @see compress_kv_list/6.
+%% @see compress_kv_list/5.
 -spec compress_kv_pair(Key::?RT:key(), Version::client_version(),
                         SigSize::signature_size(), VMod::pos_integer())
         -> {KeyShort::non_neg_integer(), VersionShort::integer()}.
@@ -1299,7 +1432,7 @@ compress_kv_pair(Key, Version, SigSize, VMod) ->
 
 %% @doc Transforms a key or a KV-tuple into a compact binary representation
 %%      based on the given size.
-%% @see compress_kv_list/6.
+%% @see compress_kv_list/5.
 -spec compress_key(Key::?RT:key() | {Key::?RT:key(), Version::client_version()},
                    SigSize::signature_size()) -> KeyShort::non_neg_integer().
 compress_key(Key, SigSize) ->
@@ -1317,7 +1450,7 @@ compress_key(Key, SigSize) ->
 
 %% @doc Transforms a key from a KV-tuple into a compact binary representation
 %%      based on the given size.
-%% @see compress_kv_list/6.
+%% @see compress_kv_list/5.
 -spec trivial_compress_key({Key::?RT:key(), Version::client_version()},
                    SigSize::signature_size()) -> KeyShort::non_neg_integer().
 trivial_compress_key(KV, SigSize) ->
@@ -1326,11 +1459,17 @@ trivial_compress_key(KV, SigSize) ->
 %% @doc Creates a compressed version of a (key-)position list.
 %%      MaxPosBound represents an upper bound on the biggest value in the list;
 %%      when decoding, the same bound must be known!
--spec compress_idx_list(SortedIdxList::[non_neg_integer()],
-                        MaxPosBound::non_neg_integer(), ResultIdx::[non_neg_integer()],
-                        LastPos::non_neg_integer(), Max::non_neg_integer())
-        -> CompressedIndices::bitstring().
-compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max) ->
+-spec compress_idx_list
+        (SortedIdxList::[non_neg_integer()], MaxPosBound::non_neg_integer(),
+         ResultIdx::[non_neg_integer()], LastPos::non_neg_integer(),
+         Max::non_neg_integer(), integrate_size)
+    -> CompressedIndices::bitstring();
+        (SortedIdxList::[non_neg_integer()], MaxPosBound::non_neg_integer(),
+         ResultIdx::[non_neg_integer()], LastPos::non_neg_integer(),
+         Max::non_neg_integer(), return_size)
+    -> {CompressedIndices::bitstring(), DeltaSigSizeBits::non_neg_integer(),
+        DeltaSigSize::non_neg_integer()}.
+compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max, SizeOption) ->
     CurIdx0 = Pos - LastPos,
     % need a positive value to encode:
     CurIdx = if CurIdx0 >= 0 -> CurIdx0;
@@ -1338,35 +1477,42 @@ compress_idx_list([Pos | Rest], MaxPosBound, AccResult, LastPos, Max) ->
                         ((CurIdx0 rem Mod) + Mod) rem Mod
              end,
     compress_idx_list(Rest, MaxPosBound, [CurIdx | AccResult], Pos + 1,
-                      erlang:max(CurIdx, Max));
-compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max) ->
+                      erlang:max(CurIdx, Max), SizeOption);
+compress_idx_list([], MaxPosBound, AccResult, _LastPos, Max, SizeOption) ->
     IdxSize = if Max =:= 0 -> 1;
                  true      -> bits_for_number(Max)
               end,
     Bin = lists:foldr(fun(Pos, Acc) ->
                               <<Acc/bitstring, Pos:IdxSize/integer-unit:1>>
                       end, <<>>, AccResult),
-    case Bin of
-        <<>> ->
-            <<>>;
-        _ ->
-            IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
-            <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>
+    if Bin =/= <<>> andalso SizeOption =:= integrate_size ->
+           IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
+           <<IdxSize:IdxBitsSize/integer-unit:1, Bin/bitstring>>;
+       Bin =/= <<>> andalso SizeOption =:= return_size ->
+           IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
+           {Bin, IdxBitsSize, IdxSize};
+       Bin =:= <<>> andalso SizeOption =:= integrate_size ->
+           Bin;
+       Bin =:= <<>> andalso SizeOption =:= return_size ->
+           {Bin, 0, 0}
     end.
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5
 %%      into a list of indices encoded by that function.
 -spec decompress_idx_list(CompressedBin::bitstring(),
+                          DeltaSigSize::signature_size() | unknown,
                           MaxPosBound::non_neg_integer())
         -> {[non_neg_integer()], Count::non_neg_integer()}.
-decompress_idx_list(<<>>, _MaxPosBound) ->
+decompress_idx_list(<<>>, _, _MaxPosBound) ->
     {[], 0};
-decompress_idx_list(Bin, MaxPosBound) ->
+decompress_idx_list(Bin, unknown, MaxPosBound) ->
     IdxBitsSize = bits_for_number(bits_for_number(MaxPosBound)),
     <<SigSize0:IdxBitsSize/integer-unit:1, Bin2/bitstring>> = Bin,
-    SigSize = erlang:max(1, SigSize0),
-    Count = calc_items_in_chunk(Bin2, SigSize),
-    IdxList = decompress_idx_list_(Bin2, 0, SigSize, MaxPosBound + 1),
+    decompress_idx_list(Bin2, SigSize0, MaxPosBound);
+decompress_idx_list(Bin, DeltaSigSize, MaxPosBound) ->
+    SigSize = erlang:max(1, DeltaSigSize),
+    Count = calc_items_in_chunk(Bin, SigSize),
+    IdxList = decompress_idx_list_(Bin, 0, SigSize, MaxPosBound + 1),
     ?DBG_ASSERT(Count =:= length(IdxList)),
     {IdxList, Count}.
 
@@ -1383,8 +1529,8 @@ decompress_idx_list_(Bin, LastPos, SigSize, Mod) ->
 
 %% @doc De-compresses a bitstring with indices from compress_idx_list/5
 %%      into the encoded sub-list of the original list.
-%%      NOTE: in contrast to decompress_idx_list/2 (which is used for
-%%            compressing KV lists as well), we do not support duplicates
+%%      NOTE: in contrast to decompress_idx_list/3 (which is used for
+%%            decompressing KV lists as well), we do not support duplicates
 %%            in the original list fed into compress_idx_list/5 and will fail
 %%            during the decode!
 -spec decompress_idx_to_list(CompressedBin::bitstring(), [X]) -> [X].
@@ -1426,6 +1572,7 @@ pos_to_bitstring([], AccBin, BitsSet, FinalSize) ->
 %%      appropriate positions in KList. Result is reversly sorted.
 %%      NOTE: This is essentially the same as bitstring_to_k_list_kv/3 but we
 %%            need the separation because of the opaque RT keys.
+%% @see pos_to_bitstring/4
 -spec bitstring_to_k_list_k(PosBitString::bitstring(), KList::[?RT:key()],
                             Acc::[?RT:key()]) -> Result::[?RT:key()].
 bitstring_to_k_list_k(<<1:1, RestBits/bitstring>>, [Key | RestK], Acc) ->
@@ -1442,6 +1589,7 @@ bitstring_to_k_list_k(RestBits, [], Acc) ->
 
 %% @doc Converts the bitstring from pos_to_bitstring/4 into keys at the
 %%      appropriate positions in KVList. Result is reversly sorted.
+%% @see pos_to_bitstring/4
 -spec bitstring_to_k_list_kv(PosBitString::bitstring(), KVList::db_chunk_kv(),
                              Acc::[?RT:key()]) -> Result::[?RT:key()].
 bitstring_to_k_list_kv(<<1:1, RestBits/bitstring>>, [{Key, _Version} | RestKV], Acc) ->
@@ -1462,14 +1610,15 @@ bitstring_to_k_list_kv(RestBits, [], Acc) ->
 
 %% @doc Gets all entries from MyEntries which are not encoded in MyIOtKvSet.
 %%      Also returns the tree with all these matches removed.
--spec shash_get_full_diff(MyEntries::KV, MyIOtherKvTree::kvi_tree(),
-                          AccDiff::KV, SigSize::signature_size())
-        -> {Diff::KV, MyIOtherKvTree::kvi_tree()}
-    when is_subtype(KV, db_chunk_kv()).
+-spec shash_get_full_diff(KVList::[{HashedKey::non_neg_integer(),
+                                    {Key::?RT:key(), Version::client_version()}}],
+                          MyIOtherKvTree::kvi_tree(),
+                          AccDiff::KVList, SigSize::signature_size())
+        -> {Diff::KVList, MyIOtherKvTree::kvi_tree()}
+    when is_subtype(KVList, db_chunk_kv()).
 shash_get_full_diff([], MyIOtKvSet, AccDiff, _SigSize) ->
     {AccDiff, MyIOtKvSet};
-shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
-    CurKey = compress_key(KV, SigSize),
+shash_get_full_diff([{CurKey, KV} | Rest], MyIOtKvSet, AccDiff, SigSize) ->
     OldSize = mymaps:size(MyIOtKvSet),
     MyIOtKvSet2 = mymaps:remove(CurKey, MyIOtKvSet),
     case mymaps:size(MyIOtKvSet2) of
@@ -1479,15 +1628,16 @@ shash_get_full_diff([KV | Rest], MyIOtKvSet, AccDiff, SigSize) ->
             shash_get_full_diff(Rest, MyIOtKvSet2, AccDiff, SigSize)
     end.
 
-%% @doc Part of the resolve_req message processing of the SHash and Bloom RC
-%%      processes in phase 2 (trivial RC) at the non-initiator.
+%% @doc Part of the resolve_req message processing of the SHash, Bloom, ART RC
+%%      processes in phase 2 (trivial RC) at the initiator for Bloom and at
+%%      the non-initiator for the other protocols.
 -spec shash_bloom_perform_resolve(
-        State::state(), DBChunkTree::kvi_tree(),
+        State::state(), DBChunkTree::kvi_tree(), DupesCount::non_neg_integer(),
         SigSize::signature_size(), VSize::signature_size(),
         DestReconPid::comm:mypid(),
-        GetDiffFun::fun((MyEntries::db_chunk_kv(), MyIOtherKvTree::kvi_tree(),
-                         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()],
-                         SigSize::signature_size(), VMod::pos_integer())
+        GetDiffFun::fun((MyEntries::[{HashedKey::non_neg_integer(), Key::?RT:key(), VShort::integer()}],
+                         MyIOtherKvTree::kvi_tree(),
+                         AccFBItems::[?RT:key()], AccReqItems::[non_neg_integer()])
                        -> {FBItems::[?RT:key()], ReqItemsIdx::[non_neg_integer()],
                            MyIOtherKvTree::kvi_tree()}))
         -> rr_recon_stats:stats().
@@ -1495,9 +1645,13 @@ shash_bloom_perform_resolve(
   #rr_recon_state{dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                   kv_list = KVList,          stats = Stats,
                   method = _RMethod,         initiator = IsInitiator},
-  DBChunkTree, SigSize, VSize, DestReconPid, GetDiffFun) ->
-    {ToSendKeys1, ToReqIdx1, DBChunkTree1} =
-        GetDiffFun(KVList, DBChunkTree, [], [], SigSize, util:pow(2, VSize)),
+  DBChunkTree, DupesCount, SigSize, VSize, DestReconPid, GetDiffFun) ->
+    {ToSendKeys1, ToReqIdx1, DBChunkTree1, _Dupes} =
+        get_diff_with_dupes(KVList, DBChunkTree, [], [], SigSize, VSize,
+                            GetDiffFun),
+    ?ALG_DEBUG("CheckCKV ~B+~Bckv vs. ~Bcmp items (~B dupes)",
+               [mymaps:size(DBChunkTree), DupesCount,
+                length(KVList), length(_Dupes)]),
 
     NewStats1 = send_resolve_request(Stats, ToSendKeys1, OwnerL, DestRRPid,
                                      IsInitiator, false),
@@ -1513,7 +1667,7 @@ shash_bloom_perform_resolve(
     comm:send(DestReconPid, {resolve_req, ToReq2}),
     % the other node will use key_upd_send and we must thus increase
     % the number of resolve processes here!
-    if ReqIdx =/= [] ->
+    if ReqIdx =/= [] orelse DupesCount > 0 ->
            rr_recon_stats:inc([{rs_expected, 1}], NewStats1);
        true -> NewStats1
     end.
@@ -1523,71 +1677,51 @@ shash_bloom_perform_resolve(
 %%      current node knows them.
 %%      NOTE: Payload is only sent if the other node has not shutdown yet!
 -spec phase2_run_trivial_on_diff(
-  UnidentifiedDiff::db_chunk_kv(), Payload::any(),
-  PayloadSize::non_neg_integer(), OtherHasShutdown::boolean(),
-  P1E_p2::float(), OtherCmpItemCount::non_neg_integer(), State::state())
+  UnidentifiedDiff::db_chunk_kv(), Payload::any(), OtherHasShutdown::boolean(),
+  FR_p2::float(), OtherCmpItemCount::non_neg_integer(), State::state())
         -> NewState::state().
 phase2_run_trivial_on_diff(
-  UnidentifiedDiff, Payload, OtherDiffIdxSize, OtherHasShutdown, P1E_p2,
+  UnidentifiedDiff, Payload, OtherHasShutdown, FR_p2,
   OtherCmpItemCount, % number of items the other nodes compares CKV entries with
   State = #rr_recon_state{stats = Stats, dest_recon_pid = DestReconPid,
-                          method = Method, initiator = IsInitiator,
+                          initiator = IsInitiator,
                           dest_rr_pid = DestRRPid, ownerPid = OwnerL}) ->
-    CKVSize = length(UnidentifiedDiff),
-    StartResolve = CKVSize + OtherDiffIdxSize > 0,
-    ?ALG_DEBUG("Reconcile SHash/Bloom/ART~n  Session=~.0p ; Diff=~B+~B",
-               [rr_recon_stats:get(session_id, Stats), CKVSize, OtherDiffIdxSize]),
+    CKVItems = UnidentifiedDiff,
+    CKVSize = length(CKVItems),
+    StartResolve = CKVSize + OtherCmpItemCount > 0,
+    ?ALG_DEBUG("Reconcile SHash/Bloom/ART~n  Session=~.0p ; Phase2=~B vs. ~B",
+               [rr_recon_stats:get(session_id, Stats), CKVSize, OtherCmpItemCount]),
     if StartResolve andalso not OtherHasShutdown ->
            % send idx of non-matching other items & KV-List of my diff items
            % start resolve similar to a trivial recon but using the full diff!
            % (as if non-initiator in trivial recon)
-           ExpDelta =
-               case Method of
-                   shash ->
-                       % UnidentifiedDiff contains Delta(*,*) without Reg(I, NI),
-                       % the non-initiator (NI) checks the CkIdx in the Payload
-                       % (Delta(*,*) without Reg(NI, I)) against it.
-                       % In the worst case, these do not overlap
-                       % (UnidentifiedDiff contains Reg(NI, I),
-                       %  OtherDiffIdx contains Reg(I, NI))
-                       % and thus the expected max delta among these sets is:
-                       100;
-                   bloom ->
-                       % UnidentifiedDiff contains Delta(*,*) without Reg(NI, I),
-                       % the non-initiator (NI) checks these against
-                       % Delta(*,*) without Reg(I, NI), so the same applies here
-                       100;
-                   art ->
-                       100 % TODO
-               end,
-           {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, SigSizeT, _VSizeT}} =
+           ExpDelta = 100, % the sets at I and NI may be distinct (in the worst-case)
+           {BuildTime, {MyDiffK, MyDiffV, ResortedKVOrigList, Dupes, SigSizeT, _VSizeT}} =
                util:tc(fun() ->
-                               compress_kv_list_p1e(
-                                 UnidentifiedDiff, CKVSize, OtherCmpItemCount, ExpDelta, P1E_p2,
+                               compress_kv_list_fr(
+                                 CKVItems, OtherCmpItemCount, CKVSize, ExpDelta, FR_p2,
                                  fun trivial_signature_sizes/4, fun trivial_compress_key/2)
                        end),
-           ?DBG_ASSERT(?implies(Payload =:= none, MyDiffK =/= <<>>)), % if no items to request
-           ?DBG_ASSERT((MyDiffK =:= <<>>) =:= (MyDiffV =:= <<>>)),
-           MyDiff = {MyDiffK, MyDiffV},
-           P1E_p2_real = trivial_worst_case_failprob(
-                           SigSizeT, CKVSize, OtherCmpItemCount, ExpDelta),
+           Fr_p2_real = trivial_worst_case_failrate(
+                          SigSizeT, OtherCmpItemCount, CKVSize, ExpDelta),
 
            send(DestReconPid,
-                {resolve_req, MyDiff, Payload, SigSizeT, comm:this()}),
+                {resolve_req, {MyDiffK, MyDiffV}, _DupesCount = length(Dupes),
+                 Payload, SigSizeT, comm:this()}),
            % the other node will use key_upd_send and we must thus increase
            % the number of resolve processes here!
            NewStats1 = rr_recon_stats:inc([{rs_expected, 1},
                                            {build_time, BuildTime}], Stats),
-           NewStats  = rr_recon_stats:set([{p1e_phase2, P1E_p2_real}], NewStats1),
+           NewStats  = rr_recon_stats:set([{fail_rate_p2, Fr_p2_real}], NewStats1),
            KList = [element(1, KV) || KV <- ResortedKVOrigList],
            State#rr_recon_state{stats = NewStats, stage = resolve,
                                 kv_list = [], k_list = KList,
-                                misc = [{my_bin_diff_empty, MyDiffK =:= <<>>}]};
+                                next_phase_kv = Dupes, misc = []};
        OtherHasShutdown ->
            % no need to send resolve_req message - the non-initiator already shut down
            % the other node does not have any items but there may be a diff at our node!
            % start a resolve here:
-           KList = [element(1, KV) || KV <- UnidentifiedDiff],
+           KList = [element(1, KV) || KV <- CKVItems],
            NewStats = send_resolve_request(
                         Stats, KList, OwnerL, DestRRPid, IsInitiator, true),
            NewState = State#rr_recon_state{stats = NewStats, stage = resolve},
@@ -1602,62 +1736,67 @@ phase2_run_trivial_on_diff(
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Calculates from a total P1E the (next) P1E to use for signature and
-%%      sub-tree reconciliations.
--spec merkle_next_p1e(BranchFactor::pos_integer(), P1ETotal::float())
-    -> {P1E_I::float(), P1E_L::float()}.
-merkle_next_p1e(BranchFactor, P1ETotal) ->
+%% @doc Calculates from a total failure rate target FR the (next) failure rate
+%%      targets to use for signature and sub-tree reconciliations.
+-spec merkle_next_fr_targets(BranchFactor::pos_integer(), FRPerNode::float())
+    -> {FR_I::float(), FR_L::float()}.
+merkle_next_fr_targets(BranchFactor, FRPerNode) ->
     % mistakes caused by:
     % inner node: current node or any of its BranchFactor children (B=BranchFactor+1)
-    % leaf node: current node only (B=1) and thus P1ETotal
-    % => current node's probability of 0 errors = P0E(child)^B
-    P1E_I = calc_n_subparts_p1e(BranchFactor + 1, P1ETotal),
-    P1E_L = P1ETotal,
-%%     log:pal("merkle [ ~p ]~n  P1ETotal: ~p, \tP1E_I: ~p, \tP1E_L: ~p",
-%%             [self(), P1ETotal, P1E_I, P1E_L]),
-    {P1E_I, P1E_L}.
+    % leaf node: current node only (B=1) and thus FRPerNode
+    FR_I = calc_n_subparts_FR(BranchFactor + 1, FRPerNode),
+    FR_L = FRPerNode,
+%%     log:pal("merkle [ ~p ]~n  FRPerNode: ~p, \tFR_I: ~p, \tFR_L: ~p",
+%%             [self(), FRPerNode, FR_I, FR_L]),
+    {FR_I, FR_L}.
 
-%% @doc Calculates the new signature sizes based on the next P1E as in
-%%      merkle_next_p1e/2
+%% @doc Calculates the new signature sizes based on the next failure targets
+%%      as in merkle_next_fr_targets/2
 -spec merkle_next_signature_sizes(
-        Params::#merkle_params{}, P1ETotal::float(),
-        MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer())
-    -> {P1E_I::float(), P1E_L::float(),
+        Params::#merkle_params{}, FRPerNode::float(),
+        MyMaxItemsCount::non_neg_integer(), OtherMaxItemsCount::non_neg_integer(),
+        MaxAffectedItems::non_neg_integer())
+    -> {FR_I::float(), FR_L::float(),
         NextSigSizeI::signature_size(), NextSigSizeL::signature_size(),
-        EffectiveP1E_I::float(), EffectiveP1E_L::float()}.
+        EffectiveFr_I::float(), EffectiveFr_L::float()}.
 merkle_next_signature_sizes(
-  #merkle_params{bucket_size = BucketSize, branch_factor = BranchFactor,
-                 exp_delta = ExpDelta}, P1ETotal,
-  MyMaxItemsCount, OtherMaxItemsCount) ->
-    {P1E_I, P1E_L} = merkle_next_p1e(BranchFactor, P1ETotal),
+  #merkle_params{bucket_size = BucketSize, branch_factor = BranchFactor},
+  FRPerNode, MyMaxItemsCount, OtherMaxItemsCount, MaxAffectedItems) ->
+    {FR_I, FR_L} = merkle_next_fr_targets(BranchFactor, FRPerNode),
 
-    % note: we need to use the same P1E for this level's signature
+    % note: we need to use the same failure rate for this level's signature
     %       comparison as a children's tree has in total!
-    if MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
-           AffectedItemsI =
-               calc_max_different_hashes(MyMaxItemsCount, OtherMaxItemsCount, key, ExpDelta),
-           NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / P1E_I)),
+    if MaxAffectedItems =:= 0 ->
+           NextSigSizeL = NextSigSizeI = get_min_hash_bits(),
+           _AffectedItemsI = _AffectedItemsL = 0,
+           EffectiveFr_L = EffectiveFr_I = float(0 / util:pow(2, NextSigSizeI));
+       MyMaxItemsCount =/= 0 andalso OtherMaxItemsCount =/= 0 ->
+           _AffectedItemsI =
+               AffectedItemsI = erlang:min(MyMaxItemsCount + OtherMaxItemsCount,
+                                           MaxAffectedItems),
+           NextSigSizeI = min_max(util:ceil(util:log2(AffectedItemsI / FR_I)),
                                   get_min_hash_bits(), 160),
-           EffectiveP1E_I = float(AffectedItemsI / util:pow(2, NextSigSizeI));
+           EffectiveFr_I = float(AffectedItemsI / util:pow(2, NextSigSizeI)),
+           _AffectedItemsL =
+               AffectedItemsL = lists:min([MyMaxItemsCount + OtherMaxItemsCount,
+                                           2 * BucketSize, MaxAffectedItems]),
+           NextSigSizeL = min_max(util:ceil(util:log2(AffectedItemsL / FR_L)),
+                                  get_min_hash_bits(), 160),
+           EffectiveFr_L = float(AffectedItemsL / util:pow(2, NextSigSizeL));
        true ->
-           NextSigSizeI = 0,
-           EffectiveP1E_I = 0.0
+           % should only occur during the reconciliation initiation in begin_sync/1
+           NextSigSizeL = NextSigSizeI = 0,
+           _AffectedItemsI = _AffectedItemsL = 0,
+           EffectiveFr_L = EffectiveFr_I = 0.0
     end,
-    ?DBG_ASSERT2(EffectiveP1E_I >= 0 andalso EffectiveP1E_I < 1, EffectiveP1E_I),
 
-    AffectedItemsL = 2 * BucketSize,
-    NextSigSizeL = min_max(util:ceil(util:log2(AffectedItemsL / P1E_L)),
-                           get_min_hash_bits(), 160),
-    EffectiveP1E_L = float(AffectedItemsL / util:pow(2, NextSigSizeL)),
-    ?DBG_ASSERT2(EffectiveP1E_L > 0 andalso EffectiveP1E_L < 1, EffectiveP1E_L),
-
-    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B"
-               "\tP1E_I: ~g,\tP1E_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
-               "  -> eff. P1E_I: ~g,\teff. P1E_L: ~g",
-               [MyMaxItemsCount, OtherMaxItemsCount,
-                P1E_I, P1E_L, NextSigSizeI, NextSigSizeL,
-                EffectiveP1E_I, EffectiveP1E_L]),
-    {P1E_I, P1E_L, NextSigSizeI, NextSigSizeL, EffectiveP1E_I, EffectiveP1E_L}.
+    ?ALG_DEBUG("merkle - signatures~n  MyMI: ~B,\tOtMI: ~B,\tMaxAffected: ~B,\tMaxAffectedI: ~B,\tMaxAffectedL: ~B~n"
+               "  FR_I: ~g,\tFR_L: ~g,\tSigSizeI: ~B,\tSigSizeL: ~B~n"
+               "  -> eff. FR_I: ~g,\teff. FR_L: ~g",
+               [MyMaxItemsCount, OtherMaxItemsCount, MaxAffectedItems, _AffectedItemsI, _AffectedItemsL,
+                FR_I, FR_L, NextSigSizeI, NextSigSizeL,
+                EffectiveFr_I, EffectiveFr_L]),
+    {FR_I, FR_L, NextSigSizeI, NextSigSizeL, EffectiveFr_I, EffectiveFr_L}.
 
 -compile({nowarn_unused_function, {min_max_feeder, 3}}).
 -spec min_max_feeder(X::number(), Min::number(), Max::number())
@@ -1754,6 +1893,7 @@ merkle_check_node([], [], _SigSizeI, _SigSizeL,
     %       should go into MIC - every inner node always has more items than
     %       any leaf node (otherwise it would have been a leaf node)
     AccMIC = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- RestTreeAcc]]),
+    ?DBG_ASSERT(NextLvlNodesActIN =:= length(RestTreeAcc)),
     {FlagsAcc, lists:reverse(RestTreeAcc),
      {lists:reverse(SyncAccSend, SyncInSend),
       lists:reverse(SyncAccRcv, SyncInRcv),
@@ -1819,7 +1959,7 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
        (not IsLeafNode) andalso NonEmptyLeafHash ->
            % inner node here, non-empty leaf there
            % no need to compare hashes - this is an exact process based on the tags
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            Sync = {MyMaxItemsCount, MyKVItems},
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
                              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
@@ -1853,7 +1993,7 @@ merkle_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSizeI, SigSizeL,
            ResultCode = if not IsLeafNode -> ?recon_fail_stop_inner; % stop_empty_leaf1
                            NonEmptyLeafNode -> ?recon_fail_stop_leaf % stop_empty_leaf2
                         end,
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
            merkle_check_node(TK, TN, SigSizeI, SigSizeL,
                              MyMaxItemsCount, OtherMaxItemsCount, Params, Stats,
@@ -1914,6 +2054,7 @@ merkle_cmp_result(<<>>, [], _SigSizeI, _SigSizeL,
     %       should go into MIC - every inner node always has more items than
     %       any leaf node (otherwise it would have been a leaf node)
     AccMIC = lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- RestTreeAcc]]),
+    ?DBG_ASSERT(NextLvlNodesActIN =:= length(RestTreeAcc)),
     {lists:reverse(RestTreeAcc),
      {lists:reverse(SyncAccSend, SyncInSend),
       lists:reverse(SyncAccRcv, SyncInRcv),
@@ -2006,7 +2147,7 @@ merkle_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN],
            % -> resolve directly here, i.e. without a trivial sub process
            SyncAccSend1 = SyncAccSend,
            OtherSyncAccDRLCount1 = OtherSyncAccDRLCount,
-           {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+           {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
            MySyncAccDRK1 = [element(1, X) || X <- MyKVItems] ++ MySyncAccDRK,
            MySyncAccDRLCount1 = MySyncAccDRLCount + LeafCount
     end,
@@ -2040,7 +2181,7 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                     OtherSyncAccDRLCount1 = OtherSyncAccDRLCount + 1
             end;
         false -> % stop_leaf
-            {MyKVItems, LeafCount} = merkle_tree:get_items([Node]),
+            {MyKVItems, LeafCount} = merkle_tree:get_items(Node),
             SyncAccRcv1 =
                 [{MyMaxItemsCount, MyKVItems} | SyncAccRcv],
             SyncAccRcvLeafCount1 = SyncAccRcvLeafCount + LeafCount,
@@ -2053,129 +2194,204 @@ merkle_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN],
                       AccCmp + 1, AccSkip,
                       NextLvlNodesActIN, HashCmpI_IN, HashCmpL_IN).
 
-%% @doc Helper for calculating the actual failure probability during merkle
+%% @doc Helper for calculating the actual used failure rate during merkle
 %%      hash comparisons.
--spec merkle_calc_next_p1e(PrevP1E::float(), EffectiveP1E_I::float(),
-                           EffectiveP1E_L::float(), HashCmpI::non_neg_integer(),
-                           HashCmpL::non_neg_integer()) -> float().
-merkle_calc_next_p1e(PrevP1E, _EffectiveP1E_I, _EffectiveP1E_L, 0, 0) ->
-    % mostly during the start and end of the reconciliation
-    PrevP1E;
-merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, EffectiveP1E_L, 1, 1) ->
-    PrevP1E + EffectiveP1E_I + EffectiveP1E_L
-        - PrevP1E * EffectiveP1E_I - PrevP1E * EffectiveP1E_L - EffectiveP1E_I * EffectiveP1E_L
-        + PrevP1E * EffectiveP1E_I * EffectiveP1E_L;
-merkle_calc_next_p1e(PrevP1E, _EffectiveP1E_I, EffectiveP1E_L, 0, 1) ->
-    PrevP1E + EffectiveP1E_L - PrevP1E * EffectiveP1E_L;
-merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, _EffectiveP1E_L, 1, 0) ->
-    PrevP1E + EffectiveP1E_I - PrevP1E * EffectiveP1E_I;
-merkle_calc_next_p1e(PrevP1E, EffectiveP1E_I, EffectiveP1E_L, HashCmpI, HashCmpL) ->
-    % TODO: can we get a higher sensitivity with floats near 1?
-    1 - (1 - PrevP1E) * math:pow(1 - EffectiveP1E_I, HashCmpI)
-        * math:pow(1 - EffectiveP1E_L, HashCmpL).
+-spec merkle_calc_used_fr(PrevUsedFr::UsedFrSum, EffectiveFr_I::float(),
+                          EffectiveFr_L::float(), HashCmpI::non_neg_integer(),
+                          HashCmpL::non_neg_integer()) -> UsedFrSum
+        when is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
+merkle_calc_used_fr({PrevUsedFr, PrevCompensation}, EffectiveFr_I,
+                    EffectiveFr_L, HashCmpI, HashCmpL) ->
+    % PrevUsedFr + HashCmpI * EffectiveFr_I +  HashCmpL * EffectiveFr_L
+    util:kahan_sum([HashCmpI * EffectiveFr_I,  HashCmpL * EffectiveFr_L],
+                   PrevUsedFr, PrevCompensation).
 
 %% @doc Helper for adding a leaf node's KV-List to a compressed binary
 %%      during merkle sync.
-%% @see merkle_resolve_retrieve_leaf_hashes/10
--spec merkle_resolve_add_leaf_hash(
-        Bucket::merkle_tree:mt_bucket(), P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
-        OtherMaxItemsCount::non_neg_integer(), BucketSizeBits::pos_integer(),
-        ExpDelta::number(), HashesK::Bin, HashesV::Bin, PrevP1E::float())
-        -> {HashesK::Bin, HashesV::Bin, NextP1E::float(),
-            ResortedBucket::merkle_tree:mt_bucket()}
-    when is_subtype(Bin, bitstring()).
-merkle_resolve_add_leaf_hash(
-  Bucket, P1EAllLeaves, NumRestLeaves, OtherMaxItemsCount, BucketSizeBits,
-  ExpDelta, HashesK, HashesV, PrevP1E) ->
+%% @see merkle_resolve_retrieve_leaf_hashes/14
+-spec merkle_resolve_add_leaf_hashes(
+        [SyncSend], FRAllLeaves::float(), NumRestLeaves::non_neg_integer(),
+        BucketSizeBits::non_neg_integer(), DupesSizeBits::pos_integer(),
+        Params::#merkle_params{}, PrevFR::UsedFrSum,
+        HashesK::Bin, HashesV::Bin, BucketSizesBin::Bin, DiffSigSizesBin::Bin, DupesCount::Bin,
+        NewSyncAcc::[SyncSend], Dupes::[db_chunk_kv()])
+        -> {{HashesK::Bin, HashesV::Bin, BucketSizesBin::Bin, DiffSigSizesBin::Bin, DupesCount::Bin},
+            NewSyncSend::[SyncSend], Dupes::db_chunk_kv()}
+    when is_subtype(Bin, bitstring()),
+         is_subtype(SyncSend, {OtherMaxItemsCount::non_neg_integer(),
+                               Bucket::merkle_tree:mt_bucket()}),
+         is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
+merkle_resolve_add_leaf_hashes(
+  [{OtherMaxItemsCount, Bucket} | Rest], FRAllLeaves, NumRestLeaves,
+  BucketSizeBits, DupesSizeBits, Params, {PrevFRSum, PrevFrC} = _PrevFR,
+  HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, SyncAcc, Dupes) ->
     BucketSize = length(Bucket),
+    ExpDelta = 100, % TODO: establish a bound of maximum MaxAffectedItems items for very low (initial) ExpDelta?
     ?DBG_ASSERT(BucketSize > 0),
     ?DBG_ASSERT(BucketSize =< util:pow(2, BucketSizeBits)),
-    HashesK1 = <<HashesK/bitstring, (BucketSize - 1):BucketSizeBits>>,
-    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP1E),
-%%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
-%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP1E}, {BucketSize, OtherMaxItemsCount, P1E_next}]),
+    % note: this includes duplicates which are actually not encoded!
+    ?DBG_ASSERT(?implies(BucketSizeBits =:= 0, BucketSize =:= 1)),
+    BucketSizesBinNew = <<BucketSizesBin/bitstring, (BucketSize - 1):BucketSizeBits>>,
+    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFRSum),
     {SigSize, VSize} =
-        trivial_signature_sizes(BucketSize, OtherMaxItemsCount, ExpDelta, P1E_next),
-    % note: we can only estimate the real P1E of this part here - the other
+        trivial_signature_sizes(OtherMaxItemsCount, BucketSize, ExpDelta, FR_next),
+    % note: we can only estimate the real FR of this part here - the other
     %       node will report back the exact probability based on its actual
     %       number of items (we nonetheless need this value to adjust the
     %       individual trivial syncs' signatures!)
-    ThisP1E_upper_bound =
-        trivial_worst_case_failprob(SigSize, BucketSize, OtherMaxItemsCount, ExpDelta),
-    % pay attention to floating point issues near 1:
-%%     NextP1E = 1 - (1 - PrevP1E) * (1 - ThisP1E_upper_bound),
-    NextP1E = PrevP1E + ThisP1E_upper_bound - PrevP1E * ThisP1E_upper_bound,
-%%     log:pal("merkle_send [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
-%%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
-    {HashesKNew, HashesVNew, ResortedBucket} =
-        compress_kv_list(Bucket, {HashesK1, HashesV}, SigSize, VSize,
-                         fun trivial_compress_key/2),
-    {HashesKNew, HashesVNew, NextP1E, ResortedBucket}.
+    ThisFR_upper_bound =
+        trivial_worst_case_failrate(SigSize, OtherMaxItemsCount, BucketSize, ExpDelta),
+    NextFR = util:kahan_sum([ThisFR_upper_bound], PrevFRSum, PrevFrC),
+%%     log:pal("merkle_send [ ~p ] (rest: ~B):~n  bits: ~p, FR: ~p vs. ~p~n  acc total: ~p -> ~p",
+%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, FR_p1, _PrevFR, NextFR]),
+    {{HashesKBucket, IdxBitsSize, DiffSigSize1}, HashesVBucket, ResortedBucket, AddDupes} =
+        compress_kv_list(Bucket, SigSize, VSize, fun trivial_compress_key/2, return_size),
+    AddDupesL = length(AddDupes),
+    % beware: buckets with 0 encoded items are optimised to <<>>
+    if (BucketSize - AddDupesL) > 0 ->
+           DiffSigSizesBinNew = <<DiffSigSizesBin/bitstring, DiffSigSize1:IdxBitsSize/integer-unit:1>>,
+           HashesKNew = <<HashesK/bitstring, HashesKBucket/bitstring>>,
+           HashesVNew = <<HashesV/bitstring, HashesVBucket/bitstring>>,
+           ok;
+       true ->
+           ?DBG_ASSERT(HashesKBucket =:= <<>>),
+           ?DBG_ASSERT(HashesVBucket =:= <<>>),
+           DiffSigSizesBinNew = DiffSigSizesBin,
+           HashesKNew = HashesK,
+           HashesVNew = HashesV,
+           ok
+    end,
+%%     log:pal("merkle_send [ ~p ]:~n  ~p~n  ~p",
+%%             [self(), {NumRestLeaves, FRAllLeaves, _PrevFR},
+%%              {BucketSize, AddDupesL, OtherMaxItemsCount, FR_next}]),
+    DupesCountNew = <<DupesCount/bitstring, AddDupesL:DupesSizeBits>>,
+    merkle_resolve_add_leaf_hashes(
+      Rest, FRAllLeaves, NumRestLeaves - 1, BucketSizeBits, DupesSizeBits, Params, NextFR,
+      HashesKNew, HashesVNew, BucketSizesBinNew, DiffSigSizesBinNew, DupesCountNew, [{OtherMaxItemsCount, ResortedBucket} | SyncAcc],
+      [AddDupes | Dupes]);
+merkle_resolve_add_leaf_hashes(
+    [], _FRAllLeaves, _NumRestLeaves, _BucketSizeBits, _DupesSizeBits,
+    _Params, _PrevFR, HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, SyncAcc, Dupes) ->
+    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>> orelse DupesCount > 0),
+    {{HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount},
+     lists:reverse(SyncAcc), lists:flatten(Dupes)}.
 
 %% @doc Helper for retrieving a leaf node's KV-List from the compressed binary
-%%      returned by merkle_resolve_add_leaf_hash/9 during merkle sync.
-%% @see merkle_resolve_add_leaf_hash/9
+%%      returned by merkle_resolve_add_leaf_hashes/9 during merkle sync.
+%% @see merkle_resolve_add_leaf_hashes/9
 -spec merkle_resolve_retrieve_leaf_hashes(
-        HashesK::Bin, HashesV::Bin, P1EAllLeaves::float(), NumRestLeaves::pos_integer(),
-        PrevP1E::float(), MyMaxItemsCount::non_neg_integer(),
-        PrevP1E_real::float(), MyActualItemsCount::non_neg_integer(),
-        BucketSizeBits::pos_integer(), ExpDelta::number())
-        -> {NewHashesK::Bin, NewHashesV::Bin, OtherBucketTree::kvi_tree(),
-            OrigDBChunkLen::non_neg_integer(),
-            SigSize::signature_size(), VSize::signature_size(),
-            NextP1E::float(), NextP1E_real::float()}
-    when is_subtype(Bin, bitstring()).
+        [SyncRcv], HashesK::Bin, HashesV::Bin, BucketSizesBin::Bin, DiffSigSizesBin::Bin, DupesCount::Bin, FRAllLeaves::float(),
+        NumRestLeaves::non_neg_integer(), PrevFR::UsedFrSum, PrevFR_real::UsedFrSum,
+        BucketSizeBits::non_neg_integer(), DupesSizeBits::pos_integer(), Params::#merkle_params{},
+        ToSendKeysAcc::[?RT:key()], ToResolveIdxAcc::[bitstring()],
+        ResolveNonEmpty::boolean(), DupesCountTotal::non_neg_integer())
+        -> {ToSendKeys::[?RT:key()], ToResolveIdx::Bin,
+            OtherHasResolve::boolean(), ThisFR_real::float()}
+    when is_subtype(Bin, bitstring()),
+         is_subtype(SyncRcv, {MyMaxItemsCount::non_neg_integer(),
+                              Bucket::merkle_tree:mt_bucket()}),
+         is_subtype(UsedFrSum, {Sum::float(), Compensation::float()}).
 merkle_resolve_retrieve_leaf_hashes(
-  HashesK, HashesV, P1EAllLeaves, NumRestLeaves, PrevP1E, MyMaxItemsCount,
-  PrevP1E_real, MyActualItemsCount, BucketSizeBits, ExpDelta) ->
-    <<BucketSize0:BucketSizeBits/integer-unit:1, HashesKT/bitstring>> = HashesK,
-    BucketSize = BucketSize0 + 1,
-    P1E_next = calc_n_subparts_p1e(NumRestLeaves, P1EAllLeaves, PrevP1E),
+  [{MyMaxItemsCount, MyKVItems} | Rest],
+  HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, FRAllLeaves, NumRestLeaves,
+  {PrevFRSum, PrevFrC} = _PrevFR, {PrevFR_real_Sum, PrevFr_real_C} = _PrevFR_real,
+  BucketSizeBits, DupesSizeBits, Params, ToSendKeys, ToResolveIdx,
+  ResolveNonEmpty, DupesCountTotal) ->
+    MyActualItemsCount = length(MyKVItems),
+    ExpDelta = 100, % TODO: establish a bound of maximum MaxAffectedItems items for very low (initial) ExpDelta?
+    <<BucketSize0:BucketSizeBits/integer-unit:1, NBucketSizesBin/bitstring>> = BucketSizesBin,
+    <<Dupes:DupesSizeBits/integer-unit:1, NDupesCount/bitstring>> = DupesCount,
+    OtherActualItemsCount = BucketSize0 + 1,
+    BucketSize = OtherActualItemsCount - Dupes,
+    FR_next = calc_n_subparts_FR(NumRestLeaves, FRAllLeaves, PrevFRSum),
 %%     log:pal("merkle_receive [ ~p ]:~n  ~p~n  ~p",
-%%             [self(), {NumRestLeaves, P1EAllLeaves, PrevP0E},
-%%              {BucketSize, MyMaxItemsCount, P1E_next}]),
+%%             [self(), {NumRestLeaves, FRAllLeaves, _PrevFR},
+%%              {BucketSize, Dupes, MyMaxItemsCount, FR_next}]),
     {SigSize, VSize} =
-        trivial_signature_sizes(BucketSize, MyMaxItemsCount, ExpDelta, P1E_next),
-    ThisP1E =
-        trivial_worst_case_failprob(SigSize, BucketSize, MyMaxItemsCount, ExpDelta),
-    % pay attention to floating point issues near 1:
-%%     NextP1E = 1 - (1 - PrevP1E) * (1 - ThisP1E),
-    NextP1E = PrevP1E + ThisP1E - PrevP1E * ThisP1E,
-    ThisP1E_real =
-        trivial_worst_case_failprob(SigSize, BucketSize, MyActualItemsCount, ExpDelta),
-    % pay attention to floating point issues near 1:
-%%     NextP1E_real = 1 - (1 - PrevP1E_real) * (1 - ThisP1E_real),
-    NextP1E_real = PrevP1E_real + ThisP1E_real - PrevP1E_real * ThisP1E_real,
-%%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n  bits: ~p, P1E: ~p vs. ~p~n  P0E: ~p -> ~p",
-%%             [self(), NumRestLeaves, {SigSize, VSize}, P1E_next, P1E_p1, PrevP0E, NextP0E]),
-    % we need to know how large a piece is
-    % -> peak into the binary (using the format in decompress_idx_list/3):
-    IdxBitsSize = bits_for_number(SigSize),
-    <<DiffSigSize1:IdxBitsSize/integer-unit:1, _/bitstring>> = HashesKT,
-    OBucketKBinSize = BucketSize * DiffSigSize1 + IdxBitsSize,
-    %log:pal("merkle: ~B", [OBucketKBinSize]),
-    OBucketVBinSize = BucketSize * VSize,
-    <<OBucketKBin:OBucketKBinSize/bitstring, NHashesK/bitstring>> = HashesKT,
-    <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
-    {OBucketTree, _OrigDBChunkLen, VSize} =
-        decompress_kv_list({OBucketKBin, OBucketVBin}, SigSize),
-    {NHashesK, NHashesV, OBucketTree, BucketSize, SigSize, VSize,
-     NextP1E, NextP1E_real}.
+        trivial_signature_sizes(MyMaxItemsCount, OtherActualItemsCount, ExpDelta, FR_next),
+    ThisFR_upper_bound =
+        trivial_worst_case_failrate(SigSize, MyMaxItemsCount, OtherActualItemsCount, ExpDelta),
+    NextFR = util:kahan_sum([ThisFR_upper_bound], PrevFRSum, PrevFrC),
+    ThisFR_real =
+        trivial_worst_case_failrate(SigSize, MyActualItemsCount, OtherActualItemsCount, ExpDelta),
+    NextFR_real = util:kahan_sum([ThisFR_real], PrevFR_real_Sum, PrevFr_real_C),
+%%     log:pal("merkle_receive [ ~p ] (rest: ~B):~n  bits: ~p, acc: ~p vs. ~p~n  acc total: ~p -> ~p",
+%%             [self(), NumRestLeaves, {SigSize, VSize}, FR_next, ThisFR_upper_bound, _PrevFR, NextFR]),
+    % beware: buckets with 0 encoded items are optimised to <<>>
+    if BucketSize > 0 ->
+           IdxBitsSize = bits_for_number(SigSize),
+           <<DiffSigSize1:IdxBitsSize/integer-unit:1, NDiffSigSizesBin/bitstring>> = DiffSigSizesBin,
+           OBucketKBinSize = BucketSize * DiffSigSize1,
+           %log:pal("merkle: ~B", [OBucketKBinSize]),
+           OBucketVBinSize = BucketSize * VSize,
+           <<OBucketKBin:OBucketKBinSize/bitstring, NHashesK/bitstring>> = HashesK,
+           <<OBucketVBin:OBucketVBinSize/bitstring, NHashesV/bitstring>> = HashesV,
+           {OBucketTree, VSize} = decompress_kv_list({OBucketKBin, OBucketVBin}, DiffSigSize1, SigSize),
+           ok;
+       true ->
+           OBucketTree = mymaps:new(),
+           NHashesK = HashesK,
+           NHashesV = HashesV,
+           NDiffSigSizesBin = DiffSigSizesBin,
+           ok
+    end,
+
+    % calc diff (trivial sync)
+    ?DBG_ASSERT(MyKVItems =/= []),
+%%     log:pal("Tree: ~.2p", [mymaps:values(OBucketTree)]),
+    % note: dupes are already added to ToSendKeys1
+    {ToSendKeys1, ToReqIdx1, OBucketTree1, _Dupes} =
+        get_diff_with_dupes(
+          MyKVItems, OBucketTree, ToSendKeys, [], SigSize, VSize,
+          fun get_full_diff/4),
+    ReqIdx = lists:usort(
+               [Idx || {_Version, Idx} <- mymaps:values(OBucketTree1)]
+                   ++ ToReqIdx1),
+%%     log:pal("pos_to_bitstring(~.2p, ~.2p, 0, ~B)",
+%%             [ReqIdx, ToResolveIdx, Params#merkle_params.bucket_size]),
+    ToResolveIdx1 = pos_to_bitstring(ReqIdx, ToResolveIdx, 0,
+                                     Params#merkle_params.bucket_size),
+    merkle_resolve_retrieve_leaf_hashes(
+      Rest, NHashesK, NHashesV, NBucketSizesBin, NDiffSigSizesBin, NDupesCount, FRAllLeaves, NumRestLeaves - 1, NextFR,
+      NextFR_real, BucketSizeBits, DupesSizeBits, Params, ToSendKeys1, ToResolveIdx1,
+      ?IIF(ReqIdx =/= [], true, ResolveNonEmpty), DupesCountTotal + Dupes);
+merkle_resolve_retrieve_leaf_hashes(
+  [], HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, _FRAllLeaves, _NumRestLeaves, _PrevFR,
+  PrevFR_real, _BucketSizeBits, _DupesSizeBits, _Params, ToSendKeys, ToResolveIdx,
+  ResolveNonEmpty, DupesCountTotal) ->
+    ?ASSERT(HashesK =:= <<>>),
+    ?ASSERT(HashesV =:= <<>>),
+    ?ASSERT(BucketSizesBin =:= <<>>),
+    ?ASSERT(DiffSigSizesBin =:= <<>>),
+    ?ASSERT(DupesCount =:= <<>>),
+    ToResolveIdx1 =
+        if ResolveNonEmpty ->
+               erlang:list_to_bitstring(lists:reverse(ToResolveIdx));
+           true ->
+               % optimise this case away (otherwise all entries will be 0)
+               % (also ref. the calls of merkle_resolve_leaves_ckidx/8)
+               <<>>
+        end,
+    {ToSendKeys, ToResolveIdx1, DupesCountTotal > 0 orelse ResolveNonEmpty,
+     element(1, PrevFR_real)}.
 
 %% @doc Creates a compact binary consisting of bitstrings with trivial
 %%      reconciliations for all sync requests to send.
--spec merkle_resolve_leaves_send(State::state(), NextP1E::float()) -> NewState::state().
+-spec merkle_resolve_leaves_send(
+        State::state(), UsedFr::{Sum::float(), Compensation::float()})
+    -> NewState::state().
 merkle_resolve_leaves_send(
   State = #rr_recon_state{params = Params, initiator = IsInitiator,
                           stats = Stats, dest_recon_pid = DestReconPid,
                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                           merkle_sync = {SyncSend, SyncRcv, SyncRcvLeafCount,
                                          {MySyncDRK, MySyncDRLCount, OtherSyncDRLCount}}},
-  NextP1E) ->
+  {UsedFrSum, _UsedFrC}) ->
 %%     log:pal("Sync (~s):~n  send:~.2p~n  rcv:~.2p",
 %%             [?IIF(IsInitiator, "I", "NI"), SyncSend, SyncRcv]),
     % resolve items from emptyLeaf-* comparisons with empty leaves on any node as key_upd:
-    NStats1 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
+    NStats0 = send_resolve_request(Stats, MySyncDRK, OwnerL, DestRRPid, IsInitiator, true),
+    NStats1 = rr_recon_stats:set([{fail_rate_p1, UsedFrSum}], NStats0),
     NStats2 = rr_recon_stats:inc(
                 [{tree_leavesSynced, MySyncDRLCount + OtherSyncDRLCount},
                  {rs_expected, ?IIF(OtherSyncDRLCount > 0, 1, 0)}], NStats1),
@@ -2185,16 +2401,20 @@ merkle_resolve_leaves_send(
     SyncSendL = length(SyncSend),
     SyncRcvL = length(SyncRcv),
     TrivialProcs = SyncSendL + SyncRcvL,
-    P1EAllLeaves = calc_n_subparts_p1e(1, Params#merkle_params.p1e, NextP1E),
-    ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tP1EAllLeaves: ~g\t"
-               "ItemsToSend: ~B (~g per leaf)",
+    FRAllLeaves = calc_n_subparts_FR(1, Params#merkle_params.fail_rate, UsedFrSum),
+    ?ALG_DEBUG("merkle (~s) - LeafSync~n  ~B (send), ~B (receive), ~B direct (~s)\tFRAllLeaves: ~g\t"
+               "ItemsToSend: ~B (~g per leaf)~n  send: ~B (L-L) + ~B (L-I), receive: ~B (L-L) + ~B (I-L)",
                [?IIF(IsInitiator, "I", "NI"), SyncSendL, SyncRcvL,
                 MySyncDRLCount, ?IIF(IsInitiator, "in", "out"),
-                P1EAllLeaves,
+                FRAllLeaves,
                 lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]),
                 ?IIF(SyncSend =/= [],
                      lists:sum([length(MyKVItems) || {_, MyKVItems} <- SyncSend]) /
-                         SyncSendL, 0.0)]),
+                         SyncSendL, 0.0),
+                length([ok || {OtherMaxIC, _MyKVItems} <- SyncSend, OtherMaxIC =< Params#merkle_params.bucket_size]),
+                SyncSendL - length([ok || {OtherMaxIC, _MyKVItems} <- SyncSend, OtherMaxIC =< Params#merkle_params.bucket_size]),
+                length([ok || {MyMaxIC, _MyKVItems} <- SyncRcv, MyMaxIC =< Params#merkle_params.bucket_size]),
+                SyncRcvL - length([ok || {MyMaxIC, _MyKVItems} <- SyncRcv, MyMaxIC =< Params#merkle_params.bucket_size])]),
     
     if SyncSendL =:= 0 andalso SyncRcvL =:= 0 ->
            % nothing to do
@@ -2204,97 +2424,68 @@ merkle_resolve_leaves_send(
        SyncSend =/= [] ->
            % note: we do not have empty buckets here and thus always store (BucketSize - 1)
            BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
-           ExpDelta = Params#merkle_params.exp_delta,
+           % note: duplicates can be 0 up to BucketSize
+           DupesSizeBits = bits_for_number(Params#merkle_params.bucket_size),
+           {SyncStruct, NewSyncSend, Dupes} =
+               merkle_resolve_add_leaf_hashes(
+                 SyncSend, FRAllLeaves, TrivialProcs, BucketSizeBits, DupesSizeBits,
+                 Params, {0.0, 0.0}, <<>>, <<>>, <<>>, <<>>, <<>>, [], []),
            % note: 1 trivial proc contains 1 leaf
-           {HashesK, HashesV, NewSyncSend_rev, _ThisP1E_upper_bound, LeafCount} =
-               lists:foldl(
-                 fun({OtherMaxItemsCount, MyKVItems},
-                     {HashesKAcc, HashesVAcc, SyncAcc, PrevP1E, LeafNAcc}) ->
-                         {HashesKAcc1, HashesVAcc1, CurP1E, MyKVItems1} =
-                             merkle_resolve_add_leaf_hash(
-                               MyKVItems, P1EAllLeaves, TrivialProcs - LeafNAcc,
-                               OtherMaxItemsCount, BucketSizeBits, ExpDelta,
-                               HashesKAcc, HashesVAcc, PrevP1E),
-                         {HashesKAcc1, HashesVAcc1,
-                          [{OtherMaxItemsCount, MyKVItems1} | SyncAcc],
-                          CurP1E, LeafNAcc + 1}
-                 end, {<<>>, <<>>, [], 0.0, 0}, SyncSend),
            % the other node will send its items from this CKV list - increase rs_expected, too
-           NStats3 = rr_recon_stats:inc([{tree_leavesSynced, LeafCount},
+           NStats3 = rr_recon_stats:inc([{tree_leavesSynced, SyncSendL},
                                          {rs_expected, 1}], NStats2),
            
-           MerkleSyncNew1 = {lists:reverse(NewSyncSend_rev), SyncRcv, SyncRcvLeafCount,
+           MerkleSyncNew1 = {NewSyncSend, SyncRcv, SyncRcvLeafCount,
                              {[], MySyncDRLCount, OtherSyncDRLCount}},
-           ?ALG_DEBUG("merkle (~s) - HashesSize: ~B+~B (~B+~B compressed)",
+           ?ALG_DEBUG("merkle (~s) - HashesSize: ~B (~B compressed)",
                       [?IIF(IsInitiator, "I", "NI"),
-                       erlang:byte_size(erlang:term_to_binary(HashesK)),
-                       erlang:byte_size(erlang:term_to_binary(HashesV)),
+                       erlang:byte_size(erlang:term_to_binary(SyncStruct)),
                        erlang:byte_size(
-                         erlang:term_to_binary(HashesK, [compressed])),
-                       erlang:byte_size(
-                         erlang:term_to_binary(HashesV, [compressed]))]),
-           ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
-           send(DestReconPid, {resolve_req, HashesK, HashesV}),
+                         erlang:term_to_binary(SyncStruct, [compressed]))]),
+           send(DestReconPid, {resolve_req, SyncStruct}),
            State#rr_recon_state{stage = resolve, stats = NStats3,
                                 merkle_sync = MerkleSyncNew1,
-                                misc = [{all_leaf_p1e, P1EAllLeaves},
+                                next_phase_kv = Dupes,
+                                misc = [{all_leaf_acc, FRAllLeaves},
                                         {trivial_procs, TrivialProcs}]};
        true ->
            % only wait for the other node's resolve_req
            State#rr_recon_state{stage = resolve, merkle_sync = SyncNew1,
                                 stats = NStats2,
-                                misc = [{all_leaf_p1e, P1EAllLeaves},
+                                misc = [{all_leaf_acc, FRAllLeaves},
                                         {trivial_procs, TrivialProcs}]}
     end.
 
 %% @doc Decodes the trivial reconciliations from merkle_resolve_leaves_send/5
 %%      and resolves them returning a compressed idx list each with keys to
 %%      request.
--spec merkle_resolve_leaves_receive(State::state(), HashesK::bitstring(),
-                                    HashesV::bitstring()) -> NewState::state().
+-spec merkle_resolve_leaves_receive(
+        State::state(), {HashesK::Bin, HashesV::Bin, BucketSizesBin::Bin,
+                         DiffSigSizesBin::Bin, DupesCount::Bin}) -> NewState::state()
+    when is_subtype(Bin, bitstring()).
 merkle_resolve_leaves_receive(
   State = #rr_recon_state{initiator = IsInitiator,
                           merkle_sync = {SyncSend, SyncRcv, SyncRcvLeafCount, DirectResolve},
                           params = Params,
                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                           dest_recon_pid = DestRCPid, stats = Stats,
-                          misc = [{all_leaf_p1e, P1EAllLeaves},
+                          misc = [{all_leaf_acc, FRAllLeaves},
                                   {trivial_procs, TrivialProcs}]},
-  HashesK, HashesV) ->
-    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>>),
+  {HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount}) ->
+    ?DBG_ASSERT(HashesK =/= <<>> orelse HashesV =/= <<>> orelse DupesCount > 0),
     % note: we do not have empty buckets here and thus always store (BucketSize - 1)
     BucketSizeBits = bits_for_number(Params#merkle_params.bucket_size - 1),
-    ExpDelta = Params#merkle_params.exp_delta,
+    % note: duplicates can be 0 up to BucketSize
+    DupesSizeBits = bits_for_number(Params#merkle_params.bucket_size),
     % mismatches to resolve:
     % * at initiator    : inner(I)-leaf(NI) or leaf(NI)-non-empty-leaf(I)
     % * at non-initiator: inner(NI)-leaf(I)
-    % note: 1 trivial proc may contain more than 1 leaf!
-    {<<>>, <<>>, ToSend, ToResolve, ResolveNonEmpty, _TrivialProcsRest,
-     _ThisP1E_upper_bound, ThisP1E_real} =
-        lists:foldl(
-          fun({MyMaxItemsCount, MyKVItems},
-              {HashesKAcc, HashesVAcc, ToSend, ToResolve, ResolveNonEmpty,
-               TProcsAcc, P1EIn, P1EIn_real}) ->
-                  {NHashesKAcc, NHashesVAcc, OBucketTree, _OrigDBChunkLen,
-                   SigSize, VSize, ThisP1E, ThisP1E_real} =
-                      merkle_resolve_retrieve_leaf_hashes(
-                        HashesKAcc, HashesVAcc, P1EAllLeaves, TProcsAcc,
-                        P1EIn, MyMaxItemsCount, P1EIn_real, length(MyKVItems),
-                        BucketSizeBits, ExpDelta),
-                  % calc diff (trivial sync)
-                  ?DBG_ASSERT(MyKVItems =/= []),
-                  {ToSend1, ToReqIdx1, OBucketTree1} =
-                      get_full_diff(
-                        MyKVItems, OBucketTree, ToSend, [], SigSize, util:pow(2, VSize)),
-                  ReqIdx = lists:usort(
-                             [Idx || {_Version, Idx} <- mymaps:values(OBucketTree1)]
-                                 ++ ToReqIdx1),
-                  ToResolve1 = pos_to_bitstring(ReqIdx, ToResolve, 0,
-                                                Params#merkle_params.bucket_size),
-                  {NHashesKAcc, NHashesVAcc, ToSend1, ToResolve1,
-                   ?IIF(ReqIdx =/= [], true, ResolveNonEmpty),
-                   TProcsAcc - 1, ThisP1E, ThisP1E_real}
-          end, {HashesK, HashesV, [], [], false, TrivialProcs, 0.0, 0.0}, SyncRcv),
+    % note: 1 trivial proc may thus contain more than 1 leaf!
+    {ToSend, ToResolve, OtherHasResolve, ThisFR_real} =
+        merkle_resolve_retrieve_leaf_hashes(
+          SyncRcv, HashesK, HashesV, BucketSizesBin, DiffSigSizesBin, DupesCount, FRAllLeaves, TrivialProcs,
+          {0.0, 0.0}, {0.0, 0.0},
+          BucketSizeBits, DupesSizeBits, Params, [], [], false, 0),
 
     % send resolve message:
     % resolve items we should send as key_upd:
@@ -2304,22 +2495,16 @@ merkle_resolve_leaves_receive(
     % let the other node's rr_recon process identify the remaining keys;
     % it will use key_upd_send (if non-empty) and we must thus increase
     % the number of resolve processes here!
-    if ResolveNonEmpty -> 
-           ToResolve1 = erlang:list_to_bitstring(lists:reverse(ToResolve)),
-           MerkleResReqs = 1;
-       true ->
-           ToResolve1 = <<>>,
-           MerkleResReqs = 0
-    end,
+    MerkleResReqs = ?IIF(OtherHasResolve, 1, 0),
     Stats2 = rr_recon_stats:inc([{tree_leavesSynced, SyncRcvLeafCount},
                                  {rs_expected, MerkleResReqs}], Stats1),
-    ?DBG_ASSERT(rr_recon_stats:get(p1e_phase2, Stats2) =:= 0.0),
-    NStats  = rr_recon_stats:set([{p1e_phase2, ThisP1E_real}], Stats2),
+    ?DBG_ASSERT(rr_recon_stats:get(fail_rate_p2, Stats2) =:= 0.0),
+    NStats  = rr_recon_stats:set([{fail_rate_p2, ThisFR_real}], Stats2),
     ?ALG_DEBUG("resolve_req Merkle~n  Session=~.0p ; resolve expexted=~B",
                [rr_recon_stats:get(session_id, NStats),
                 rr_recon_stats:get(rs_expected, NStats)]),
 
-    comm:send(DestRCPid, {resolve_req, ToResolve1, ThisP1E_real}),
+    comm:send(DestRCPid, {resolve_req, ToResolve, ThisFR_real}),
     % free up some memory:
     NewState = State#rr_recon_state{merkle_sync = {SyncSend, [], SyncRcvLeafCount, DirectResolve},
                                     stats = NStats},
@@ -2328,7 +2513,7 @@ merkle_resolve_leaves_receive(
        true -> NewState
     end.
 
-%% @doc Decodes all requested keys from merkle_resolve_leaves_receive/3 (as a
+%% @doc Decodes all requested keys from merkle_resolve_leaves_receive/2 (as a
 %%      result of sending resolve requests) and resolves the appropriate entries
 %%      (if non-empty) with our data using a key_upd_send.
 -spec merkle_resolve_leaves_ckidx(
@@ -2415,155 +2600,111 @@ bits_for_number(0) -> 0;
 bits_for_number(Number) ->
     util:ceil(util:log2(Number + 1)).
 
-%% @doc Splits P1E into N equal independent sub-processes and returns the P1E
-%%      to use for each of these sub-processes: p_sub = 1 - (1 - p1e)^(1/n).
-%%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
--spec calc_n_subparts_p1e(N::number(), P1E::float()) -> P1E_sub::float().
-calc_n_subparts_p1e(N, P1E) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
-    P1E;
-calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1.0e-8 ->
-%%     _VP = 1 - math:pow(1 - P1E, 1 / N).
-    % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
-    %         point representation is sub-optimal!
-    % => use Taylor expansion of 1 - (1 - p1e)^(1/n)  at P1E = 0
-    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%281+-+p%29^%281%2Fn%29++at+p+%3D+0
-    N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
-    P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
-    _VP = P1E / N + (N - 1) * P1E2 / (2 * N2)
-              + (2*N2 - 3*N + 1) * P1E3 / (6 * N3)
-              + (6*N3 - 11*N2 + 6*N - 1) * P1E4 / (24 * N4)
-              + (24*N4 - 50*N3 + 35*N2 - 10*N + 1) * P1E5 / (120 * N5); % +O[p^6]
-calc_n_subparts_p1e(N, P1E) when P1E > 0 andalso P1E < 1 ->
-    _VP = 1 - math:pow(1 - P1E, 1 / N).
+%% @doc Splits the target failure rate FR into N (not necessarily independent)
+%%      sub-processes with equal failure rates and returns the FR to use for
+%%      each of them: FR_sub = FR / N.
+%%      This is based on the linearity of the expected number of failures.
+-spec calc_n_subparts_FR(N::pos_integer(), FR::float()) -> FR_sub::float().
+calc_n_subparts_FR(N, FR) when FR > 0 andalso N >= 1 ->
+    _FR_sub = FR / N.
 
-%% @doc Splits P1E into N further (equal) independent sub-processes and returns
-%%      the P1E to use for the next of these sub-processes with the previous
-%%      sub-processes having a (combined) failure probability of PrevP1.
-%%      This is based on p0e(total) = (1 - p1e(total)) = p0e(each)^n = (1 - p1e(each))^n.
--spec calc_n_subparts_p1e(N::number(), P1E::float(), PrevP1::float())
-        -> P1E_sub::float().
-calc_n_subparts_p1e(N, P1E, 0.0) when N == 1 andalso P1E > 0 andalso P1E < 1 ->
-    % special case with e.g. no items in the first/previous phase
-    P1E;
-calc_n_subparts_p1e(N, P1E, PrevP1E) when P1E > 0 andalso P1E < 1.0e-8 andalso
-                                              PrevP1E >= 0 andalso PrevP1E < 1 ->
-    % BEWARE: we cannot use (1-p1E) since it is near 1 and its floating
-    %         point representation is sub-optimal!
-    % => use Taylor expansion of 1 - ((1 - p1e) / PrevP0E)^(1/n)  at P1E = 0
-    % http://www.wolframalpha.com/input/?i=Taylor+expansion+of+1+-+%28%281+-+p%29%2Fq%29^%281%2Fn%29++at+p+%3D+0
-    N2 = N * N, N3 = N2 * N, N4 = N3 * N, N5 = N4 * N,
-    P1E2 = P1E * P1E, P1E3 = P1E2* P1E, P1E4 = P1E3 * P1E, P1E5 = P1E4 * P1E,
-    % find a (somewhat) better representation of Q1 and Q0=1-Q1:
-%%  Q1 = math:pow(1 / (1 - PrevP1E), 1 / N),
-%%  Q0 = 1 - Q1,
-    P2 = PrevP1E * PrevP1E, P3 = P2 * PrevP1E, P4 = P3 * PrevP1E, P5 = P4 * PrevP1E,
-    Q0 = -PrevP1E / N - (P2 * (N+1)) / (2 * N2) -
-             (P3 * (2 * N2 + 3 * N + 1)) / (6 * N3) -
-             (P4 * (6 * N3 + 11 * N2 + 6 * N + 1)) / (24 * N4) -
-             (P5 * (24 * N4 + 50 * N3 + 35 * N2 + 10 * N + 1)) / (120 * N5), %+O[p^6]
-    Q1 = 1 - Q0,
-    VP = Q0 + (P1E * Q1) / N +
-              ((N-1) * P1E2 * Q1) / (2 * N2) +
-              ((N-1) * (2 * N - 1) * P1E3 * Q1) / (6 * N3) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * P1E4 * Q1) / (24 * N4) +
-              ((N-1) * (2 * N - 1) * (3 * N - 1) * (4 * N - 1) * P1E5 * Q1) / (120 * N5), % +O[P1E^6]
-    if VP > 0 andalso VP < 1 ->
-           VP;
-       VP =< 0 ->
-           log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
-                   "  continuing with smallest possible failure probability"
-                   "  (instead of ~g)",
-                   [?MODULE, pid_groups:my_groupname(), self(), VP]),
-           1.0e-16 % do not go below this so that the opposite probability is possible as a float!
-    end;
-calc_n_subparts_p1e(N, P1E, PrevP1E) when P1E > 0 andalso P1E < 1 andalso
-                                              PrevP1E >= 0 andalso PrevP1E < 1 ->
-    % TODO: this may also be close to 1 if N is large!
-    VP = 1 - math:pow((1 - P1E) / (1 - PrevP1E), 1 / N),
-    if VP > 0 andalso VP < 1 ->
-           VP;
-       VP =< 0 ->
-           log:log("~w: [ ~.0p:~.0p ] P1E constraint broken (phase 1 overstepped?)~n"
-                   "  continuing with smallest possible failure probability"
-                   "  (instead of ~g)",
-                   [?MODULE, pid_groups:my_groupname(), self(), VP]),
-           1.0e-16 % do not go below this so that the opposite probability is possible as a float!
+%% @doc Splits the target failure rate FR into N further almost equal (not
+%%      necessarily independent) independent sub-processes and returns the
+%%      target FR use for the next of these sub-processes with all the previous
+%%      sub-processes having a combined failure rate of PrevFr.
+%%      This is based on the linearity of the expected number of failures.
+-spec calc_n_subparts_FR(N::pos_integer(), FR::float(), PrevFr::float())
+        -> FR_sub::float().
+calc_n_subparts_FR(N, FR, PrevFr)
+  when FR > 0 andalso PrevFr >= 0 andalso N >= 1 ->
+    FR_sub = (FR - PrevFr) / N,
+    % a previous phase may overstep (if item counts change during the setup)
+    % -> allow that and print a warning
+    if FR_sub > 0 ->
+           FR_sub;
+       true ->
+           log:log("~w: [ ~.0p:~.0p ] FR constraint broken (phase 1 overstepped?)~n"
+                   "  continuing with ~p instead (~p, ~p, ~B)",
+                   [?MODULE, pid_groups:my_groupname(), self(), 1.0e-16,
+                    FR, PrevFr, N]),
+           1.0e-16
     end.
 
 %% @doc Calculates the signature sizes for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
-%%      Sets the bit sizes to have an error below P1E.
+%%      Sets the bit sizes to have a failure rate below FR.
 %% @see shash_signature_sizes/4
 -spec trivial_signature_sizes
-        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
-         ExpDelta::number(), P1E::float())
+        (ItemCountI::non_neg_integer(), ItemCountNI::non_neg_integer(),
+         ExpDelta::number(), FR::float())
         -> {SigSize::signature_size(), VSize::signature_size()}.
-trivial_signature_sizes(0, _, _ExpDelta,  _P1E) ->
+trivial_signature_sizes(0, _ItemCountNI, _ExpDelta, FR) when FR > 0 ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-trivial_signature_sizes(_, 0, _ExpDelta, _P1E) ->
+trivial_signature_sizes(_ItemCountI, 0, _ExpDelta, FR) when FR > 0 ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-trivial_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
+trivial_signature_sizes(ItemCountI, ItemCountNI, ExpDelta, FR) when FR > 0 ->
     MaxKeySize = 128, % see compress_key/2
     VSize = get_min_version_bits(),
-    % note: there are up to 2 affected items for a hash collision
-    %       -> use (P1E / 2)
-    SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, key, ExpDelta, P1E / 2, MaxKeySize),
-%%     log:pal("trivial [ ~p ] - P1E: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
-%%             "MyIC: ~B, \tOtIC: ~B",
-%%             [self(), P1E, SigSize, VSize, ItemCount, OtherItemCount]),
+    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, ExpDelta),
+    SigSize =
+        if NT > 1 ->
+               %% log_2(1 / (1 - (1 - FR / (2*NT))^(1 / (NT-1))))
+               Y = calc_one_m_xpow_one_m_z(1 / (NT - 1), FR / (2 * NT)),
+               min_max(util:ceil(util:log2(1 / Y)), get_min_hash_bits(), MaxKeySize);
+           NT =:= 1 ->
+               % should only happen for ExpDelta == 0, but may occur in other
+               % cases due to floating point issues
+               get_min_hash_bits()
+        end,
+%%     log:pal("trivial [ ~p ] - FR: ~p, \tSigSize: ~B, \tVSizeL: ~B~n"
+%%             "IC@I: ~B, \tIC@NI: ~B",
+%%             [self(), FR, SigSize, VSize, ItemCountI, ItemCountNI]),
     {SigSize, VSize}.
 
-%% @doc Calculates the worst-case failure probability of the trivial algorithm
+%% @doc Calculates the worst-case failure rate of the trivial algorithm
 %%      with the given signature size, item counts and expected delta.
 %%      NOTE: Precision loss may occur for very high values!
-%% @see shash_worst_case_failprob/4
--spec trivial_worst_case_failprob(
-        SigSize::signature_size(), ItemCount::non_neg_integer(),
-        OtherItemCount::non_neg_integer(), ExpDelta::number()) -> float().
-trivial_worst_case_failprob(0, 0, _OtherItemCount, _ExpDelta) ->
+%% @see shash_worst_case_failrate/4
+-spec trivial_worst_case_failrate(
+        SigSize::signature_size(), ItemCountI::non_neg_integer(),
+        ItemCountNI::non_neg_integer(), ExpDelta::number()) -> float().
+trivial_worst_case_failrate(0, 0, _ItemCountNI, _ExpDelta) ->
     % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-trivial_worst_case_failprob(0, _ItemCount, 0, _ExpDelta) ->
+trivial_worst_case_failrate(0, _ItemCountI, 0, _ExpDelta) ->
     % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-trivial_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
+trivial_worst_case_failrate(SigSize, ItemCountI, ItemCountNI, ExpDelta) ->
     BK2 = util:pow(2, SigSize),
-    NT = calc_max_different_hashes(ItemCount, OtherItemCount, key, ExpDelta),
-    % both solutions have their problems with floats near 1
-    % -> use fastest as they are quite close
-    % exact:
-%%     2 * (1 - util:for_to_fold(1, NT - 1,
-%%                               fun(I) -> (1 - I / BK2) end,
-%%                               fun erlang:'*'/2, 1)).
-    % approx:
-    2 * (1 - math:exp(-(NT * (NT - 1) / 2) / BK2)).
+    NT = calc_max_different_hashes(ItemCountI, ItemCountNI, ExpDelta),
+    % exact but with problems for small 1 / BK2:
+%%     2 * NT * (1 - math:pow(1 - 1 / BK2, NT - 1)).
+    2 * NT * calc_one_m_xpow_one_m_z(NT - 1, 1 / BK2).
 
-%% @doc Creates a compressed key-value list comparing every item in Items
+%% @doc Creates a compressed key-value list for comparing every item in Items
 %%      (at most ItemCount) with OtherItemCount other items and expecting at
 %%      most min(ItemCount, OtherItemCount) version comparisons.
-%%      Sets the bit sizes to have an error below P1E.
--spec compress_kv_list_p1e(
-        Items::db_chunk_kv(), ItemCount, OtherItemCount, ExpDelta, P1E,
-        SigFun::fun((ItemCount, OtherItemCount, ExpDelta, P1E) -> {SigSize, VSize::signature_size()}),
+%%      Sets the bit sizes to have an error below FR.
+-spec compress_kv_list_fr(
+        Items::db_chunk_kv(), ItemCountI::IC, ItemCountNI::IC, ExpDelta, FR,
+        SigFun::fun((ItemCountI::IC, ItemCountNI::IC, ExpDelta, FR) -> {SigSize, VSize::signature_size()}),
         KeyComprFun::fun(({?RT:key(), client_version()}, SigSize) -> bitstring()))
         -> {KeyDiff::Bin, VBin::Bin, ResortedKOrigList::db_chunk_kv(),
-            SigSize::signature_size(), VSize::signature_size()}
+            Dupes::db_chunk_kv(), SigSize::signature_size(), VSize::signature_size()}
     when is_subtype(Bin, bitstring()),
-         is_subtype(ItemCount, non_neg_integer()),
-         is_subtype(OtherItemCount, non_neg_integer()),
+         is_subtype(IC, non_neg_integer()),
          is_subtype(ExpDelta, number()),
-         is_subtype(P1E, float()),
+         is_subtype(FR, float()),
          is_subtype(SigSize, signature_size()).
-compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, KeyComprFun) ->
-    {SigSize, VSize} = SigFun(ItemCount, OtherItemCount, ExpDelta, P1E),
-    {HashesKNew, HashesVNew, ResortedBucket} =
-        compress_kv_list(DBItems, {<<>>, <<>>}, SigSize, VSize, KeyComprFun),
+compress_kv_list_fr(DBItems, ItemCountI, ItemCountNI, ExpDelta, FR, SigFun, KeyComprFun) ->
+    {SigSize, VSize} = SigFun(ItemCountI, ItemCountNI, ExpDelta, FR),
+    {HashesKNew, HashesVNew, ResortedBucket, Dupes} =
+        compress_kv_list(DBItems, SigSize, VSize, KeyComprFun, integrate_size),
     % debug compressed and uncompressed sizes:
-    % TODO: include ExpDelta in these values:
-    ?ALG_DEBUG("compress_kv_list~n  ~B vs. ~B items, SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
-               [ItemCount, OtherItemCount, SigSize, VSize,
+    ?ALG_DEBUG("compress_kv_list (ExpDelta = ~p)~n"
+               "  ~Bckv vs. ~Bcmp items (~B dupes), SigSize: ~B, VSize: ~B, ChunkSize: ~B+~B / ~B+~B bits",
+               [ExpDelta, ItemCountNI, ItemCountI, length(Dupes), SigSize, VSize,
                 erlang:bit_size(erlang:term_to_binary(HashesKNew)),
                 erlang:bit_size(erlang:term_to_binary(HashesVNew)),
                 erlang:bit_size(
@@ -2572,253 +2713,189 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, ExpDelta, P1E, SigFun, 
                 erlang:bit_size(
                   erlang:term_to_binary(HashesVNew,
                                         [{minor_version, 1}, {compressed, 2}]))]),
-    {HashesKNew, HashesVNew, ResortedBucket, SigSize, VSize}.
+    ?DBG_ASSERT(?implies(VSize =/= 0, (HashesKNew =:= <<>>) =:= (HashesVNew =:= <<>>))),
+    {HashesKNew, HashesVNew, ResortedBucket, Dupes, SigSize, VSize}.
 
 %% @doc Calculates the signature size for comparing ItemCount items with
 %%      OtherItemCount other items (including versions into the hashes).
-%%      Sets the bit size to have an error below P1E.
-%%      NOTE: P1E is reduced in this function for the two phases of the
-%%            reconciliation protocol!
+%%      Sets the bit size to have a failure rate below FR.
 %% @see trivial_signature_sizes/4
--spec shash_signature_sizes
-        (ItemCount::non_neg_integer(), OtherItemCount::non_neg_integer(),
-         ExpDelta::number(), P1E::float())
+-spec shash_signature_sizes(
+        ItemCountI::non_neg_integer(), ItemCountNI::non_neg_integer(),
+        ExpDelta::number(), FR::float())
         -> {SigSize::signature_size(), _VSize::0}.
-shash_signature_sizes(0, _, _ExpDelta, _P1E) ->
+shash_signature_sizes(0, _ItemCountNI, _ExpDelta, FR) when FR > 0 ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-shash_signature_sizes(_, 0, _ExpDelta, _P1E) ->
+shash_signature_sizes(_ItemCountI, 0, _ExpDelta, FR) when FR > 0 ->
     {0, 0}; % invalid but since there are 0 items, this is ok!
-shash_signature_sizes(ItemCount, OtherItemCount, ExpDelta, P1E) ->
-    % reduce P1E for the two parts here (hash and trivial phases)
-    P1E_sub = calc_n_subparts_p1e(2, P1E),
-    MaxKeySize = 128, % see compress_key/2
-    % note: there are up to 2 affected items for a hash collision
-    %       -> use (P1E_sub / 2)
-    SigSize = calc_signature_size_nm_pair(
-                ItemCount, OtherItemCount, key_version, ExpDelta, P1E_sub / 2,
-                MaxKeySize),
-%%     log:pal("shash [ ~p ] - P1E: ~p, \tSigSize: ~B, \tMyIC: ~B, \tOtIC: ~B",
-%%             [self(), P1E, SigSize, ItemCount, OtherItemCount]),
+shash_signature_sizes(ItemCountI, ItemCountNI, ExpDelta, FR) when FR > 0 ->
+    MaxSize = 128, % see compress_key/2
+    N_delta_I = calc_max_different_items_node(ItemCountI, ItemCountNI, ExpDelta),
+    N_delta_NI = calc_max_different_items_node(ItemCountNI, ItemCountI, ExpDelta),
+    SigSize0 = util:ceil(
+                 util:log2(
+                   % if the delta is low and/or FR is high, this term is negative
+                   % and we cannot apply the logarithm - here, any signature
+                   % size suffices and we choose the lowest non-zero value
+                   erlang:max(1,
+                              2 * N_delta_I * N_delta_NI / FR
+                                  - N_delta_NI - ItemCountI + 2))),
+    SigSize = min_max(SigSize0, get_min_hash_bits(), MaxSize),
+%%     log:pal("shash [ ~p ] - FR: ~p, \tSigSize: ~B, \tIC@I: ~B, \tIC@NI: ~B~n"
+%%             "  Ndelta_@I: ~B, \tNdelta_@I: ~B",
+%%             [self(), FR, SigSize, ItemCountI, ItemCountNI, N_delta_I, N_delta_NI]),
     {SigSize, 0}.
 
-%% @doc Calculates the worst-case failure probability of the SHash algorithm
+%% @doc Calculates the worst-case failure rate of the SHash algorithm
 %%      with the given signature size, item counts and expected delta.
 %%      NOTE: Precision loss may occur for very high values!
-%% @see trivial_worst_case_failprob/4
--spec shash_worst_case_failprob(
-        SigSize::signature_size(), ItemCount::non_neg_integer(),
-        OtherItemCount::non_neg_integer(), ExpDelta::number()) -> float().
-shash_worst_case_failprob(0, 0, _OtherItemCount, _ExpDelta) ->
+%% @see trivial_worst_case_failrate/4
+-spec shash_worst_case_failrate(
+        SigSize::signature_size(), ItemCountI::non_neg_integer(),
+        ItemCountNI::non_neg_integer(), ExpDelta::number()) -> float().
+shash_worst_case_failrate(0, 0, _ItemCountNI, _ExpDelta) ->
     % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-shash_worst_case_failprob(0, _ItemCount, 0, _ExpDelta) ->
+shash_worst_case_failrate(0, _ItemCountI, 0, _ExpDelta) ->
     % this is exact! (see special case in trivial_signature_sizes/4)
     0.0;
-shash_worst_case_failprob(SigSize, ItemCount, OtherItemCount, ExpDelta) ->
+shash_worst_case_failrate(SigSize, ItemCountI, ItemCountNI, ExpDelta) ->
     BK2 = util:pow(2, SigSize),
-    NT = calc_max_different_hashes(ItemCount, OtherItemCount, key_version, ExpDelta),
-    % both solutions have their problems with floats near 1
-    % -> use fastest as they are quite close
-    % exact:
-%%     2 * (1 - util:for_to_fold(1, NT - 1,
-%%                               fun(I) -> (1 - I / BK2) end,
-%%                               fun erlang:'*'/2, 1)).
-    % approx:
-    2 * (1 - math:exp(-(NT * (NT - 1) / 2) / BK2)).
+    N_delta_I = calc_max_different_items_node(ItemCountI, ItemCountNI, ExpDelta),
+    N_delta_NI = calc_max_different_items_node(ItemCountNI, ItemCountI, ExpDelta),
+    % exact but with problems for small 1 / BK2:
+%%     2 * N_delta_I * N_delta_NI / BK2 * math:pow(1 - 1 / BK2, N_delta_NI + ItemCountI - 2),
+    2 * N_delta_I * N_delta_NI / BK2 * math:exp((N_delta_NI + ItemCountI - 2) * util:log1p(-1 / BK2)).
 
-%% @doc Calculates the bloom FP, i.e. a single comparison's failure probability,
-%%      assuming:
-%%      * the other node executes NrChecks number of checks
-%%      * the worst case in the number of item checks that could yield false
-%%        positives, i.e. with items that are not encoded in the Bloom filter
-%%        taking the expected delta into account
--spec bloom_fp(BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
-               ExpDelta::number(), P1E::float()) -> float().
-bloom_fp(BFCount, NrChecks, ExpDelta, P1E) ->
-    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
-    % 1 - math:pow(1 - P1E, 1 / erlang:max(NrChecksNotInBF, 1)).
-    % more precise:
-    calc_n_subparts_p1e(erlang:max(NrChecksNotInBF, 1), P1E).
+%% @doc Calculates the bloom target FP for each of two Bloom filters so that
+%%      their combined expected failure rate is below FR, assuming the worst
+%%      case in the number of item checks that could yield false positives,
+%%      i.e. items that are not encoded in the Bloom filter, taking the
+%%      expected delta into account.
+-spec bloom_target_fp(
+        ItemCountI::non_neg_integer(), ItemCountNI::non_neg_integer(),
+        ExpDelta::number(), FR::float()) -> TargetFP::float().
+bloom_target_fp(ItemCountI, ItemCountNI, ExpDelta, FR) ->
+    NrChecksNotInBFI = calc_max_different_items_node(ItemCountI, ItemCountNI, ExpDelta),
+    NrChecksNotInBFNI = calc_max_different_items_node(ItemCountNI, ItemCountI, ExpDelta),
+    % assume at least one comparison, even if empty sets are reconciled
+    FR / erlang:max(NrChecksNotInBFI + NrChecksNotInBFNI, 1).
 
-%% @doc Helper for bloom_fp/3 calculating the maximum number of item checks
-%%      that could yield false positives, i.e. items not originally encoded
-%%      in the Bloom filter, when an upper bound on the delta is known.
--spec bloom_calc_max_nr_checks(
-        BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
-        ExpDelta::number()) -> non_neg_integer().
-bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta) ->
-    % the worst case with the maximal number of item checks is when
-    % this node has all ExpDelta items missing
-    % -> calculate the (expected) original item count
-    % -> have ExpDelta percent checks
-    % (if items are only outdated, there are ExpDelta percent checks from this
-    % item count which is less than the worst case above)
-    MaxItems = calc_max_different_hashes(BFCount, NrChecks, key, ExpDelta),
-    FPCandidates =
-        if ExpDelta == 0   -> 0;
-           ExpDelta == 100 -> MaxItems; % special case of the one below
-           is_float(ExpDelta) ->
-               % worst case: we have all the ExpDelta percent items the other node does not have
-               util:ceil(MaxItems * ExpDelta / 100);
-           is_integer(ExpDelta) ->
-               % -> use integer division (and round up) for higher precision:
-               (MaxItems * ExpDelta + 99) div 100
-        end,
-    MaxNrChecks = erlang:min(NrChecks, FPCandidates),
-%%     log:pal("[ ~p ] MaxItems: ~B Checks: ~B", [self(), MaxItems, MaxNrChecks]),
-    MaxNrChecks.
-
-%% @doc Calculates the worst-case failure probability of the bloom algorithm
-%%      with the Bloom filter and number of items to check inside the filter.
+%% @doc Calculates the worst-case failure probability of the bloom
+%%      reconciliation with the given two Bloom filters from either node.
 %%      NOTE: Precision loss may occur for very high values!
--spec bloom_worst_case_failprob(
-        BF::bloom:bloom_filter(), NrChecks::non_neg_integer(),
+-spec bloom_worst_case_failrate(
+        BFI::bloom:bloom_filter(), BFNI::bloom:bloom_filter(),
         ExpDelta::number()) -> float().
-bloom_worst_case_failprob(_BF, 0, _ExpDelta) ->
-    0.0;
-bloom_worst_case_failprob(BF, NrChecks, ExpDelta) ->
-    Fpr = bloom:get_property(BF, fpr),
-    BFCount = bloom:get_property(BF, items_count),
-    bloom_worst_case_failprob_(Fpr, BFCount, NrChecks, ExpDelta).
+bloom_worst_case_failrate(BFI, BFNI, ExpDelta) ->
+    FprI = bloom:get_property(BFI, fpr),
+    FprNI = bloom:get_property(BFNI, fpr),
+    ItemCountI = bloom:get_property(BFI, items_count),
+    ItemCountNI = bloom:get_property(BFNI, items_count),
+    bloom_worst_case_failrate_(FprI, FprNI, ItemCountI, ItemCountNI, ExpDelta).
 
-%% @doc Helper for bloom_worst_case_failprob/2.
-%% @see bloom_worst_case_failprob/2
--spec bloom_worst_case_failprob_(
-        Fpr::float(), BFCount::non_neg_integer(), NrChecks::non_neg_integer(),
+%% @doc Helper for bloom_worst_case_failrate/3.
+%% @see bloom_worst_case_failrate/3
+-spec bloom_worst_case_failrate_(
+        FprI::float(), FprNI::float(),
+        ItemCountI::non_neg_integer(), ItemCountNI::non_neg_integer(),
         ExpDelta::number()) -> float().
-bloom_worst_case_failprob_(_Fpr, _BFCount, 0, _ExpDelta) ->
-    0.0;
-bloom_worst_case_failprob_(Fpr, BFCount, NrChecks, ExpDelta) ->
-    ?DBG_ASSERT2(Fpr >= 0 andalso Fpr =< 1, Fpr),
-    NrChecksNotInBF = bloom_calc_max_nr_checks(BFCount, NrChecks, ExpDelta),
-    % 1 - math:pow(1 - Fpr, NrChecksNotInBF).
-    % more precise:
-    if Fpr == 0.0 -> 0.0;
-       Fpr == 1.0 -> 1.0;
-       NrChecksNotInBF == 0 -> 0.0;
-       true       -> calc_n_subparts_p1e(1 / NrChecksNotInBF, Fpr)
-    end.
+bloom_worst_case_failrate_(FprI, FprNI, ItemCountI, ItemCountNI, ExpDelta) ->
+    ?DBG_ASSERT2(FprI >= 0 andalso FprI =< 1, FprI),
+    ?DBG_ASSERT2(FprNI >= 0 andalso FprNI =< 1, FprNI),
+    NrChecksNotInBFI = calc_max_different_items_node(ItemCountI, ItemCountNI, ExpDelta),
+    NrChecksNotInBFNI = calc_max_different_items_node(ItemCountNI, ItemCountI, ExpDelta),
+    NrChecksNotInBFI * FprNI + NrChecksNotInBFNI * FprI.
 
 -spec build_recon_struct(
         method(), DestI::intervals:non_empty_interval(), db_chunk_kv(),
         InitiatorMaxItems::non_neg_integer() | undefined, % not applicable on iniator
-        Params::parameters() | {}) -> {sync_struct(), P1E_p1::float()}.
+        Params::parameters() | {})
+        -> {sync_struct(), Fr_p1::float()}.
 build_recon_struct(trivial, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     ItemCount = length(DBItems),
     ExpDelta = get_max_expected_delta(),
-    {MyDiffK, MyDiffV, ResortedKVOrigList, SigSize, _VSize} =
-        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems,
-                             ExpDelta, get_p1e(),
+    {MyDiffK, MyDiffV, ResortedKVOrigList, Dupes, SigSize, _VSize} =
+        compress_kv_list_fr(DBItems, InitiatorMaxItems, ItemCount,
+                             ExpDelta, get_failure_rate(),
                              fun trivial_signature_sizes/4, fun trivial_compress_key/2),
-    {#trivial_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
-                           db_chunk = {MyDiffK, MyDiffV, ResortedKVOrigList},
-                           sig_size = SigSize},
-     _P1E_p1 = trivial_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
+    {#trivial_sync{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
+                   db_chunk = {MyDiffK, MyDiffV, ResortedKVOrigList, Dupes},
+                   '+item_count' = length(Dupes), sig_size = SigSize},
+     % Note: we can only guess the number of items of the initiator here, so
+     %       this is not exactly the failure rate of phase 1!
+     _Fr_p1 = trivial_worst_case_failrate(SigSize, InitiatorMaxItems, ItemCount, ExpDelta)};
 build_recon_struct(shash, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     ItemCount = length(DBItems),
-    P1E = get_p1e(),
+    FR = get_failure_rate(),
+    FR_p1 = calc_n_subparts_FR(2, FR),
     ExpDelta = get_max_expected_delta(),
-    {MyDiffK, <<>>, ResortedKVOrigList, SigSize, 0} =
-        compress_kv_list_p1e(DBItems, ItemCount, InitiatorMaxItems,
-                             ExpDelta, P1E,
+    {MyDiffK, <<>>, ResortedKVOrigList, Dupes, SigSize, 0} =
+        compress_kv_list_fr(DBItems, InitiatorMaxItems, ItemCount,
+                             ExpDelta, FR_p1,
                              fun shash_signature_sizes/4, fun compress_key/2),
-    {#shash_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
-                         db_chunk = {MyDiffK, ResortedKVOrigList},
-                         sig_size = SigSize, p1e = P1E},
-    % Note: we can only guess the number of items of the initiator here, so
-    %       this is not exactly the P1E of phase 1!
-     _P1E_p1 = shash_worst_case_failprob(SigSize, ItemCount, InitiatorMaxItems, ExpDelta)};
+    {#shash_sync{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
+                 db_chunk = {MyDiffK, ResortedKVOrigList, Dupes},
+                 '+item_count' = length(Dupes), sig_size = SigSize,
+                 fail_rate = FR},
+     % Note: we can only guess the number of items of the initiator here, so
+     %       this is not exactly the failure rate of phase 1!
+     _Fr_p1 = shash_worst_case_failrate(SigSize, InitiatorMaxItems, ItemCount, ExpDelta)};
 build_recon_struct(bloom, I, DBItems, InitiatorMaxItems, _Params) ->
     % at non-initiator
     ?DBG_ASSERT(not intervals:is_empty(I)),
     ?DBG_ASSERT(InitiatorMaxItems =/= undefined),
     MyMaxItems = length(DBItems),
-    P1E = get_p1e(),
-    P1E_p1 = calc_n_subparts_p1e(2, P1E),
-    P1E_p1_bf = calc_n_subparts_p1e(2, P1E_p1), % one bloom filter on each side!
+    FR = get_failure_rate(),
+    FR_p1 = calc_n_subparts_FR(2, FR),
+    ExpDelta = get_max_expected_delta(),
     % decide for a common Bloom filter size (and number of hash functions)
     % for an efficient diff BF - use a combination where both Bloom filters
-    % are below the targeted P1E_p1_bf (we may thus not reach P1E_p1 exactly):
-    ExpDelta = get_max_expected_delta(),
-    FP1 = bloom_fp(MyMaxItems, InitiatorMaxItems, ExpDelta, P1E_p1_bf),
-    FP2 = bloom_fp(InitiatorMaxItems, MyMaxItems, ExpDelta, P1E_p1_bf),
-    {K1, M1} = bloom:calc_HF_num_Size_opt(MyMaxItems, FP1),
-    {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FP2),
-    ?ALG_DEBUG("Bloom My: ~B OtherMax: ~B~n  bloom1: ~p~n  bloom2: ~p",
-               [MyMaxItems, InitiatorMaxItems, {FP1, K1, M1}, {FP2, K2, M2}]),
-    FP1_MyFP = bloom_worst_case_failprob_(
-                 bloom:calc_FPR(M1, MyMaxItems, K1), MyMaxItems, InitiatorMaxItems, ExpDelta),
-    FP1_OtherFP = bloom_worst_case_failprob_(
-                    bloom:calc_FPR(M1, InitiatorMaxItems, K1), InitiatorMaxItems, MyMaxItems, ExpDelta),
-    FP2_MyFP = bloom_worst_case_failprob_(
-                 bloom:calc_FPR(M2, MyMaxItems, K2), MyMaxItems, InitiatorMaxItems, ExpDelta),
-    FP2_OtherFP = bloom_worst_case_failprob_(
-                    bloom:calc_FPR(M2, InitiatorMaxItems, K2), InitiatorMaxItems, MyMaxItems, ExpDelta),
-    % pay attention to floating point issues near 1:
-%%     FP1_P1E_p1 = 1 - (1 - FP1_MyFP) * (1 - FP1_OtherFP),
-%%     FP2_P1E_p1 = 1 - (1 - FP2_MyFP) * (1 - FP2_OtherFP),
-    FP1_P1E_p1 = FP1_MyFP + FP1_OtherFP - FP1_MyFP * FP1_OtherFP,
-    FP2_P1E_p1 = FP2_MyFP + FP2_OtherFP - FP2_MyFP * FP2_OtherFP,
-    BF0 = if FP1_P1E_p1 =< P1E_p1 andalso FP2_P1E_p1 =< P1E_p1 ->
-                 if M1 < M2 ->
-                        bloom:new(M1, K1);
-                    M1 =:= M2 andalso FP1_P1E_p1 < FP2_P1E_p1 ->
-                        bloom:new(M1, K1);
-                    true ->
-                        bloom:new(M2, K2)
-                 end;
-             FP1_P1E_p1 =< P1E_p1 -> % andalso FP2_P1E_p1 > P1E_p1
-                 bloom:new(M1, K1);
-             FP2_P1E_p1 =< P1E_p1 -> % andalso FP1_P1E_p1 > P1E_p1
-                 bloom:new(M2, K2);
-             true -> % FP1_P1E_p1 > P1E_p1 andalso FP2_P1E_p1 > P1E_p1
-                 % all other cases are probably due to floating point inefficiencies
-                 log:log("~w: [ ~.0p:~.0p ] P1E constraint for phase 1 probably broken",
-                         [?MODULE, pid_groups:my_groupname(), self()]),
-                 % use the one with the lowest error and size:
-                 if FP1_P1E_p1 < FP2_P1E_p1 ->
-                        bloom:new(M1, K1);
-                    FP1_P1E_p1 == FP2_P1E_p1 andalso M1 =< M2 ->
-                        bloom:new(M1, K1);
-                    true ->
-                        bloom:new(M2, K2)
-                 end
-          end,
-    % TODO: include ExpDelta in these values:
-    ?ALG_DEBUG("NI:~.0p, P1E_bf=~p~n"
+    % are below the targeted FR_p1_bf (we may thus not reach FR_p1 exactly)
+    % based on a common target FPt:
+    FPt = bloom_target_fp(InitiatorMaxItems, MyMaxItems, ExpDelta, FR_p1),
+    {K1, M1} = bloom:calc_HF_num_Size_opt(MyMaxItems, FPt),
+    {K2, M2} = bloom:calc_HF_num_Size_opt(InitiatorMaxItems, FPt),
+    % total failure rates in phase 1 for the two options {K1, M1} vs. {K2, M2}
+    FP1_I = bloom:calc_FPR(M1, InitiatorMaxItems, K1),
+    FP1_NI = bloom:calc_FPR(M1, MyMaxItems, K1),
+    Fr1_p1 = bloom_worst_case_failrate_(FP1_I, FP1_NI, InitiatorMaxItems,
+                                        MyMaxItems, ExpDelta),
+    FP2_I = bloom:calc_FPR(M2, InitiatorMaxItems, K2),
+    FP2_NI = bloom:calc_FPR(M2, MyMaxItems, K2),
+    Fr2_p1 = bloom_worst_case_failrate_(FP2_I, FP2_NI, InitiatorMaxItems,
+                                        MyMaxItems, ExpDelta),
+    ?ALG_DEBUG("Bloom My: ~B OtherMax: ~B FPt: ~p~n  bloom1: ~p~n  bloom2: ~p",
+               [MyMaxItems, InitiatorMaxItems, FPt,
+                {K1, M1, FP1_I, FP1_NI}, {K2, M2, FP2_I, FP2_NI}]),
+    {K, M, Fr_p1} = bloom:select_best(FR_p1, K1, M1, Fr1_p1, K2, M2, Fr2_p1),
+    BF0 = bloom:new(M, K),
+    if Fr_p1 > FR_p1 ->
+           log:log("~w: [ ~.0p:~.0p ] FR constraint for phase 1 probably broken",
+                   [?MODULE, pid_groups:my_groupname(), self()]);
+       true -> ok
+    end,
+    ?ALG_DEBUG("NI:~.0p, FR(phase1)=~p, ExpDelta = ~p~n"
                "  m=~B k=~B NICount=~B ICount=~B~n"
-               "  P1E_bf1=~p P1E_bf2=~p",
-               [comm:this(), P1E_p1_bf, bloom:get_property(BF0, size),
-                bloom:get_property(BF0, hfs_size),
-                MyMaxItems, InitiatorMaxItems,
-                bloom_worst_case_failprob_(
-                  bloom:calc_FPR(
-                    bloom:get_property(BF0, size), MyMaxItems,
-                    bloom:get_property(BF0, hfs_size)),
-                  MyMaxItems, InitiatorMaxItems, ExpDelta),
-                bloom_worst_case_failprob_(
-                  bloom:calc_FPR(
-                    bloom:get_property(BF0, size), InitiatorMaxItems,
-                    bloom:get_property(BF0, hfs_size)),
-                  InitiatorMaxItems, MyMaxItems, ExpDelta)]),
-    HfCount = bloom:get_property(BF0, hfs_size),
+               "  fr(phase1)=~p",
+               [comm:this(), FR_p1, ExpDelta, M, K,
+                MyMaxItems, InitiatorMaxItems, Fr_p1]),
     BF = bloom:add_list(BF0, DBItems),
-    {#bloom_recon_struct{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
-                         bf = BF, item_count = MyMaxItems,
-                         hf_count = HfCount, p1e = P1E},
-    % Note: we can only guess the number of items of the initiator here, so
-    %       this is not exactly the P1E of phase 1!
-    %       (also we miss the returned BF's probability here)
-     _P1E_p1 = bloom_worst_case_failprob(BF, InitiatorMaxItems, ExpDelta)};
+    {#bloom_sync{interval = I, reconPid = comm:this(), exp_delta = ExpDelta,
+                 bf = BF, item_count = MyMaxItems, hf_count = K,
+                 fail_rate = FR},
+     % Note: we can only guess the number of items of the initiator here, so
+     %       this is not exactly the failure rate of phase 1!
+     Fr_p1};
 build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    P1E_p1 = 0.0, % needs to be set at the end of phase 1!
+    Fr_p1 = 0.0, % needs to be set at the end of phase 1!
     case Params of
         {} ->
             % merkle_tree - at non-initiator!
@@ -2828,7 +2905,7 @@ build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
             % do not build the real tree here - build during begin_sync so that
             % the initiator can start creating its struct earlier and in parallel
             % the actual build process is executed in begin_sync/2
-            {merkle_tree:new(I, [{keep_bucket, true} | MOpts]), P1E_p1};
+            {merkle_tree:new(I, [{keep_bucket, true} | MOpts]), Fr_p1};
         #merkle_params{branch_factor = BranchFactor,
                        bucket_size = BucketSize,
                        num_trees = NumTrees} ->
@@ -2841,7 +2918,7 @@ build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
             ICBList = merkle_tree:keys_to_intervals(DBItems, RootsI),
             {[merkle_tree:get_root(
                merkle_tree:new(SubI, Bucket, [{keep_bucket, true} | MOpts]))
-               || {SubI, _Count, Bucket} <- ICBList], P1E_p1};
+               || {SubI, _Count, Bucket} <- ICBList], Fr_p1};
         #art_recon_struct{branch_factor = BranchFactor,
                           bucket_size = BucketSize} ->
             % ART at initiator
@@ -2849,7 +2926,7 @@ build_recon_struct(merkle_tree, I, DBItems, _InitiatorMaxItems, Params) ->
                      {bucket_size, BucketSize},
                      {leaf_hf, fun art:merkle_leaf_hf/2}],
             {merkle_tree:new(I, DBItems, [{keep_bucket, true} | MOpts]),
-             P1E_p1 % TODO
+             Fr_p1
             }
     end;
 build_recon_struct(art, I, DBItems, _InitiatorMaxItems, _Params = {}) ->
@@ -2867,7 +2944,7 @@ build_recon_struct(art, I, DBItems, _InitiatorMaxItems, _Params = {}) ->
                        reconPid = comm:this(),
                        branch_factor = BranchFactor,
                        bucket_size = BucketSize},
-     _P1E_p1 = 0.0 % TODO
+     _Fr_p1 = 0.0
     }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3097,8 +3174,8 @@ start(SessionId, SenderRRPid) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config parameter handling
 %
-% rr_recon_p1e              - probability of a single false positive,
-%                             i.e. false positive absolute count
+% rr_recon_failure_rate     - expected number of failures during the
+%                             (approximate) reconciliation process
 % rr_art_inner_fpr          - 
 % rr_art_leaf_fpr           -  
 % rr_art_correction_factor  - 
@@ -3116,10 +3193,17 @@ check_percent(Atom) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(rr_recon_method, [trivial, shash, bloom, merkle_tree, art]) andalso
-        config:cfg_is_float(rr_recon_p1e) andalso
-        config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
-        config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso
+     % deprecated, old, and unused config parameter
+    case config:read(rr_recon_p1e) of
+        failed -> true;
+        _ -> error_logger:error_msg("rr_recon_p1e parameter exists - "
+                                    "please migrate to rr_recon_failure_rate "
+                                    "(see scalaris.cfg and scalaris.local.cfg)~n"),
+             false
+    end andalso
+        config:cfg_is_in(rr_recon_method, [trivial, shash, bloom, merkle_tree, art]) andalso
+        config:cfg_is_number(rr_recon_failure_rate) andalso
+        config:cfg_is_greater_than(rr_recon_failure_rate, 0) andalso
         config:cfg_is_number(rr_recon_expected_delta) andalso
         config:cfg_is_in_range(rr_recon_expected_delta, 0, 100) andalso
         config:cfg_is_integer(rr_recon_version_bits) andalso
@@ -3141,9 +3225,9 @@ check_config() ->
         config:cfg_is_integer(rr_art_correction_factor) andalso
         config:cfg_is_greater_than(rr_art_correction_factor, 0).
 
--spec get_p1e() -> float().
-get_p1e() ->
-    config:read(rr_recon_p1e).
+-spec get_failure_rate() -> float().
+get_failure_rate() ->
+    config:read(rr_recon_failure_rate).
 
 %% @doc Specifies what the maximum expected delta is (in percent between 0 and
 %%      100, inclusive). The failure probabilities will take this into account.

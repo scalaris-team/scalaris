@@ -23,6 +23,7 @@ AC_PATH_PROG(FALSE, false)
 AC_SUBST(FALSE)
 AC_PATH_PROG(TRUE, true)
 AC_SUBST(TRUE)
+AC_PROG_SED
 
 ###########################################################
 #
@@ -37,6 +38,7 @@ AC_ARG_ENABLE([cpp],
               [ENABLE_CPP=$enableval],
               [ENABLE_CPP=$enableval])
 
+enabled_cxx=0
 if test "x$ENABLE_CPP" != xno ; then
   # fake automake scripts (config.guess, install-sh, ...)
   #              Homebrew                     Ubuntu
@@ -50,19 +52,36 @@ if test "x$ENABLE_CPP" != xno ; then
     fi
   done
   # C++ and boost checks
-  AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
-  AX_BOOST_BASE([1.47])
-  AX_BOOST_SYSTEM
-  AX_BOOST_REGEX
-  AX_BOOST_ASIO
-  AX_BOOST_PROGRAM_OPTIONS
-  AX_BOOST_UNIT_TEST_FRAMEWORK
-else
+  AX_CXX_COMPILE_STDCXX_11([noext],[optional])
+  if test "x$HAVE_CXX11" = "x1" ; then
+    have_boost_147=
+    AX_BOOST_BASE([1.47], [have_boost_147=yes], [have_boost_147=no])
+    AX_BOOST_SYSTEM
+    AX_BOOST_REGEX
+    AX_BOOST_ASIO
+    AX_BOOST_PROGRAM_OPTIONS
+    AX_BOOST_UNIT_TEST_FRAMEWORK
+
+    if test "x$have_boost_147" = "xyes" -a "x$ax_cv_boost_system" = "xyes" -a "x$ax_cv_boost_regex" = "xyes"  -a "x$ax_cv_boost_program_options" = "xyes"  -a "x$ax_cv_boost_unit_test_framework" = "xyes" ; then
+      enabled_cxx=1
+    fi
+  fi
+fi
+
+if test "x$enabled_cxx" = "x0" ; then
   AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
+fi
+
+CXXSHELL=$SHELL
+if test -f /usr/local/bin/bash; then
+  CXXSHELL=/usr/local/bin/bash
+elif test -f /bin/bash; then
+  CXXSHELL=/bin/bash
 fi
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(CXXSHELL)
 
 ###########################################################
 #
@@ -248,7 +267,7 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
 # split erlang erts version:
-set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
+set `echo $erlang_cv_erts_ver | $SED 's/\./ /g'`
 ERTS_MAJOR=$1
 ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
@@ -661,10 +680,9 @@ AC_SUBST(NIFFLAGS)
 mkdir -p ~/.yaws 2> /dev/null
 
 mkdir -p python3-api
-cp python-api/scalaris.in python3-api/
-sed -i -e "s|python-api|python3-api|g" \
-       -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
-       -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
+$SED -e "s|python-api|python3-api|g" \
+     -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
+     -e "s|PYTHON2|PYTHON3|g" python-api/scalaris.in > python3-api/scalaris.in
 
 AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/rt.hrl cpp-api/Makefile java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
@@ -677,3 +695,39 @@ chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
 chmod u+x contrib/init.d/scalaris-monitor
 
+echo "Erlang"
+if test "x$BITCASK_LIBS" = "x" ; then
+  echo "  Bitcask              : no"
+else
+  echo "  Bitcask              : yes"
+fi
+
+if test "x$ERLANG_HANOIDB_FLAGS" = "x" ; then
+  echo "  hanoidb              : no"
+else
+  echo "  hanoidb              : yes"
+fi
+
+if test "x$ERLANG_TOKE_FLAGS" = "x" ; then
+  echo "  toke                 : no"
+else
+  echo "  toke                 : yes"
+fi
+
+if test "x$enabled_cxx" = "x0" ; then
+  echo "C++ API                : no"
+else
+  echo "C++ API                : yes"
+fi
+
+if test "x$ENABLEPYTHON2INSTALL" = "xinstall-python" ; then
+  echo "Python API             : yes"
+else
+  echo "Python API             : no"
+fi
+
+if test "x$ENABLEPYTHON3" = "xpython3-compile" ; then
+  echo "Python3 API            : yes"
+else
+  echo "Python3 API            : no"
+fi

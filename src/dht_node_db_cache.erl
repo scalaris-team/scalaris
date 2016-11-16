@@ -34,6 +34,9 @@
     {get_split_key, DB::db_dht:db(), CurRange::intervals:interval(),
      Begin::?RT:key(), End::?RT:key(),
      TargetLoad::pos_integer(), Direction::forward | backward, SourcePid::comm:erl_local_pid()} |
+    {get_split_key_wrapper, SourcePid::comm:erl_local_pid(), DB::db_dht:db(),
+     CurRange::intervals:interval(), {get_split_key_response, Val::{?RT:key(),
+     TakenLoad::non_neg_integer()}}} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 -type state() :: [{DB::db_dht:db(), Range::intervals:interval(), Expires::erlang_timestamp(),
@@ -67,8 +70,21 @@ on({get_split_key, DB, CurRange, Begin, End, TargetLoad, Direction, SourcePid}, 
             comm:send_local(SourcePid, {get_split_key_response, Val}),
             State;
         _ ->
-            Val = db_dht:get_split_key(DB, Begin, End, TargetLoad, Direction),
-            comm:send_local(SourcePid, {get_split_key_response, Val}),
+            Sender = comm:reply_as(self(), 5,
+                                   {get_split_key_wrapper, SourcePid, DB, CurRange, '_'}),
+            comm:send_local(pid_groups:get_my(dht_node),
+                            {get_split_key, DB, Begin, End,
+                             TargetLoad, Direction, Sender}),
+            State
+    end;
+
+on({get_split_key_wrapper, SourcePid, DB, CurRange, {get_split_key_response, Val}}, State) ->
+    comm:send_local(SourcePid, {get_split_key_response, Val}),
+    Now = util:timestamp2us(os:timestamp()),
+    case lists:keyfind(get_split_key, 4, State) of
+        {DB, CurRange, Expires, get_split_key, Val} when Now < Expires ->
+            State;
+        _ ->
             CachedVal = {DB, CurRange, Now + 10 * 1000000, % 10s
                          get_split_key, Val},
             lists:keystore(get_split_key, 4, State, CachedVal)

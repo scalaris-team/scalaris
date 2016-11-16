@@ -1,4 +1,4 @@
-% @copyright 2012-2015 Zuse Institute Berlin
+% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <lakedaimon300@googlemail.com>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc    Helper functions for replica repair evaluation, defining evaluation
 %%         data.
 %% @see    rr_eval_admin
@@ -44,9 +45,9 @@
                           BW_RS_Size  :: integer(),   % number of transmitted resolve bytes
                           BW_RS_Msg   :: integer(),   % number of resolve messages
                           BW_RS_KVV   :: integer(),   % number of kvv-triple send
-                          P1E_p1      :: float() | '-', % effective worst-case probability of phase 1
-                          P1E_p2      :: float() | '-', % effective worst-case probability of phase 2
-                          P1E         :: float() | '-'  % effective total worst-case probability
+                          Fr_p1       :: float() | '-', % effective worst-case probability of phase 1
+                          Fr_p2       :: float() | '-', % effective worst-case probability of phase 2
+                          Fr          :: float() | '-'  % effective total worst-case probability
                           }.
 
 -type eval_point() :: {
@@ -54,9 +55,9 @@
                        %PARAMETER
                        NodeCount        :: integer(),
                        DataCount        :: integer(),
-                       FProb            :: 0..100,
+                       FRate            :: 0..100,
                        Round            :: integer(),
-                       ReconP1E         :: float(),
+                       ReconFR          :: float(),
                        Merkle_Bucket    :: pos_integer(),
                        Merkle_Branch    :: pos_integer(),
                        Art_Corr_Fac     :: non_neg_integer(),
@@ -118,21 +119,21 @@
                        DTYPE            :: db_generator:db_type(),
                        TPROB            :: 0..100,
                        Merkle_NumTrees  :: pos_integer(),
-                       % AVG, STD, MIN, MAX P1E of phase 1
-                       MeanP1E_p1       :: float() | '-',
-                       ErrP1E_p1        :: float() | '-',
-                       MinP1E_p1        :: float() | '-',
-                       MaxP1E_p1        :: float() | '-',
-                       % AVG, STD, MIN, MAX P1E of phase 2
-                       MeanP1E_p2       :: float() | '-',
-                       ErrP1E_p2        :: float() | '-',
-                       MinP1E_p2        :: float() | '-',
-                       MaxP1E_p2        :: float() | '-',
-                       % AVG, STD, MIN, MAX total P1E
-                       MeanP1E          :: float() | '-',
-                       ErrP1E           :: float() | '-',
-                       MinP1E           :: float() | '-',
-                       MaxP1E           :: float() | '-',
+                       % AVG, STD, MIN, MAX effective failure rate of phase 1
+                       MeanFr_p1        :: float() | '-',
+                       ErrFr_p1         :: float() | '-',
+                       MinFr_p1         :: float() | '-',
+                       MaxFr_p1         :: float() | '-',
+                       % AVG, STD, MIN, MAX effective failure rate  of phase 2
+                       MeanFr_p2        :: float() | '-',
+                       ErrFr_p2         :: float() | '-',
+                       MinFr_p2         :: float() | '-',
+                       MaxFr_p2         :: float() | '-',
+                       % AVG, STD, MIN, MAX total effective failure rate
+                       MeanFr           :: float() | '-',
+                       ErrFr            :: float() | '-',
+                       MinFr            :: float() | '-',
+                       MaxFr            :: float() | '-',
                        % misc
                        ExpectedDelta    :: number()
                       }.
@@ -145,7 +146,7 @@ column_names() ->
     [id,
      %Parameter
      nodes, dbsize, fprob, round,
-     recon_p1e, merkle_bucket, merkle_branch, art_corr_factor, art_leaf_fpr,
+     recon_fail_rate, merkle_bucket, merkle_branch, art_corr_factor, art_leaf_fpr,
      art_inner_fpr,
      % Avg Measure
      missing, regen, outdated, updated,
@@ -164,10 +165,10 @@ column_names() ->
      min_bw_rs_kvv, max_bw_rs_kvv,
      % additional parameters originally missing
      rc_method, ring_type, ddist, ftype, fdist, dtype, tprob, merkle_num_trees,
-     % AVG, STD, MIN, MAX P1E of phase 1 and 2
-     p1e_p1, sd_p1e_p1, min_p1e_p1, max_p1e_p1,
-     p1e_p2, sd_p1e_p2, min_p1e_p2, max_p1e_p2,
-     p1e, sd_p1e, min_p1e, max_p1e,
+     % AVG, STD, MIN, MAX effective failure rate of phase 1 and 2
+     fr_p1, sd_fr_p1, min_fr_p1, max_fr_p1,
+     fr_p2, sd_fr_p2, min_fr_p2, max_fr_p2,
+     fr, sd_fr, min_fr, max_fr,
      expected_delta
     ].
 
@@ -178,7 +179,7 @@ column_names() ->
 mp_column_names() ->
     [id, iteration, round, missing, regen, outdated, updated,
      bw_rc_size, bw_rc_msg, bw_rc2_size, bw_rc2_msg,
-     bw_rs_size, bw_rs_msg, bw_rs_kvv, p1E_p1, p1E_p2, p1E].
+     bw_rs_size, bw_rs_msg, bw_rs_kvv, fr_p1, fr_p2, fr].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -201,8 +202,8 @@ generate_ep(ID,
             {#scenario{ring_type = RingType, data_distribution = DDist,
                        data_failure_type = FType, fail_distribution = FDist,
                        data_type = DType, trigger_prob = TProb},
-             #ring_config{node_count = NC, data_count = DC, data_failure_prob = FProb},
-             #rc_config{recon_method = RCMethod, recon_p1e = RcP1E,
+             #ring_config{node_count = NC, data_count = DC, data_failure_rate = FRate},
+             #rc_config{recon_method = RCMethod, recon_fail_rate = RcFR,
                         expected_delta = ExpDelta,
                         merkle_bucket= MBU, merkle_branch = MBR,
                         merkle_num_trees = MNT, art_corr_factor = ArtCF,
@@ -223,22 +224,22 @@ generate_ep(ID,
     {MeanRSM, ErrRSM, MinRSM, MaxRSM}   = mean_w_error(13, MP),
     {MeanRSK, ErrRSK, MinRSK, MaxRSK}   = mean_w_error(14, MP),
     
-    {MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1} =
+    {MeanFr_p1, ErrFr_p1, MinFr_p1, MaxFr_p1} =
         try mean_w_error(15, MP)
         catch _:_ -> {'-', '-', '-', '-'}
         end,
-    {MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2} =
+    {MeanFr_p2, ErrFr_p2, MinFr_p2, MaxFr_p2} =
         try mean_w_error(16, MP)
         catch _:_ -> {'-', '-', '-', '-'}
         end,
-    {MeanP1E, ErrP1E, MinP1E, MaxP1E} =
+    {MeanFr, ErrFr, MinFr, MaxFr} =
         try mean_w_error(17, MP)
         catch _:_ -> {'-', '-', '-', '-'}
         end,
 
     {ID,
-     NC, 4 * DC, FProb, element(3, hd(MP)),
-     RcP1E, MBU, MBR, ArtCF, ArtLF, ArtIF,
+     NC, 4 * DC, FRate, element(3, hd(MP)),
+     RcFR, MBU, MBR, ArtCF, ArtLF, ArtIF,
      MeanM, MeanR, MeanO, MeanU,
      MeanRCS, MeanRCM, MeanRC2S, MeanRC2M, MeanRSS, MeanRSM, MeanRSK,
      ErrM, ErrR, ErrO, ErrU,
@@ -248,9 +249,9 @@ generate_ep(ID,
      MinRSS, MaxRSS, MinRSM, MaxRSM, MinRSK, MaxRSK,
      RCMethod, RingType, dist_to_name(DDist), FType, dist_to_name(FDist),
      DType, TProb, MNT,
-     MeanP1E_p1, ErrP1E_p1, MinP1E_p1, MaxP1E_p1,
-     MeanP1E_p2, ErrP1E_p2, MinP1E_p2, MaxP1E_p2,
-     MeanP1E, ErrP1E, MinP1E, MaxP1E,
+     MeanFr_p1, ErrFr_p1, MinFr_p1, MaxFr_p1,
+     MeanFr_p2, ErrFr_p2, MinFr_p2, MaxFr_p2,
+     MeanFr, ErrFr, MinFr, MaxFr,
      ExpDelta}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().

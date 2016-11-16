@@ -1,7 +1,4 @@
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-  SHELL = /usr/local/bin/bash
-endif
+SHELL=@CXXSHELL@
 
 AR=ar
 ARFLAGS=rv

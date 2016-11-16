@@ -15,7 +15,7 @@ Parallel builds are supported.
 
 Example:
 
-> make trivial_0-10-all/0.001/trivial.dat EVAL_REPEATS=10
+> make trivial_0-10_expDas_fprob-all/0.001/trivial.dat EVAL_REPEATS=10
 
 
 These targets run the most important pre-defined tests in parallel (2 jobs):

@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@
 %% @version $Id$
 -module(random_bias).
 -author('malange@informatik.hu-berlin.de').
--vsn('$Id$').
-
--include("record_helpers.hrl").
--include("scalaris.hrl").
 
 -export([binomial/2]).
 -export([next/1]).

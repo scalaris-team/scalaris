@@ -1,4 +1,4 @@
-% @copyright 2011-2012 Zuse Institute Berlin
+% @copyright 2011-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,13 +29,17 @@
 -define(REP_HFS, hfs_plain). %HashFunctionSet selection for usage by bloom filter
 
 -export([new_fpr/2, new_fpr/3, new_bpi/3, new_bin/3, new/2,
-         add/2, add_list/2, is_element/2, item_count/1,
-         calc_HF_num_Size_opt/2, calc_FPR/3]).
--export([equals/2, join/2, print/1]).
+         add/2, add_list/2, is_element/2, filter/2, filter_neg/2,
+         filter_neg_and_add/3,
+         item_count/1]).
+-export([equals/2, join/2, get_property/2, print/1]).
 
-% for tests:
--export([get_property/2]).
--export([p_add_list_v1/4, p_add_list_v2/4, resize/2]).
+% needed by other Bloom filter implementations or rr_recon:
+-export([calc_least_size/3,
+         calc_HF_num_Size_opt/2, calc_FPR/3,
+         select_best/7,
+         p_add_positions/3,
+         resize/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
@@ -100,7 +104,7 @@ new(BitSize, Hfs) ->
 add(#bloom{hfs = Hfs, items_count = FilledCount,
            filter = Filter} = Bloom, Item) ->
     BFSize = erlang:bit_size(Filter),
-    Bloom#bloom{filter = p_add_list_v1(Hfs, BFSize, Filter, [Item]),
+    Bloom#bloom{filter = p_add_list(Hfs, BFSize, Filter, [Item]),
                 items_count = FilledCount + 1}.
 
 %% @doc Adds multiple items to the bloom filter.
@@ -110,51 +114,39 @@ add_list(#bloom{hfs = Hfs,
                 filter = Filter
                } = Bloom, Items) ->
     BFSize = erlang:bit_size(Filter),
-    F = p_add_list_v2(Hfs, BFSize, Filter, Items),
+    F = p_add_list(Hfs, BFSize, Filter, Items),
     ItemsL = length(Items),
     Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
--compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
-                   p_add_list_v2/4]}).
+-compile({inline, [p_add_list/4, p_add_positions/3]}).
 
-% V1 - good for few items / positions to set
-% faster than lists:foldl
--spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v1(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v1(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
-p_add_list_v1(Hfs, BFSize, BF, Items = [_|_]) ->
-    p_add_list_v1_(Hfs, BFSize, BF, Items).
-
--spec p_add_list_v1_(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v1_(Hfs, BFSize, BF, [Item | Items]) ->
-    Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
-    p_add_list_v1_(Hfs, BFSize, set_bits(BF, BFSize, Positions), Items);
-p_add_list_v1_(_Hfs, _BFSize, BF, []) ->
-    BF.
-
-% V2 - good for large number of items / positions to set
--spec p_add_list_v2(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
-                    BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
-p_add_list_v2(_Hfs, _BFSize, BF, []) -> BF;
-p_add_list_v2(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
-p_add_list_v2(Hfs, BFSize, BF, Items = [_|_]) ->
+%% @doc Helper to set item bits, optimised for a large number of items /
+%%      positions to set.
+-spec p_add_list(Hfs::?REP_HFS:hfs(), BFSize::pos_integer(),
+                 BF1::bitstring(), Items::[key()]) -> BF2::bitstring().
+p_add_list(_Hfs, _BFSize, BF, []) -> BF;
+p_add_list(_Hfs, 1, _BF, _Items = [_|_]) -> <<1:1>>;
+p_add_list(Hfs, BFSize, BF, Items = [_|_]) ->
     Positions = lists:flatmap(fun(Item) ->
                                       ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
                               end, Items),
+    p_add_positions(Positions, BF, BFSize).
+
+-spec p_add_positions(Positions::[non_neg_integer(),...], BF1::bitstring(),
+                      BFSize::pos_integer()) -> BF2::bitstring().
+p_add_positions(Positions, BF, BFSize) ->
     [Pos | Rest] = lists:usort(Positions),
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,
     AccPosBF = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF, [<<0:PreBitsNum>>], PreBitsNum, BF, BFSize).
+    p_add_list_(Rest, AccPosBF, [<<0:PreBitsNum>>], PreBitsNum, BF, BFSize).
 
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - AccBFSize < 8 ->
+p_add_list_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) when Pos - AccBFSize < 8 ->
     % Pos in same byte
     PosInByte = Pos rem 8,
     AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    p_add_list_(Rest, AccPosBF2, AccBF, AccBFSize, BF, BFSize);
+p_add_list_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     % Pos in next byte
     PosInByte = Pos rem 8,
     PreBitsNum2 = Pos - PosInByte,
@@ -163,8 +155,8 @@ p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     AccBF2 = [<<AccPosBF:8, 0:DiffBits>> | AccBF],
     % make new AccPosBF
     AccPosBF2 = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF2, AccBFSize + 8 + DiffBits, BF, BFSize);
-p_add_list_v2_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
+    p_add_list_(Rest, AccPosBF2, AccBF2, AccBFSize + 8 + DiffBits, BF, BFSize);
+p_add_list_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
     RestBits = BFSize - AccBFSize,
     LastBitString = if RestBits >= 8 ->
                            <<AccPosBF:RestBits/little>>;
@@ -187,7 +179,7 @@ p_add_list_v2_([], AccPosBF, AccBF, AccBFSize, BF, BFSize) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns true if the bloom filter contains item
+%% @doc Returns true if the bloom filter contains this item.
 -spec is_element(bloom_filter(), key()) -> boolean().
 is_element(#bloom{items_count = 0}, _Item) ->
     false;
@@ -195,6 +187,57 @@ is_element(#bloom{hfs = Hfs, filter = Filter}, Item) ->
     BFSize = erlang:bit_size(Filter),
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_bits(Filter, Positions).
+
+%% @doc Returns all items present in the bloom filter.
+-spec filter(bloom_filter(), Items::[key()]) -> [key()].
+filter(#bloom{items_count = 0}, _Items) ->
+    [];
+filter(#bloom{hfs = Hfs, filter = Filter}, Items) ->
+    BFSize = erlang:bit_size(Filter),
+    [Item || Item <- Items,
+             check_bits(Filter, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize))].
+
+%% @doc Returns all items not present in the bloom filter.
+-spec filter_neg(bloom_filter(), Items::[key()]) -> [key()].
+filter_neg(#bloom{items_count = 0}, Items) ->
+    Items;
+filter_neg(#bloom{hfs = Hfs, filter = Filter}, Items) ->
+    BFSize = erlang:bit_size(Filter),
+    [Item || Item <- Items,
+             not check_bits(Filter, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize))].
+
+%% @doc Returns all items not present in the bloom filter and adds all items
+%%      to a Bloom filter of the same structure in parallel.
+%%      This way, the bit positions do not need to be determined twice
+%%      (using costly hash functions) compared to executing these two
+%%      functions separately.
+%% @see filter_neg/2
+%% @see add_list/2
+-spec filter_neg_and_add(BFFilter::bloom_filter(), Items::[key()],
+                         BFAdd::bloom_filter()) -> {[key()], BFAdd2::bloom_filter()}.
+filter_neg_and_add(#bloom{items_count = 0, hfs = Hfs, filter = Filter}, Items,
+                   BFAdd = #bloom{hfs = Hfs, filter = FilterAdd}) ->
+    ?ASSERT(erlang:bit_size(Filter) =:= erlang:bit_size(FilterAdd)),
+    {Items, bloom:add_list(BFAdd, Items)};
+filter_neg_and_add(#bloom{hfs = Hfs, filter = Filter}, Items,
+                   BFAdd = #bloom{hfs = Hfs, filter = FilterAdd, items_count = FilledCountAdd}) ->
+    BFSize = erlang:bit_size(Filter),
+    BFSize = erlang:bit_size(FilterAdd), % needs to be equal!
+    IPositions = [{Item, ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)} || Item <- Items],
+    FilteredItems = [Item || {Item, Pos} <- IPositions,
+                             not check_bits(Filter, Pos)],
+    % from p_add_list/4:
+    FilterAdd2 =
+        if Items =:= [] -> FilterAdd;
+           BFSize =:= 1 -> <<1:1>>;
+           true ->
+               Positions = lists:flatmap(fun({_Item, Pos}) -> Pos end, IPositions),
+               p_add_positions(Positions, FilterAdd, BFSize)
+        end,
+    % from add_list/2:
+    ItemsL = length(Items),
+    BFAdd2 = BFAdd#bloom{filter = FilterAdd2, items_count = FilledCountAdd + ItemsL},
+    {FilteredItems, BFAdd2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -204,7 +247,8 @@ item_count(#bloom{items_count = ItemsCount}) -> ItemsCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc joins two bloom filter, returned bloom filter represents their union
+%% @doc Joins two bloom filter so that the returned bloom filter represents
+%%      their union.
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
 join(#bloom{items_count = 0, hfs = Hfs1} = _BF1,
      #bloom{hfs = Hfs2} = BF2) ->
@@ -237,7 +281,7 @@ equals(#bloom{ items_count = Items1, filter = Filter1 },
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Return bloom filter debug information.
+%% @doc Returns bloom filter debug information.
 -spec print(bloom_filter()) -> [{atom(), any()}].
 print(#bloom{filter = Filter, hfs = Hfs, items_count = NumItems} = Bloom) ->
     Size = erlang:bit_size(Filter),
@@ -271,38 +315,8 @@ get_property(#bloom{items_count = X}, items_count) -> X.
 %% bit operations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Sets all filter-bits at given positions to 1
--spec set_bits(bitstring(), Size::non_neg_integer(), [non_neg_integer()]) -> bitstring().
-set_bits(Filter, BFSize, [Pos | Positions]) ->
-    PreByteNum = Pos div 8,
-    PosInByte = Pos rem 8,
-    OldByteBits = erlang:min(BFSize - PreByteNum * 8, 8),
-    <<PreBin:PreByteNum/binary, OldByte:OldByteBits, PostBin/bitstring>> = Filter,
-    % be careful with non-byte sizes for OldByteBits and get the position right
-    NewBinary =
-        case (OldByte bor ((1 bsl (OldByteBits - 1)) bsr PosInByte)) of
-            OldByte -> Filter;
-            NewByte ->
-%%                 log:pal("~p", [{PreBin, NewByte, OldByteBits, PostBin}]),
-                <<PreBin/binary, NewByte:OldByteBits, PostBin/bitstring>>
-        end,
-    set_bits(NewBinary, BFSize, Positions);
-set_bits(Filter, _BFSize, []) ->
-    Filter.
-
-%% V2 -> 1/3 slower than V1
-%% set_bits(Filter, BFSize, [Pos | Positions]) ->
-%%     <<A:Pos/bitstring, B:1/bitstring, C/bitstring>> = Filter,
-%%     NewBinary = case B of
-%%                     0 -> Filter;
-%%                     _ -> <<A:Pos/bitstring, 1:1, C/bitstring>>
-%%                 end,
-%%     set_bits(NewBinary, BFSize, Positions);
-%% set_bits(Filter, _BFSize, []) ->
-%%     Filter.
-
-% @doc Checks if all bits are set on a given position list
--spec check_bits(bitstring(), [non_neg_integer()]) -> boolean().
+% @doc Checks whether all bits are set at the given positions.
+-spec check_bits(bitstring(), Positions::[non_neg_integer()]) -> boolean().
 % V1
 %% check_bits(Filter, [Pos | Positions]) ->
 %%     PreBytes = Pos div 8,
@@ -354,25 +368,37 @@ calc_HF_num_Size_opt(N, FP) ->
     %?DBG_ASSERT(FPR_Max =< FP),
 %%     log:pal("Bloom (~g): K=~B, M=~B (FP=~g) vs. K=~B, M=~B (FP=~g)",
 %%             [FP, K_Min, M_Min, FPR_Min, K_Max, M_Max, FPR_Max]),
-    if FPR_Min =< FP andalso FPR_Max =< FP ->
-           if M_Min < M_Max ->
-                  {K_Min, M_Min};
-              M_Min =:= M_Max andalso FPR_Min < FPR_Max ->
-                  {K_Min, M_Min};
+    {K, M, _FPX} = select_best(FP, K_Min, M_Min, FPR_Min,
+                               K_Max, M_Max, FPR_Max),
+    {K, M}.
+
+%% @doc Given two different options to create a Bloom filter with false
+%%      positive rates (or any other measure, e.g. failure rate) FP1 and FP2
+%%      and a target false positive rate FP, selects the best option that has
+%%      FPX =&lt; FP and the lowest MX.
+-spec select_best(FP::float(), K1::pos_integer(), M1::pos_integer(), FP1::float(),
+                  K2::pos_integer(), M2::pos_integer(), FP2::float())
+        -> {K::pos_integer(), M::pos_integer(), FP::float()}.
+select_best(FP, K1, M1, FP1, K2, M2, FP2) ->
+    if FP1 =< FP andalso FP2 =< FP ->
+           if M1 < M2 ->
+                  {K1, M1, FP1};
+              M1 =:= M2 andalso FP1 < FP2 ->
+                  {K1, M1, FP1};
               true ->
-                  {K_Max, M_Max}
+                  {K2, M2, FP2}
            end;
-       FPR_Min =< FP -> % andalso FPR_Max > FP
-           {K_Min, M_Min};
-       FPR_Max =< FP -> % andalso FPR_Min > FP
-           {K_Max, M_Max};
-       % all below have FPR_Min > FP andalso FPR_Max > FP
-       FPR_Min < FPR_Max ->
-           {K_Min, M_Min};
-       FPR_Min == FPR_Max andalso M_Min =< M_Max ->
-           {K_Min, M_Min};
+       FP1 =< FP -> % andalso FP2 > FP
+           {K1, M1, FP1};
+       FP2 =< FP -> % andalso FP1 > FP
+           {K2, M2, FP2};
+       % all below have FP1 > FP andalso FP2 > FP
+       FP1 < FP2 ->
+           {K1, M1, FP1};
+       FP1 == FP2 andalso M1 =< M2 ->
+           {K1, M1, FP1};
        true ->
-           {K_Max, M_Max}
+           {K2, M2, FP2}
     end.
 
 %% @doc Calculates the number of bits needed by a bloom filter to have a false

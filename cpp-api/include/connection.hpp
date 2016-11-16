@@ -21,6 +21,7 @@
 #include <stdexcept>
 
 #include <boost/asio.hpp>
+#include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
 
@@ -47,7 +48,7 @@ namespace scalaris {
 
     template<typename... Args>
     Json::Value rpc(const std::string& methodname, Args... args) {
-      std::array<Json::Value, sizeof...(args)> arg_list = {{args... }};
+      std::array<Json::Value, sizeof...(args)> arg_list = {{Converter<Args>::to_value(args)... }};
 
       Json::Value params = Json::arrayValue;
       for(size_t i = 0; i< sizeof...(args); i++)

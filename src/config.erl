@@ -198,7 +198,8 @@ check_config() ->
                          fun lb_active:check_config/0,
                          fun gossip_cyclon:check_config/0,
                          fun gossip_vivaldi:check_config/0,
-                         fun db_prbr:check_config/0
+                         fun db_prbr:check_config/0,
+                         fun prbr:check_config/0
                        ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
 

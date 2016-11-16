@@ -123,7 +123,7 @@ get_rep_upd_config(Method) ->
      {rr_recon_method, Method},
      {rr_session_ttl, 100000},
      {rr_gc_interval, 60000},
-     {rr_recon_p1e, 0.1},
+     {rr_recon_failure_rate, 0.1},
      {rr_trigger_probability, 100},
      {rr_art_inner_fpr, 0.01},
      {rr_art_leaf_fpr, 0.1},
@@ -161,13 +161,13 @@ mpath(Config) ->
     %parameter
     NodeCount = 4,
     DataCount = 1000,
-    P1E = 0.1,
+    FR = 0.1,
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
     _ = build_ring(NodeCount, Config, [get_rep_upd_config(Method),
-                                       {rr_recon_p1e, P1E}]),
+                                       {rr_recon_failure_rate, FR}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -219,12 +219,12 @@ dest(Config) ->
     %parameter
     NodeCount = 7,
     DataCount = 1000,
-    P1E = 0.1,
+    FR = 0.1,
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
     _ = build_ring(NodeCount, Config, [get_rep_upd_config(Method),
-                                       {rr_recon_p1e, P1E}]),
+                                       {rr_recon_failure_rate, FR}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -265,11 +265,11 @@ dest(Config) ->
 dest_empty_node(Config) ->
     %parameter
     DataCount = 1000,
-    P1E = 0.1,
+    FR = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
     _ = build_ring(symmetric, Config,
-                   [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
+                   [get_rep_upd_config(Method), {rr_recon_failure_rate, FR}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
                                                    {fprob, 100},
                                                    {distribution, uniform},
@@ -394,15 +394,15 @@ asymmetric_ring(Config) ->
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
 -spec start_sync(Config, Nodes::Int | symmetric, DBSize::Int, DBParams,
-                 Rounds::Int, P1E, RRConf::Config, CompFun) -> true when
+                 Rounds::Int, FR, RRConf::Config, CompFun) -> true when
     is_subtype(Config,      [tuple()]),
     is_subtype(Int,         pos_integer()),
     is_subtype(DBParams,    [db_generator:db_parameter()]),
-    is_subtype(P1E,         float()),
+    is_subtype(FR,         float()),
     is_subtype(CompFun,     fun((T, T) -> boolean())).
-start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) ->
+start_sync(Config, NodeCount, DBSize, DBParams, Rounds, FR, RRConfig, CompFun) ->
     % NOTE: a sync round may not decrease the sync degree if there is no error on the participating nodes!
-    NodeKeys = build_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
+    NodeKeys = build_ring(NodeCount, Config, [RRConfig, {rr_recon_failure_rate, FR}]),
     Nodes = [begin
                  comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
                  trace_mpath:thread_yield(),

@@ -14,17 +14,15 @@
 #	destDir -> destination path for pdfs
 #	regenAccInPercent -> whether to show the regen accuracy in percent instead of absolute values (useful for bloom)
 #	absoluteRedundancy -> whether to show the absolute redundancy or a relative one
-#	stepSize -> the stepSize parameter used (2 if unset)
-#	systemSize -> the number of items being reconciled
 #	plot_label -> additional label to print at the bottom left of the screen (optional)
 #	RC_costs_note -> replaces "phase 1+2" in the y-axis description of the transfer costs (optional)
 #	filename -> defaults to "all_file" (no extension, .pdf will be appended)
+#	failrate -> lower target failure rate (upper target failure rate: failrate * 10**6)
 
 set macro
 
 load colDefFile
 
-step_size = exists("stepSize") ? stepSize : 2
 plotCount = exists("srcFile5") && strlen(srcFile5) > 0 ? 5 : exists("srcFile4") && strlen(srcFile4) > 0 ? 4 : exists("srcFile3") && strlen(srcFile3) > 0 ? 3 : exists("srcFile2") && strlen(srcFile2) > 0 ? 2 : 1
 files = srcFile1 . (plotCount >= 2 ? " " . srcFile2 : "") . (plotCount >= 3 ? " " . srcFile3 : "") . (plotCount >= 4 ? " " . srcFile4 : "") . (plotCount >= 5 ? " " . srcFile5 : "")
 get_file(i) = (i == 5) ? srcFile5 : (i == 4) ? srcFile4 : (i == 3) ? srcFile3 : (i == 2) ? srcFile2 : srcFile1
@@ -39,6 +37,9 @@ set style line 3 lw 1 lt 1 lc rgb '#59c955' pt 7 # dark green
 set style line 4 lw 1 lt 1 lc rgb '#b05abd' pt 4 # dark purple
 set style line 5 lw 1 lt 1 lc rgb '#ff7f00' pt 10 # dark orange
 
+set dashtype 11 (8,6,8,6)
+set style line 6 lw 1 lt 1 dt 11 lc rgb "#777777" pt 8 # gray (for the naive line)
+
 set style line 101 lw 1 lt 1 lc rgb '#ff191b' pt 0 # dark red
 set style line 102 lw 1 lt 1 lc rgb '#2d8ede' pt 0 # dark blue
 set style line 103 lw 1 lt 1 lc rgb '#59c955' pt 0 # dark green
@@ -46,16 +47,16 @@ set style line 104 lw 1 lt 1 lc rgb '#b05abd' pt 0 # dark purple
 set style line 105 lw 1 lt 1 lc rgb '#ff7f00' pt 0 # dark orange
 
 if (plotCount == 5) {
-  plotShift(x, i) = (i == 5) ? (x + 0.7*(0.5*step_size)) : (i == 4) ? (x + 0.35*(0.5*step_size)) : (i == 3) ? (x) : (i == 2) ? (x - 0.35*(0.5*step_size)) : (x - 0.7*(0.5*step_size))
+  plotShift(x, i) = (i == 5) ? (x + (x / 1.6)) : (i == 4) ? (x + (x / 3.7)) : (i == 3) ? (x) : (i == 2) ? (x - (x / 4.6)) : (x - (x / 2.6))
 } else {
   if (plotCount == 4) {
-    plotShift(x, i) = (i == 4) ? (x + 0.6*(0.5*step_size)) : (i == 3) ? (x + 0.2*(0.5*step_size)) : (i == 2) ? (x - 0.2*(0.5*step_size)) : (x - 0.6*(0.5*step_size))
+    plotShift(x, i) = (i == 4) ? (x + (x / 1.9)) : (i == 3) ? (x + (x / 6.5)) : (i == 2) ? (x - (x / 7.9)) : (x - (x / 2.95))
   } else {
     if (plotCount == 3) {
-      plotShift(x, i) = (i == 3) ? (x + 0.55*(0.5*step_size)) : (i == 2) ? (x) : (x - 0.55*(0.5*step_size))
+      plotShift(x, i) = (i == 3) ? (x + (x / 2.3)) : (i == 2) ? (x) : (x - (x / 3.2))
     } else {
       if (plotCount == 2) {
-        plotShift(x, i) = (i == 2) ? (x + 0.4*(0.5*step_size)) : (x - 0.4*(0.5*step_size))
+        plotShift(x, i) = (i == 2) ? (x + (x / 3)) : (x - (x / 4))
       } else {
         plotShift(x, i) = x
       }
@@ -77,6 +78,9 @@ if (exists("absoluteRedundancy") && absoluteRedundancy == 1) {
   absoluteRedundancy = 0
   redundancy(transferred, updated, regen) = transferred / (updated + regen)
   redundancyStderr(transferred, updated, regen) = "-"
+}
+if (!exists("failrate")) {
+  failrate = 0.0001
 }
 plot_boxwidth = (0.8 / plotCount)
 
@@ -137,13 +141,15 @@ if (red_max > 0.5) {red_max=red_max*1.05}
 if (red_max >= 1.5 && red_max < 2) {red_max=2}
 
 bw_max=1
+bw_min=1
 do for [i=1:plotCount] {
   stats "<awk '$" . col_ftype . " == \"update\" || $" . col_ftype . " == \"regen\"' " . get_file(i) using (kB(column(col_bw_rc_size)+column(col_bw_rc2_size)+stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) nooutput
   if (STATS_max > bw_max) {bw_max = STATS_max}
+  if (STATS_min < bw_min) {bw_min = STATS_min}
 }
-if (bw_max > 1) {bw_max=bw_max*1.015}
+bw_min = 2.0**floor(log(bw_min) / log(2))
 
-key_width_fun(i) = min(-0.5, (9-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.25)
+key_width_fun(i) = min(1, (9-strstrt(get_title(i), "_")) - (strlen(get_title(i)) - strstrt(get_title(i), "_")) * 0.25)
 key_width = min(key_width_fun(1),key_width_fun(plotCount))
 # print "key_width: ",key_width
 
@@ -157,20 +163,23 @@ if (plotCount == 1) {
 } else {
   set style data yerrorbars
 }
-set xtics 0,step_size,5*step_size
-set grid layerdefault   linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
+set logscale x 10
+set xrange [(failrate/3.1):(failrate*10**6*3.1)] # TODO: adapt if number of data points changes!
+set grid layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
 set pointsize (plotCount >= 4) ? 0.7 : (plotCount == 3) ? 0.8 : 1
+arrow_di=0 # added to each i in loop - arrows drawn at (i+arrow_di)*arrow_dx
+arrow_xpoints=7 # TODO: adapt if number of data points changes!
+arrow_dx=1.0/arrow_xpoints # grid spacing in x
 
 set style line 100 lw 2 lc -1 pt 0 lt 1
 
 #--------------------------------- ALL
-set xrange [(0.5*step_size):(5.5*step_size)]
 set boxwidth plot_boxwidth relative
 set style fill solid 1 border -1
-set xtics scale 0.1
+set xtics scale 0.1 failrate,10 rotate by -45
 set ytics scale 0.8
-set mxtics 2
-set grid noxtics mxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
+set grid noxtics nomxtics layerdefault linetype 0 linewidth 1.000,  linetype 0 linewidth 1.000
+set for [i=1:arrow_xpoints] arrow from graph (i+arrow_di)*arrow_dx,graph 0 to graph (i+arrow_di)*arrow_dx,graph 1 nohead back linetype 0 linewidth 1.000
 
 set o destDir . filename . "." . fileEx
 set multiplot
@@ -178,39 +187,26 @@ set multiplot
 all_width_r = 0.545
 all_width_l = all_width_r
 bw_height_full = 0.700
-bw_height = (plotCount > 1) ? (bw_height_full - 0.018) : bw_height_full
-red_height = 0.170
-red_pos_y = bw_height_full - 0.032
-acc_height_full = 0.195
+bw_height = 0.000 + ((plotCount > 1) ? (bw_height_full - 0.018) : bw_height_full)
+red_height = (plotCount > 1) ? 0.180 : 0.184
+red_pos_y = (plotCount > 1) ? bw_height_full - 0.033 : bw_height_full - 0.035
+acc_height_full = (plotCount > 1) ? 0.200 : 0.204
 acc_height = (plotCount > 1) ? (acc_height_full - 0.012) : acc_height_full
-acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height - 0.006) : (red_pos_y + red_height - 0.02)
+acc_pos_y = (plotCount > 1) ? (red_pos_y + red_height - 0.017) : (red_pos_y + red_height - 0.035)
 
 # accuracy
 
+set logscale y 10
+set logscale y2 10
+
 set size all_width_l,acc_height
 set origin -0.002,acc_pos_y
-if (acc_upd_max > 0.5 && acc_upd_max <= 1) {
-  set ytics 0.2
-} else {
-  if (acc_upd_max > 3 && acc_upd_max <= 6) {
-    set ytics 1
-  } else {
-    if (acc_upd_max > 6 && acc_upd_max <= 12) {
-      set ytics 2
-    } else {
-      if (acc_upd_max > 12 && acc_upd_max <= 30) {
-        set ytics 5
-      } else {
-        set ytics autofreq
-      }
-    }
-  }
-}
 unset xlabel
 set format x ""
 set ylabel "|Δ| missed " font ",16"
-set yrange [0:acc_upd_max]
-set format y " %2.1f"
+set ytics 100
+set yrange [(failrate)/10:(failrate*10**6*5)]
+set format y "%g"
 if (plotCount > 1) {
   set key at screen 0.500,(acc_pos_y + 0.003) center center vertical Left reverse noopaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
@@ -218,164 +214,117 @@ if (plotCount > 1) {
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)):(stderrSum(column(col_sd_regen),column(col_sd_updated))) t get_title(i) ls i
+ u (plotShift(column(col_recon_fr), i)):(column(col_missing)+column(col_outdated) - column(col_regen)-column(col_updated)):(stderrSum(column(col_sd_regen),column(col_sd_updated))) t get_title(i) ls i
 
 set origin 0.49,acc_pos_y
-set rmargin at screen 0.924
 unset key
 unset ylabel
 unset ytics
 set grid y2tics
+set size all_width_r,acc_height
 if (regenAccInPercent == 1) {
-  set y2tics mirror offset 0 scale 0.8
-  set size (all_width_r + 0.028),acc_height
-  set format y2 "%-2.1f_{ }%%"
+  set y2tics mirror format "%-3.0f_{ }%%" offset 0 scale 0.8
   set y2range [(acc_reg_avg-acc_reg_max):(acc_reg_avg+acc_reg_max)]
 } else {
-  set size all_width_r,acc_height
-  set y2tics mirror format "%-1.1f" scale 0.8
-  if (acc_reg_max > 0.5 && acc_reg_max <= 1) {
-    set y2tics 0.2
-  } else {
-    if (acc_reg_max > 3 && acc_reg_max <= 6) {
-      set y2tics 1
-    } else {
-      if (acc_reg_max > 6 && acc_reg_max <= 12) {
-        set y2tics 2
-      } else {
-        if (acc_reg_max > 12 && acc_reg_max <= 30) {
-          set y2tics 5
-        } else {
-          set y2tics autofreq
-        }
-      }
-    }
-  }
-  set y2range [0:acc_reg_max]
+  set y2tics mirror format "%g" scale 0.8 100
+  set y2range [(failrate)/10:(failrate*10**6*5)]
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(regenAcc(column(col_regen)+column(col_updated), column(col_missing)+column(col_outdated))):(regenAccErr(column(col_sd_regen),column(col_sd_updated),(column(col_missing)+column(col_outdated)))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
+ u (plotShift(column(col_recon_fr), i)):(regenAcc(column(col_regen)+column(col_updated), column(col_missing)+column(col_outdated))):(regenAccErr(column(col_sd_regen),column(col_sd_updated),(column(col_missing)+column(col_outdated)))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
 
-set ytics autofreq scale 0.8
+set ytics scale 0.8
 unset y2tics
-unset rmargin
 set grid noy2tics
 
 # redundancy
 
 set size all_width_l,red_height
 set origin -0.002,red_pos_y
-if (red_max > 0.5 && red_max <= 1) {
-  set ytics 0.2
-} else {
-  if (red_max > 2 && red_max <= 6) {
-    set ytics 1
-  } else {
-    if (red_max > 6 && red_max <= 12) {
-      set ytics 2
-    } else {
-      if (red_max > 12 && red_max <= 30) {
-        set ytics 5
-      } else {
-        set ytics autofreq
-      }
-    }
-  }
-}
 if (absoluteRedundancy == 1) {
 set ylabel "Red." font ",16" # transferred / updated
 } else {
 set ylabel "rel. Red." font ",16" # transferred / updated
 }
-set yrange [0:red_max]
-set y2range [0:red_max]
-set format y "%4.1f"
-set format y2 "%-4.1f"
+set ytics 100
+set yrange [(failrate)/10:(failrate*10**6*5)]
+set format y "%g"
 unset key
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls i
+ u (plotShift(column(col_recon_fr), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls i
 
 set size all_width_r,red_height
 set origin 0.49,red_pos_y
-set rmargin at screen 0.924
 if (plotCount == 1) {
-  set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
+  set key bottom right horizontal Right noreverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics mirror scale 0.8
-if (red_max > 0.5 && red_max <= 1) {
-  set y2tics 0.2
-} else {
-  if (red_max > 2 && red_max <= 6) {
-    set y2tics 1
-  } else {
-    if (red_max > 6 && red_max <= 12) {
-      set y2tics 2
-    } else {
-      if (red_max > 12 && red_max <= 30) {
-        set y2tics 5
-      } else {
-        set y2tics autofreq
-      }
-    }
-  }
-}
+set y2tics mirror format "%g" scale 0.8 100
+set format y2 "%g"
+set y2range [(failrate)/10:(failrate*10**6*5)]
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) axes x1y2 t get_title(i) ls (plotCount > 1 ? i : 2)
+ u (plotShift(column(col_recon_fr), i)):(redundancy(column(col_bw_rs_kvv), column(col_updated), column(col_regen))):(redundancyStderr(column(col_sd_bw_rs_kvv), column(col_sd_updated), column(col_sd_regen))) t get_title(i) ls (plotCount > 1 ? i : 2)
 
 set ytics autofreq scale 0.8
 unset y2tics
-unset rmargin
 set grid noy2tics
 
 # bandwidth
 
 set size all_width_l,bw_height
-set origin -0.002,0
-set xlabel "total δ (outdated items)" font ",16"
-set xtics 0,step_size,5*step_size format "%g_{ }%%" rotate by -30 offset -1,0
+set origin -0.002,-0.0025
+set xlabel "FR (outdated δ)" font ",16"
 set ylabel sprintf("Transfer costs (%s) in KiB",exists("RC_costs_note") ? RC_costs_note : "phase 1+2") font ",16"
-set yrange [0:bw_max]
-set y2range [0:bw_max]
-set format y "%4.0f"
-set mytics 2
+set yrange [0:bw_max*1.025]
+set y2range [0:bw_max*1.025]
+unset logscale y
+unset logscale y2
+if (bw_min < 1) {
+  if (bw_min < 0.5) {
+set format y "    2^{%L}"
+  } else {
+set format y " %4.1f"
+  }
+} else {
+set format y " %5.0f"
+}
+set format x "%g"
 if (plotCount > 1) {
   set key at screen 0.500,(red_pos_y + 0.0065) center center vertical Left reverse noopaque enhanced autotitles nobox maxrows 1 width (plotCount >= 5 ? (key_width-3.2) : plotCount >= 4 ? (key_width+2) : (key_width+3)) samplen 1.75 font ",14" spacing 1.3
 } else {
-  if (srcFile1_title[1:6] eq "merkle" || (exists("srcFile3_title") && srcFile3_title[1:6] eq "merkle") || (exists("srcFile4_title") && srcFile4_title[1:6] eq "merkle")) {
-    set key top left horizontal Left reverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
-  } else {
-    set key bottom right horizontal Right noreverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
-  }
+  set key at graph 0.900,0.925 horizontal Right noreverse opaque enhanced autotitles box maxcols 1 width key_width samplen 1.5 font ",13"
 }
 
-# LABEL = "⇡naïve approach: ≈" . (systemSize*(128+32)/8/1024) . " KiB"
-# set obj 10 rect at graph 0.5,0.96 size char (strlen(LABEL)-6), char 1
-# set obj 10 fillstyle solid noborder front
-# set label 10 at graph 0.5,0.96 LABEL front center font ",12"
-
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) with boxes notitle ls i fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size))) with boxes t get_title(i) ls i, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with lines notitle ls (plotCount > 1 ? (100+i) : 100) lw 2, \
+     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"update\"' " . get_file(i) \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) with yerrorbars notitle ls 100
 
 set size all_width_r,bw_height
-set origin 0.49,0
-set rmargin at screen 0.924
-set xlabel "total δ (missing items)" font ",16"
+set origin 0.49,-0.0025
+set xlabel "FR (missing δ)" font ",16"
 unset key
 unset ylabel
 unset ytics
 set grid y2tics
-set y2tics autofreq mirror format "%-3.0f" scale 0.8
-set my2tics 2
+set y2tics autofreq mirror scale 0.8
+if (bw_min < 1) {
+  if (bw_min < 0.5) {
+set format y2 "    2^{%L}"
+  } else {
+set format y2 " %4.1f"
+  }
+} else {
+set format y2 " %5.0f"
+}
 
 if (exists("plot_label") && strlen(plot_label) > 0) {
 # label with box: (box width unreliable for enhanced text)
@@ -386,8 +335,10 @@ set label 100 at char 1,char 1 plot_label front left font ",12"
 }
 
 plot for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))) axes x1y2 with boxes notitle ls (plotCount > 1 ? i : 2) fs solid 0.4, \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size))) axes x1y2 with boxes t get_title(i) ls (plotCount > 1 ? i : 2), \
      for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
- u (plotShift(column(col_failrate), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size), column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with lines notitle ls (plotCount > 1 ? (100+i) : 100) lw 2, \
+     for [i=1:plotCount] "<awk '$" . col_ftype . " == \"regen\"' " . get_file(i) \
+ u (plotShift(column(col_recon_fr), i)):(kB(column(col_bw_rc_size)+column(col_bw_rc2_size))):(kB(stderrSum(column(col_sd_bw_rc_size),column(col_sd_bw_rc2_size)))) axes x1y2 with yerrorbars notitle ls 100

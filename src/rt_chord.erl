@@ -142,7 +142,7 @@ add_range(Key, Range) -> normalize(Key + Range).
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
--spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
+-spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> non_neg_integer().
 get_range(Begin, Begin) -> n(); % I am the only node
 get_range(?MINUS_INFINITY, ?PLUS_INFINITY) -> n(); % special case, only node
 get_range(Begin, End) when End > Begin -> End - Begin;

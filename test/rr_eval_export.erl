@@ -1,4 +1,4 @@
-% @copyright 2010-2015 Zuse Institute Berlin
+% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Export helper functions for replica repair evaluation.
 %% @see    rr_eval_admin
-%% @version $Id $
 -module(rr_eval_export).
 
 -author('malange@informatik.hu-berlin.de').
@@ -107,10 +106,7 @@ write_ds(IoDevice, {DSProp, Table}) ->
 
 -spec write_row(IoDevice::file:io_device(), Row::[any()]) -> ok.
 write_row(IoDevice, Row) ->
-    _ = [case type_of(Field) of
-             float -> io:fwrite(IoDevice, "~f~c", [Field, ?TAB]);
-             _     -> io:fwrite(IoDevice, "~p~c", [Field, ?TAB])
-         end || Field <- Row],
+    _ = [io:fwrite(IoDevice, "~p~c", [Field, ?TAB]) || Field <- Row],
     io:fwrite(IoDevice, "~n", []).
 
 -spec close_file(IoDevice::file:io_device()) -> ok.
@@ -150,9 +146,3 @@ write_raw(DataSet, Options) ->
         {_, _} ->
             io_error
     end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-type_of(X) when is_float(X) -> float;
-type_of(X) when is_integer(X) -> integer;
-type_of(_) -> some.

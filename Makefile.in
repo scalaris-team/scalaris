@@ -539,10 +539,10 @@ log-clean:
 	-rm -rf log/*
 
 # delete all generated files except test results and logs
-clean: erlang-clean tags-clean cpp-clean java-clean python-clean python3-clean
+clean: erlang-clean nifs-clean tags-clean cpp-clean java-clean python-clean python3-clean
 
 # delete all files related to our erlang sources
-erlang-clean: nifs-clean
+erlang-clean:
 	-rm -f .make-doc
 	-rm -f bin/*.beam
 	-rm -f ebin/*.beam

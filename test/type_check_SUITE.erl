@@ -469,9 +469,8 @@ tester_type_check_rrepair(_Config) ->
              {pos_to_bitstring, 4}, % needs to fulfil certain preconditions
              {bitstring_to_k_list_k, 3}, % needs a special binary to correspond to a number of Key entries
              {bitstring_to_k_list_kv, 3}, % needs a special binary to correspond to a number of KV entries
-             {calc_n_subparts_p1e, 2}, %% needs float > 0, < 1
-             {calc_n_subparts_p1e, 3}, %% needs float > 0, < 1
-             {calc_signature_size_nm_pair, 6}, %% needs float > 0, < 1
+             {calc_n_subparts_FR, 2}, %% needs float >= 0
+             {calc_n_subparts_FR, 3}, %% needs float >= 0
              {start_gen_component,5} %% unsupported types
            ],
            [
@@ -480,36 +479,40 @@ tester_type_check_rrepair(_Config) ->
              {build_recon_struct, 5}, %% DB items must be in interval
              {begin_sync, 1}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
-             {merkle_next_signature_sizes, 4}, %% needs float > 0, < 1
+             {merkle_next_signature_sizes, 5}, %% needs float > 0, < 1
              {min_max, 3}, %% tested via feeder
              {trivial_signature_sizes, 4}, %% needs float > 0, < 1
-             {trivial_worst_case_failprob, 4}, %% needs 0 =< ExpDelta =< 100
+             {trivial_worst_case_failrate, 4}, %% needs 0 =< ExpDelta =< 100
              {shash_signature_sizes, 4}, %% needs float > 0, < 1
-             {shash_worst_case_failprob, 4}, %% needs 0 =< ExpDelta =< 100
-             {calc_max_different_hashes, 4}, %% needs 0 =< ExpDelta =< 100
+             {shash_worst_case_failrate, 4}, %% needs 0 =< ExpDelta =< 100
+             {calc_one_m_xpow_one_m_z, 2}, %% needs X =/= 0
+             {calc_max_different_hashes_, 3}, %% needs 0 =< ExpDelta =< 100
+             {calc_max_different_hashes, 3}, %% needs 0 =< ExpDelta =< 100
+             {calc_max_different_items_total, 3}, %% needs 0 =< ExpDelta =< 100
+             {calc_max_different_items_node, 3}, %% needs 0 =< ExpDelta =< 100
              {compress_kv_list, 5}, %% needs a fun
-             {compress_kv_list_p1e, 7}, %% needs float > 0, < 1 and a fun
-             {bloom_calc_max_nr_checks, 3}, %% needs 0 =< ExpDelta =< 100
-             {bloom_worst_case_failprob, 3}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
-             {bloom_worst_case_failprob_, 4}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
-             {bloom_fp, 4}, %% needs float > 0, < 1
-             {merkle_next_p1e, 2}, %% needs float > 0, < 1
+             {compress_kv_list_fr, 7}, %% needs float > 0, < 1 and a fun
+             {bloom_worst_case_failrate, 3}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
+             {bloom_worst_case_failrate_, 5}, %% needs float > 0, < 1, 0 =< ExpDelta =< 100
+             {bloom_target_fp, 4}, %% needs float > 0, < 1
+             {merkle_next_fr_targets, 2}, %% needs float > 0, < 1
+             {get_diff_with_dupes, 7}, %% needs a function
              {calc_items_in_chunk, 2}, %% needs special input
-             {decompress_kv_list, 2}, %% needs a special binary to correspond to a number of bits
-             {compress_idx_list, 5}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
-             {decompress_idx_list, 2}, %% needs a special binary to correspond to a number of bits
+             {decompress_kv_list, 3}, %% needs a special binary to correspond to a number of bits
+             {compress_idx_list, 6}, %% needs a sorted list of positions, also LastPos needs to be smaller than these positions
+             {decompress_idx_list, 3}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_list_, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list, 2}, %% needs a special binary to correspond to a number of bits
              {decompress_idx_to_list_, 3}, %% needs a special binary to correspond to a number of bits
-             {shash_bloom_perform_resolve, 6}, %% needs a special binary to correspond to a number of bits
-             {phase2_run_trivial_on_diff, 7}, %% needs parameters to match
+             {shash_bloom_perform_resolve, 7}, %% needs a special binary to correspond to a number of bits
+             {phase2_run_trivial_on_diff, 6}, %% needs parameters to match
              {merkle_check_node, 22}, %% needs merkle_tree/nodes with hashes
              {merkle_cmp_result, 21}, %% needs matching result and merkle nodes
-             {merkle_calc_next_p1e, 5}, %% needs floats >= 0, =< 1
-             {merkle_resolve_add_leaf_hash, 9}, %% needs KV-List merkle buckets
-             {merkle_resolve_retrieve_leaf_hashes, 10}, %% needs special bitstring
+             {merkle_calc_used_fr, 5}, %% needs floats >= 0, =< 1
+             {merkle_resolve_add_leaf_hashes, 14}, %% needs KV-List merkle buckets
+             {merkle_resolve_retrieve_leaf_hashes, 17}, %% needs special bitstring
              {merkle_resolve_leaves_send, 2}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_receive, 3}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_receive, 2}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_ckidx, 8}, % needs same-length lists
              {send_resolve_request, 6}, %% tries to send messages
              {art_get_sync_leaves, 6}, %% needs non-empty bloom filters
