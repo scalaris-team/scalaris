@@ -59,24 +59,11 @@ rand_uniform_feeder(X, Y, C) when X > Y -> {Y, X, C};
 rand_uniform_feeder(X, Y, C) when X < Y -> {X, Y, C};
 rand_uniform_feeder(X, X, C) -> {X, X + 1, C}.
 
-% let's see how long we can use this (faster) code based on an internal API...
--compile({nowarn_deprecated_function, [{crypto, mpint, 1}, {crypto, erlint, 1}]}).
 %% @doc Generates Count random numbers N with Lo &lt;= N &lt; Hi using the crypto
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer(), Count::non_neg_integer()) -> [integer()].
 rand_uniform(Lo, Hi, Count) when Lo < Hi ->
-    % alternative, without the use of crypto's internal API (but slower):
-    % util:for_to_ex(1, Count, fun(_) -> crypto:rand_uniform(L, R) end)
-    rand_uniform_(crypto:mpint(Lo), crypto:mpint(Hi), Count).
-
-%% @doc Helper for rand_uniform/3.
-rand_uniform_(_Lo, _Hi, 0) -> [];
-rand_uniform_(Lo, Hi, Count) ->
-    X = case crypto:rand_uniform(Lo, Hi) of
-            Result when is_binary(Result) -> crypto:erlint(Result);
-            Other -> Other
-        end,
-    [X | rand_uniform_(Lo, Hi, Count - 1)].
+    util:for_to_ex(1, Count, fun(_) -> crypto:rand_uniform(Lo, Hi) end).
 
 %% @doc Stops the crypto module's server.
 -spec stop() -> ok.
