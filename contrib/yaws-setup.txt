@@ -12,3 +12,5 @@
     rm ebin/Makefile.*, include/Makefile.*, src/Makefile.*
     echo "/*.beam" > ebin/.gitignore
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
+
+You probably have to patch yaws to make the erlang/dev dialyzer happy.

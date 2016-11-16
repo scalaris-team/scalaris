@@ -1513,10 +1513,11 @@ pick_sconf({nossl, _}, GC, H, Group) ->
 pick_sconf({ssl, _}, #gconf{sni=disable}=GC, H, Group) ->
     pick_sconf(GC, H, Group);
 pick_sconf({ssl, Sock}, GC, H, Group) ->
-    SniHost = case ssl:connection_information(Sock, [sni_hostname]) of
-                  {ok, [{sni_hostname, SN}]} -> SN;
-                  _                          -> undefined
-              end,
+    SniHost = unfdefined,
+%case ssl:connection_information(Sock, [sni_hostname]) of
+%                  {ok, [{sni_hostname, SN}]} -> SN;
+%                  _                          -> undefined
+%              end,
     if
         SniHost == undefined andalso GC#gconf.sni == strict ->
             error_logger:format(

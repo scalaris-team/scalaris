@@ -79,10 +79,5 @@ call_appender(Logger, Appender, Msg) ->
     end.
     
     
-    timestamp() ->
-    try
-	erlang:timestamp()
-    catch
-	error:undef ->
-	    erlang:now()
-    end.
+timestamp() ->
+    erlang:now().

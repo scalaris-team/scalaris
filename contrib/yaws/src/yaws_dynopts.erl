@@ -60,32 +60,16 @@ have_rand() ->
     (code:which(rand) /= non_existing).
 
 rand_bytes(N) ->
-    case have_crypto_strong_rand_bytes() of
-        true  -> crypto:strong_rand_bytes(N);
-        false -> (fun crypto:rand_bytes/1)(N)
-    end.
+    crypto:strong_rand_bytes(N).
 
 unique_triple() ->
-    case have_erlang_now() of
-        true ->
-            (fun erlang:now/0)();
-        false ->
-            {erlang:unique_integer([positive]),
-             erlang:unique_integer([positive]),
-             erlang:unique_integer([positive])}
-    end.
+    erlang:now().
 
 get_time_tuple() ->
-    case have_erlang_now() of
-        true  -> (fun erlang:now/0)();
-        false -> erlang:timestamp()
-    end.
+    erlang:now().
 
 now_secs() ->
-    {M,S,_} = case have_erlang_now() of
-                  true  -> (fun erlang:now/0)();
-                  false -> erlang:timestamp()
-              end,
+    {M,S,_} = erlang:now(),
     (M*1000000)+S.
 
 random_seed(A,B,C) ->

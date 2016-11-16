@@ -3,3 +3,5 @@
 2) remove append from FILE_OPTIONS in include/log4erl.hrl
 2) add delayed_write to FILE_OPTIONS in include/log4erl.hrl to increase performance at the cost of losing log entries if the log4erl process dies
 7) that's it, go back to <scalaris>/ and run ./configure && make
+
+You probably have to patch log4erl to make the erlang/dev dialyzer happy.
