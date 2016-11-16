@@ -9,10 +9,14 @@
 -export([start_link/1]).
 -export([change_log_level/2]).
 -export([change_level/3]).
+-export([change_filename/3]).
 -export([add_logger/1]).
 -export([add_appender/3]).
 -export([change_format/3]).
 -export([log/4]).
+%% Don't want compile-warnings about the use of erlang:now/0 in
+%% this module.
+-compile(nowarn_deprecated_function).
 
 start_link(Logger) when is_atom(Logger) ->
     ?LOG2("log_manager adding Logger ~p~n",[Logger]),
@@ -37,14 +41,17 @@ change_level(Logger, Appender, Level) ->
 change_format(Logger, Appender, Format) ->
     call_appender(Logger, Appender, {change_format, Format}).
 
+change_filename(Logger, Appender, Filename) ->
+    call_appender(Logger, Appender, {change_filename, Filename}).
+
 %%--------------------------------------------------------------------
 %% Logger API functions
 %%--------------------------------------------------------------------
 log(Logger, Level, Log, Data) ->
-    T = calendar:local_time(),
-    {_, _, Ms} = erlang:now(),
+    Now = {_, _, Ms} = timestamp(),
+    T = calendar:now_to_local_time(Now),
     ?LOG2("Logging:~n ~p ~p ~p ~p~n",[Logger, Level, Log, Data]),
-    LL = #log{level=Level, msg=Log, data=Data, time=T, millis = Ms},
+    LL = #log{level=Level, msg=Log, data=Data, time=T, millis = Ms div 1000},
     notify_logger(Logger, {log, LL}).
 
 notify_logger(Logger, Msg) ->
@@ -69,4 +76,13 @@ call_appender(Logger, Appender, Msg) ->
     catch
 	exit:noproc ->
 	    {error, no_such_logger}
+    end.
+    
+    
+    timestamp() ->
+    try
+	erlang:timestamp()
+    catch
+	error:undef ->
+	    erlang:now()
     end.

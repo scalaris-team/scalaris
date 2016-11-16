@@ -9,8 +9,9 @@ leex(File) ->
     case R of
 	{ok, Tokens, _} ->
 	    Tokens;
-	_ ->
-	    io:format("Error ~p~n",[R])
+	Error ->
+	    io:format("Error ~p~n",[R]),
+	    erlang:error(Error, [File])
     end.
 
 parse(Tokens) ->

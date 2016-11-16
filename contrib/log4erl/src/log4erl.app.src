@@ -1,0 +1,10 @@
+%% -*- mode: erlang -*-
+
+{application, log4erl,
+[{description, "Logger for erlang in the spirit of Log4J"},
+ {vsn, "0.9.0"},
+ {registered,[log4erl]},
+ {applications, [kernel,stdlib]},
+ {mod, {log4erl,[]}},
+ {start_phases, []}
+]}.

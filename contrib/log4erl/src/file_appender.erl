@@ -42,6 +42,14 @@ init({Dir, Fname, {Type, Max}, Rot, Suf, Level, Pattern} = _Conf) ->
     File = Dir ++ "/" ++ Fname ++ "." ++ Suf,
     {ok, Fd} = file:open(File, ?FILE_OPTIONS),
     Ltype = #log_type{type = Type, max = Max},
+
+    case Type of
+	time ->
+	    start_file_timer(Max);
+	_ ->
+	    ok
+    end,
+    
     % Check Rot >= 0
     Rot1 = case Rot < 0 of
 	       true ->
@@ -49,6 +57,7 @@ init({Dir, Fname, {Type, Max}, Rot, Suf, Level, Pattern} = _Conf) ->
 	       false ->
 		   Rot
 	   end,
+    
     ?LOG2("To parse format with customer format ~p~n",[Pattern]),
     {ok, Format} = log_formatter:parse(Pattern),
     ?LOG2("Adding format of ~p~n",[Format]),
@@ -93,10 +102,22 @@ handle_call({change_level, Level}, State) ->
     State2 = State#file_appender{level = Level},
     ?LOG2("Changed level to ~p~n",[Level]),
     {ok, ok, State2};
+handle_call({change_filename, Fname}, #file_appender{dir=Dir, suffix=Suf} = State) ->
+    ok = file:close(State#file_appender.fd),
+    File = Dir ++ "/" ++ Fname ++ "." ++ Suf,
+    {ok, Fd} = file:open(File, ?FILE_OPTIONS),
+    State2 = State#file_appender{file_name = Fname, fd = Fd},
+    ?LOG2("Changed filename to ~p~n",[File]),
+    {ok, ok, State2};
 handle_call(_Request, State) ->
     Reply = ok,
     {ok, Reply, State}.
 
+handle_info(rotate_timer, #file_appender{log_type=#log_type{max=Max}} = State) ->
+    ?LOG2("rotate_timer msg is received", []),
+    {ok, State2} = rotate(State),
+    start_file_timer(Max),
+    {ok, State2};
 handle_info(_Info, State) ->
     ?LOG2("~w received unknown message: ~p~n", [?MODULE, _Info]),
     {ok, State}.
@@ -157,8 +178,18 @@ check_rotation(State) ->
 		true ->
 		    State
 	    end;
-	%% time-based rotation is not implemented yet
+	%% time-based rotation is implemented in a seperate process
 	_ ->
 	    State
     end.
 
+start_file_timer(Max) ->
+    Self = self(),
+    ?LOG("starting file timer"),
+    spawn_link(fun() ->
+		       %% time is in seconds
+		       timer:sleep(Max*1000),
+		       Self ! rotate_timer
+	       end),
+    ok.
+		       

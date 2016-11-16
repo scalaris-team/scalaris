@@ -1,18 +1,13 @@
-SRC = src
+all: compile
 
-all:    subdirs
+depends:
+	./rebar get-deps
+	./rebar update-deps
 
-subdirs: 
-	cd ${SRC}; make
+compile:
+	./rebar compile
 
-# remove all the code
-clean: 
-	rm -rf ebin/*.beam erl_crash.dump
-	rm -f *~
-	rm -f src/*~
-	rm -f ebin/*~
-	rm -f include/*~
-	cd ${SRC}; make clean
+clean:
+	./rebar clean
 
-#install:
-#        cp -f ebin/* ../../www/ebin
+.PHONY: all depends compile

@@ -89,6 +89,12 @@ handle_call({change_level, Level}, State) ->
     State2 = State#xml_appender{level = Level},
     ?LOG2("Changed level to ~p~n",[Level]),
     {ok, ok, State2};
+handle_call({change_filename, Fname}, #xml_appender{dir=Dir, suffix=Suf} = State) ->
+    File = Dir ++ "/" ++ Fname ++ "." ++ Suf,
+    {ok, Fd} = file:open(File, ?FILE_OPTIONS),
+    State2 = State#xml_appender{file_name = Fname, fd = Fd},
+    ?LOG2("Changed filename to ~p~n",[File]),
+    {ok, ok, State2};
 handle_call(_Request, State) ->
     Reply = ok,
     {ok, Reply, State}.

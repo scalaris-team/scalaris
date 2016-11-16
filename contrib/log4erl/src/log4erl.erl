@@ -10,6 +10,7 @@
 %% API
 -export([change_log_level/1, change_log_level/2]).
 -export([change_level/2, change_level/3]).
+-export([change_filename/2, change_filename/3]).
 -export([add_logger/1, conf/1]).
 -export([add_appender/2, add_appender/3]).
 -export([add_file_appender/2, add_file_appender/3]).
@@ -110,6 +111,12 @@ change_level(Appender, Level) ->
 
 change_level(Logger, Appender, Level) ->
     try_msg({change_level, Logger, Appender, Level}).
+
+change_filename(Appender, Filename) ->
+    try_msg({change_filename, ?DEFAULT_LOGGER, Appender, Filename}).
+
+change_filename(Logger, Appender, Filename) ->
+    try_msg({change_filename, Logger, Appender, Filename}).
 
 error_logger_handler() ->
     error_logger_log4erl_h:add_handler().
@@ -212,6 +219,8 @@ handle_call({change_log_level, Logger, Level}) ->
     log_manager:change_log_level(Logger, Level);
 handle_call({change_format, Logger, Appender, Format}) ->
     log_manager:change_format(Logger, Appender, Format);
+handle_call({change_filename, Logger, Appender, Filename}) ->
+    log_manager:change_filename(Logger, Appender, Filename);
 handle_call({log, Logger, Level, Log, Data}) ->
     log_manager:log(Logger, Level, Log, Data).
 

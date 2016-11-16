@@ -8,14 +8,39 @@
 
 test() ->
     Log = #log{level = warn,
-	              msg = "logging message for testing purposes ~p",
-	              data = [tt],
-	              time = calendar:local_time()},
-    %Ts = "%j %T [%L] - %l %n",
+	       msg = "logging message for testing purposes ~p",
+	       data = [tt],
+	       time = calendar:local_time()},
     Ts = "[%L] %l%n",
     {ok, Tokens} = parse(Ts),
-        T = format(Log, Tokens),
-        io:format("~s",[T]).
+    T = format(Log, Tokens),
+    io:format("~s",[T]).
+
+test_dst() ->
+    HourSwitchingFromDST = {{2012,10,28},{2,13,37}},
+    HourSwitchingToDST = {{2013,03,31},{2,13,37}},
+    Log1 = #log{level = warn,
+	       msg = "Testing logging during switch FROM DST! ~p",
+	       data = [tt],
+	       time = HourSwitchingFromDST,
+               millis = 111},
+    Log2 = #log{level = warn,
+	       msg = "Testing logging during switch TO DST! ~p",
+	       data = [tt],
+	       time = HourSwitchingToDST,
+               millis = 111},
+    FormatTokens = fun(Ts) ->
+                           {ok, Tokens} = parse(Ts),
+                           T1 = format(Log1, Tokens),
+                           T2 = format(Log2, Tokens),
+                           io:format("~s",[T1]),
+                           io:format("~s",[T2])
+                   end,
+    lists:map(FormatTokens, ["[%I] %l%n", %% iso_format
+                             "[%S] %l%n", %% iso_format2
+                             "[%Z] %l%n"  %% time_zone
+                            ]),
+    ok.
 
 test2(Num) ->
     Ts = "%j %T [%L] - %l",
@@ -45,6 +70,7 @@ make_log(Level, Msg, Data) ->
 format(Log, Tokens) ->
     ?LOG2("log_formatter formatting log: ~p~n",[Log]),
     F = fun(X) ->
+		?LOG2("X == ~p and Log = ~p~n",[X,Log]),
 		M = get_token_value(X,Log),
 		M
 	end,
@@ -77,7 +103,7 @@ get_token_value(time, Log) ->
     {_,{H, M, S}} = D,
     [A,B,C] = lists:map(
 		fun(X) ->
-			integer_to_list(X)
+			log4erl_utils:return_2columns(integer_to_list(X))
 		end,
 		[H,M,S]),    
     Res = A ++ ":" ++ B ++ ":" ++ C,
@@ -86,12 +112,13 @@ get_token_value(time2, Log) ->
     D = Log#log.time,
     Ms = Log#log.millis,
     {_,{H, M, S}} = D,
-    [A,B,C,E] = lists:map(
+    [A,B,C] = lists:map(
 		fun(X) ->
 			X2 = integer_to_list(X),
 			log4erl_utils:return_2columns(X2)
 		end,
-		[H,M,S, Ms]),    
+		[H,M,S]),
+    E = log4erl_utils:return_Ncolumns(integer_to_list(Ms), 3),
     Res = A ++ ":" ++ B ++ ":" ++ C ++ "." ++ E,
     Res;
 get_token_value(year4, Log) ->
@@ -130,7 +157,7 @@ get_token_value(second, Log) ->
     integer_to_list(S);
 get_token_value(millis, Log) ->
     Ms = Log#log.millis,
-    integer_to_list(Ms);
+    log4erl_utils:return_Ncolumns(integer_to_list(Ms), 3);
 get_token_value(log, Log) ->
     Msg = Log#log.msg,
     Data = Log#log.data,
@@ -141,13 +168,14 @@ get_token_value(new_line, _Log) ->
     "\n";
 % GMT TZ
 get_token_value(iso_format, Log) ->
-    [Date] = calendar:local_time_to_universal_time_dst(Log#log.time),
-    get_token_value(date2, Log) ++ "T" ++ get_token_value(time2, Log#log{time=Date}) ++ "Z";
+    Date = local_time_to_pseudo_universal_time_dst(Log#log.time),
+    get_token_value(date2, Log) ++ "T" ++
+        get_token_value(time2, Log#log{time=Date}) ++ "Z";
 % With TZ
 get_token_value(iso_format2, Log) ->
-    D = Log#log.time,
-    [UD] = calendar:local_time_to_universal_time_dst(D),
-    Ds = calendar:datetime_to_gregorian_seconds(D),
+    Date = Log#log.time,
+    UD = local_time_to_pseudo_universal_time_dst(Date),
+    Ds = calendar:datetime_to_gregorian_seconds(Date),
     UDs = calendar:datetime_to_gregorian_seconds(UD),
     TZ = case Ds-UDs > 0 of
 	     true ->
@@ -164,9 +192,9 @@ get_token_value(iso_format2, Log) ->
     get_token_value(date2, Log) ++ "T" ++ get_token_value(time2, Log) ++ TZ;
 % TZ only
 get_token_value(time_zone, Log) ->
-    D = Log#log.time,
-    [UD] = calendar:local_time_to_universal_time_dst(D),
-    Ds = calendar:datetime_to_gregorian_seconds(D),
+    Date = Log#log.time,
+    UD = local_time_to_pseudo_universal_time_dst(Date),
+    Ds = calendar:datetime_to_gregorian_seconds(Date),
     UDs = calendar:datetime_to_gregorian_seconds(UD),
     TZ = case Ds-UDs > 0 of
 	     true ->
@@ -253,3 +281,11 @@ parse_char($Z) ->
 parse_char(C) ->
     C.
 
+%% Always log a time, even though corresponding UTC time during periods
+%% switching TO or FROM DST may not make sense.
+local_time_to_pseudo_universal_time_dst(DateTime1) ->
+    case calendar:local_time_to_universal_time_dst(DateTime1) of
+        [] -> DateTime1;
+        [DstDateTimeUTC, _DateTimeUTC] -> DstDateTimeUTC;
+        [DateTimeUTC] -> DateTimeUTC
+    end.

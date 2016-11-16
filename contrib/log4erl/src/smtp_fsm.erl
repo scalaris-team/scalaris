@@ -108,7 +108,7 @@ hexit(Int) ->
 %% generates MD5 mac and returns as hex string
 md5_hmac(Challenge,Pwd) ->
     crypto:start(),
-    Md5_bin = crypto:md5_mac(Pwd,Challenge),
+    Md5_bin = crypto:hmac(md5, Pwd, Challenge),
     crypto:stop(),
     hexdigest(Md5_bin).
 

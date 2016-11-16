@@ -1,6 +1,7 @@
 -module(log4erl_utils).
 
--export([gen_log_txt/1,return_2columns/1, get_current_time/1, to_log/2]).
+-export([gen_log_txt/1,return_2columns/1, return_Ncolumns/2]).
+-export([get_current_time/1, to_log/2]).
 -export([get_id/0, get_month_name/1, get_month_long_name/1]).
 -export([to_atom/1, to_list/1, to_int/1]).
 
@@ -21,10 +22,13 @@ gen_log_txt(L) when is_list(L) ->
 
 % a function to format date/time properly (e.g. 09 instead of 9)
 return_2columns(X) ->
-    case string:len(X) of
-	1 ->
-	    "0" ++ X;
-	_ ->
+    return_Ncolumns(X, 2).
+
+return_Ncolumns(X, N) ->
+    Len = string:len(X),
+    if Len < N ->
+	    string:chars($0, N - Len) ++ X;
+	true ->
 	    X
     end.
 
@@ -32,10 +36,10 @@ return_2columns(X) ->
 %get_current_time() ->
 get_current_time({{Y, M, D}, {H, Mi, S}}) ->
     %{{Y, M, D}, {H, Mi, S}} = calendar:local_time(),
-    L = lists:map(fun(X) -> 
-			  X2=integer_to_list(X), 
-			  return_2columns(X2) 
-		  end, 
+    L = lists:map(fun(X) ->
+			  X2=integer_to_list(X),
+			  return_2columns(X2)
+		  end,
 		  [Y, M, D, H, Mi, S]
 		 ),
     [Y2, M2, D2, H2, Mi2, S2] = L,
@@ -44,21 +48,26 @@ get_current_time({{Y, M, D}, {H, Mi, S}}) ->
 %% DEBUG <- INFO <- WARN <- ERROR <- FATAL
 %% user defined levels are always logged
 to_log(Cur, Level) ->
-    case Level of
-	debug ->
-	    true;
-	info ->
-	    ((Cur == info) or (Cur == warn) or (Cur == error) or (Cur == fatal));
-	warn ->
-	    ((Cur == warn) or (Cur == error) or (Cur == fatal));
-	error ->
-	    ((Cur == error) or (Cur == fatal));
-	fatal ->
-	    (Cur == fatal);
-	none ->
-	    false;
-	_ ->
-	    true
+    case lists:member(Cur, [debug, info, warn, error, fatal]) of
+        true ->
+            case Level of
+                debug ->
+                    true;
+                info ->
+                    ((Cur == info) or (Cur == warn) or (Cur == error) or (Cur == fatal));
+                warn ->
+                    ((Cur == warn) or (Cur == error) or (Cur == fatal));
+                error ->
+                    ((Cur == error) or (Cur == fatal));
+                fatal ->
+                    (Cur == fatal);
+                none ->
+                    false;
+                _ ->
+                    true
+            end;
+        _ ->
+            true
     end.
 
 get_id() ->
