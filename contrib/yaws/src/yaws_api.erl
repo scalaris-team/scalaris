@@ -583,6 +583,7 @@ code_to_phrase(426) -> "Upgrade Required";
 code_to_phrase(428) -> "Precondition Required";
 code_to_phrase(429) -> "Too Many Requests";
 code_to_phrase(431) -> "Request Header Fields Too Large";
+code_to_phrase(451) -> "Unavailable For Legal Reasons";
 code_to_phrase(500) -> "Internal Server Error";
 code_to_phrase(501) -> "Not Implemented";
 code_to_phrase(502) -> "Bad Gateway";
@@ -601,7 +602,6 @@ code_to_phrase(511) -> "Network Authentication Required";
 %% sticking with the HTTP status codes above for maximal portability and
 %% interoperability.
 %%
-code_to_phrase(451) -> "Requested Action Aborted";   % from FTP (RFC 959)
 code_to_phrase(452) -> "Insufficient Storage Space"; % from FTP (RFC 959)
 code_to_phrase(453) -> "Not Enough Bandwidth".       % from RTSP (RFC 2326)
 
@@ -878,32 +878,28 @@ url_decode_q_split([], Ack) ->
     {path_norm_reverse(Ack), []}.
 
 
+url_encode(URL) when is_list(URL) ->
+    Bin = case file:native_name_encoding() of
+              latin1 -> list_to_binary(URL);
+              utf8   -> unicode:characters_to_binary(URL)
+          end,
+    %% ReservedChars = "!*'();:@&=+$,/?%#[]",
+    UnreservedChars = sets:from_list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                     "abcdefghijklmnopqrstuvwxyz"
+                                     "0123456789-_.~"),
+    flatten([url_encode_byte(Byte, UnreservedChars) || <<Byte>> <= Bin]).
 
-url_encode([H|T]) when is_list(H) ->
-    [url_encode(H) | url_encode(T)];
-url_encode([H|T]) ->
-    if
-        H >= $a, $z >= H ->
-            [H|url_encode(T)];
-        H >= $A, $Z >= H ->
-            [H|url_encode(T)];
-        H >= $0, $9 >= H ->
-            [H|url_encode(T)];
-        H == $_; H == $.; H == $-; H == $/; H == $: -> % FIXME: more..
-            [H|url_encode(T)];
-        true ->
-            case yaws:integer_to_hex(H) of
-                [X, Y] ->
-                    [$%, X, Y | url_encode(T)];
-                [X] ->
-                    [$%, $0, X | url_encode(T)]
+url_encode_byte($:, _) -> $:;  % FIXME: both : and / should be encoded, but
+url_encode_byte($/, _) -> $/;  % too much code currently assumes they're not
+url_encode_byte(Byte, UnreservedChars) ->
+    case sets:is_element(Byte, UnreservedChars) of
+        true -> Byte;
+        false ->
+            case yaws:integer_to_hex(Byte) of
+                [X, Y] -> [$%, X, Y];
+                [X]    -> [$%, $0, X]
             end
-     end;
-
-url_encode([]) ->
-    [].
-
-
+    end.
 
 redirect(Url) -> [{redirect, Url}].
 
@@ -1018,6 +1014,10 @@ stream_process_end(Sock, YawsPid) ->
     YawsPid ! endofstreamcontent.
 
 
+websocket_send(#ws_state{}=WSState, {Type, Data}) ->
+    yaws_websockets:send(WSState, {Type, Data});
+websocket_send(#ws_state{}=WSState, #ws_frame{}=Frame) ->
+    yaws_websockets:send(WSState, Frame);
 %% Pid must be the process in control of the websocket connection.
 websocket_send(Pid, {Type, Data}) when is_pid(Pid) ->
     yaws_websockets:send(Pid, {Type, Data});
@@ -2615,7 +2615,7 @@ setconf(GC0, Groups0, CheckCertsChanged) ->
         {true, true} ->
             yaws_config:soft_setconf(GC, Groups2, OLDGC, OldGroups);
         {true, false} ->
-            yaws_config:hard_setconf(GC, Groups2);
+            ok = yaws_config:hard_setconf(GC, Groups2);
         _ ->
             {error, need_restart}
     end.

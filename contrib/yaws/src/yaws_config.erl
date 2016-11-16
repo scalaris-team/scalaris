@@ -15,23 +15,17 @@
 
 -include_lib("kernel/include/file.hrl").
 
--ifndef(HAVE_BAD_WILDCARD).
--define(WILDCARD_SUPPORTED, true).
--else.
--define(WILDCARD_SUPPORTED, false).
--endif.
-
 -define(NEXTLINE, io_get_line(FD, '', [])).
 
 -export([load/1,
-         make_default_gconf/2, make_default_sconf/0, make_default_sconf/2,
+         make_default_gconf/2, make_default_sconf/0, make_default_sconf/3,
          add_sconf/1,
          add_yaws_auth/1,
          add_yaws_soap_srv/1, add_yaws_soap_srv/2,
          load_mime_types_module/2,
          compile_and_load_src_dir/1,
-         search_sconf/2, search_group/2,
-         update_sconf/3, delete_sconf/2,
+         search_sconf/3, search_group/3,
+         update_sconf/4, delete_sconf/3,
          eq_sconfs/2, soft_setconf/4, hard_setconf/2,
          can_hard_gc/2, can_soft_setconf/4,
          can_soft_gc/2, verify_upgrade_args/2, toks/2]).
@@ -273,11 +267,43 @@ parse_yaws_auth_file([{file, File}|T], Auth0) ->
 
 parse_yaws_auth_file([{User, Password}|T], Auth0)
   when is_list(User), is_list(Password) ->
-    Users = case lists:member({User,Password}, Auth0#auth.users) of
+    Salt = yaws_dynopts:rand_bytes(32),
+    Hash = crypto:hash(sha256, [Salt, Password]),
+    Users = case lists:member({User, sha256, Salt, Hash}, Auth0#auth.users) of
                 true  -> Auth0#auth.users;
-                false -> [{User, Password} | Auth0#auth.users]
+                false -> [{User, sha256, Salt, Hash} | Auth0#auth.users]
             end,
     parse_yaws_auth_file(T, Auth0#auth{users = Users});
+
+parse_yaws_auth_file([{User, Algo, B64Hash}|T], Auth0)
+  when is_list(User), is_list(Algo), is_list(B64Hash) ->
+    case parse_auth_user(User, Algo, "", B64Hash) of
+        {ok, Res} ->
+            Users = case lists:member(Res, Auth0#auth.users) of
+                        true  -> Auth0#auth.users;
+                        false -> [Res | Auth0#auth.users]
+                    end,
+            parse_yaws_auth_file(T, Auth0#auth{users = Users});
+        {error, Reason} ->
+            error_logger:format("Failed to parse user line ~p: ~p~n",
+                                [{User, Algo, B64Hash}, Reason]),
+            parse_yaws_auth_file(T, Auth0)
+    end;
+
+parse_yaws_auth_file([{User, Algo, B64Salt, B64Hash}|T], Auth0)
+  when is_list(User), is_list(Algo), is_list(B64Salt), is_list(B64Hash) ->
+    case parse_auth_user(User, Algo, B64Salt, B64Hash) of
+        {ok, Res} ->
+            Users = case lists:member(Res, Auth0#auth.users) of
+                        true  -> Auth0#auth.users;
+                        false -> [Res | Auth0#auth.users]
+                    end,
+            parse_yaws_auth_file(T, Auth0#auth{users = Users});
+        {error, Reason} ->
+            error_logger:format("Failed to parse user line ~p: ~p~n",
+                                [{User, Algo, B64Hash, B64Hash}, Reason]),
+            parse_yaws_auth_file(T, Auth0)
+    end;
 
 parse_yaws_auth_file([{allow, all}|T], Auth0) ->
     Auth1 = case Auth0#auth.acl of
@@ -429,12 +455,15 @@ compile_and_load_src_dir(Dir, [Entry0|Rest], Opts) ->
 compile_module_src_dir(File, Opts) ->
     case catch compile:file(File, Opts) of
         {ok, Mod, Bin} ->
-            error_logger:format("Compiled ~p~n", [File]),
+            error_logger:info_msg("Compiled ~p~n", [File]),
+            load_src_dir(File, Mod, Bin);
+        {ok, Mod, Bin, []} ->
+            error_logger:info_msg("Compiled ~p [0 Errors - 0 Warnings]~n", [File]),
             load_src_dir(File, Mod, Bin);
         {ok, Mod, Bin, Warnings} ->
             WsMsg = [format_compile_warns(W,[]) || W <- Warnings],
-            error_logger:format("Compiled ~p [~p Errors - ~p Warnings]~n~s",
-                                [File,0,length(WsMsg),WsMsg]),
+            error_logger:warning_msg("Compiled ~p [~p Errors - ~p Warnings]~n~s",
+                                     [File,0,length(WsMsg),WsMsg]),
             load_src_dir(File, Mod, Bin);
         {error, [], Warnings} ->
             WsMsg = [format_compile_warns(W,[]) || W <- Warnings],
@@ -491,7 +520,7 @@ validate_cs(GC, Cs) ->
                   end, Cs),
     L2 = lists:map(fun(X) -> element(2, X) end, lists:keysort(1,L)),
     L3 = arrange(L2, start, [], []),
-    case validate_groups(L3) of
+    case validate_groups(GC, L3) of
         ok ->
             {ok, GC, L3};
         Err ->
@@ -499,17 +528,17 @@ validate_cs(GC, Cs) ->
     end.
 
 
-validate_groups([]) ->
+validate_groups(_, []) ->
     ok;
-validate_groups([H|T]) ->
-    case (catch validate_group(H)) of
+validate_groups(GC, [H|T]) ->
+    case (catch validate_group(GC, H)) of
         ok ->
-            validate_groups(T);
+            validate_groups(GC, T);
         Err ->
             Err
     end.
 
-validate_group(List) ->
+validate_group(GC, List) ->
     [SC0|SCs] = List,
 
     %% all servers with the same IP/Port must share the same tcp configuration
@@ -524,13 +553,43 @@ validate_group(List) ->
                              " configuration: ~p", [SC0#sconf.servername])})
     end,
 
-    %% all servers with the same IP/Port must share the same ssl configuration
-    case lists:all(fun(SC) -> SC#sconf.ssl == SC0#sconf.ssl end, SCs) of
+    %% If the default servers (the first one) is not an SSL server:
+    %%    all servers  with the same IP/Port must be non-SSL server
+    %% If SNI is disabled or not supported:
+    %%    all servers with the same IP/Port must share the same SSL config
+    %% If SNI is enabled:
+    %%    TLS protocol must be supported by the default servers (the first one)
+    if
+        SC0#sconf.ssl == undefined ->
+            case lists:all(fun(SC) -> SC#sconf.ssl == SC0#sconf.ssl end, SCs) of
+                true  -> ok;
+                false ->
+                    throw({error, ?F("All servers in the same group than"
+                                     " ~p must have no SSL configuration",
+                                     [SC0#sconf.servername])})
+            end;
+        GC#gconf.sni == disable ->
+            case lists:all(fun(SC) -> SC#sconf.ssl == SC0#sconf.ssl end, SCs) of
+                true  -> ok;
+                false ->
+                    throw({error, ?F("SNI is disabled, all servers in the same"
+                                     " group than ~p must share the same ssl"
+                                     " configuration",
+                                     [SC0#sconf.servername])})
+            end;
+
         true ->
-            ok;
-        false ->
-            throw({error, ?F("Servers in the same group must share the same ssl"
-                             " configuration: ~p", [SC0#sconf.servername])})
+            Vs = case (SC0#sconf.ssl)#ssl.protocol_version of
+                     undefined -> proplists:get_value(available,ssl:versions());
+                     L         -> L
+                 end,
+            F = fun(V) -> lists:member(V, ['tlsv1.2','tlsv1.1',tlsv1]) end,
+            case lists:any(F, Vs) of
+                true -> ok;
+                false ->
+                    throw({error, ?F("SNI is enabled, the server ~p must enable"
+                                     " TLS protocol", [SC0#sconf.servername])})
+            end
     end,
 
     %% all servernames in a group must be unique
@@ -548,33 +607,42 @@ no_two_same([]) ->
 
 
 arrange([C|Tail], start, [], B) ->
-    arrange(Tail, {in, C}, [set_server(C)], B);
+    C1 = set_server(C),
+    arrange(Tail, {in, C1}, [C1], B);
 arrange([], _, [], B) ->
     B;
 arrange([], _, A, B) ->
     [lists:reverse(A) | B];
-arrange([C1|Tail], {in, C0}, A, B) ->
+arrange([C|Tail], {in, C0}, A, B) ->
+    C1 = set_server(C),
     if
         C1#sconf.listen == C0#sconf.listen,
         C1#sconf.port == C0#sconf.port ->
-            arrange(Tail, {in, C0}, [set_server(C1)|A], B);
+            arrange(Tail, {in, C0}, [C1|A], B);
         true ->
-            arrange(Tail, {in, C1}, [set_server(C1)], [lists:reverse(A)|B])
+            arrange(Tail, {in, C1}, [C1], [lists:reverse(A)|B])
     end.
 
 
 set_server(SC) ->
-    case {SC#sconf.ssl, SC#sconf.port, ?sc_has_add_port(SC)} of
+    SC1 = if
+              SC#sconf.port == 0 ->
+                  {ok, P} = yaws:find_private_port(),
+                  SC#sconf{port=P};
+              true ->
+                  SC
+          end,
+    case {SC1#sconf.ssl, SC1#sconf.port, ?sc_has_add_port(SC1)} of
         {undefined, 80, _} ->
-            SC;
+            SC1;
         {undefined, Port, true} ->
-            add_port(SC, Port);
+            add_port(SC1, Port);
         {_SSL, 443, _} ->
-            SC;
+            SC1;
         {_SSL, Port, true} ->
-            add_port(SC, Port);
+            add_port(SC1, Port);
         {_,_,_} ->
-            SC
+            SC1
     end.
 
 
@@ -626,17 +694,20 @@ make_default_gconf(Debug, Id) ->
 %% Keep this function for backward compatibility. But no one is supposed to use
 %% it (yaws_config is an internal module, its api is private).
 make_default_sconf() ->
-    make_default_sconf([], undefined).
+    make_default_sconf([], undefined, undefined).
 
-make_default_sconf([], Port) ->
-    make_default_sconf(filename:join([yaws_dir(), "www"]), Port);
-make_default_sconf(DocRoot, undefined) ->
-    make_default_sconf(DocRoot, 8000);
-make_default_sconf(DocRoot, Port) ->
+make_default_sconf([], Servername, Port) ->
+    make_default_sconf(filename:join([yaws_dir(), "www"]), Servername, Port);
+make_default_sconf(DocRoot, undefined, Port) ->
+    make_default_sconf(DocRoot, "localhost", Port);
+make_default_sconf(DocRoot, Servername, undefined) ->
+    make_default_sconf(DocRoot, Servername, 8000);
+make_default_sconf(DocRoot, Servername, Port) ->
     AbsDocRoot = filename:absname(DocRoot),
     case is_dir(AbsDocRoot) of
         true ->
-            set_server(#sconf{port=Port,listen={127,0,0,1},docroot=AbsDocRoot});
+            set_server(#sconf{port=Port, servername=Servername,
+                              listen={127,0,0,1},docroot=AbsDocRoot});
         false ->
             throw({error, ?F("Invalid docroot: directory ~s does not exist",
                              [AbsDocRoot])})
@@ -1030,14 +1101,12 @@ fload(FD, GC, Cs, Lno, Chars) ->
              ),
             fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
-        ["use_old_ssl", '=',  Bool] ->
-            case is_bool(Bool) of
-                {true, Val} ->
-                    fload(FD, ?gc_set_use_old_ssl(GC,Val), Cs,
-                          Lno+1, ?NEXTLINE);
-                false ->
-                    {error, ?F("Expect true|false at line ~w", [Lno])}
-            end;
+        ["use_old_ssl", '=',  _Bool] ->
+            %% feature removed
+            error_logger:format(
+              "use_old_ssl in yaws.conf is no longer supported - ignoring\n",[]
+             ),
+            fload(FD, GC, Cs, Lno+1, ?NEXTLINE);
 
         ["use_large_ssl_pool", '=',  _Bool] ->
             %% just ignore - not relevant any longer
@@ -1058,6 +1127,24 @@ fload(FD, GC, Cs, Lno, Chars) ->
             Ysession_mod = list_to_atom(Mod_str),
             fload(FD, GC#gconf{ysession_mod = Ysession_mod}, Cs,
                   Lno+1, ?NEXTLINE);
+
+        ["ysession_idle_timeout", '=', YsessionIdle] ->
+            case (catch list_to_integer(YsessionIdle)) of
+                I when is_integer(I), I > 0 ->
+                    fload(FD, GC#gconf{ysession_idle_timeout = I}, Cs,
+                          Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect positive integer at line ~w",[Lno])}
+            end;
+
+        ["ysession_long_timeout", '=', YsessionLong] ->
+            case (catch list_to_integer(YsessionLong)) of
+                I when is_integer(I), I > 0 ->
+                    fload(FD, GC#gconf{ysession_long_timeout = I}, Cs,
+                          Lno+1, ?NEXTLINE);
+                _ ->
+                    {error, ?F("Expect positive integer at line ~w",[Lno])}
+            end;
 
         ["server_signature", '=', Signature] ->
             fload(FD, GC#gconf{yaws=Signature}, Cs, Lno+1, ?NEXTLINE);
@@ -1124,6 +1211,25 @@ fload(FD, GC, Cs, Lno, Chars) ->
                           Lno+1, ?NEXTLINE);
                 {error, Str} ->
                     {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
+
+        ["sni", '=', Sni] ->
+            if
+                Sni == "disable" ->
+                    fload(FD, GC#gconf{sni=disable}, Cs, Lno+1, ?NEXTLINE);
+
+                Sni == "enable" orelse Sni == "strict" ->
+                    case yaws_dynopts:have_ssl_sni() of
+                        true ->
+                            fload(FD, GC#gconf{sni=list_to_atom(Sni)}, Cs, Lno+1,
+                                  ?NEXTLINE);
+                        _ ->
+                            error_logger:info_msg("Warning, sni option is not"
+                                                  " supported at line ~w~n", [Lno]),
+                            fload(FD, GC, Cs, Lno+1, ?NEXTLINE)
+                    end;
+                true ->
+                    {error, ?F("Expect disable|enable|strict at line ~w",[Lno])}
             end;
 
         ['<', "server", Server, '>'] ->
@@ -1838,18 +1944,30 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
             end;
 
         ["verify", '=', Val0] ->
-            Val = try
-                      list_to_integer(Val0)
-                  catch error:badarg ->
-                          list_to_atom(Val0)
-                  end,
-            case lists:member(Val, [0,1,2,verify_peer,verify_none]) of
-                true ->
-                    C1 = C#sconf{ssl = (C#sconf.ssl)#ssl{verify = Val}},
-                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
-                _ ->
+            Fail0 = (C#sconf.ssl)#ssl.fail_if_no_peer_cert,
+            {Val, Fail} = try
+                              case list_to_integer(Val0) of
+                                  0 -> {verify_none, Fail0};
+                                  1 -> {verify_peer, false};
+                                  2 -> {verify_peer, true};
+                                  _ -> {error, Fail0}
+                              end
+                          catch error:badarg ->
+                                  case list_to_atom(Val0) of
+                                      verify_none -> {verify_none, Fail0};
+                                      verify_peer -> {verify_peer, Fail0};
+                                      _           -> {error, Fail0}
+                                  end
+                          end,
+            case Val of
+                error ->
                     {error, ?F("Expect integer or verify_none, "
-                               "verify_peer at line ~w", [Lno])}
+                               "verify_peer at line ~w", [Lno])};
+                _ ->
+                    SSL = (C#sconf.ssl)#ssl{verify=Val,
+                                            fail_if_no_peer_cert=Fail},
+                    C1 = C#sconf{ssl=SSL},
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE)
             end;
 
         ["fail_if_no_peer_cert", '=', Bool] ->
@@ -1901,8 +2019,7 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
             end;
 
         ["client_renegotiation", '=', Bool] ->
-            %% below, ignore dialyzer warning:
-            case ?SSL_CLIENT_RENEGOTIATION of
+            case yaws_dynopts:have_ssl_client_renegotiation() of
                 true ->
                     case is_bool(Bool) of
                         {true, Val} ->
@@ -1919,8 +2036,7 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
             end;
 
         ["honor_cipher_order", '=', Bool] ->
-            %% below, ignore dialyzer warning:
-            case ?HONOR_CIPHER_ORDER of
+            case yaws_dynopts:have_ssl_honor_cipher_order() of
                 true ->
                     case is_bool(Bool) of
                         {true, Val} ->
@@ -1947,6 +2063,17 @@ fload(FD, ssl, GC, C, Lno, Chars) ->
                 fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE)
             catch _:_ ->
                     {error, ?F("Bad ssl protocol_version at line ~w", [Lno])}
+            end;
+
+        ["require_sni", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C1 = C#sconf{
+                           ssl=(C#sconf.ssl)#ssl{require_sni=Val}
+                          },
+                    fload(FD, ssl, GC, C1, Lno+1, ?NEXTLINE);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
         ['<', "/ssl", '>'] ->
@@ -2003,13 +2130,15 @@ fload(FD, server_auth, GC, C, Lno, Chars) ->
             fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
 
         ["user", '=', User] ->
-            case (catch string:tokens(User, ":")) of
-                [Name, Passwd] ->
-                    Auth1 = Auth#auth{users = [{Name, Passwd}|Auth#auth.users]},
+            case parse_auth_user(User, Lno) of
+                {Name, Algo, Salt, Hash} ->
+                    Auth1 = Auth#auth{
+                              users = [{Name, Algo, Salt, Hash}|Auth#auth.users]
+                             },
                     C1 = C#sconf{authdirs=[Auth1|AuthDirs]},
                     fload(FD, server_auth, GC, C1, Lno+1, ?NEXTLINE);
-                _ ->
-                    {error, ?F("Invalid user at line ~w", [Lno])}
+                {error, Str} ->
+                    {error, Str}
             end;
 
         ["allow", '=', "all"] ->
@@ -2872,7 +3001,6 @@ parse_redirect(_Path, _, _Mode, Lno) ->
     {error, ?F("Bad redirect rule at line ~w", [Lno])}.
 
 
-
 ssl_start() ->
     case catch ssl:start() of
         ok ->
@@ -2888,10 +3016,10 @@ ssl_start() ->
 %% search for an SC within Pairs that have the same, listen,port,ssl,severname
 %% Return {Pid, SC, Scs} or false
 %% Pairs is the pairs in yaws_server #state{}
-search_sconf(NewSC, Pairs) ->
+search_sconf(GC, NewSC, Pairs) ->
     case lists:zf(
            fun({Pid, Scs = [SC|_]}) ->
-                   case same_virt_srv(NewSC, SC) of
+                   case same_virt_srv(GC, NewSC, SC) of
                        true ->
                            case lists:keysearch(NewSC#sconf.servername,
                                                 #sconf.servername, Scs) of
@@ -2915,9 +3043,9 @@ search_sconf(NewSC, Pairs) ->
     end.
 
 %% find the group a new SC would belong to
-search_group(SC, Pairs) ->
+search_group(GC, SC, Pairs) ->
     Fun =  fun({Pid, [S|Ss]}) ->
-                   case same_virt_srv(S, SC) of
+                   case same_virt_srv(GC, S, SC) of
                        true ->
                            {true, {Pid, [S|Ss]}};
                        false ->
@@ -2929,10 +3057,10 @@ search_group(SC, Pairs) ->
 
 
 %% Return a new Pairs list with one SC updated
-update_sconf(NewSc, Pos, Pairs) ->
+update_sconf(Gc, NewSc, Pos, Pairs) ->
     lists:map(
       fun({Pid, Scs}) ->
-              case same_virt_srv(hd(Scs), NewSc) of
+              case same_virt_srv(Gc, hd(Scs), NewSc) of
                   true ->
                       L2 = lists:keydelete(NewSc#sconf.servername,
                                            #sconf.servername, Scs),
@@ -2944,10 +3072,10 @@ update_sconf(NewSc, Pos, Pairs) ->
 
 
 %% return a new pairs list with SC removed
-delete_sconf(OldSc, Pairs) ->
+delete_sconf(Gc, OldSc, Pairs) ->
     lists:zf(
       fun({Pid, Scs}) ->
-              case same_virt_srv(hd(Scs), OldSc) of
+              case same_virt_srv(Gc, hd(Scs), OldSc) of
                   true ->
                       L2 = lists:keydelete(OldSc#sconf.servername,
                                            #sconf.servername, Scs),
@@ -2960,12 +3088,17 @@ delete_sconf(OldSc, Pairs) ->
 
 
 
-same_virt_srv(S, NewSc) when
-      S#sconf.listen == NewSc#sconf.listen,
-      S#sconf.port == NewSc#sconf.port,
-      S#sconf.ssl == NewSc#sconf.ssl ->
-    true;
-same_virt_srv(_,_) ->
+same_virt_srv(Gc, S, NewSc) when S#sconf.listen == NewSc#sconf.listen,
+                                 S#sconf.port == NewSc#sconf.port ->
+    if
+        Gc#gconf.sni == disable orelse
+        S#sconf.ssl == undefined orelse
+        NewSc#sconf.ssl == undefined ->
+            (S#sconf.ssl == NewSc#sconf.ssl);
+        true ->
+            true
+    end;
+same_virt_srv(_,_,_) ->
     false.
 
 
@@ -3020,8 +3153,8 @@ soft_setconf(GC, Groups, OLDGC, OldGroups) ->
     end,
     compile_and_load_src_dir(GC),
     Grps = load_mime_types_module(GC, Groups),
-    Rems = remove_old_scs(lists:flatten(OldGroups), Grps),
-    Adds = soft_setconf_scs(lists:flatten(Grps), 1, OldGroups),
+    Rems = remove_old_scs(GC, lists:flatten(OldGroups), Grps),
+    Adds = soft_setconf_scs(GC, lists:flatten(Grps), 1, OldGroups),
     lists:foreach(
       fun({delete_sconf, SC}) ->
               delete_sconf(SC);
@@ -3034,44 +3167,37 @@ soft_setconf(GC, Groups, OLDGC, OldGroups) ->
 
 
 hard_setconf(GC, Groups) ->
-    case gen_server:call(yaws_server,{setconf, GC, Groups},infinity) of
-        ok ->
-            yaws_log:setup(GC, Groups),
-            yaws_trace:setup(GC);
-        E ->
-            erlang:error(E)
-    end.
+    gen_server:call(yaws_server,{setconf, GC, Groups}, infinity).
 
 
-
-remove_old_scs([Sc|Scs], NewGroups) ->
-    case find_group(Sc, NewGroups) of
+remove_old_scs(Gc, [Sc|Scs], NewGroups) ->
+    case find_group(Gc, Sc, NewGroups) of
         false ->
-            [{delete_sconf, Sc} |remove_old_scs(Scs, NewGroups)];
+            [{delete_sconf, Sc} |remove_old_scs(Gc, Scs, NewGroups)];
         {true, G} ->
             case find_sc(Sc, G) of
                 false ->
-                    [{delete_sconf, Sc} | remove_old_scs(Scs, NewGroups)];
+                    [{delete_sconf, Sc} | remove_old_scs(Gc, Scs, NewGroups)];
                 _ ->
-                    remove_old_scs(Scs, NewGroups)
+                    remove_old_scs(Gc, Scs, NewGroups)
             end
     end;
-remove_old_scs([],_) ->
+remove_old_scs(_, [],_) ->
     [].
 
-soft_setconf_scs([Sc|Scs], N, OldGroups) ->
-    case find_group(Sc, OldGroups) of
+soft_setconf_scs(Gc, [Sc|Scs], N, OldGroups) ->
+    case find_group(Gc, Sc, OldGroups) of
         false ->
-            [{add_sconf,N,Sc} | soft_setconf_scs(Scs, N+1, OldGroups)];
+            [{add_sconf,N,Sc} | soft_setconf_scs(Gc, Scs, N+1, OldGroups)];
         {true, G} ->
             case find_sc(Sc, G) of
                 false ->
-                    [{add_sconf,N,Sc} | soft_setconf_scs(Scs,N+1,OldGroups)];
+                    [{add_sconf,N,Sc} | soft_setconf_scs(Gc, Scs,N+1,OldGroups)];
                 {true, _OldSc} ->
-                    [{update_sconf,N,Sc} | soft_setconf_scs(Scs,N+1,OldGroups)]
+                    [{update_sconf,N,Sc} | soft_setconf_scs(Gc, Scs,N+1,OldGroups)]
             end
     end;
-soft_setconf_scs([], _, _) ->
+soft_setconf_scs(_,[], _, _) ->
     [].
 
 
@@ -3093,13 +3219,14 @@ can_hard_gc(New, Old) ->
 
 can_soft_setconf(NEWGC, NewGroups, OLDGC, OldGroups) ->
     can_soft_gc(NEWGC, OLDGC) andalso
-        can_soft_sconf(lists:flatten(NewGroups), OldGroups).
+        can_soft_sconf(NEWGC, lists:flatten(NewGroups), OldGroups).
 
 can_soft_gc(G1, G2) ->
     if
         G1#gconf.flags == G2#gconf.flags,
         G1#gconf.logdir == G2#gconf.logdir,
         G1#gconf.log_wrap_size == G2#gconf.log_wrap_size,
+        G1#gconf.sni == G2#gconf.sni,
         G1#gconf.id == G2#gconf.id ->
             true;
         true ->
@@ -3107,14 +3234,14 @@ can_soft_gc(G1, G2) ->
     end.
 
 
-can_soft_sconf([Sc|Scs], OldGroups) ->
-    case find_group(Sc, OldGroups) of
+can_soft_sconf(Gc, [Sc|Scs], OldGroups) ->
+    case find_group(Gc, Sc, OldGroups) of
         false ->
-            can_soft_sconf(Scs, OldGroups);
+            can_soft_sconf(Gc, Scs, OldGroups);
         {true, G} ->
             case find_sc(Sc, G) of
                 false ->
-                    can_soft_sconf(Scs, OldGroups);
+                    can_soft_sconf(Gc, Scs, OldGroups);
                 {true, Old} when Old#sconf.start_mod /= Sc#sconf.start_mod ->
                     false;
                 {true, Old} ->
@@ -3122,24 +3249,24 @@ can_soft_sconf([Sc|Scs], OldGroups) ->
                         {proplists:get_value(listen_opts, Old#sconf.soptions),
                          proplists:get_value(listen_opts, Sc#sconf.soptions)} of
                         {Opts, Opts} ->
-                            can_soft_sconf(Scs, OldGroups);
+                            can_soft_sconf(Gc, Scs, OldGroups);
                         _ ->
                             false
                     end
             end
     end;
-can_soft_sconf([], _) ->
+can_soft_sconf(_, [], _) ->
     true.
 
 
-find_group(SC, [G|Gs]) ->
-    case same_virt_srv(SC, hd(G)) of
+find_group(GC, SC, [G|Gs]) ->
+    case same_virt_srv(GC, SC, hd(G)) of
         true ->
             {true, G};
         false ->
-            find_group(SC, Gs)
+            find_group(GC, SC, Gs)
     end;
-find_group(_,[]) ->
+find_group(_,_,[]) ->
     false.
 
 find_sc(SC, [S|Ss]) ->
@@ -3189,12 +3316,13 @@ verify_upgrade_args(GC, Groups0) when is_record(GC, gconf) ->
 add_sconf(SC) ->
     add_sconf(-1, SC).
 
-add_sconf(Pos, SC) ->
-    ok= gen_server:call(yaws_server, {add_sconf, Pos, SC}, infinity),
-    ok = yaws_log:add_sconf(SC).
+add_sconf(Pos, SC0) ->
+    {ok, SC1} = gen_server:call(yaws_server, {add_sconf, Pos, SC0}, infinity),
+    ok = yaws_log:add_sconf(SC1),
+    {ok, SC1}.
 
 update_sconf(Pos, SC) ->
-    ok = gen_server:call(yaws_server, {update_sconf, Pos, SC}, infinity).
+    gen_server:call(yaws_server, {update_sconf, Pos, SC}, infinity).
 
 delete_sconf(SC) ->
     ok = gen_server:call(yaws_server, {delete_sconf, SC}, infinity),
@@ -3213,6 +3341,46 @@ parse_auth_ips([Str|Rest], Result) ->
         _:_ -> parse_auth_ips(Rest, Result)
     end.
 
+parse_auth_user(User, Lno) ->
+    try
+        [Name, Passwd] = string:tokens(User, ":"),
+        case re:run(Passwd, "{([^}]+)}(?:\\$([^$]+)\\$)?(.+)", [{capture,all_but_first,list}]) of
+            {match, [Algo, B64Salt, B64Hash]} ->
+                case parse_auth_user(Name, Algo, B64Salt, B64Hash) of
+                    {ok, Res} ->
+                        Res;
+                    {error, bad_algo} ->
+                        {error, ?F("Unsupported hash algorithm '~p' at line ~w",
+                                   [Algo, Lno])};
+                    {error, bad_user} ->
+                        {error, ?F("Invalid user at line ~w", [Lno])}
+                end;
+            _ ->
+                Salt = yaws_dynopts:rand_bytes(32),
+                {Name, sha256, Salt, crypto:hash(sha256, [Salt, Passwd])}
+        end
+    catch
+        _:_ ->
+            {error, ?F("Invalid user at line ~w", [Lno])}
+    end.
+
+parse_auth_user(User, Algo, B64Salt, B64Hash) ->
+    try
+        if
+            Algo == "md5"    orelse Algo == "sha"    orelse
+            Algo == "sha224" orelse Algo == "sha256" orelse
+            Algo == "sha384" orelse Algo == "sha512" orelse
+            Algo == "ripemd160" ->
+                Salt = base64:decode(B64Salt),
+                Hash = base64:decode(B64Hash),
+                {ok, {User, list_to_atom(Algo), Salt, Hash}};
+            true ->
+                {error, unsupported_algo}
+        end
+    catch
+        _:_ -> {error, bad_user}
+    end.
+
 
 subconfigfiles(FD, Name, Lno) ->
     {ok, Config} = file:pid2name(FD),
@@ -3222,17 +3390,9 @@ subconfigfiles(FD, Name, Lno) ->
         {true,_} ->
             {ok, [File]};
         {false,true} ->
-            %% below, ignore dialyzer warning:
-            case ?WILDCARD_SUPPORTED of
-                true ->
-                    Names = filelib:wildcard(Name, ConfPath),
-                    Files = [filename:absname(N, ConfPath)
-                             || N <- lists:sort(Names)],
-                    {ok, lists:filter(fun filter_subconfigfile/1, Files)};
-                false ->
-                    {error, ?F("Unsupport wildcard at line ~w"
-                               " [support by releases >= R16A ]",[Lno])}
-            end;
+            Names = filelib:wildcard(Name, ConfPath),
+            Files = [filename:absname(N, ConfPath) || N <- lists:sort(Names)],
+            {ok, lists:filter(fun filter_subconfigfile/1, Files)};
         {false,false} ->
             {error, ?F("Expect filename or wildcard at line ~w"
                        " (subconfig: ~s)", [Lno, Name])}

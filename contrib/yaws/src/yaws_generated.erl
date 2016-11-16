@@ -14,7 +14,7 @@
          vardir/0,
          etcdir/0]).
 
-version() -> "2.0.2".
+version() -> "2.0.4".
 
 vardir() ->  "/usr/local/var".
 

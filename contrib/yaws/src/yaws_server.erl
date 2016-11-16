@@ -20,7 +20,7 @@
 
 %% External exports
 -export([start_link/1]).
--export([safe_decode_path/1]).
+-export([safe_path/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -60,9 +60,8 @@
 -record(gs, {gconf,
              group,         %% list of #sconf{} s
              ssl,           %% ssl | nossl
-             certinfo,      %% undefined | #certinfo{}
+             certinfo,      %% undefined | [{string(), #certinfo{}}]
              l,             %% listen socket
-             mnum = 0,
              connections = 0, %% number of TCP connections opened now
              sessions = 0,  %% number of active HTTP sessions
              reqs = 0}).    %% total number of processed HTTP requests
@@ -70,7 +69,6 @@
 
 -record(state, {gc,         %% Global conf #gc{} record
                 pairs,      %% [{GservPid, ScList}]
-                mnum = 0,   %% dyn compiled erl module  number
                 embedded    %% true if in embedded mode, false otherwise
                }).
 
@@ -167,11 +165,7 @@ init(Env) -> %% #env{Trace, TraceOut, Conf, RunMod, Embedded, Id}) ->
                                                [?format_record(_SC, sconf)])
                                 end, Group)
                       end, Sconfs),
-                    yaws_trace:setup(Gconf),
-                    Res = init2(Gconf, Sconfs, Env#env.runmod,
-                          Env#env.embedded, true),
-                    yaws_log:setup(Gconf, Sconfs),
-                    Res;
+                    init2(Gconf, Sconfs, Env#env.runmod, Env#env.embedded, true);
                 {error, E} ->
                     case erase(logdir) of
                         undefined ->
@@ -194,8 +188,7 @@ init(Env) -> %% #env{Trace, TraceOut, Conf, RunMod, Embedded, Id}) ->
         true ->
             {ok, #state{gc = undefined,
                         embedded = Env#env.embedded,
-                        pairs = [],
-                        mnum = 0}}
+                        pairs = []}}
     end.
 
 
@@ -245,11 +238,13 @@ init2(GC, Sconfs, RunMod, Embedded, FirstTime) ->
 
     runmod(RunMod, GC),
     yaws_config:compile_and_load_src_dir(GC),
+    yaws_dynopts:generate(GC),
+    yaws_log:setup(GC, Sconfs),
+    yaws_trace:setup(GC),
     L2 = lists:zf(fun(Group) -> start_group(GC, Group) end,
                   yaws_config:load_mime_types_module(GC, Sconfs)),
     {ok, #state{gc       = GC,
                 pairs    = L2,
-                mnum     = 0,
                 embedded = Embedded}}.
 
 
@@ -298,11 +293,6 @@ handle_call(pids, _From, State) ->  %% for gprof
     L = map(fun(X) ->element(1, X) end, State#state.pairs),
     {reply, [self() | L], State};
 
-handle_call(mnum, _From, State) ->
-    Mnum = State#state.mnum +1,
-    {reply, Mnum, State#state{mnum = Mnum}};
-
-
 
 %% This is a brutal restart of everything
 handle_call({setconf, GC, Groups}, _From, State) ->
@@ -329,7 +319,7 @@ handle_call(check_certs, _From, State) ->
     {reply, L, State};
 
 handle_call({update_sconf, Pos, NewSc}, From, State) ->
-    case yaws_config:search_sconf(NewSc, State#state.pairs) of
+    case yaws_config:search_sconf(State#state.gc, NewSc, State#state.pairs) of
         {Pid, OldSc, Group} ->
             OldPos = string:str(Group, [OldSc]),
             case (yaws_config:eq_sconfs(OldSc,NewSc) andalso OldPos == Pos) of
@@ -341,7 +331,8 @@ handle_call({update_sconf, Pos, NewSc}, From, State) ->
                     Pid ! {update_sconf, Pos, NewSc, OldSc, From, self()},
                     receive
                         {updated_sconf, Pid, NewSc2} ->
-                            P2 = yaws_config:update_sconf(NewSc2, Pos,
+                            P2 = yaws_config:update_sconf(State#state.gc,
+                                                          NewSc2, Pos,
                                                           State#state.pairs),
                             {noreply, State#state{pairs = P2}}
                     after 2000 ->
@@ -354,7 +345,7 @@ handle_call({update_sconf, Pos, NewSc}, From, State) ->
 
 
 handle_call({delete_sconf, Sc}, From, State) ->
-    case yaws_config:search_sconf(Sc, State#state.pairs) of
+    case yaws_config:search_sconf(State#state.gc, Sc, State#state.pairs) of
         {Pid, OldSc, Group} when length(Group) == 1 ->
             error_logger:info_msg("Terminate whole ~s virt server group \n",
                                   [yaws:sconf_to_srvstr(OldSc)]),
@@ -363,19 +354,21 @@ handle_call({delete_sconf, Sc}, From, State) ->
             {reply, ok, State#state{pairs = NewPairs}};
         {Pid, OldSc, _Group} ->
             Pid ! {delete_sconf, OldSc, From},
-            P2 = yaws_config:delete_sconf(OldSc, State#state.pairs),
+            P2 = yaws_config:delete_sconf(State#state.gc, OldSc,
+                                          State#state.pairs),
             {noreply, State#state{pairs = P2}};
         false ->
             {reply, {error, "No matching group"}, State}
     end;
 
 handle_call({add_sconf, Pos, Sc}, From, State) ->
-    case yaws_config:search_group(Sc, State#state.pairs) of
+    case yaws_config:search_group(State#state.gc, Sc, State#state.pairs) of
         [{Pid, _Group}] ->
             Pid ! {add_sconf, From, Pos, Sc, self()},
             receive
                 {added_sconf, Pid, Sc2} ->
-                    P2 = yaws_config:update_sconf(Sc2, Pos,
+                    P2 = yaws_config:update_sconf(State#state.gc,
+                                                  Sc2, Pos,
                                                   State#state.pairs),
                     {noreply, State#state{pairs = P2}}
             after 2000 ->
@@ -388,10 +381,10 @@ handle_call({add_sconf, Pos, Sc}, From, State) ->
             GC = State#state.gc,
             case start_group(GC, [Sc]) of
                 false ->
-                    {reply, ok, State};
-                {true, Pair} ->
+                    {reply, {ok, Sc}, State};
+                {true, {_,[Sc2]}=Pair} ->
                     P2 = [Pair | State#state.pairs],
-                    {reply, ok, State#state{pairs = P2}}
+                    {reply, {ok, Sc2}, State#state{pairs = P2}}
             end
     end;
 
@@ -449,19 +442,43 @@ terminate(_Reason, State) ->
     foreach(fun({Pid, _GP}) -> gserv_stop(Pid) end, State#state.pairs),
     ok.
 
-do_listen(GC, SC) ->
-    case SC#sconf.ssl of
+do_listen(GC, [SC0|_]=Group) ->
+    case SC0#sconf.ssl of
         undefined ->
-            {nossl, undefined, gen_tcp_listen(SC#sconf.port, listen_opts(SC))};
-        SSL ->
-            {ssl, certinfo(SSL),
-             ssl_listen(SC#sconf.port, ssl_listen_opts(GC, SC, SSL))}
+            {nossl, undefined,
+             gen_tcp_listen(SC0#sconf.port, tcp_listen_opts(SC0))};
+        _ ->
+            CertInfo = lists:foldl(fun(#sconf{servername=SN, ssl=SSL}, Acc) ->
+                                           [{SN, certinfo(SSL)}|Acc]
+                                   end, [], Group),
+            {ssl, lists:reverse(CertInfo),
+             ssl_listen(SC0#sconf.port, ssl_listen_opts(GC, Group))}
     end.
 
-certinfo(SSL) ->
+certinfo(SSL=#ssl{}) ->
     #certinfo{
-          keyfile = if SSL#ssl.keyfile /= undefined ->
-                            case file:read_file_info(SSL#ssl.keyfile) of
+       keyfile = if SSL#ssl.keyfile /= undefined ->
+                         case file:read_file_info(SSL#ssl.keyfile) of
+                             {ok, FI} ->
+                                 FI#file_info.mtime;
+                             _ ->
+                                 undefined
+                         end;
+                    true ->
+                         undefined
+                 end,
+       certfile = if SSL#ssl.certfile /= undefined ->
+                          case file:read_file_info(SSL#ssl.certfile) of
+                              {ok, FI} ->
+                                  FI#file_info.mtime;
+                              _ ->
+                                  undefined
+                          end;
+                     true ->
+                          undefined
+                  end,
+       cacertfile = if SSL#ssl.cacertfile /= undefined ->
+                            case file:read_file_info(SSL#ssl.cacertfile) of
                                 {ok, FI} ->
                                     FI#file_info.mtime;
                                 _ ->
@@ -469,28 +486,8 @@ certinfo(SSL) ->
                             end;
                        true ->
                             undefined
-                    end,
-          certfile = if SSL#ssl.certfile /= undefined ->
-                             case file:read_file_info(SSL#ssl.certfile) of
-                                 {ok, FI} ->
-                                     FI#file_info.mtime;
-                                 _ ->
-                                     undefined
-                             end;
-                        true ->
-                             undefined
-                     end,
-          cacertfile = if SSL#ssl.cacertfile /= undefined ->
-                               case file:read_file_info(SSL#ssl.cacertfile) of
-                                   {ok, FI} ->
-                                       FI#file_info.mtime;
-                                   _ ->
-                                       undefined
-                               end;
-                          true ->
-                               undefined
-                       end
-         }.
+                    end
+      }.
 
 gen_tcp_listen(Port, Opts) ->
     ?Debug("TCP Listen ~p:~p~n", [Port, Opts]),
@@ -509,24 +506,15 @@ gserv(Top, GC, Group0) ->
     ?TC([{record, GC, gconf}]),
     put(gc, GC),
     put(top, Top),
-    Group1 = map(fun(SC) -> setup_ets(SC)
-                 end, Group0),
-    Group = map(fun(SC) ->
-                        case ?sc_has_statistics(SC) of
-                            true ->
-                                start_stats(SC);
-                            false ->
-                                SC
-                        end
-                end, Group1),
-    SC = hd(Group),
-    case do_listen(GC, SC) of
+    Group1 = map(fun(SC) -> setup_ets(SC) end, Group0),
+    Group = map(fun(SC) -> start_stats(SC) end, Group1),
+    case do_listen(GC, Group) of
         {SSLBOOL, CertInfo, {ok, Listen}} ->
-            lists:foreach(fun(XSC) -> call_start_mod(XSC) end, Group),
+            lists:foreach(fun(SC) -> call_start_mod(SC) end, Group),
             error_logger:info_msg(
               "Yaws: Listening to ~s:~w for <~p> virtual servers:~s~n",
-              [inet_parse:ntoa(SC#sconf.listen),
-               SC#sconf.port,
+              [inet_parse:ntoa((hd(Group))#sconf.listen),
+               (hd(Group))#sconf.port,
                length(Group),
                catch map(
                        fun(S) ->
@@ -545,8 +533,8 @@ gserv(Top, GC, Group0) ->
             gserv_loop(GS#gs{sessions = 1}, [], 0, Last);
         {_,_,Err} ->
             error_logger:format("Yaws: Failed to listen ~s:~w  : ~p~n",
-                                [inet_parse:ntoa(SC#sconf.listen),
-                                 SC#sconf.port, Err]),
+                                [inet_parse:ntoa((hd(Group))#sconf.listen),
+                                 (hd(Group))#sconf.port, Err]),
             proc_lib:init_ack({error, "Can't listen to socket: ~p ",[Err]}),
             exit(normal)
     end.
@@ -590,9 +578,25 @@ clear_ets_complete(SC) ->
 
 
 start_stats(SC) ->
-    {ok, Pid} = yaws_stats:start_link(),
-    SC#sconf{stats = Pid}.
+    case ?sc_has_statistics(SC) of
+        true ->
+            {ok, Pid} = yaws_stats:start_link(),
+            SC#sconf{stats = Pid};
+        false ->
+            SC
+    end.
 
+stop_stats(SC) ->
+    case SC#sconf.stats of
+        undefined ->
+            SC;
+        Pid when is_pid(Pid) ->
+            %% Unlink the stats process before stopping it to be sure to not
+            %% receive the {'EXIT..} message in gserv_loop.
+            unlink(Pid),
+            yaws_stats:stop(Pid),
+            SC#sconf{stats = undefined}
+    end.
 
 gserv_loop(GS, Ready, Rnum, Last) ->
     receive
@@ -683,11 +687,7 @@ gserv_loop(GS, Ready, Rnum, Last) ->
             end,
 
             %% Stop yaws_stats processes, if needed
-            foreach(fun(#sconf{stats=Pid}) when is_pid(Pid) ->
-                            yaws_stats:stop(Pid);
-                       (_) ->
-                            ok
-                    end, GS#gs.group),
+            foreach(fun(SC) -> stop_stats(SC) end, GS#gs.group),
 
             %% Close softly all opened connections
             {links, Ls1} = process_info(self(), links),
@@ -726,29 +726,19 @@ gserv_loop(GS, Ready, Rnum, Last) ->
                                            [OldSc, GS#gs.group]),
                     erlang:error(nosc);
                 true ->
-                    Pid = OldSc#sconf.stats,
-                    error_logger:info_msg("update_sconf: Stats pid ~p~n",[Pid]),
-                    case Pid of
-                        undefined ->
-                            ok;
-                        Pid when is_pid(Pid) ->
-                            yaws_stats:stop(Pid)
-                    end,
-                    NewSc1 = case ?sc_has_statistics(NewSc) of
-                                 true ->
-                                     start_stats(NewSc);
-                                 false ->
-                                     NewSc
-                             end,
+                    stop_stats(OldSc),
+                    NewSc1 = start_stats(NewSc),
                     stop_ready(Ready, Last),
-                    NewSc2 = clear_ets_complete(NewSc1),
+                    NewSc2 = clear_ets_complete(
+                               NewSc1#sconf{ets = OldSc#sconf.ets}
+                              ),
                     GS2 = GS#gs{group = yaws:insert_at(
                                           NewSc2, Pos,
                                           lists:delete(OldSc, GS#gs.group)
                                          )},
                     Ready2 = [],
                     Updater ! {updated_sconf, self(), NewSc2},
-                    gen_server:reply(From, ok),
+                    gen_server:reply(From, {ok, NewSc2}),
                     error_logger:info_msg("Updating sconf for server ~s~n",
                                           [yaws:sconf_to_srvstr(NewSc2)]),
                     New = acceptor(GS2),
@@ -761,18 +751,10 @@ gserv_loop(GS, Ready, Rnum, Last) ->
                     error_logger:error_msg("gserv: No found SC ~n",[]),
                     erlang:error(nosc);
                 true ->
-                    Pid = OldSc#sconf.stats,
                     stop_ready(Ready, Last),
                     GS2 = GS#gs{group =  lists:delete(OldSc,GS#gs.group)},
                     Ready2 = [],
-                    case ?sc_has_statistics(OldSc) of
-                        true ->
-                            error_logger:info_msg("delete_sconf: Pid= ~p~n",
-                                                  [Pid]),
-                            yaws_stats:stop(Pid);
-                        false ->
-                            ok
-                    end,
+                    stop_stats(OldSc),
                     ets:delete(OldSc#sconf.ets),
                     gen_server:reply(From, ok),
                     error_logger:info_msg("Deleting sconf for server ~s~n",
@@ -782,20 +764,13 @@ gserv_loop(GS, Ready, Rnum, Last) ->
             end;
 
         {add_sconf, From, Pos, SC0, Adder} ->
-            SC = case ?sc_has_statistics(SC0) of
-                     true ->
-                         {ok, Pid} = yaws_stats:start_link(),
-                         error_logger:info_msg("add_sconf: Pid= ~p~n", [Pid]),
-                         SC0#sconf{stats=Pid};
-                     false ->
-                         SC0
-                 end,
+            SC = start_stats(SC0),
             stop_ready(Ready, Last),
             SC2 = setup_ets(SC),
             GS2 = GS#gs{group =  yaws:insert_at(SC2, Pos, GS#gs.group)},
             Ready2 = [],
             Adder ! {added_sconf, self(), SC2},
-            gen_server:reply(From, ok),
+            gen_server:reply(From, {ok, SC2}),
             error_logger:info_msg("Adding sconf for server ~s~n",
                                   [yaws:sconf_to_srvstr(SC)]),
             New = acceptor(GS2),
@@ -805,23 +780,21 @@ gserv_loop(GS, Ready, Rnum, Last) ->
                 case GS#gs.ssl of
                     ssl ->
                         CertInfo = GS#gs.certinfo,
-                        case lists:any(
-                               fun(SC) ->
-                                       certinfo(SC#sconf.ssl) =/= CertInfo end,
-                               GS#gs.group) of
-                            true ->
-                                yes;
-                            false ->
-                                no
-                        end;
+                        lists:any(
+                          fun(#sconf{servername=SN}=SC) ->
+                                  certinfo(SC#sconf.ssl) /=
+                                      proplists:get_value(SN, CertInfo)
+                          end,
+                          GS#gs.group
+                         );
                     nossl ->
-                        no
+                        false
                 end,
             if
-                Changed == no ->
+                Changed == false ->
                     From ! {self(), no},
                     ?MODULE:gserv_loop(GS, Ready, Rnum, Last);
-                Changed == yes ->
+                Changed == true ->
                     error_logger:info_msg(
                       "Stopping ~s due to cert change\n",
                       [yaws:sconf_to_srvstr(hd(GS#gs.group))]),
@@ -903,36 +876,56 @@ listen_opts(SC) ->
                    true ->
                        []
                end,
-    Opts = [binary,
-            {ip, SC#sconf.listen},
-            {packet, http},
-            {packet_size, 16#4000},
-            {reuseaddr, true},
-            {active, false}
-            | proplists:get_value(listen_opts, SC#sconf.soptions, [])
-           ] ++ InetType,
+    [binary,
+     {ip, SC#sconf.listen},
+     {packet, http},
+     {packet_size, 16#4000},
+     {reuseaddr, true},
+     {active, false}
+     | proplists:get_value(listen_opts, SC#sconf.soptions, [])
+    ] ++ InetType.
+
+tcp_listen_opts(SC) ->
+    Opts = listen_opts(SC),
     ?Debug("tcp listen options: ~p", [Opts]),
     Opts.
 
-ssl_listen_opts(GC, SC, SSL) ->
-    InetType = if
-                   is_tuple( SC#sconf.listen), size( SC#sconf.listen) == 8 ->
-                       [inet6];
-                   true ->
-                       []
-               end,
-    Opts = [binary,
-            {ip, SC#sconf.listen},
-            {packet, http},
-            {packet_size, 16#4000},
-            {reuseaddr, true},
-            {active, false}
-            | ssl_listen_opts(GC, SSL)] ++ InetType ++
-        proplists:get_value(listen_opts, SC#sconf.soptions, []),
+check_sni_servername(_, [], Default) ->
+    Default;
+check_sni_servername(SN, [{SC,Opts}|Rest], Default) ->
+    case comp_sname(SN, SC#sconf.servername) of
+        true  ->
+            Opts;
+        false ->
+            Res = lists:any(fun(Alias) -> wildcomp_salias(SN, Alias) end,
+                            SC#sconf.serveralias),
+            case Res of
+                true  -> Opts;
+                false -> check_sni_servername(SN, Rest, Default)
+            end
+    end.
+
+ssl_sni_opts(Group, DefaultSSLOpts) ->
+    SniOpts = lists:foldl(fun(SC, Acc) ->
+                                  [{SC, ssl_listen_opts(SC)}|Acc]
+                          end, [], Group),
+    SniFun = fun(SN) ->
+                     check_sni_servername(SN, lists:reverse(SniOpts),
+                                          DefaultSSLOpts)
+             end,
+    [{sni_fun, SniFun}].
+
+ssl_listen_opts(GC, [SC0|_]=Group) ->
+    DefaultSSLOpts = ssl_listen_opts(SC0),
+    Opts0 = listen_opts(SC0) ++ DefaultSSLOpts,
+    Opts = case GC#gconf.sni of
+               disable -> Opts0;
+               _       -> Opts0 ++ ssl_sni_opts(Group, DefaultSSLOpts)
+           end,
     ?Debug("ssl listen options: ~p", [Opts]),
     Opts.
 
-ssl_listen_opts(GC, SSL) ->
+ssl_listen_opts(#sconf{ssl=SSL}) ->
     L = [if SSL#ssl.keyfile /= undefined ->
                  {keyfile, SSL#ssl.keyfile};
             true ->
@@ -994,29 +987,21 @@ ssl_listen_opts(GC, SSL) ->
             true ->
                  false
          end,
-         if SSL#ssl.client_renegotiation /= undefined andalso
-            ?SSL_CLIENT_RENEGOTIATION == true ->
-                {client_renegotiation, SSL#ssl.client_renegotiation};
+         if SSL#ssl.client_renegotiation /= undefined ->
+                 {client_renegotiation, SSL#ssl.client_renegotiation};
             true ->
                  false
          end,
-         if SSL#ssl.honor_cipher_order /= undefined andalso
-            ?HONOR_CIPHER_ORDER == true ->
+         if SSL#ssl.honor_cipher_order /= undefined ->
                  {honor_cipher_order, SSL#ssl.honor_cipher_order};
             true ->
                  false
          end,
-         ?SSL_LOG_ALERT,
-         if ?gc_use_old_ssl(GC) ->
-                 {ssl_imp, old};
-            true ->
-                 {ssl_imp, new}
+         case yaws_dynopts:have_ssl_log_alert() of
+             true  -> {log_alert, false};
+             false -> false
          end
         ],
-    filter_false(L).
-
-
-filter_false(L) ->
     [X || X <- L, X /= false].
 
 do_accept(GS) when GS#gs.ssl == nossl ->
@@ -1213,7 +1198,7 @@ aloop(CliSock, {IP,Port}=IPPort, GS, Num) ->
         {Req0, H0} when Req0#http_request.method /= bad_request ->
             {Req, H} = fix_abs_uri(Req0, H0),
             ?Debug("{Req, H} = ~p~n", [{Req, H}]),
-            case pick_sconf(GS#gs.gconf, H, GS#gs.group) of
+            case pick_sconf({GS#gs.ssl, CliSock}, GS#gs.gconf, H, GS#gs.group) of
                 undefined ->
                     deliver_400(CliSock, Req),
                     {ok, Num+1};
@@ -1516,9 +1501,65 @@ wildcomp_salias([C1|T1], [C2|T2]) ->
         false -> false
     end.
 
+comp_sni(SniHost, Host) ->
+    case Host of
+        undefined -> false;
+        {_}       -> false;
+        _         -> comp_sname(SniHost, Host)
+    end.
+
+pick_sconf({nossl, _}, GC, H, Group) ->
+    pick_sconf(GC, H, Group);
+pick_sconf({ssl, _}, #gconf{sni=disable}=GC, H, Group) ->
+    pick_sconf(GC, H, Group);
+pick_sconf({ssl, Sock}, GC, H, Group) ->
+    SniHost = case ssl:connection_information(Sock, [sni_hostname]) of
+                  {ok, [{sni_hostname, SN}]} -> SN;
+                  _                          -> undefined
+              end,
+    if
+        SniHost == undefined andalso GC#gconf.sni == strict ->
+            error_logger:format(
+              "SSL Error: No Hostname was provided via SNI~n", []
+             ),
+            undefined;
+        SniHost /= undefined ->
+            %% Host header must be defined to SniHost. Multiple Host headers are
+            %% not allowed here.
+            case comp_sni(SniHost, H#headers.host) of
+                true ->
+                    pick_sni_sconf(SniHost, GC, H, Group);
+                false ->
+                    error_logger:format(
+                      "SSL Error: Hostname ~p provided via SNI and hostname ~p"
+                      " provided via HTTP are different~n",
+                      [SniHost, H#headers.host]
+                     ),
+                    undefined
+            end;
+        true ->
+            pick_sni_sconf(SniHost, GC, H, Group)
+    end.
+
+%% Check is the server is visible without SNI or if the default server is
+%% visible when SNI hostname does not match.
+pick_sni_sconf(SniHost, GC, H, Group) ->
+    SC = pick_sconf(GC, H, Group),
+    Flag = (SniHost == undefined orelse get(nomatch_virthost)),
+    if
+        Flag andalso SC /= undefined andalso
+        SC#sconf.ssl /= undefined andalso (SC#sconf.ssl)#ssl.require_sni ->
+            error_logger:format("server ~p require a (matching) SNI hostname~n",
+                                [SC#sconf.servername]),
+            undefined;
+        true ->
+            SC
+    end.
+
 pick_sconf(GC, H, Group) ->
     case H#headers.host of
         undefined when ?gc_pick_first_virthost_on_nomatch(GC) ->
+            put(nomatch_virthost, true),
             hd(Group);
         {[Host|_]} when ?gc_pick_first_virthost_on_nomatch(GC) ->
             pick_host(GC, Host, Group, Group);
@@ -1534,6 +1575,7 @@ pick_host(GC, Host, SCs, Group)
   when Host == []; Host == undefined; SCs == [] ->
     if
         ?gc_pick_first_virthost_on_nomatch(GC) ->
+            put(nomatch_virthost, true),
             hd(Group);
         true ->
             yaws_debug:format("Drop req since ~p doesn't match any "
@@ -1561,7 +1603,7 @@ maybe_auth_log(Item, ARG) ->
         true ->
             Req = ARG#arg.req,
             {IP,_} = ARG#arg.client_ip_port,
-            Path = safe_decode_path(Req#http_request.path),
+            Path = safe_path(Req#http_request.path),
             yaws_log:authlog(SC, IP, Path, Item)
     end.
 
@@ -1575,17 +1617,8 @@ maybe_access_log(Ip, Req, H) ->
             ignore
     end.
 
-safe_decode_path(Path) ->
-    case (catch decode_path(Path)) of
-        {'EXIT', _} ->
-            "/undecodable_path";
-        Val ->
-            Val
-    end.
-
-
-decode_path({abs_path, Path}) ->
-    yaws_api:url_decode(Path).
+safe_path({abs_path, Path}) -> Path;
+safe_path(_)                -> "/undecodable_path".
 
 
 %% ret:  continue | done
@@ -1621,7 +1654,8 @@ call_method(Method, CliSock, IPPort, Req, H) ->
 not_implemented(CliSock, _IPPort, Req, Head) ->
     SC=get(sc),
     ok = yaws:setopts(CliSock, [{packet, raw}, binary], yaws:is_ssl(SC)),
-    flush(CliSock, Head#headers.content_length, Head#headers.transfer_encoding),
+    flush(CliSock, Head#headers.content_length,
+          yaws:to_lower(Head#headers.transfer_encoding)),
     deliver_501(CliSock, Req).
 
 
@@ -1674,38 +1708,23 @@ body_method(CliSock, IPPort, Req, Head) ->
                 _ -> ok
             end
     end,
-    Res = case Head#headers.content_length of
-              undefined ->
-                  case yaws:to_lower(Head#headers.transfer_encoding) of
-                      "chunked" ->
-                          get_chunked_client_data(CliSock, yaws:is_ssl(SC));
-                      _ ->
-                          <<>>
-                  end;
-              Len when is_integer(PPS) ->
+    Res = case {yaws:to_lower(Head#headers.transfer_encoding),
+                Head#headers.content_length} of
+              {"chunked", _} ->
+                  get_chunked_client_data(CliSock, yaws:is_ssl(SC));
+              {_, undefined} ->
+                  <<>>;
+              {_, Len} ->
                   Int_len = list_to_integer(Len),
                   if
                       Int_len < 0 ->
                           {error, content_length_overflow};
                       Int_len == 0 ->
                           <<>>;
-                      PPS < Int_len ->
-                          {partial, get_client_data(CliSock, PPS,
-                                                    yaws:is_ssl(SC))};
+                      PPS /= nolimit andalso PPS < Int_len ->
+                          {partial, get_client_data(CliSock, PPS, yaws:is_ssl(SC))};
                       true ->
-                          get_client_data(CliSock, Int_len,
-                                          yaws:is_ssl(SC))
-                  end;
-              Len when PPS == nolimit ->
-                  Int_len = list_to_integer(Len),
-                  if
-                      Int_len < 0 ->
-                          {error, content_length_overflow};
-                      Int_len == 0 ->
-                          <<>>;
-                      true ->
-                          get_client_data(CliSock, Int_len,
-                                          yaws:is_ssl(SC))
+                          get_client_data(CliSock, Int_len, yaws:is_ssl(SC))
                   end
           end,
     case Res of
@@ -1723,7 +1742,8 @@ body_method(CliSock, IPPort, Req, Head) ->
 no_body_method(CliSock, IPPort, Req, Head) ->
     SC=get(sc),
     ok = yaws:setopts(CliSock, [{packet, raw}, binary], yaws:is_ssl(SC)),
-    flush(CliSock, Head#headers.content_length, Head#headers.transfer_encoding),
+    flush(CliSock, Head#headers.content_length,
+          yaws:to_lower(Head#headers.transfer_encoding)),
     Head1 = Head#headers{content_length=undefined, transfer_encoding=undefined},
     ARG = make_arg(CliSock, IPPort, Head1, Req, undefined),
     handle_request(CliSock, ARG, 0).
@@ -1966,7 +1986,7 @@ set_auth_user(ARG, User) ->
 
 filter_auths(Auths, Req_dir) ->
     case filter_auths(Auths, Req_dir, []) of
-        [] when Req_dir =:= "/" ->
+        [] when Req_dir =:= "/" orelse Req_dir =:= "." ->
             [];
         [] ->
             filter_auths(Auths, filename:dirname(Req_dir));
@@ -2152,7 +2172,10 @@ handle_auth(ARG, {User, Password, OrigString},
 
 handle_auth(ARG, {User, Password, OrigString},
             Auth_methods = #auth{users = Users}, Ret) when Users /= [] ->
-    case member({User, Password}, Users) of
+    F = fun({U, A, S, H}) ->
+                (U == User andalso H == crypto:hash(A, [S,Password]))
+        end,
+    case lists:any(F, Users) of
         true ->
             maybe_auth_log({ok, User}, ARG),
             true;
@@ -2180,7 +2203,7 @@ is_revproxy1(Path, RevConf) ->
     case lists:keyfind(Path, #proxy_cfg.prefix, RevConf) of
         #proxy_cfg{}=R ->
             {true, R};
-        false when Path == "/" ->
+        false when Path =:= "/" orelse Path =:= "." ->
             false;
         false ->
             is_revproxy1(filename:dirname(Path), RevConf)
@@ -2192,7 +2215,7 @@ is_redirect_map(Path, RedirMap) ->
     case lists:keyfind(Path, 1, RedirMap) of
         {Path, _Code, _Url, _AppendMod}=E ->
             {true, E};
-        false when Path == "/" ->
+        false when Path =:= "/" orelse Path =:= "." ->
             false;
         false ->
             is_redirect_map(filename:dirname(Path), RedirMap)
@@ -2654,7 +2677,7 @@ deliver_redirect_map(CliSock, Req, Arg,
     case DoClose of
         true  -> ok;
         _     -> flush(CliSock, N, (Arg#arg.headers)#headers.content_length,
-                       (Arg#arg.headers)#headers.transfer_encoding)
+                       yaws:to_lower((Arg#arg.headers)#headers.transfer_encoding))
     end,
     new_redir_h(H#outh{
                   connection = yaws:make_connection_close_header(DoClose),
@@ -2758,25 +2781,21 @@ do_yaws(CliSock, ARG, UT, N) ->
                                               Es == 0 ->
             deliver_dyn_file(CliSock, Spec, ARG, UT, N);
         Other  ->
-            del_old_files(get(gc),Other),
-            {ok, [{errors, Errs}| Spec]} =
-                yaws_compile:compile_file(UT#urltype.fullpath),
+            purge_old_mods(get(gc),Other),
+            {ok, NbErrs, Spec} = yaws_compile:compile_file(UT#urltype.fullpath),
             ?Debug("Spec for file ~s is:~n~p~n",[UT#urltype.fullpath, Spec]),
-            ets:insert(SC#sconf.ets, {Key, spec, Mtime, Spec, Errs}),
+            ets:insert(SC#sconf.ets, {Key, spec, Mtime, Spec, NbErrs}),
             deliver_dyn_file(CliSock, Spec, ARG, UT, N)
     end.
 
 
-del_old_files(_, []) ->
+purge_old_mods(_, []) ->
     ok;
-del_old_files(_GC, [{_FileAtom, spec, _Mtime1, Spec, _}]) ->
+purge_old_mods(_GC, [{_FileAtom, spec, _Mtime1, Spec, _}]) ->
     foreach(
       fun({mod, _, _, _,  Mod, _Func}) ->
-              F=filename:join([yaws:tmpdir(), "yaws",
-                               yaws:to_list(Mod) ++ ".erl"]),
               code:purge(Mod),
-              code:purge(Mod),
-              file:delete(F);
+              code:purge(Mod);
          (_) ->
               ok
       end, Spec).
@@ -3177,12 +3196,12 @@ handle_out_reply({yssi, Yfile}, LineNo, YawsFile, UT, ARG) ->
                                                       Es == 0 ->
                     deliver_dyn_file(CliSock, Spec ++ [yssi], ARG, UT2, N);
                 Other  ->
-                    del_old_files(get(gc), Other),
-                    {ok, [{errors, Errs}| Spec]} =
+                    purge_old_mods(get(gc), Other),
+                    {ok, NbErrs, Spec} =
                         yaws_compile:compile_file(UT2#urltype.fullpath),
                     ?Debug("Spec for file ~s is:~n~p~n",
                            [UT2#urltype.fullpath, Spec]),
-                    ets:insert(SC#sconf.ets, {Key, spec, Mtime, Spec, Errs}),
+                    ets:insert(SC#sconf.ets, {Key, spec, Mtime, Spec, NbErrs}),
                     deliver_dyn_file(CliSock, Spec ++ [yssi], ARG, UT2, N)
             end;
         error when SC#sconf.xtra_docroots /= [] ->
@@ -3817,22 +3836,19 @@ deflate_accumulated(Arg, Content, ContentLength, Mode) ->
 get_more_post_data(CliSock, PPS, ARG) ->
     SC = get(sc),
     N = SC#sconf.partial_post_size,
-    case (ARG#arg.headers)#headers.content_length of
-        undefined ->
-            case yaws:to_lower((ARG#arg.headers)#headers.transfer_encoding) of
-                "chunked" ->
-                    get_chunked_client_data(CliSock, yaws:is_ssl(SC));
-                _  ->
-                    <<>>
-            end;
-        Len ->
+    case {yaws:to_lower((ARG#arg.headers)#headers.transfer_encoding),
+          (ARG#arg.headers)#headers.content_length} of
+        {"chunked", _} ->
+            get_chunked_client_data(CliSock, yaws:is_ssl(SC));
+        {_, undefined} ->
+            <<>>;
+        {_, Len} ->
             Int_len = list_to_integer(Len),
             if N + PPS < Int_len ->
                     Bin = get_client_data(CliSock, N, yaws:is_ssl(SC)),
                     {partial, Bin};
                true ->
-                    get_client_data(CliSock, Int_len - PPS,
-                                    yaws:is_ssl(SC))
+                    get_client_data(CliSock, Int_len - PPS, yaws:is_ssl(SC))
             end
     end.
 
@@ -4028,15 +4044,7 @@ send_file_range(CliSock, Fd, 0) ->
 crnl() ->
     "\r\n".
 
--ifdef(HAVE_ERLANG_NOW).
-now_secs() ->
-    {M,S,_}=now(),
-    (M*1000000)+S.
--else.
-now_secs() ->
-    {M,S,_} = erlang:timestamp(),
-    (M*1000000)+S.
--endif.
+now_secs() -> yaws_dynopts:now_secs().
 
 %% a file cache,
 url_type(GetPath, ArgDocroot, VirtualDir) ->
@@ -4861,10 +4869,10 @@ compressible_mime_type(Mime, Type, SubType, [_|Rest]) ->
 flush(Sock, Sz, TransferEncoding) ->
     flush(Sock, 0, Sz, TransferEncoding).
 
-flush(Sock, Pos, undefined, "chunked") ->
+flush(Sock, Pos, Sz, "chunked") ->
     SC = get(sc),
     case get_chunked_client_data(Sock, yaws:is_ssl(SC)) of
-        {partial, Bin} -> flush(Sock, Pos+size(Bin), undefined, "chunked");
+        {partial, Bin} -> flush(Sock, Pos+size(Bin), Sz, "chunked");
         _              -> Pos
     end;
 flush(_Sock, Pos, undefined, _) ->

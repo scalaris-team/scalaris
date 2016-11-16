@@ -18,9 +18,8 @@
 -define(GC_FAIL_ON_BIND_ERR,                32).
 -define(GC_PICK_FIRST_VIRTHOST_ON_NOMATCH,  64).
 -define(GC_USE_FDSRV,                      128).
--define(GC_USE_OLD_SSL,                    256).
--define(GC_USE_ERLANG_SENDFILE,            512).
--define(GC_USE_YAWS_SENDFILE,             1024).
+-define(GC_USE_ERLANG_SENDFILE,            256).
+-define(GC_USE_YAWS_SENDFILE,              512).
 
 
 
@@ -38,8 +37,6 @@
         ((GC#gconf.flags band ?GC_FAIL_ON_BIND_ERR) /= 0)).
 -define(gc_pick_first_virthost_on_nomatch(GC),
         ((GC#gconf.flags band ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH) /= 0)).
--define(gc_use_old_ssl(GC),
-        ((GC#gconf.flags band ?GC_USE_OLD_SSL) /= 0)).
 -define(gc_use_erlang_sendfile(GC),
         ((GC#gconf.flags band ?GC_USE_ERLANG_SENDFILE) /= 0)).
 -define(gc_use_yaws_sendfile(GC),
@@ -59,8 +56,6 @@
 -define(gc_set_pick_first_virthost_on_nomatch(GC, Bool),
         GC#gconf{flags = yaws:flag(GC#gconf.flags,
                                    ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH,Bool)}).
--define(gc_set_use_old_ssl(GC, Bool),
-        GC#gconf{flags = yaws:flag(GC#gconf.flags,?GC_USE_OLD_SSL,Bool)}).
 -define(gc_set_use_erlang_sendfile(GC, Bool),
         GC#gconf{flags = yaws:flag(GC#gconf.flags,?GC_USE_ERLANG_SENDFILE,Bool)}).
 -define(gc_set_use_yaws_sendfile(GC, Bool),
@@ -110,32 +105,17 @@
           acceptor_pool_size = 8,             % size of acceptor proc pool
 
           mime_types_info,                    % undefined | #mime_types_info{}
-          nslookup_pref = [inet]              % [inet | inet6]
+          nslookup_pref = [inet],             % [inet | inet6]
+          ysession_idle_timeout = 2*60*1000,  % default 2 minutes
+          ysession_long_timeout = 60*60*1000, % default 1 hour
+
+          sni = disable % disable | enable | strict
          }).
-
-
--ifdef(HAVE_SSL_HONOR_CIPHER_ORDER).
--define(HONOR_CIPHER_ORDER, true).
--else.
--define(HONOR_CIPHER_ORDER, undefined).
--endif.
-
--ifdef(HAVE_SSL_CLIENT_RENEGOTIATION).
--define(SSL_CLIENT_RENEGOTIATION, true).
--else.
--define(SSL_CLIENT_RENEGOTIATION, undefined).
--endif.
-
--ifdef(HAVE_SSL_LOG_ALERT).
--define(SSL_LOG_ALERT, {log_alert, false}).
--else.
--define(SSL_LOG_ALERT, false).
--endif.
 
 -record(ssl, {
           keyfile,
           certfile,
-          verify = 0,
+          verify = verify_none,
           fail_if_no_peer_cert,
           depth = 1,
           password,
@@ -144,9 +124,16 @@
           ciphers,
           cachetimeout,
           secure_renegotiate = false,
-          client_renegotiation = ?SSL_CLIENT_RENEGOTIATION,
-          honor_cipher_order = ?HONOR_CIPHER_ORDER,
-          protocol_version
+          client_renegotiation = case yaws_dynopts:have_ssl_client_renegotiation() of
+                                     true  -> true;
+                                     false -> undefined
+                                 end,
+          honor_cipher_order = case yaws_dynopts:have_ssl_honor_cipher_order() of
+                                   true  -> true;
+                                   false -> undefined
+                               end,
+          protocol_version,
+          require_sni = false
          }).
 
 
@@ -159,11 +146,11 @@
 -define(SC_DIR_LISTINGS,          32).
 -define(SC_DEFLATE,               64).
 -define(SC_DIR_ALL_ZIP,          128).
--define(SC_DAV,                  512).
--define(SC_FCGI_TRACE_PROTOCOL, 1024).
--define(SC_FCGI_LOG_APP_ERROR,  2048).
--define(SC_FORWARD_PROXY,       4096).
--define(SC_AUTH_SKIP_DOCROOT,   8192).
+-define(SC_DAV,                  256).
+-define(SC_FCGI_TRACE_PROTOCOL,  512).
+-define(SC_FCGI_LOG_APP_ERROR,  1024).
+-define(SC_FORWARD_PROXY,       2048).
+-define(SC_AUTH_SKIP_DOCROOT,   4096).
 
 
 
