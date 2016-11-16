@@ -1,3 +1,4 @@
+16.11.2016: download from https://github.com/ahmednawras/log4erl
 1) download new version
 2) remove append from FILE_OPTIONS in include/log4erl.hrl
 2) add delayed_write to FILE_OPTIONS in include/log4erl.hrl to increase performance at the cost of losing log entries if the log4erl process dies
