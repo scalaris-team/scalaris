@@ -1,4 +1,4 @@
-%% @copyright 2012-2015 Zuse Institute Berlin
+%% @copyright 2012-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -289,8 +289,6 @@ tester_type_check_math(_Config) ->
              {stop, 0},
              {rand_uniform, 2}, % tested via feeder
              {rand_uniform, 3}  % tested via feeder
-           ],
-           [ {rand_uniform_, 3}  % internal helper for rand_uniform/3
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
