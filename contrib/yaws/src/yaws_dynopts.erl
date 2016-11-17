@@ -107,7 +107,11 @@ compare_version1([X1|Rest1], [X2|Rest2]) ->
     case compare_digit(X1, X2) of
         equal -> compare_version1(Rest1, Rest2);
         Else  -> Else
-    end.
+    end;
+compare_version1(_X, []) ->
+    greater;
+compare_version1([], _X) ->
+    less.
 
 compare_digit(X, X) ->
     equal;
