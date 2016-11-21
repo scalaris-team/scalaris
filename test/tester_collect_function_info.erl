@@ -260,6 +260,8 @@ parse_type({type, _Line, boolean, []}, _Module, ParseState) ->
     {bool, ParseState};
 parse_type({type, _Line, any, []}, _Module, ParseState) ->
     {{typedef, tester, test_any, []}, ParseState};
+parse_type({type, _Line, any}, _Module, ParseState) ->
+    {{typedef, tester, test_any}, ParseState};
 parse_type({type, _Line, atom, []}, _Module, ParseState) ->
     {atom, ParseState};
 parse_type({type, _Line, arity, []}, _Module, ParseState) ->
