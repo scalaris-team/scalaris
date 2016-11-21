@@ -75,7 +75,7 @@ There are three different ways for installing Scalaris:
 
 
 When you used packages from your distribution to install Erlang
-etc. configure should be able to find the requirements and it is sufficient to
+etc. configure should be able to find the requirements. However, you have to have installed a C and a C++ compiler. Otherwise configure will fail. It is sufficient to
 call:
 
 ~~~~~~
@@ -121,7 +121,7 @@ For more details please consult our Users and Developers Guide ([pdf]({{ site.re
   * Python-API, CLI: Python >= 2.6 (including 3.x)
   * Ruby-API, CLI: Ruby >= 1.8
   * Storage on disk: Tokyocabinet, toke
-  * C++-API, CLI: boost >= 1.47
+  * C++-API, CLI: boost >= 1.47 (regex, asio, program-options, test)
 
 ### Prebuild packages
 
