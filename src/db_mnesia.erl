@@ -1,4 +1,4 @@
-% @copyright 2013-2015 Zuse Institute Berlin,
+% @copyright 2013-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -137,7 +137,8 @@ delete_mnesia_tables(Tabs) ->
 new(DBName) ->
     ?TRACE("new:~nDB_name:~p~n",[DBName]),
     DbAtom = list_to_atom(DBName),
-    mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set}]),
+    {atomic, ok} = mnesia:create_table(DbAtom, [{disc_copies, [node()]},
+                                                {type, ordered_set}]),
     DbAtom.
 
 %% @doc Creates new DB handle named DBName with possibility to pass Options.
@@ -145,7 +146,8 @@ new(DBName) ->
 new(DBName, Options) ->
     ?TRACE("new:~nDB_name:~p~nOption~p~n",[DBName, Options]),
     DbAtom = list_to_atom(DBName),
-    mnesia:create_table(DbAtom, [{disc_copies, [node()]}, {type, ordered_set} | Options]),
+    {atomic, ok} = mnesia:create_table(DbAtom, [{disc_copies, [node()]},
+                                                {type, ordered_set} | Options]),
     DbAtom.
 
 %% @doc Open a previously existing database assuming the database has been
