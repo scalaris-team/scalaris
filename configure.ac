@@ -654,26 +654,58 @@ AC_SUBST(ENABLEPYTHON3INSTALL)
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
+
+#http://unix.stackexchange.com/questions/35183/how-do-i-identify-which-linux-distro-is-running
+
+LINUXVERSION="unknown linux"
+if test -f /etc/SuSE-release ; then
+  LINUXVERSION=`cat /etc/SuSE-release`
+elif test -f /etc/redhat-release ; then
+  LINUXVERSION=`cat /etc/redhat-release`
+elif test -f /etc/fedora-release ; then
+  LINUXVERSION=`cat /etc/fedora-release`
+elif test -f /etc/debian_release ; then
+  LINUXVERSION=`cat /etc/debian_release`
+elif test -f /etc/debian_version ; then
+  LINUXVERSION=`cat /etc/debian_version`
+elif test -f /etc/gentoo-release ; then
+  LINUXVERSION=`cat /etc/gentoo-release`
+fi
+
+OS=""
 case `uname -s` in
  linux*)
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
+     OS=$LINUXVERSION
      ;;
  Linux*)
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
+     OS=$LINUXVERSION
      ;;
  Darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
+     OS="OSX `sw_vers -productVersion`"
      ;;
  darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
+     OS="OSX `sw_vers -productVersion`"
      ;;
 esac
 
-echo "detected OS is: '$DRIVER_OS'"
+GIT=`which git`
+SRC="download"
+CONFIGURESTATUS=""
+
+if test -n $GIT -a -d .git ; then
+   SRC=`git log --pretty=format:'%h' -n 1 .`
+   CONFIGURESTATUS=`git status -s configure | cut -d ' ' -f 2`
+fi
+
+echo "detected OS is: '$OS' $SRC $CONFIGURESTATUS"
 AC_SUBST(DRIVER_OS)
 AC_SUBST(NIFFLAGS)
 
