@@ -7854,12 +7854,24 @@ case `uname -s` in
 esac
 
 GIT=`which git`
+STAT=`which stat`
+SHA1SUM=`which sha1sum`
 SRC="download"
 CONFIGURESTATUS=""
 
-if test -n $GIT -a -d .git ; then
-   SRC=`git log --pretty=format:'%h' -n 1 .`
-   CONFIGURESTATUS=`git status -s configure | cut -d ' ' -f 2`
+if test "x$GIT" != "x" -a -d .git; then
+  SRC=`git log --pretty=format:'%h' -n 1 .`
+  CONFIGURESTATUS=`git status -s configure | cut -d ' ' -f 2`
+elif test "x$GIT" != "x"; then
+  CONFIGURESTATUS=`git hash-object configure`
+elif test "x$DRIVER_OS" = "xMACOSX" ; then
+  # BSD
+  SIZE=`/usr/bin/stat -f "%z" configure`
+  CONFIGURESTATUS=`(/usr/bin/printf "blob $SIZE\0" ; /bin/cat configure) | /usr/bin/openssl sha1`
+elif test "x$STAT" != "x" -a "x$SHA1SUM" != "x" ; then
+  CONFIGURESTATUS=`(stat --printf="blob %s\0" configure; cat configure) | sha1sum -b | cut -d " " -f1`
+else
+  CONFIGURESTATUS=""
 fi
 
 echo "detected OS is: '$OS' $SRC $CONFIGURESTATUS"
