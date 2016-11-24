@@ -38,7 +38,9 @@ suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     %% need config here to get db path
-    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir}]}]),
+    unittest_helper:check_ring_size_fully_joined(config:read(replication_factor)),
 
     %% cleanup schema generated possibly in earlier failed run
     PWD = os:cmd(pwd),
@@ -48,9 +50,9 @@ init_per_suite(Config) ->
 
     tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
     tester:register_value_creator({typedef, db_backend_beh, key, []}, db_backend_beh, tester_create_db_key, 1),
-    Config2.
+    Config.
 
-end_per_suite(Config) ->
+end_per_suite(_Config) ->
     tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
     tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
 
@@ -60,7 +62,7 @@ end_per_suite(Config) ->
         "/" ++ config:read(db_directory) ++ "/" ++ atom_to_list(erlang:node()) ++ "/",
     cleanup(WorkingDir),
 
-    _ = unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:stop_ring(),
     ok.
 
 rw_suite_runs(N) ->
