@@ -14,6 +14,10 @@
 
 AC_PREREQ(2.65)
 AC_INIT(scalaris, 0.9.0+git, scalaris@googlegroups.com)
+AC_CONFIG_MACRO_DIR([m4])
+# we will never do automake, just pull in config.guess, config.sub, ... for boost
+AC_CONFIG_AUX_DIR([build-aux])
+AM_INIT_AUTOMAKE()
 
 EMAKEFILEDEFINES=
 EDOCMACROS=
@@ -40,17 +44,6 @@ AC_ARG_ENABLE([cpp],
 
 enabled_cxx=0
 if test "x$ENABLE_CPP" != xno ; then
-  # fake automake scripts (config.guess, install-sh, ...)
-  #              Homebrew                     Ubuntu
-  for PREFIX in "/usr/local/Cellar/automake" "/usr/share"; do
-    if test -d $PREFIX; then
-      location=`find $PREFIX -type d -name "automake-?.??"`
-      if test "$location"; then
-        AC_CONFIG_AUX_DIR([$location])
-        break
-      fi
-    fi
-  done
   # C++ and boost checks
   AX_CXX_COMPILE_STDCXX_11([noext],[optional])
   if test "x$HAVE_CXX11" = "x1" ; then
