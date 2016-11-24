@@ -1,3 +1,4 @@
+
 # Copyright 2007-2016 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -584,7 +585,7 @@ doc: .make-doc
 docs: doc java-doc
 
 dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test --no_native
+	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Wunmatched_returns -Wunknown -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test --no_native --statistics
 
 dialyzer-col:
 	$(MAKE) dialyzer | sed -f contrib/dialyzer-col.sed
