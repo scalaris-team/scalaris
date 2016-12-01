@@ -25,7 +25,7 @@
 
 -export([get_keys/1]).
 -export([write_values_for_keys/2]).
--export([quorum_accepted/2, quorum_denied/2]).
+-export([quorum_accepted/1, quorum_denied/1]).
 -export([collect_read_value/3]).
 -export([collect_newer_read_value/3]).
 -export([collect_older_read_value/3]).
@@ -44,14 +44,14 @@ write_values_for_keys(Keys, WriteValue) ->
     [WriteValue || _K <- Keys].
 
 %% @doc Returns if enough acks for majority have been collected.
--spec quorum_accepted(?RT:key(), integer()) -> boolean().
-quorum_accepted(_Key, AccCount) ->
+-spec quorum_accepted(integer()) -> boolean().
+quorum_accepted(AccCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_accept(R) =< AccCount.
 
 %% @doc Returns if enough denies for majority have been collected.
--spec quorum_denied(?RT:key(), integer()) -> boolean().
-quorum_denied(_Key, DeniedCount) ->
+-spec quorum_denied(integer()) -> boolean().
+quorum_denied(DeniedCount) ->
     R = config:read(replication_factor),
     quorum:majority_for_deny(R) =< DeniedCount.
 

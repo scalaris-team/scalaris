@@ -62,15 +62,19 @@
                   ?RT:key(), %% key
                   module(), %% data type
                   comm:erl_local_pid(), %% client
-                  pr:pr(), %% my round
-                  non_neg_integer(), %% number of acks
-                  non_neg_integer(), %% number of denies
-                  pr:pr(), %% highest accepted write round in replies
-                  any(), %% value of highest seen round in replies
                   any(), %% filter (read) or tuple of filters (write)
-                  non_neg_integer() %% number of newest replies
+                  pr:pr(), %% my round
+                  replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
                  }.
+
+-type replies() :: {
+                    non_neg_integer(), %% number of newest replies
+                    non_neg_integer(), %% number of acks
+                    non_neg_integer(), %% number of denies
+                    pr:pr(), %% highest accepted write round in replies
+                    any() %% value of highest seen round in replies
+                   }.
 
 -type check_next_step() :: fun((term(), term()) -> term()).
 
@@ -341,22 +345,26 @@ on({qread_collect,
             %% outdated as all replies run through the same process.
             State;
         Entry ->
-            case add_read_reply(Entry, db_selector(State), MyRwithId,
-                                Val, SeenWriteRound, Cons) of
-                %% {decided?, Entry}
-                {false, NewEntry} ->
+            Replies = entry_replies(Entry),
+            {Result, NewReplies, NewRound} =
+                add_read_reply(Replies, db_selector(State), MyRwithId, Val, SeenWriteRound,
+                               entry_my_round(Entry), entry_datatype(Entry), entry_filters(Entry), Cons),
+            TE = entry_set_my_round(Entry, NewRound),
+            NewEntry = entry_set_replies(TE, NewReplies),
+            case Result of
+                false ->
 %%                    log_entry(qread_collect_false, NewEntry),
                     set_entry(NewEntry, tablename(State)),
                     State;
-                {true, NewEntry} ->
+                true ->
 %%                    log_entry(qread_collect_true, NewEntry),
                     trace_mpath:log_info(self(),
                                          {qread_done,
-                                          readval, entry_val(NewEntry)}),
+                                          readval, replies_val(NewReplies)}),
                     inform_client(qread_done, NewEntry),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
-                {write_through, NewEntry} ->
+                write_through ->
 %%                    log_entry(qread_collect_WT, NewEntry),
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
@@ -462,11 +470,12 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% we only try to re-write a consensus in exactly this
             %% round without retrying, so having no content check is
             %% fine here
+            ReadReplies = entry_replies(ReadEntry),
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
-                case pr:get_wf(entry_max_write_r(ReadEntry)) of
+                case pr:get_wf(replies_max_write_r(ReadReplies)) of
                     none ->
                         {fun prbr:noop_write_filter/3, none,
-                         entry_val(ReadEntry)};
+                         replies_val(ReadReplies)};
                     WTInfos ->
                         DataType = entry_datatype(ReadEntry),
                         %% Depending on the datatype the write through value might
@@ -477,7 +486,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                                   true ->
                                         setelement(3, WTInfos,
                                                    DataType:get_write_through_value(
-                                                     entry_val(ReadEntry)));
+                                                     replies_val(ReadReplies)));
                                   _    -> WTInfos
                               end,
                         % WTInfo = write through infos
@@ -551,9 +560,12 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
             %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
-            case add_write_reply(Entry, Round, Cons) of
-                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
-                {true, NewEntry} ->
+            Replies = entry_replies(Entry),
+            {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
+            NewEntry = entry_set_replies(Entry, NewReplies),
+            case Done of
+                false -> set_entry(NewEntry, tablename(State));
+                true ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
@@ -575,7 +587,9 @@ on({qread_write_through_collect, ReqId,
         _ ->
             %% log:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
-            {Done, NewEntry} = add_write_deny(Entry, NewerRound, Cons),
+            Replies = entry_replies(Entry),
+            {Done, NewReplies} = add_write_deny(Replies, NewerRound, Cons),
+            NewEntry = entry_set_replies(Entry, NewReplies),
             %% log:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
             case Done of
                 false ->
@@ -665,7 +679,9 @@ on({qread_write_through_done, ReadEntry, Filtering,
             apply_filter -> F = entry_filters(ReadEntry), F(Val);
             _ -> Val
         end,
-    TReplyEntry = entry_set_val(ReadEntry, ClientVal),
+    Replies = entry_replies(ReadEntry),
+    NewReplies = replies_set_val(Replies, ClientVal),
+    TReplyEntry = entry_set_replies(ReadEntry, NewReplies),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
     %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
@@ -726,7 +742,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
           NewEntry = setelement(2, Entry, do_qwrite_fast),
           ContentCheck = element(2, entry_filters(NewEntry)),
           WriteFilter = element(3, entry_filters(NewEntry)),
-          WriteValue = entry_val(NewEntry),
+          WriteValue = replies_val(entry_replies(NewEntry)),
           DataType = entry_datatype(NewEntry),
 
           _ = case ContentCheck(OldRFResultValue,
@@ -773,13 +789,17 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            case add_write_reply(Entry, Round, Cons) of
-                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
-                {true, NewEntry} ->
+            Replies = entry_replies(Entry),
+            {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
+            NewEntry = entry_set_replies(Entry, NewReplies),
+            case Done of
+                false -> set_entry(NewEntry, tablename(State));
+                true ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
+                    WriteValue = replies_val(NewReplies),
                     trace_mpath:log_info(self(),
                                          {qwrite_done,
-                                          value, entry_val(ReplyEntry)}),
+                                          value, WriteValue}),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
@@ -800,10 +820,13 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            case add_write_deny(Entry, NewerRound, Cons) of
-                {false, NewEntry} -> set_entry(NewEntry, TableName),
+            Replies = entry_replies(Entry),
+            {Done, NewReplies} = add_write_deny(Replies, NewerRound, Cons),
+            NewEntry = entry_set_replies(Entry, NewReplies),
+            case Done of
+                false -> set_entry(NewEntry, TableName),
                                      State;
-                {true, NewEntry} ->
+                true ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),
 
@@ -884,7 +907,7 @@ on({next_period, NewPeriod}, State) ->
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             14 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+             9 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -909,11 +932,12 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 14),
-    if is_tuple(element(13, Entry)) -> %% write request
+    ?ASSERT(erlang:tuple_size(Entry) =:= 10),
+    Filters = entry_filters(Entry),
+    if is_tuple(Filters) -> %% write request
            {qwrite, entry_client(Entry),
             entry_key(Entry), entry_datatype(Entry),
-            entry_filters(Entry), entry_val(Entry),
+            entry_filters(Entry), replies_val(entry_replies(Entry)),
             RetriggerDelay};
        true -> %% read request
            {qread, entry_client(Entry), entry_key(Entry),
@@ -926,7 +950,7 @@ retrigger(Entry, TableName, IncDelay) ->
     Request = req_for_retrigger(Entry, IncDelay),
     ?TRACE("Retrigger caused by timeout or concurrency for ~.0p~n", [Request]),
     comm:send_local(self(), Request),
-    ?PDB:delete(element(1, Entry), TableName).
+    ?PDB:delete(entry_reqid(Entry), TableName).
 
 -spec get_entry(any(), ?PDB:tableid()) -> entry() | undefined.
 get_entry(ReqId, TableName) ->
@@ -942,16 +966,19 @@ set_entry(NewEntry, TableName) ->
                      non_neg_integer())
                     -> entry().
 entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+    Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
+               _MaxSeenWRound = pr:new(0,0), _Val = empty_new_read_entry},
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     _MyRound = pr:new(0, 0), _NumAcked = 0,
-     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _Val = empty_new_read_entry, Filter, 0}.
+     Filter, _MyRound = pr:new(0, 0), Replies}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
+    Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
+               _MaxSeenRound = pr:new(0,0), _Val = Value},
     {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
-     _MyRound = pr:new(0, 0), _NumAcked = 0, _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), Value, Filters, 0}.
+     Filters, _MyRound = pr:new(0, 0), Replies}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -965,163 +992,171 @@ entry_key(Entry)                  -> element(5, Entry).
 entry_datatype(Entry)             -> element(6, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
 entry_client(Entry)               -> element(7, Entry).
+-spec entry_filters(entry())      -> any().
+entry_filters(Entry)              -> element(8, Entry).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(8, Entry).
+entry_my_round(Entry)             -> element(9, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(8, Entry, Round).
--spec entry_num_acks(entry())     -> non_neg_integer().
-entry_num_acks(Entry)             -> element(9, Entry).
--spec entry_inc_num_acks(entry()) -> entry().
-entry_inc_num_acks(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
--spec entry_set_num_acks(entry(), non_neg_integer()) -> entry().
-entry_set_num_acks(Entry, Num)    -> setelement(9, Entry, Num).
--spec entry_num_denies(entry())   -> non_neg_integer().
-entry_num_denies(Entry)           -> element(10, Entry).
--spec entry_inc_num_denies(entry()) -> entry().
-entry_inc_num_denies(Entry) -> setelement(10, Entry, element(10, Entry) + 1).
--spec entry_set_num_denies(entry(), non_neg_integer()) -> entry().
-entry_set_num_denies(Entry, Val) -> setelement(10, Entry, Val).
--spec entry_max_write_r(entry())  -> pr:pr().
-entry_max_write_r(Entry)          -> element(11, Entry).
--spec entry_set_max_write_r(entry(), pr:pr()) -> entry().
-entry_set_max_write_r(Entry, Round) -> setelement(11, Entry, Round).
--spec entry_val(entry())           -> any().
-entry_val(Entry)                   -> element(12, Entry).
--spec entry_set_val(entry(), any()) -> entry().
-entry_set_val(Entry, Val)          -> setelement(12, Entry, Val).
--spec entry_filters(entry())       -> any().
-entry_filters(Entry)               -> element(13, Entry).
--spec entry_set_num_newest(entry(), non_neg_integer())  -> entry().
-entry_set_num_newest(Entry, Val)        -> setelement(14, Entry, Val).
--spec entry_inc_num_newest(entry()) -> entry().
-entry_inc_num_newest(Entry)        -> setelement(14, Entry, 1 + element(14, Entry)).
--spec entry_num_newest(entry())    -> non_neg_integer().
-entry_num_newest(Entry)            -> element(14, Entry).
+entry_set_my_round(Entry, Round)  -> setelement(9, Entry, Round).
+-spec entry_replies(entry())      -> replies().
+entry_replies(Entry)              -> element(10, Entry).
+-spec entry_set_replies(entry(), replies()) -> entry().
+entry_set_replies(Entry, Replies) -> setelement(10, Entry, Replies).
 
--spec add_read_reply(entry(), dht_node_state:db_selector(),
-                     pr:pr(), client_value(),
-                     pr:pr(), Consistency::boolean())
-                    -> {Done::boolean() | write_through, entry()}.
-add_read_reply(Entry, _DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
+-spec replies_set_num_newest(replies(), non_neg_integer())  -> replies().
+replies_set_num_newest(Replies, Val)    -> setelement(1, Replies, Val).
+-spec replies_inc_num_newest(replies()) -> replies().
+replies_inc_num_newest(Replies)         -> setelement(1, Replies, 1 + element(1, Replies)).
+-spec replies_num_newest(replies())     -> non_neg_integer().
+replies_num_newest(Replies)             -> element(1, Replies).
+-spec replies_num_acks(replies())       -> non_neg_integer().
+replies_num_acks(Replies)               -> element(2, Replies).
+-spec replies_inc_num_acks(replies())   -> replies().
+replies_inc_num_acks(Replies)           -> setelement(2, Replies, element(2, Replies) + 1).
+-spec replies_set_num_acks(replies(), non_neg_integer()) -> replies().
+replies_set_num_acks(Replies, Num)      -> setelement(2, Replies, Num).
+-spec replies_num_denies(replies())     -> non_neg_integer().
+replies_num_denies(Replies)             -> element(3, Replies).
+-spec replies_inc_num_denies(replies()) -> replies().
+replies_inc_num_denies(Replies)         -> setelement(3, Replies, element(3, Replies) + 1).
+-spec replies_set_num_denies(replies(), non_neg_integer()) -> replies().
+replies_set_num_denies(Replies, Val)    -> setelement(3, Replies, Val).
+-spec replies_max_write_r(replies())    -> pr:pr().
+replies_max_write_r(Replies)            -> element(4, Replies).
+-spec replies_set_max_write_r(replies(), pr:pr()) -> replies().
+replies_set_max_write_r(Replies, Round) -> setelement(4, Replies, Round).
+-spec replies_val(replies())            -> any().
+replies_val(Replies)                    -> element(5, Replies).
+-spec replies_set_val(replies(), any()) -> replies().
+replies_set_val(Replies, Val)           -> setelement(5, Replies, Val).
+
+-spec add_read_reply(replies(), dht_node_state:db_selector(),
+                     pr:pr(),  client_value(),  pr:pr(),
+                     pr:pr(), module(), any(), Consistency::boolean())
+                    -> {Done::boolean() | write_through, replies(), pr:pr()}.
+add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
+               CurrentRound, Datatype, Filters, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
-
     %% Otherwise we decide on a consistent quorum (a majority agrees
     %% on the same version). We ensure this by write_through on odd
     %% cases.
-    MaxWriteR = entry_max_write_r(Entry),
+    MaxWriteR = replies_max_write_r(Replies),
     %% extract write through info for round comparisons since
     %% they can be key-dependent if something different than
     %% replication is used for redundancy
     MaxWriteRNoWTInfo = pr:set_wf(MaxWriteR, none),
     SeenWriteRoundNoWTInfo = pr:set_wf(SeenWriteRound, none),
-    E1 =
+    R1 =
         if SeenWriteRoundNoWTInfo > MaxWriteRNoWTInfo ->
-                T1 = entry_set_max_write_r(Entry, SeenWriteRound),
-                T2 = entry_set_num_newest(T1, 1),
-                NewVal = ?REDUNDANCY:collect_newer_read_value(entry_val(T2),
-                                             Val, entry_datatype(Entry)),
-                entry_set_val(T2, NewVal);
+                T1 = replies_set_max_write_r(Replies, SeenWriteRound),
+                T2 = replies_set_num_newest(T1, 1),
+                NewVal = ?REDUNDANCY:collect_newer_read_value(replies_val(T2),
+                                             Val, Datatype),
+                replies_set_val(T2, NewVal);
            SeenWriteRoundNoWTInfo =:= MaxWriteRNoWTInfo ->
-                %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
+                %% ?DBG_ASSERT2(Val =:= replies_val(Replies),
                 %%    {collected_different_values_with_same_round,
-                %%     Val, entry_val(Entry), proto_sched:get_infos()}),
+                %%     Val, replies_val(Replies), proto_sched:get_infos()}),
 
-                %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
+                %% ?DBG_ASSERT2(Val =:= replies_val(Replies),
                 %%    {collected_different_values_with_same_round,
-                %%     Val, entry_val(Entry), proto_sched:get_infos()}),
-                NewVal = ?REDUNDANCY:collect_read_value(entry_val(Entry),
-                                             Val, entry_datatype(Entry)),
-                T1 = entry_set_val(Entry, NewVal),
-                entry_inc_num_newest(T1);
+                %%     Val, replies_val(Replies), proto_sched:get_infos()}),
+                NewVal = ?REDUNDANCY:collect_read_value(replies_val(Replies),
+                                             Val, Datatype),
+                T1 = replies_set_val(Replies, NewVal),
+                replies_inc_num_newest(T1);
            true ->
-               NewVal = ?REDUNDANCY:collect_older_read_value(entry_val(Entry),
-                                            Val, entry_datatype(Entry)),
-               entry_set_val(Entry, NewVal)
+               NewVal = ?REDUNDANCY:collect_older_read_value(replies_val(Replies),
+                                            Val, Datatype),
+               replies_set_val(Replies, NewVal)
     end,
-    MyRound = erlang:max(entry_my_round(E1), AssignedRound),
-    E2 = case entry_num_acks(E1) of
-             0 -> entry_set_my_round(E1, MyRound);
-             1 -> entry_set_my_round(E1, MyRound);
-             _ -> E1
+    MyRound = erlang:max(CurrentRound, AssignedRound),
+    NewRound = case replies_num_acks(Replies) of
+             0 -> MyRound;
+             1 -> MyRound;
+             _ -> CurrentRound
          end,
-    E3 = entry_inc_num_acks(E2),
-    E3NumAcks = entry_num_acks(E3),
-    E3RF = case entry_filters(E3) of
+    R2 = replies_inc_num_acks(R1),
+    R2NumAcks = replies_num_acks(R2),
+    R2RF = case Filters of
                {RF, _, _} -> RF;
                RF         -> RF
            end,
-    case ?REDUNDANCY:quorum_accepted(entry_key(E3), E3NumAcks) of
-        true ->
-            %% we have majority of acks
+    {Result, R4} =
+        case ?REDUNDANCY:quorum_accepted(R2NumAcks) of
+            true ->
+                %% we have majority of acks
 
-            %% construct read value from replies
-            Collected = entry_val(E3),
-            Constructed = ?REDUNDANCY:get_read_value(Collected, E3RF),
-            E4 = entry_set_val(E3, Constructed),
+                %% construct read value from replies
+                Collected = replies_val(R2),
+                Constructed = ?REDUNDANCY:get_read_value(Collected, R2RF),
+                R3 = replies_set_val(R2, Constructed),
 
-            Done = case entry_num_newest(E4) =:= E3NumAcks orelse
+                Done = case replies_num_newest(R3) =:= R2NumAcks orelse
                             ?REDUNDANCY:skip_write_through(Constructed) of
-                     true -> true; %% done
-                     _ -> write_through
-                   end,
+                            true -> true; %% done
+                            _ -> write_through
+                       end,
 %%% FS add read_retry as possibility
 
-            {Done, E4};
-        _ ->
-            {false, E3}
-    end.
+                {Done, R3};
+            _ ->
+                {false, R2}
+        end,
 
-add_read_deny(Entry, _DBSelector, MyRound, LargerRound, _Cons) ->
+    {Result, R4, NewRound}.
+
+add_read_deny(Entry, _DBSelector, _MyRound, LargerRound, _Cons) ->
     {retry, entry_set_my_round(Entry, LargerRound)}.
 
--spec add_write_reply(entry(), pr:pr(), Consistency::boolean())
-                     -> {Done::boolean(), entry()}.
-add_write_reply(Entry, Round, _Cons) ->
-    EntryMaxWriteR = entry_max_write_r(Entry),
-    EntryRoundCmp = {pr:get_r(EntryMaxWriteR), pr:get_id(EntryMaxWriteR)},
+-spec add_write_reply(replies(), pr:pr(), Consistency::boolean())
+                     -> {Done::boolean(), replies()}.
+add_write_reply(Replies, Round, _Cons) ->
+    RepliesMaxWriteR = replies_max_write_r(Replies),
+    RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
     RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
-    E1 =
-        case RoundCmp > EntryRoundCmp of
-            false -> Entry;
+    R1 =
+        case RoundCmp > RepliesRoundCmp of
+            false -> Replies;
             true ->
                 %% this is the first reply with this round number.
                 %% Older replies are (already) counted as denies, so
                 %% we expect no accounted acks here.
-%%                ?DBG_ASSERT2(entry_num_acks(Entry) =< 0,
-%%                             {found_unexpected_acks, entry_num_acks(Entry)}),
+%%                ?DBG_ASSERT2(replies_num_acks(Entry) =< 0,
+%%                             {found_unexpected_acks, replies_num_acks(Entry)}),
                 %% set rack and store newer round
-                OldAcks = entry_num_acks(Entry),
-                T1Entry = entry_set_max_write_r(Entry, Round),
-                T2Entry = entry_set_num_acks(T1Entry, 0),
-                _T3Entry = entry_set_num_denies(
-                             T2Entry, OldAcks + entry_num_denies(T2Entry))
+                OldAcks = replies_num_acks(Replies),
+                T1Replies = replies_set_max_write_r(Replies, Round),
+                T2Replies = replies_set_num_acks(T1Replies, 0),
+                _T3Replies = replies_set_num_denies(
+                             T2Replies, OldAcks + replies_num_denies(T2Replies))
         end,
-    E2 = entry_inc_num_acks(E1),
-    Done = ?REDUNDANCY:quorum_accepted(entry_key(E2), entry_num_acks(E2)),
-    {Done, E2}.
+    R2 = replies_inc_num_acks(R1),
+    Done = ?REDUNDANCY:quorum_accepted(replies_num_acks(R2)),
+    {Done, R2}.
 
--spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
-                    -> {Done::boolean(), entry()}.
-add_write_deny(Entry, Round, _Cons) ->
-    EntryMaxWriteR = entry_max_write_r(Entry),
-    EntryRoundCmp = {pr:get_r(EntryMaxWriteR), pr:get_id(EntryMaxWriteR)},
+-spec add_write_deny(replies(), pr:pr(), Consistency::boolean())
+                    -> {Done::boolean(), replies()}.
+add_write_deny(Replies, Round, _Cons) ->
+    RepliesMaxWriteR = replies_max_write_r(Replies),
+    RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
     RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
-    E1 =
-        case RoundCmp > EntryRoundCmp of
-            false -> Entry;
+    R1 =
+        case RoundCmp > RepliesRoundCmp of
+            false -> Replies;
             true ->
                 %% reset rack and store newer round
-                OldAcks = entry_num_acks(Entry),
-                T1Entry = entry_set_max_write_r(Entry, Round),
-                T2Entry = entry_set_num_acks(T1Entry, 0),
-                _T3Entry = entry_set_num_denies(
-                             T2Entry, OldAcks + entry_num_denies(T2Entry))
+                OldAcks = replies_num_acks(Replies),
+                T1Replies = replies_set_max_write_r(Replies, Round),
+                T2Replies = replies_set_num_acks(T1Replies, 0),
+                _T3Replies = replies_set_num_denies(
+                             T2Replies, OldAcks + replies_num_denies(T2Replies))
         end,
-    E2 = entry_inc_num_denies(E1),
-    Done = ?REDUNDANCY:quorum_denied(entry_key(E2), entry_num_denies(E2)),
-    {Done, E2}.
+    R2 = replies_inc_num_denies(R1),
+    Done = ?REDUNDANCY:quorum_denied(replies_num_denies(R2)),
+    {Done, R2}.
 
 -spec inform_client(qread_done, entry()) -> ok.
 inform_client(qread_done, Entry) ->
@@ -1130,7 +1165,7 @@ inform_client(qread_done, Entry) ->
       {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
-       entry_val(Entry)
+       replies_val(entry_replies(Entry))
       }).
 
 -spec inform_client(qwrite_done, entry(), any()) -> ok.
@@ -1140,7 +1175,7 @@ inform_client(qwrite_done, Entry, WriteRet) ->
       {qwrite_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
-       entry_val(Entry),
+       replies_val(entry_replies(Entry)),
        WriteRet
       }).
 
@@ -1168,7 +1203,8 @@ get_db_for_id(DBName, Key) ->
 
 
 
-log_entry(Prefix, Entry) ->
+log_replies(Prefix, Entry) ->
+    Replies = entry_replies(Entry),
     ct:pal("################# ~.0p:~n"
            "ReqId           : ~p~n"
 %%           "Debug           : ~p~n"
@@ -1192,12 +1228,12 @@ log_entry(Prefix, Entry) ->
              entry_datatype(Entry),
              entry_client(Entry),
              entry_my_round(Entry),
-             entry_num_acks(Entry),
-             entry_num_denies(Entry),
-             entry_max_write_r(Entry),
-             entry_val(Entry),
-             entry_filters(Entry),
-             entry_num_newest(Entry)
+             replies_num_acks(Replies),
+             replies_num_denies(Replies),
+             replies_max_write_r(Replies),
+             replies_val(Replies),
+             entry_filters(Replies),
+             replies_num_newest(Replies)
             ]).
 
 
