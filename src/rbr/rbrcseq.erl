@@ -63,6 +63,7 @@
                   module(), %% data type
                   comm:erl_local_pid(), %% client
                   any(), %% filter (read) or tuple of filters (write)
+                  is_read | any(), %% value to write if entry belongs to write
                   pr:pr(), %% my round
                   replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
@@ -742,7 +743,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
           NewEntry = setelement(2, Entry, do_qwrite_fast),
           ContentCheck = element(2, entry_filters(NewEntry)),
           WriteFilter = element(3, entry_filters(NewEntry)),
-          WriteValue = replies_val(entry_replies(NewEntry)),
+          WriteValue = entry_write_val(NewEntry),
           DataType = entry_datatype(NewEntry),
 
           _ = case ContentCheck(OldRFResultValue,
@@ -796,10 +797,9 @@ on({qwrite_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
-                    WriteValue = replies_val(NewReplies),
                     trace_mpath:log_info(self(),
                                          {qwrite_done,
-                                          value, WriteValue}),
+                                          value, entry_write_val(ReplyEntry)}),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
                     ?PDB:delete(ReqId, tablename(State))
             end
@@ -907,7 +907,7 @@ on({next_period, NewPeriod}, State) ->
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             9 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+             11 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -932,12 +932,12 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 10),
+    ?ASSERT(erlang:tuple_size(Entry) =:= 11),
     Filters = entry_filters(Entry),
     if is_tuple(Filters) -> %% write request
            {qwrite, entry_client(Entry),
             entry_key(Entry), entry_datatype(Entry),
-            entry_filters(Entry), replies_val(entry_replies(Entry)),
+            entry_filters(Entry), entry_write_val(Entry),
             RetriggerDelay};
        true -> %% read request
            {qread, entry_client(Entry), entry_key(Entry),
@@ -969,16 +969,16 @@ entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAft
     Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
                _MaxSeenWRound = pr:new(0,0), _Val = empty_new_read_entry},
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     Filter, _MyRound = pr:new(0, 0), Replies}.
+     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0, 0), Replies}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
     Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
-               _MaxSeenRound = pr:new(0,0), _Val = Value},
+               _MaxSeenRound = pr:new(0,0), _Val = empty_new_write_entry},
     {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
-     Filters, _MyRound = pr:new(0, 0), Replies}.
+     Filters, _ValueToWrite = Value, _MyRound = pr:new(0, 0), Replies}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -994,14 +994,16 @@ entry_datatype(Entry)             -> element(6, Entry).
 entry_client(Entry)               -> element(7, Entry).
 -spec entry_filters(entry())      -> any().
 entry_filters(Entry)              -> element(8, Entry).
+-spec entry_write_val(entry())    -> is_read | any().
+entry_write_val(Entry)            -> element(9, Entry).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(9, Entry).
+entry_my_round(Entry)             -> element(10, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(9, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(10, Entry, Round).
 -spec entry_replies(entry())      -> replies().
-entry_replies(Entry)              -> element(10, Entry).
+entry_replies(Entry)              -> element(11, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
-entry_set_replies(Entry, Replies) -> setelement(10, Entry, Replies).
+entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
 
 -spec replies_set_num_newest(replies(), non_neg_integer())  -> replies().
 replies_set_num_newest(Replies, Val)    -> setelement(1, Replies, Val).
@@ -1175,7 +1177,7 @@ inform_client(qwrite_done, Entry, WriteRet) ->
       {qwrite_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
-       replies_val(entry_replies(Entry)),
+       entry_write_val(Entry),
        WriteRet
       }).
 
