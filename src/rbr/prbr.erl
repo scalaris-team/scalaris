@@ -116,7 +116,8 @@
 -type entry() :: { any(), %% key
                    pr:pr(), %% r_read
                    pr:pr(), %% r_write
-                   any()    %% value
+                   any(), %% value
+                   [comm:mypid()] %% learner
                  }.
 
 %% Messages to expect from this module
@@ -125,6 +126,10 @@
              -> ok.
 msg_read_reply(Client, Cons, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, Cons, YourRound, Val, LastWriteRound}).
+
+-spec msg_read_deny(comm:mypid(), Consistency::boolean(), pr:pr(), pr:pr()) -> ok.
+msg_read_deny(Client, Cons, YourRound, LargerRound) ->
+    comm:send(Client, {read_deny, Cons, YourRound, LargerRound}).
 
 -spec msg_write_reply(comm:mypid(), Consistency::boolean(),
                       any(), pr:pr(), pr:pr(), any()) -> ok.
@@ -187,8 +192,13 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
                 end;
             _ -> entry_r_write(KeyEntry)
         end,
-    msg_read_reply(Proposer, Cons, AssignedReadRound,
-                   ReadVal, EntryWriteRound),
+%%    msg_read_reply(Proposer, Cons, AssignedReadRound,
+%%                   ReadVal, EntryWriteRound),
+
+    %% disable write without round temporaryly by rejecting the
+    %% request to transform it in one with a round number
+    msg_read_deny(Proposer, Cons, AssignedReadRound,
+                  AssignedReadRound),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
     NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
@@ -198,10 +208,51 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
     _ = set_entry(NewKeyEntry2, TableName),
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, ReadRound}, TableName) ->
+    ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
+    KeyEntry = get_entry(Key, TableName),
+
+    case ReadRound > entry_r_read(KeyEntry) of
+        true ->
+            {NewKeyEntryVal, ReadVal} =
+                case erlang:function_exported(DataType, prbr_read_handler, 3) of
+                    true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
+                    _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry))}
+                end,
+            trace_mpath:log_info(self(), {'prbr:on(read)',
+                                          %% key, Key,
+                                          round, ReadRound,
+                                          val, NewKeyEntryVal,
+                                          read_filter, ReadFilter}),
+            msg_read_reply(Proposer, Cons, ReadRound,
+                           ReadVal, entry_r_write(KeyEntry)),
+
+            NewKeyEntry = entry_set_r_read(KeyEntry, ReadRound),
+            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
+            %%    log:log("read~n"
+            %%            "Key: ~p~n"
+            %%            "Val: ~p", [Key, NewKeyEntry]),
+            _ = set_entry(NewKeyEntry2, TableName);
+        _ ->
+            msg_read_deny(Proposer, Cons, ReadRound, entry_r_read(KeyEntry))
+    end,
+    TableName;
+
+on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
+    PassedToUpdate, WriteFilter, IsWriteThrough}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     trace_mpath:log_info(self(), {prbr_on_write}),
-    KeyEntry = get_entry(Key, TableName),
+    OrigKeyEntry = get_entry(Key, TableName),
+    %% update learners:
+    %% when IsWriteThrough add current proposer as learner
+    %% otherwise clean registered learners by setting current proposer
+    %% as learner as we start a new consensus.
+    KeyEntry = case IsWriteThrough of
+                   true ->
+                       %% ct:pal("WriteThrough~n"),
+                       entry_add_learner(OrigKeyEntry, Proposer);
+                   _ -> entry_set_learner(OrigKeyEntry, Proposer)
+               end,
     %% we store the writefilter to be able to reproduce the request in
     %% write_throughs. We modify the InRound here to avoid duplicate
     %% transfer of the Value etc.
@@ -221,6 +272,9 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpd
                         _    -> WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value)
                     end,
+%%                ct:pal("modify ~p: ~p -> ~p (~.0p > ~.0p)",
+%%                       [Key, entry_val(KeyEntry), NewVal,
+%%                        entry_r_write(KeyEntry), RoundForWrite]),
                 trace_mpath:log_info(self(), {'prbr:on(write)',
                                   %% key, Key,
                                   round, RoundForWrite,
@@ -236,7 +290,9 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpd
 %%                        "Val: ~p", [Key, KeyEntry, NewVal]);
 %%                    _ -> ok
 %%                end,
-                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound, Ret),
+                [ msg_write_reply(P, Cons, Key, InRound,
+                                  NextWriteRound, Ret)
+                  || P <- entry_get_learner(NewKeyEntry) ],
                 NewKeyEntry2 =
                     %% see macro definition for explanation
                     case ?SEP_WTI of
@@ -265,7 +321,15 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value, PassedToUpd
                                   round, RoundForWrite,
                                   newer_round, NewerRound}),
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
-                msg_write_deny(Proposer, Cons, Key, NewerRound)
+                [ msg_write_deny(P, Cons, Key, NewerRound)
+                  || P <- entry_get_learner(KeyEntry) ],
+                %% we added proposers to the KeyEntry, so we have to store it
+
+
+                %% for a deny update the read round to the max(InRound
+                %% and entryroiundr)
+
+                set_entry(KeyEntry, TableName)
         end,
     TableName;
 
@@ -282,6 +346,10 @@ on({prbr, delete_key, _DB, Client, Key}, TableName) ->
 %% on({prbr, tab2list, DB, Client}, TableName) ->
 %%     comm:send_local(Client, {DB, tab2list(TableName)}),
 %%     TableName;
+
+on({prbr, get_entry, _DB, Client, Key}, TableName) ->
+    comm:send_local(Client, {entry, get_entry(Key, TableName)}),
+    TableName;
 
 on({prbr, tab2list_raw, DB, Client}, TableName) ->
     comm:send_local(Client, {DB, tab2list_raw(TableName)}),
@@ -335,8 +403,8 @@ new(Key, Val) ->
      _R_Read = pr:new(0, '_'),
      %% Note: atoms < pids, so this is a good default.
      _R_Write = pr:new(0, '_'),
-     _Value = Val}.
-
+     _Value = Val,
+     _Learner = []}.
 
 -spec entry_key(entry()) -> any().
 entry_key(Entry) -> element(1, Entry).
@@ -354,6 +422,17 @@ entry_set_r_write(Entry, Round) -> setelement(3, Entry, Round).
 entry_val(Entry) -> element(4, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
 entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
+-spec entry_add_learner(entry(), comm:mypid()) -> entry().
+entry_add_learner(Entry, Learner) ->
+    NewLearners = case lists:member(Learner, entry_get_learner(Entry)) of
+                      true -> Entry;
+                      false -> [Learner | entry_get_learner(Entry)]
+                  end,
+    setelement(5, Entry, NewLearners).
+-spec entry_set_learner(entry(), comm:mypid()) -> entry().
+entry_set_learner(Entry, Learner) -> setelement(5, Entry, [Learner]).
+-spec entry_get_learner(entry()) -> [comm:mypid()].
+entry_get_learner(Entry) -> element(5, Entry).
 
 -spec next_read_round(entry(), any()) -> pr:pr().
 next_read_round(Entry, ProposerUID) ->
@@ -370,7 +449,20 @@ next_read_round(Entry, ProposerUID) ->
 writable(Entry, InRound) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
-    if (InRound >= LatestSeenRead) andalso (InRound > LatestSeenWrite) ->
+    InRoundR = pr:get_r(InRound),
+    InRoundId = pr:get_id(InRound),
+    LatestSeenReadR = pr:get_r(LatestSeenRead),
+    LatestSeenReadId = pr:get_id(LatestSeenRead),
+    LatestSeenWriteR = pr:get_r(LatestSeenWrite),
+    if ((InRoundR =:= LatestSeenReadR andalso InRoundId=:= LatestSeenReadId)
+        orelse (InRoundR > LatestSeenReadR))
+       andalso (InRoundR > LatestSeenWriteR) ->
+           %%ct:pal("Accept~n"
+           %%       "InRound         ~.0p~n"
+           %%       "LatestSeenRead  ~.0p~n"
+           %%       "LatestSeenWrite ~.0p~n"
+           %%       "Value           ~.0p~n",
+           %%       [InRound, LatestSeenRead, LatestSeenWrite, entry_val(Entry)]),
            T1Entry = entry_set_r_write(Entry, InRound),
            %% prepare fast_paxos for this client:
            NextWriteRound = next_read_round(T1Entry,
@@ -380,13 +472,19 @@ writable(Entry, InRound) ->
            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
            {ok, T2Entry, NextWriteRound};
        true ->
-           %% proposer may not have latest value for a clean content
-           %% check, and another proposer is concurrently active, so
-           %% we do not prepare a fast_paxos for this client, but let
-           %% the other proposer the chance to pass read and write
-           %% phase.  The denied proposer has to perform a read and write
-           %% phase on its own (including a new content check).
-           {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
+            %%ct:pal("Deny~n"
+            %%       "InRound         ~.0p~n"
+            %%       "LatestSeenRead  ~.0p~n"
+            %%       "LatestSeenWrite ~.0p~n"
+            %%       "Value           ~.0p~n",
+            %%       [InRound, LatestSeenRead, LatestSeenWrite, entry_val(Entry)]),
+            %% proposer may not have latest value for a clean content
+            %% check, and another proposer is concurrently active, so
+            %% we do not prepare a fast_paxos for this client, but let
+            %% the other proposer the chance to pass read and write
+            %% phase.  The denied proposer has to perform a read and write
+            %% phase on its own (including a new content check).
+            {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
     end.
 
 -spec get_wti_key(any())-> any().

@@ -72,6 +72,8 @@ collect_read_value(Collected, NewValue, DataType) ->
     case NewValue of
         Collected -> Collected;
         DifferingVal ->
+            ct:log("Consistency based on value comparision: ~p <-> ~p (~p)",
+                   [Collected, NewValue, DataType]),
             %% if this happens, consistency is probably broken by
             %% too weak (wrong) content checks...?
 

@@ -1,4 +1,4 @@
-% @copyright 2014-2015 Zuse Institute Berlin,
+% @copyright 2014-2016 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -84,5 +84,5 @@ set_wf(R, WF) -> setelement(3, R, WF).
 %% when the first one writes.  In consequence, at most one proposer
 %% can perform a successful fast_write with its smallest_round. Voila!
 -spec smallest_round(comm:mypid()) -> pr().
-smallest_round(Pid) -> new(0, Pid).
+smallest_round(Pid) -> new(1, Pid).
 
