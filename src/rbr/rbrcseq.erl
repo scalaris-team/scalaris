@@ -1172,12 +1172,8 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
                                             Val, Datatype),
                replies_set_val(Replies, NewVal)
     end,
-    MyRound = erlang:max(CurrentRound, AssignedRound),
-    NewRound = case replies_num_acks(Replies) of
-             0 -> MyRound;
-             1 -> MyRound;
-             _ -> CurrentRound
-         end,
+    NewRound = erlang:max(CurrentRound, AssignedRound),
+
     R2 = replies_inc_num_acks(R1),
     R2NumAcks = replies_num_acks(R2),
     R2RF = case Filters of
