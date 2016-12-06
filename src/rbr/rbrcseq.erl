@@ -254,9 +254,9 @@ init(DBSelector) ->
 %% state()) -> state().
 
 
-%% normal qread step 1: preparation and starting read-phase
+%% qread round request step 1: requets the current read/write rounds of replicas
 on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
-    ?TRACE("rbrcseq:on qread, Client ~p~n", [Client]),
+    ?TRACE("rbrcseq:on round_request, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
     %% if the caller process may handle more than one request at a
@@ -264,10 +264,9 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% request to use the prbr correctly.
     ReqId = uid:get_pids_uid(),
 
-    ?TRACE("rbrcseq:on qread ReqId ~p~n", [ReqId]),
+    ?TRACE("rbrcseq:on round_request ReqId ~p~n", [ReqId]),
     %% initiate lookups for replicas(Key) and perform
-    %% rbr reads in a certain round (work as paxos proposer)
-    %% there apply the content filter to only retrieve the required information
+    %% rbr reads there apply the content filter to only retrieve the required information
     This = comm:reply_as(comm:this(), 2, {qread_collect, '_'}),
 
     %% add the ReqId in case we concurrently perform several requests
@@ -282,7 +281,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
               LookupEnvelope =
                   dht_node_lookup:envelope(
                     4,
-                    {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter}),
+                    {prbr, round_request, DB, '_', This, X, DataType, MyId, ReadFilter}),
               comm:send_local(Dest,
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
@@ -299,6 +298,40 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% store local state of the request
     set_entry(Entry, tablename(State)),
     State;
+
+%% qread round request step 2: a replica replied from step 1
+on({qread_collect,
+    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue}}, State) ->
+    ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
+
+    {_Round, ReqId} = pr:get_id(ReceivedReadRound),
+    case get_entry(ReqId, tablename(State)) of
+        undefined ->
+            %% drop replies for unknown requests, as they must be outdated as all replies
+            %% run through the same process.
+            State;
+        Entry ->
+            Replies = entry_replies(Entry),
+            {Result, NewReplies} = add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
+                                                ReceivedWriteRound, ReadValue, entry_datatype(Entry),
+                                                entry_filters(Entry), Cons),
+            NewEntry = entry_set_replies(Entry, NewReplies),
+            case Result of
+                false ->
+                    set_entry(NewEntry, tablename(State)),
+                    State;
+                true ->
+                    % majority replied -> do qread with highest received read round
+                    ?PDB:delete(ReqId, tablename(State)),
+                    gen_component:post_op({qread,
+                                           entry_client(NewEntry),
+                                           entry_key(NewEntry),
+                                           entry_datatype(NewEntry),
+                                           entry_filters(NewEntry),
+                                           entry_retrigger(NewEntry),
+                                           1+pr:get_r(Replies#rr_replies.highest_r_round)}, State)
+            end
+    end;
 
 %% qread step 1 with explicit read round number
 on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State) ->
@@ -434,7 +467,6 @@ on({qread_collect,
 
 on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
     {_Round, ReqId} = pr:get_id(MyRwithId),
-
     case get_entry(ReqId, tablename(State)) of
         undefined ->
             State;
@@ -1066,6 +1098,37 @@ replies_set_max_write_r(Replies, Round) -> setelement(4, Replies, Round).
 replies_val(Replies)                    -> element(5, Replies).
 -spec replies_set_val(replies(), any()) -> replies().
 replies_set_val(Replies, Val)           -> setelement(5, Replies, Val).
+
+-spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
+                   pr:pr(), pr:pr(), client_value(), module(),
+                   any(), boolean())
+                   -> {boolean(), #rr_replies{}}.
+add_rr_reply(Replies, _DBSelector, SeenReadRound, _SeenWriteRound, _Value,
+             _Datatype, _Filters, _Cons) ->
+
+    % increment number of replies received
+    ReplyCount = Replies#rr_replies.reply_count + 1,
+    R1 = Replies#rr_replies{reply_count=ReplyCount},
+
+    % update number of newest read replies received
+    MaxReadR = Replies#rr_replies.highest_r_round,
+    R2 =
+        if MaxReadR =:= SeenReadRound ->
+               MaxRCount = R1#rr_replies.newest_r_reply_count + 1,
+               R1#rr_replies{newest_r_reply_count=MaxRCount};
+           MaxReadR < SeenReadRound ->
+               RT1 = R1#rr_replies{newest_r_reply_count=1},
+               RT1#rr_replies{highest_r_round=SeenReadRound};
+           true ->
+               R1
+        end,
+
+    {Result, R3} =
+        case ?REDUNDANCY:quorum_accepted(ReplyCount) of
+            true -> {true, R2};
+            false -> {false, R2}
+        end,
+    {Result, R3}.
 
 -spec add_read_reply(replies(), dht_node_state:db_selector(),
                      pr:pr(),  client_value(),  pr:pr(),

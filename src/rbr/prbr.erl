@@ -121,6 +121,10 @@
                  }.
 
 %% Messages to expect from this module
+-spec msg_round_request_reply(comm:mypid(), boolean(), pr:pr(), pr:pr(), any()) -> ok.
+msg_round_request_reply(Client, Cons, ReadRound, WriteRound, Value) ->
+    comm:send(Client, {round_request_reply, Cons,  ReadRound, WriteRound, Value}).
+
 -spec msg_read_reply(comm:mypid(), Consistency::boolean(),
                      pr:pr(), any(), pr:pr())
              -> ok.
@@ -162,7 +166,7 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
-on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
@@ -195,10 +199,9 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, Ta
 %%    msg_read_reply(Proposer, Cons, AssignedReadRound,
 %%                   ReadVal, EntryWriteRound),
 
-    %% disable write without round temporaryly by rejecting the
+    %% disable write without round by rejecting the
     %% request to transform it in one with a round number
-    msg_read_deny(Proposer, Cons, AssignedReadRound,
-                  AssignedReadRound),
+    msg_round_request_reply(Proposer, Cons, AssignedReadRound, EntryWriteRound, ReadVal),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
     NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
