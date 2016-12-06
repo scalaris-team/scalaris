@@ -55,6 +55,20 @@
 %% TODO: add support for *consistent* quorum by counting the number of
 %% same-round-number replies
 
+%% rr_replies are received after executing a read without round number
+%% to receive the current highest read round. If the replies are a
+%% consistent quorum, the read value can be directly delivered, otherwise
+%% a read with the highest round number is executed.
+-record(rr_replies, {reply_count :: non_neg_integer(),            %% total number of replies recieved
+                     newest_r_reply_count :: non_neg_integer(),   %% number of replies with current highest read round
+                     highest_r_round :: pr:pr(),                  %% highest read round received in replies
+                     newest_w_reply_count ::non_neg_integer(),    %% number of replies with current highest write round
+                     highest_w_round :: pr:pr(),                  %% highest write round recieved in replies
+                     read_value :: any()                          %% value received in the reply with highest round
+                    }).
+
+-type replies() :: gen_replies() | #rr_replies{}.
+
 -type entry() :: {any(), %% ReqId
                   any(), %% debug field
                   non_neg_integer(), %% period of last retriggering / starting
@@ -69,7 +83,7 @@
 %%% Attention: There is a case that checks the size of this tuple below!!
                  }.
 
--type replies() :: {
+-type gen_replies() :: {
                     non_neg_integer(), %% number of newest replies
                     non_neg_integer(), %% number of acks
                     non_neg_integer(), %% number of denies
@@ -279,8 +293,8 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% {next_period, ...}
 
     %% create local state for the request id
-    Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
-                           ReadFilter, RetriggerAfter),
+    Entry = entry_new_round_request(qread, ReqId, Key, DataType, Client,
+                                    period(State), ReadFilter, RetriggerAfter),
 %%    log_entry(qread, Entry),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
@@ -961,24 +975,45 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
 %% abstract data type to collect quorum read/write replies
+-spec entry_new_round_request(any(), any(), ?RT:key(), module(),
+                     comm:erl_local_pid(), non_neg_integer(), any(),
+                     non_neg_integer())
+                    -> entry().
+entry_new_round_request(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
+     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0,0), new_rr_replies()}.
+
 -spec entry_new_read(any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer())
                     -> entry().
 entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
-    Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
-               _MaxSeenWRound = pr:new(0,0), _Val = empty_new_read_entry},
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0, 0), Replies}.
+     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0,0), new_read_replies()}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
-    Replies = {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
-               _MaxSeenRound = pr:new(0,0), _Val = empty_new_write_entry},
     {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
-     Filters, _ValueToWrite = Value, _MyRound = pr:new(0, 0), Replies}.
+     Filters, _ValueToWrite = Value, _MyRound = pr:new(0,0), new_write_replies()}.
+
+-spec new_rr_replies() -> #rr_replies{}.
+new_rr_replies() ->
+    #rr_replies{reply_count = 0,
+                newest_r_reply_count = 0, highest_r_round = pr:new(0,0),
+                newest_w_reply_count = 0, highest_w_round = pr:new(0,0),
+                read_value = nwe_empty_rr_replies}.
+
+-spec new_read_replies() -> gen_replies().
+new_read_replies() ->
+    {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
+     _MaxSeenRound = pr:new(0,0), _Value = empty_new_read_replies}.
+
+-spec new_write_replies() -> gen_replies().
+new_write_replies() ->
+    {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
+     _MaxSeenRound = pr:new(0,0), _Value = empty_new_write_replies}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
