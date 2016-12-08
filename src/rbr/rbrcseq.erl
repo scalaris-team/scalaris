@@ -254,9 +254,9 @@ init(DBSelector) ->
 %% state()) -> state().
 
 
-%% qread round request step 1: requets the current read/write rounds of replicas
+%% qread step 1: request the current read rounds of + values from replicas.
 on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
-    ?TRACE("rbrcseq:on round_request, Client ~p~n", [Client]),
+    ?TRACE("rbrcseq:read step 1: round_request, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
     %% if the caller process may handle more than one request at a
@@ -264,7 +264,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% request to use the prbr correctly.
     ReqId = uid:get_pids_uid(),
 
-    ?TRACE("rbrcseq:on round_request ReqId ~p~n", [ReqId]),
+    ?TRACE("rbrcseq:read step 1: round_request ReqId ~p~n", [ReqId]),
     %% initiate lookups for replicas(Key) and perform
     %% rbr reads there apply the content filter to only retrieve the required information
     This = comm:reply_as(comm:this(), 2, {qread_collect, '_'}),
@@ -299,9 +299,11 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     set_entry(Entry, tablename(State)),
     State;
 
-%% qread round request step 2: a replica replied from step 1
+%% qread step 2: collect round_request replies (step 1) from replicas.
+%% If a majority replied and it is a consistent quorum (i.e. all received read rounds are the same)
+%% we can deliver the read. If not, a qread with explicit round number is started.
 on({qread_collect,
-    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue}}, State) ->
+    {round_request_reply, Cons, ReceivedReadRound, ReadValue}}, State) ->
     ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
 
     {_Round, ReqId} = pr:get_id(ReceivedReadRound),
@@ -313,7 +315,7 @@ on({qread_collect,
         Entry ->
             Replies = entry_replies(Entry),
             {Result, NewReplies} = add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
-                                                ReceivedWriteRound, ReadValue, entry_datatype(Entry),
+                                                ReadValue, entry_datatype(Entry),
                                                 entry_filters(Entry), Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
             case Result of
@@ -321,7 +323,8 @@ on({qread_collect,
                     set_entry(NewEntry, tablename(State)),
                     State;
                 true ->
-                    % majority replied -> do qread with highest received read round
+                    % majority replied, but we do not have a consistent quorum ->
+                    % do a qread with highest received read round + 1
                     ?PDB:delete(ReqId, tablename(State)),
                     gen_component:post_op({qread,
                                            entry_client(NewEntry),
@@ -333,7 +336,7 @@ on({qread_collect,
             end
     end;
 
-%% qread step 1 with explicit read round number
+%% qread step 3 with explicit read round number
 on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State) ->
     ?TRACE("rbrcseq:on qread ReqId ~p~n", [ReqId]),
     %% if the caller process may handle more than one request at a
@@ -376,7 +379,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State)
     set_entry(Entry, tablename(State)),
     State;
 
-%% qread step 2: a replica replied to read from step 1
+%% qread step 4: a replica replied to read from step 3
 %%               when      majority reached
 %%                  -> finish when consens is stable enough or
 %%                  -> trigger write_through to stabilize an open consens
@@ -1100,10 +1103,10 @@ replies_val(Replies)                    -> element(5, Replies).
 replies_set_val(Replies, Val)           -> setelement(5, Replies, Val).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
-                   pr:pr(), pr:pr(), client_value(), module(),
+                   pr:pr(), client_value(), module(),
                    any(), boolean())
                    -> {boolean(), #rr_replies{}}.
-add_rr_reply(Replies, _DBSelector, SeenReadRound, _SeenWriteRound, _Value,
+add_rr_reply(Replies, _DBSelector, SeenReadRound, _Value,
              _Datatype, _Filters, _Cons) ->
 
     % increment number of replies received

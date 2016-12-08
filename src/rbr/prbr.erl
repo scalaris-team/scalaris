@@ -121,9 +121,9 @@
                  }.
 
 %% Messages to expect from this module
--spec msg_round_request_reply(comm:mypid(), boolean(), pr:pr(), pr:pr(), any()) -> ok.
-msg_round_request_reply(Client, Cons, ReadRound, WriteRound, Value) ->
-    comm:send(Client, {round_request_reply, Cons,  ReadRound, WriteRound, Value}).
+-spec msg_round_request_reply(comm:mypid(), boolean(), pr:pr(), any()) -> ok.
+msg_round_request_reply(Client, Cons, ReadRound, Value) ->
+    comm:send(Client, {round_request_reply, Cons,  ReadRound, Value}).
 
 -spec msg_read_reply(comm:mypid(), Consistency::boolean(),
                      pr:pr(), any(), pr:pr())
@@ -167,7 +167,7 @@ close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
 on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
-    ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
+    ?TRACE("prbr:round_request: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
     {NewKeyEntryVal, ReadVal} =
@@ -178,30 +178,13 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
 
     %% assign a valid next read round number
     AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
-    trace_mpath:log_info(self(), {'prbr:on(read)',
+    trace_mpath:log_info(self(), {'prbr:on(round_request)',
                                   %% key, Key,
                                   round, AssignedReadRound,
                                   val, NewKeyEntryVal,
                                   read_filter, ReadFilter}),
-    EntryWriteRound =
-        %% see macro definition for explanation
-        case ?SEP_WTI of
-            true ->
-                %% retrieve WTI from separate location
-                case ?PDB:get(TableName, get_wti_key(Key)) of
-                    {} ->
-                        pr:set_wf(entry_r_write(KeyEntry), none);
-                    {_Key, WTI} ->
-                        pr:set_wf(entry_r_write(KeyEntry), WTI)
-                end;
-            _ -> entry_r_write(KeyEntry)
-        end,
-%%    msg_read_reply(Proposer, Cons, AssignedReadRound,
-%%                   ReadVal, EntryWriteRound),
 
-    %% disable write without round by rejecting the
-    %% request to transform it in one with a round number
-    msg_round_request_reply(Proposer, Cons, AssignedReadRound, EntryWriteRound, ReadVal),
+    msg_round_request_reply(Proposer, Cons, AssignedReadRound, ReadVal),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
     NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
@@ -227,8 +210,22 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
                                           round, ReadRound,
                                           val, NewKeyEntryVal,
                                           read_filter, ReadFilter}),
+            EntryWriteRound =
+                %% see macro definition for explanation
+                case ?SEP_WTI of
+                    true ->
+                        %% retrieve WTI from separate location
+                        case ?PDB:get(TableName, get_wti_key(Key)) of
+                            {} ->
+                                pr:set_wf(entry_r_write(KeyEntry), none);
+                            {_Key, WTI} ->
+                                pr:set_wf(entry_r_write(KeyEntry), WTI)
+                        end;
+                    _ -> entry_r_write(KeyEntry)
+                end,
+
             msg_read_reply(Proposer, Cons, ReadRound,
-                           ReadVal, entry_r_write(KeyEntry)),
+                           ReadVal, EntryWriteRound),
 
             NewKeyEntry = entry_set_r_read(KeyEntry, ReadRound),
             NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
