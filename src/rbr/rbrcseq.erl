@@ -55,16 +55,17 @@
 %% TODO: add support for *consistent* quorum by counting the number of
 %% same-round-number replies
 
+%% Aggregator for round_request replies.
 %% rr_replies are received after executing a read without round number
-%% to receive the current highest read round. If the replies are a
+%% to receive the currently highest rounds. If the replies are a
 %% consistent quorum, the read value can be directly delivered, otherwise
 %% a read with the highest round number is executed.
--record(rr_replies, {reply_count :: non_neg_integer(),            %% total number of replies recieved
-                     newest_r_reply_count :: non_neg_integer(),   %% number of replies with current highest read round
-                     highest_r_round :: pr:pr(),                  %% highest read round received in replies
-                     newest_w_reply_count ::non_neg_integer(),    %% number of replies with current highest write round
-                     highest_w_round :: pr:pr(),                  %% highest write round recieved in replies
-                     read_value :: any()                          %% value received in the reply with highest round
+-record(rr_replies, {reply_count :: non_neg_integer(),          %% total number of replies recieved
+                     highest_read_count :: non_neg_integer(),   %% number of replies with current highest read round
+                     highest_read_round :: pr:pr(),             %% highest read round received in replies
+                     highest_write_count :: non_neg_integer(),  %% number of replies with current highest write round
+                     highest_write_round :: pr:pr(),            %% highest write round recieved in replies
+                     read_value :: any()                        %% value returned from the round_request
                     }).
 
 -type replies() :: gen_replies() | #rr_replies{}.
@@ -1048,9 +1049,9 @@ entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, Ret
 -spec new_rr_replies() -> #rr_replies{}.
 new_rr_replies() ->
     #rr_replies{reply_count = 0,
-                newest_r_reply_count = 0, highest_r_round = pr:new(0,0),
-                newest_w_reply_count = 0, highest_w_round = pr:new(0,0),
-                read_value = nwe_empty_rr_replies}.
+                highest_read_count = 0, highest_read_round = pr:new(0,0),
+                highest_write_count = 0, highest_write_round = pr:new(0,0),
+                read_value = new_empty_rr_replies}.
 
 -spec new_read_replies() -> gen_replies().
 new_read_replies() ->
@@ -1126,30 +1127,30 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
 
     %% update number of newest read rounds received
-    MaxReadR = Replies#rr_replies.highest_r_round,
+    MaxReadR = Replies#rr_replies.highest_read_round,
     R2 =
         if MaxReadR =:= SeenReadRound ->
-                MaxRCount = R1#rr_replies.newest_r_reply_count + 1,
-                R1#rr_replies{newest_r_reply_count=MaxRCount};
+                MaxRCount = R1#rr_replies.highest_read_count + 1,
+                R1#rr_replies{highest_read_count=MaxRCount};
            MaxReadR < SeenReadRound ->
-                RT1 = R1#rr_replies{newest_r_reply_count=1},
-                RT1#rr_replies{highest_r_round=SeenReadRound};
+                RT1 = R1#rr_replies{highest_read_count=1},
+                RT1#rr_replies{highest_read_round=SeenReadRound};
            true ->
                 R1
         end,
 
     %% update number of newest write rounds received
-    MaxWriteR = Replies#rr_replies.highest_w_round,
+    MaxWriteR = Replies#rr_replies.highest_write_round,
     R3 =
         if MaxWriteR =:= SeenWriteRound ->
-                MaxWCount = R2#rr_replies.newest_w_reply_count + 1,
-                T = R2#rr_replies{newest_w_reply_count=MaxWCount},
+                MaxWCount = R2#rr_replies.highest_write_count + 1,
+                T = R2#rr_replies{highest_write_count=MaxWCount},
                 NewVal = ?REDUNDANCY:collect_read_value(T#rr_replies.read_value,
                                                               Value, Datatype),
                 T#rr_replies{read_value=NewVal};
            MaxWriteR < SeenWriteRound ->
-                RT = R2#rr_replies{newest_w_reply_count=1},
-                T = RT#rr_replies{highest_w_round=SeenWriteRound},
+                RT = R2#rr_replies{highest_write_count=1},
+                T = RT#rr_replies{highest_write_round=SeenWriteRound},
 
                 NewVal = ?REDUNDANCY:collect_newer_read_value(T#rr_replies.read_value,
                                                               Value, Datatype),
@@ -1169,8 +1170,8 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     {Result, R4} =
         case ?REDUNDANCY:quorum_accepted(ReplyCount) of
             true ->
-                case ReplyCount =:= R3#rr_replies.newest_r_reply_count andalso
-                     ReplyCount =:= R3#rr_replies.newest_w_reply_count of
+                case ReplyCount =:= R3#rr_replies.highest_read_count andalso
+                     ReplyCount =:= R3#rr_replies.highest_write_count of
                     true ->
                         %% consistent quorum
                         Collected = R3#rr_replies.read_value,
@@ -1188,7 +1189,7 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                 %% no majority yet
                 {false, R3}
         end,
-    {Result, R4, R4#rr_replies.highest_r_round}.
+    {Result, R4, R4#rr_replies.highest_read_round}.
 
 -spec add_read_reply(replies(), dht_node_state:db_selector(),
                      pr:pr(),  client_value(),  pr:pr(),
