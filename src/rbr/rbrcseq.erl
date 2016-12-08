@@ -254,7 +254,7 @@ init(DBSelector) ->
 %% state()) -> state().
 
 
-%% qread step 1: request the current read rounds of + values from replicas.
+%% qread step 1: request the current read/write rounds of + values from replicas.
 on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:read step 1: round_request, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
@@ -300,10 +300,10 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     State;
 
 %% qread step 2: collect round_request replies (step 1) from replicas.
-%% If a majority replied and it is a consistent quorum (i.e. all received read rounds are the same)
+%% If a majority replied and it is a consistent quorum (i.e. all received rounds are the same)
 %% we can deliver the read. If not, a qread with explicit round number is started.
 on({qread_collect,
-    {round_request_reply, Cons, ReceivedReadRound, ReadValue}}, State) ->
+    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue}}, State) ->
     ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
 
     {_Round, ReqId} = pr:get_id(ReceivedReadRound),
@@ -314,17 +314,29 @@ on({qread_collect,
             State;
         Entry ->
             Replies = entry_replies(Entry),
-            {Result, NewReplies} = add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
-                                                ReadValue, entry_datatype(Entry),
-                                                entry_filters(Entry), Cons),
-            NewEntry = entry_set_replies(Entry, NewReplies),
+            {Result, NewReplies, NewRound} =
+                add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
+                             ReceivedWriteRound, ReadValue,
+                             entry_datatype(Entry), entry_filters(Entry), Cons),
+            TEntry = entry_set_my_round(Entry, NewRound),
+            NewEntry = entry_set_replies(TEntry, NewReplies),
             case Result of
                 false ->
+                    %% no majority replied yet
                     set_entry(NewEntry, tablename(State)),
                     State;
+                consistent ->
+                    %% majority replied and we have a consistent quorum ->
+                    %% we can skip read with explicit round number and deliver directly
+                    trace_mpath:log_info(self(),
+                                          {qread_done, readval,
+                                           Replies#rr_replies.read_value}),
+                    inform_client(qread_done, NewEntry, Replies#rr_replies.read_value),
+                    ?PDB:delete(ReqId, tablename(State)),
+                    State;
                 true ->
-                    % majority replied, but we do not have a consistent quorum ->
-                    % do a qread with highest received read round + 1
+                    %% majority replied, but we do not have a consistent quorum ->
+                    %% do a qread with highest received read round + 1
                     ?PDB:delete(ReqId, tablename(State)),
                     gen_component:post_op({qread,
                                            entry_client(NewEntry),
@@ -332,7 +344,7 @@ on({qread_collect,
                                            entry_datatype(NewEntry),
                                            entry_filters(NewEntry),
                                            entry_retrigger(NewEntry),
-                                           1+pr:get_r(Replies#rr_replies.highest_r_round)}, State)
+                                           1+pr:get_r(entry_my_round(Entry))}, State)
             end
     end;
 
@@ -412,7 +424,7 @@ on({qread_collect,
                     trace_mpath:log_info(self(),
                                          {qread_done,
                                           readval, replies_val(NewReplies)}),
-                    inform_client(qread_done, NewEntry),
+                    inform_client(qread_done, NewEntry, replies_val(NewReplies)),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 write_through ->
@@ -734,7 +746,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
     TReplyEntry = entry_set_replies(ReadEntry, NewReplies),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
     %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
-    inform_client(qread_done, ReplyEntry),
+    inform_client(qread_done, ReplyEntry, replies_val(NewReplies)),
 
     State;
 
@@ -1103,35 +1115,80 @@ replies_val(Replies)                    -> element(5, Replies).
 replies_set_val(Replies, Val)           -> setelement(5, Replies, Val).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
-                   pr:pr(), client_value(), module(),
+                   pr:pr(), pr:pr(), client_value(), module(),
                    any(), boolean())
-                   -> {boolean(), #rr_replies{}}.
-add_rr_reply(Replies, _DBSelector, SeenReadRound, _Value,
-             _Datatype, _Filters, _Cons) ->
+                   -> {boolean() | consistant, #rr_replies{}, pr:pr()}.
+add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
+             Datatype, Filters, _Cons) ->
 
-    % increment number of replies received
+    %% increment number of replies received
     ReplyCount = Replies#rr_replies.reply_count + 1,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
 
-    % update number of newest read replies received
+    %% update number of newest read rounds received
     MaxReadR = Replies#rr_replies.highest_r_round,
     R2 =
         if MaxReadR =:= SeenReadRound ->
-               MaxRCount = R1#rr_replies.newest_r_reply_count + 1,
-               R1#rr_replies{newest_r_reply_count=MaxRCount};
+                MaxRCount = R1#rr_replies.newest_r_reply_count + 1,
+                R1#rr_replies{newest_r_reply_count=MaxRCount};
            MaxReadR < SeenReadRound ->
-               RT1 = R1#rr_replies{newest_r_reply_count=1},
-               RT1#rr_replies{highest_r_round=SeenReadRound};
+                RT1 = R1#rr_replies{newest_r_reply_count=1},
+                RT1#rr_replies{highest_r_round=SeenReadRound};
            true ->
-               R1
+                R1
         end,
 
-    {Result, R3} =
-        case ?REDUNDANCY:quorum_accepted(ReplyCount) of
-            true -> {true, R2};
-            false -> {false, R2}
+    %% update number of newest write rounds received
+    MaxWriteR = Replies#rr_replies.highest_w_round,
+    R3 =
+        if MaxWriteR =:= SeenWriteRound ->
+                MaxWCount = R2#rr_replies.newest_w_reply_count + 1,
+                T = R2#rr_replies{newest_w_reply_count=MaxWCount},
+                NewVal = ?REDUNDANCY:collect_read_value(T#rr_replies.read_value,
+                                                              Value, Datatype),
+                T#rr_replies{read_value=NewVal};
+           MaxWriteR < SeenWriteRound ->
+                RT = R2#rr_replies{newest_w_reply_count=1},
+                T = RT#rr_replies{highest_w_round=SeenWriteRound},
+
+                NewVal = ?REDUNDANCY:collect_newer_read_value(T#rr_replies.read_value,
+                                                              Value, Datatype),
+                T#rr_replies{read_value=NewVal};
+           true ->
+                NewVal = ?REDUNDANCY:collect_older_read_value(R2#rr_replies.read_value,
+                                                              Value, Datatype),
+                R2#rr_replies{read_value=NewVal}
         end,
-    {Result, R3}.
+    R3RF = case Filters of
+               {RF, _, _}   -> RF;
+               RF           -> RF
+           end,
+
+    %% If enough replicas have replied, decide on the next action
+    %% to take.
+    {Result, R4} =
+        case ?REDUNDANCY:quorum_accepted(ReplyCount) of
+            true ->
+                case ReplyCount =:= R3#rr_replies.newest_r_reply_count andalso
+                     ReplyCount =:= R3#rr_replies.newest_w_reply_count of
+                    true ->
+                        %% consistent quorum
+                        Collected = R3#rr_replies.read_value,
+                        ReadValue = ?REDUNDANCY:get_read_value(Collected, R3RF),
+                        T1 = R3#rr_replies{read_value=ReadValue},
+
+                        {consistent, T1};
+                    false ->
+                        %% not a consistent quorum
+                        %% we do not have to calculate the final value since a
+                        %% new read request will be started anyway.
+                        {true, R3}
+                end;
+            false ->
+                %% no majority yet
+                {false, R3}
+        end,
+    {Result, R4, R4#rr_replies.highest_r_round}.
 
 -spec add_read_reply(replies(), dht_node_state:db_selector(),
                      pr:pr(),  client_value(),  pr:pr(),
@@ -1257,17 +1314,15 @@ add_write_deny(Replies, Round, _Cons) ->
     Done = ?REDUNDANCY:quorum_denied(replies_num_denies(R2)),
     {Done, R2}.
 
--spec inform_client(qread_done, entry()) -> ok.
-inform_client(qread_done, Entry) ->
+-spec inform_client(qread_done | qwrite_done, entry(), any()) -> ok.
+inform_client(qread_done, Entry, ReadValue) ->
     comm:send_local(
       entry_client(Entry),
       {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
-       replies_val(entry_replies(Entry))
-      }).
-
--spec inform_client(qwrite_done, entry(), any()) -> ok.
+       ReadValue
+      });
 inform_client(qwrite_done, Entry, WriteRet) ->
     comm:send_local(
       entry_client(Entry),
