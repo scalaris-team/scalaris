@@ -56,10 +56,8 @@
 %% same-round-number replies
 
 %% Aggregator for round_request replies.
-%% rr_replies are received after executing a read without round number
-%% to receive the currently highest rounds. If the replies are a
-%% consistent quorum, the read value can be directly delivered, otherwise
-%% a read with the highest round number is executed.
+%% rr_replies are received after executing a read without explicit round number
+%% to receive the currently highest rounds from a quorum of replicas.
 -record(rr_replies, {reply_count :: non_neg_integer(),          %% total number of replies recieved
                      highest_read_count :: non_neg_integer(),   %% number of replies with current highest read round
                      highest_read_round :: pr:pr(),             %% highest read round received in replies
@@ -68,7 +66,17 @@
                      read_value :: any()                        %% value returned from the round_request
                     }).
 
--type replies() :: gen_replies() | #rr_replies{}.
+%% Aggregator for read replies.
+%% If qread phase 1 has not found a consistent quorum, a read with an explicit
+%% round number is startet. The replies are aggregated in this record.
+-record(r_replies, {ack_count :: non_neg_integer(),             %% number of acks reveiced
+                    deny_count :: non_neg_integer(),            %% number of denies received
+                    highest_write_count :: non_neg_integer(),   %% number of replies with current highest write round
+                    highest_write_round :: pr:pr(),             %% highest write round received
+                    read_value :: any()                         %% value returned frm read request
+                   }).
+
+-type replies() :: gen_replies() | #rr_replies{} | #r_replies{}.
 
 -type entry() :: {any(), %% ReqId
                   any(), %% debug field
@@ -424,8 +432,8 @@ on({qread_collect,
 %%                    log_entry(qread_collect_true, NewEntry),
                     trace_mpath:log_info(self(),
                                          {qread_done,
-                                          readval, replies_val(NewReplies)}),
-                    inform_client(qread_done, NewEntry, replies_val(NewReplies)),
+                                          readval, NewReplies#r_replies.read_value}),
+                    inform_client(qread_done, NewEntry, NewReplies#r_replies.read_value),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 write_through ->
@@ -535,10 +543,10 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% fine here
             ReadReplies = entry_replies(ReadEntry),
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
-                case pr:get_wf(replies_max_write_r(ReadReplies)) of
+                case pr:get_wf(ReadReplies#r_replies.highest_write_round) of
                     none ->
                         {fun prbr:noop_write_filter/3, none,
-                         replies_val(ReadReplies)};
+                         ReadReplies#r_replies.read_value};
                     WTInfos ->
                         DataType = entry_datatype(ReadEntry),
                         %% Depending on the datatype the write through value might
@@ -549,7 +557,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                                   true ->
                                         setelement(3, WTInfos,
                                                    DataType:get_write_through_value(
-                                                     replies_val(ReadReplies)));
+                                                   ReadReplies#r_replies.read_value));
                                   _    -> WTInfos
                               end,
                         % WTInfo = write through infos
@@ -1053,10 +1061,11 @@ new_rr_replies() ->
                 highest_write_count = 0, highest_write_round = pr:new(0,0),
                 read_value = new_empty_rr_replies}.
 
--spec new_read_replies() -> gen_replies().
+-spec new_read_replies() -> #r_replies{}.
 new_read_replies() ->
-    {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
-     _MaxSeenRound = pr:new(0,0), _Value = empty_new_read_replies}.
+    #r_replies{ack_count = 0, deny_count = 0,
+               highest_write_count = 0, highest_write_round = pr:new(0,0),
+               read_value = empty_new_read_replies}.
 
 -spec new_write_replies() -> gen_replies().
 new_write_replies() ->
@@ -1141,21 +1150,22 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
 
     %% update number of newest write rounds received
     PrevMaxWriteR = Replies#rr_replies.highest_write_round,
+    PrevReadValue = R2#rr_replies.read_value,
     R3 =
         if PrevMaxWriteR =:= SeenWriteRound ->
                 MaxWCount = R2#rr_replies.highest_write_count + 1,
-                NewVal = ?REDUNDANCY:collect_read_value(R2#rr_replies.read_value,
-                                                              Value, Datatype),
+                NewVal = ?REDUNDANCY:collect_read_value(PrevReadValue,
+                                                        Value, Datatype),
                 R2#rr_replies{highest_write_count=MaxWCount,
                               read_value=NewVal};
            PrevMaxWriteR < SeenWriteRound ->
-                NewVal = ?REDUNDANCY:collect_newer_read_value(R2#rr_replies.read_value,
+                NewVal = ?REDUNDANCY:collect_newer_read_value(PrevReadValue,
                                                               Value, Datatype),
                 R2#rr_replies{highest_write_count=1,
                              highest_write_round=SeenWriteRound,
                              read_value=NewVal};
            true ->
-                NewVal = ?REDUNDANCY:collect_older_read_value(R2#rr_replies.read_value,
+                NewVal = ?REDUNDANCY:collect_older_read_value(PrevReadValue,
                                                               Value, Datatype),
                 R2#rr_replies{read_value=NewVal}
         end,
@@ -1175,7 +1185,7 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                     true ->
                         %% consistent quorum
                         Collected = R3#rr_replies.read_value,
-                        ReadValue = ?REDUNDANCY:get_read_value(Collected, ReadFilte),
+                        ReadValue = ?REDUNDANCY:get_read_value(Collected, ReadFilter),
                         T1 = R3#rr_replies{read_value=ReadValue},
 
                         {consistent, T1};
@@ -1191,10 +1201,10 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
         end,
     {Result, R4, R4#rr_replies.highest_read_round}.
 
--spec add_read_reply(replies(), dht_node_state:db_selector(),
+-spec add_read_reply(#r_replies{}, dht_node_state:db_selector(),
                      pr:pr(),  client_value(),  pr:pr(),
                      pr:pr(), module(), any(), Consistency::boolean())
-                    -> {Done::boolean() | write_through, replies(), pr:pr()}.
+                    -> {Done::boolean() | write_through, #r_replies{}, pr:pr()}.
 add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
                CurrentRound, Datatype, Filters, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
@@ -1203,55 +1213,51 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     %% Otherwise we decide on a consistent quorum (a majority agrees
     %% on the same version). We ensure this by write_through on odd
     %% cases.
-    MaxWriteR = replies_max_write_r(Replies),
+    PrevMaxWriteR = Replies#r_replies.highest_write_round,
     %% extract write through info for round comparisons since
     %% they can be key-dependent if something different than
     %% replication is used for redundancy
-    MaxWriteRNoWTInfo = pr:set_wf(MaxWriteR, none),
+    PrevMaxWriteRNoWTInfo = pr:set_wf(PrevMaxWriteR, none),
     SeenWriteRoundNoWTInfo = pr:set_wf(SeenWriteRound, none),
+    PrevReadValue = Replies#r_replies.read_value,
     R1 =
-        if SeenWriteRoundNoWTInfo > MaxWriteRNoWTInfo ->
-                T1 = replies_set_max_write_r(Replies, SeenWriteRound),
-                T2 = replies_set_num_newest(T1, 1),
-                NewVal = ?REDUNDANCY:collect_newer_read_value(replies_val(T2),
-                                             Val, Datatype),
-                replies_set_val(T2, NewVal);
-           SeenWriteRoundNoWTInfo =:= MaxWriteRNoWTInfo ->
-                %% ?DBG_ASSERT2(Val =:= replies_val(Replies),
-                %%    {collected_different_values_with_same_round,
-                %%     Val, replies_val(Replies), proto_sched:get_infos()}),
-
-                %% ?DBG_ASSERT2(Val =:= replies_val(Replies),
-                %%    {collected_different_values_with_same_round,
-                %%     Val, replies_val(Replies), proto_sched:get_infos()}),
-                NewVal = ?REDUNDANCY:collect_read_value(replies_val(Replies),
-                                             Val, Datatype),
-                T1 = replies_set_val(Replies, NewVal),
-                replies_inc_num_newest(T1);
+        if SeenWriteRoundNoWTInfo > PrevMaxWriteRNoWTInfo ->
+                NewVal = ?REDUNDANCY:collect_newer_read_value(PrevReadValue,
+                                                              Val, Datatype),
+                Replies#r_replies{highest_write_count=1,
+                                  highest_write_round=SeenWriteRound,
+                                  read_value=NewVal};
+           SeenWriteRoundNoWTInfo =:= PrevMaxWriteRNoWTInfo ->
+                NewHighestWriteCount = Replies#r_replies.highest_write_count + 1,
+                NewVal = ?REDUNDANCY:collect_read_value(PrevReadValue,
+                                                        Val, Datatype),
+                Replies#r_replies{highest_write_count=NewHighestWriteCount,
+                                  read_value=NewVal};
            true ->
-               NewVal = ?REDUNDANCY:collect_older_read_value(replies_val(Replies),
-                                            Val, Datatype),
-               replies_set_val(Replies, NewVal)
+               NewVal = ?REDUNDANCY:collect_older_read_value(PrevReadValue,
+                                                             Val, Datatype),
+               Replies#r_replies{read_value=NewVal}
     end,
-    NewRound = erlang:max(CurrentRound, AssignedRound),
 
-    R2 = replies_inc_num_acks(R1),
-    R2NumAcks = replies_num_acks(R2),
-    R2RF = case Filters of
-               {RF, _, _} -> RF;
-               RF         -> RF
-           end,
+    NewAckCount = R1#r_replies.ack_count + 1,
+    R2 = R1#r_replies{ack_count=NewAckCount},
+
+    ReadFilter =
+        case Filters of
+            {RF, _, _} -> RF;
+            RF         -> RF
+        end,
+
     {Result, R4} =
-        case ?REDUNDANCY:quorum_accepted(R2NumAcks) of
+        case ?REDUNDANCY:quorum_accepted(NewAckCount) of
             true ->
                 %% we have majority of acks
-
                 %% construct read value from replies
-                Collected = replies_val(R2),
-                Constructed = ?REDUNDANCY:get_read_value(Collected, R2RF),
-                R3 = replies_set_val(R2, Constructed),
+                Collected = R2#r_replies.read_value,
+                Constructed = ?REDUNDANCY:get_read_value(Collected, ReadFilter),
+                R3 = R2#r_replies{read_value=Constructed},
 
-                Done = case replies_num_newest(R3) =:= R2NumAcks orelse
+                Done = case R3#r_replies.highest_write_count =:= NewAckCount orelse
                             ?REDUNDANCY:skip_write_through(Constructed) of
                             true -> true; %% done
                             _ -> write_through
@@ -1263,6 +1269,7 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
                 {false, R2}
         end,
 
+    NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
 
 add_read_deny(Entry, _DBSelector, _MyRound, LargerRound, _Cons) ->
