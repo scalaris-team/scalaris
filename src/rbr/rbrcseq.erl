@@ -1127,43 +1127,43 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
 
     %% update number of newest read rounds received
-    MaxReadR = Replies#rr_replies.highest_read_round,
+    PrevMaxReadR = Replies#rr_replies.highest_read_round,
     R2 =
-        if MaxReadR =:= SeenReadRound ->
+        if PrevMaxReadR =:= SeenReadRound ->
                 MaxRCount = R1#rr_replies.highest_read_count + 1,
                 R1#rr_replies{highest_read_count=MaxRCount};
-           MaxReadR < SeenReadRound ->
-                RT1 = R1#rr_replies{highest_read_count=1},
-                RT1#rr_replies{highest_read_round=SeenReadRound};
+           PrevMaxReadR < SeenReadRound ->
+                R1#rr_replies{highest_read_count=1,
+                              highest_read_round=SeenReadRound};
            true ->
                 R1
         end,
 
     %% update number of newest write rounds received
-    MaxWriteR = Replies#rr_replies.highest_write_round,
+    PrevMaxWriteR = Replies#rr_replies.highest_write_round,
     R3 =
-        if MaxWriteR =:= SeenWriteRound ->
+        if PrevMaxWriteR =:= SeenWriteRound ->
                 MaxWCount = R2#rr_replies.highest_write_count + 1,
-                T = R2#rr_replies{highest_write_count=MaxWCount},
-                NewVal = ?REDUNDANCY:collect_read_value(T#rr_replies.read_value,
+                NewVal = ?REDUNDANCY:collect_read_value(R2#rr_replies.read_value,
                                                               Value, Datatype),
-                T#rr_replies{read_value=NewVal};
-           MaxWriteR < SeenWriteRound ->
-                RT = R2#rr_replies{highest_write_count=1},
-                T = RT#rr_replies{highest_write_round=SeenWriteRound},
-
-                NewVal = ?REDUNDANCY:collect_newer_read_value(T#rr_replies.read_value,
+                R2#rr_replies{highest_write_count=MaxWCount,
+                              read_value=NewVal};
+           PrevMaxWriteR < SeenWriteRound ->
+                NewVal = ?REDUNDANCY:collect_newer_read_value(R2#rr_replies.read_value,
                                                               Value, Datatype),
-                T#rr_replies{read_value=NewVal};
+                R2#rr_replies{highest_write_count=1,
+                             highest_write_round=SeenWriteRound,
+                             read_value=NewVal};
            true ->
                 NewVal = ?REDUNDANCY:collect_older_read_value(R2#rr_replies.read_value,
                                                               Value, Datatype),
                 R2#rr_replies{read_value=NewVal}
         end,
-    R3RF = case Filters of
-               {RF, _, _}   -> RF;
-               RF           -> RF
-           end,
+    ReadFilter =
+        case Filters of
+            {RF, _, _}   -> RF;
+            RF           -> RF
+        end,
 
     %% If enough replicas have replied, decide on the next action
     %% to take.
@@ -1175,7 +1175,7 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                     true ->
                         %% consistent quorum
                         Collected = R3#rr_replies.read_value,
-                        ReadValue = ?REDUNDANCY:get_read_value(Collected, R3RF),
+                        ReadValue = ?REDUNDANCY:get_read_value(Collected, ReadFilte),
                         T1 = R3#rr_replies{read_value=ReadValue},
 
                         {consistent, T1};
