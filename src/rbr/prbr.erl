@@ -428,11 +428,11 @@ entry_val(Entry) -> element(4, Entry).
 entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
 -spec entry_add_learner(entry(), comm:mypid()) -> entry().
 entry_add_learner(Entry, Learner) ->
-    NewLearners = case lists:member(Learner, entry_get_learner(Entry)) of
-                      true -> Entry;
-                      false -> [Learner | entry_get_learner(Entry)]
-                  end,
-    setelement(5, Entry, NewLearners).
+    OldLearner = entry_get_learner(Entry),
+    case lists:member(Learner, OldLearner) of
+        true -> Entry;
+        false -> setelement(5, Entry, [Learner | OldLearner])
+    end.
 -spec entry_set_learner(entry(), comm:mypid()) -> entry().
 entry_set_learner(Entry, Learner) -> setelement(5, Entry, [Learner]).
 -spec entry_get_learner(entry()) -> [comm:mypid()].
