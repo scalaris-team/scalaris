@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,11 +15,9 @@
 %% @author Jan Fajerski <fajerski@zib.de>
 %% @doc    Unit tests for ets backend.
 %% @end
-%% @version $Id$
 -module(db_ets_SUITE).
 
 -author('fajerski@zib.de').
--vsn('$Id$').
 
 -compile(export_all).
 
@@ -36,7 +34,7 @@ all() ->
      {group, tester_tests}
     ].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 50}} ].
 
 init_per_suite(Config) ->
     tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),

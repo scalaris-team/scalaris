@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 %% @author Maik Lange <MLange@informatik.hu-berlin.de>
 %% @doc    Tests for iblt module (invertible bloom lookup table).
 %% @end
-%% @version $Id$
 -module(iblt_SUITE).
 -author('mlange@informatik.hu-berlin.de').
--vsn('$Id$').
 
 -compile(export_all).
 
@@ -38,7 +36,7 @@ all() -> [
 
 suite() ->
     [
-     {timetrap, {seconds, 30}}
+     {timetrap, {seconds, 120}}
     ].
 
 init_per_suite(Config) ->
@@ -60,7 +58,7 @@ prop_insert(CellCount, Key, Value) ->
     ?equals(iblt:get_prop(item_count, IBLT2), 1),
     ?equals(iblt:get(IBLT, Key), not_found),
     ?equals(iblt:get(IBLT2, Key), Value).
-  
+
 tester_insert(_) ->
     tester:test(?MODULE, prop_insert, 3, 1000, [{threads, 2}]).
 
@@ -81,7 +79,7 @@ prop_delete(CellCount, Key, Value) ->
                                 Acc + lists:foldl(fun({C, _, _, _, _}, A) -> A+C end, 0, Col)
                         end, 0, T),
     ?equals(Count, 0).
-  
+
 tester_delete(_) ->
     tester:test(?MODULE, prop_delete, 3, 10000, [{threads, 2}]).
 

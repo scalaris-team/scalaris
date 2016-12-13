@@ -1,4 +1,4 @@
-% @copyright 2010-2015 Zuse Institute Berlin
+% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for the current ?RT module.
 %% @end
-%% @version $Id$
 -module(rt_SUITE).
 -author('kruber@zib.de').
--vsn('$Id$').
 
 -compile(export_all).
 
@@ -34,7 +32,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 20}}
+     {timetrap, {seconds, 40}}
     ].
 
 register_value_creator() ->
