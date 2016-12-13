@@ -55,6 +55,7 @@
 {"test/*",
  [debug_info,
   inline_list_funcs,
+  nowarn_export_all,
   warn_exported_vars,
   warn_missing_spec,
   warn_untyped_record,

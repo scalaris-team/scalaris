@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,17 +15,15 @@
 %% @author Ufuk Celebi <celebi@zib.de>
 %% @doc Simple auto-scaling service API.
 %% @end
-%% @version $Id$
 -module(api_autoscale).
 -author('celebi@zib.de').
--vsn('$Id$').
 
 -include("scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--type autoscale_error_resp() :: {error, resp_timeout | autoscale_false}. 
+-type autoscale_error_resp() :: {error, resp_timeout | autoscale_false}.
 
 %% Misc API
 -export([check_config/0]).
@@ -36,13 +34,11 @@
 %% Autoscale server API
 -export([write_plot_data/0, reset_plot_data/0]).
 
--compile(export_all).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Checks whether config parameters exist and are valid (requires a pull
-%%      configuration, i.e. cloud_cps as cloud_module). 
+%%      configuration, i.e. cloud_cps as cloud_module).
 -spec check_config() -> boolean().
 check_config() ->
     autoscale:check_config() andalso is_in_pull_mode().
@@ -92,19 +88,6 @@ toggle_alarm(Name) ->
     case autoscale:check_config() of
         true  -> send_to_leader_wait_resp({toggle_alarm, Name, comm:this()},
                                           toggle_alarm_resp, 5);
-        false -> {error, autoscale_false}
-    end.
-
-%% @doc Update options of alarm Name by merging current with NewOptions.
--spec update_alarm(Name :: atom(), NewOptions :: {Key :: atom(), Value :: term()} | autoscale:key_value_list()) ->
-          {ok, {new_options, UpdatedOptions :: autoscale:key_value_list()}} |
-          autoscale_error_resp().
-update_alarm(Name, NewOption) when erlang:is_tuple(NewOption) ->
-    update_alarm(Name, [NewOption]);
-update_alarm(Name, NewOptions) ->
-    case autoscale:check_config() of
-        true  -> send_to_leader_wait_resp({update_alarm, Name, NewOptions, comm:this()},
-                                          update_alarm_resp, 5);
         false -> {error, autoscale_false}
     end.
 
@@ -171,7 +154,7 @@ send_to_leader_wait_resp(Msg, RespTag, Timeout) ->
         Timeout*1000    -> {error, resp_timeout}
     end.
 
-%% @doc Check whether scale requests are pulled or pushed to cloud_module. 
+%% @doc Check whether scale requests are pulled or pushed to cloud_module.
 -spec is_in_pull_mode() -> boolean().
 is_in_pull_mode() ->
     config:read(autoscale_cloud_module) =:= cloud_cps.
