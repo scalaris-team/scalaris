@@ -1243,6 +1243,8 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
 
+-spec add_read_deny(entry(), dht_node_state:db_selector(), pr:pr(), pr:pr(), boolean())
+                    -> {retry, entry()}.
 add_read_deny(Entry, _DBSelector, _MyRound, LargerRound, _Cons) ->
     {retry, entry_set_my_round(Entry, LargerRound)}.
 
@@ -1337,7 +1339,8 @@ get_db_for_id(DBName, Key) ->
     {DBName, ?RT:get_key_segment(Key)}.
 
 
-
+%% @doc Helper function to print an entry
+-spec log_replies(string(), entry()) -> ok.
 log_replies(Prefix, Entry) ->
     ct:pal("################# ~.0p:~n"
            "ReqId           : ~p~n"
