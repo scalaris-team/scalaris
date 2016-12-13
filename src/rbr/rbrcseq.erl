@@ -76,7 +76,13 @@
                     read_value :: any()                         %% value returned frm read request
                    }).
 
--type replies() :: gen_replies() | #rr_replies{} | #r_replies{}.
+%% Aggregator for write replies.
+-record(w_replies, {ack_count :: non_neg_integer(),             %% number of ack reveiced
+                    deny_count :: non_neg_integer(),            %% number of denies received
+                    highest_write_round :: pr:pr()              %% highest write round reveiced
+                   }).
+
+-type replies() :: gen_replies() | #rr_replies{} | #r_replies{} | #w_replies{}.
 
 -type entry() :: {any(), %% ReqId
                   any(), %% debug field
@@ -1069,8 +1075,8 @@ new_read_replies() ->
 
 -spec new_write_replies() -> gen_replies().
 new_write_replies() ->
-    {_NumNewest = 0, _NumAcked = 0, _NumDenied = 0,
-     _MaxSeenRound = pr:new(0,0), _Value = empty_new_write_replies}.
+    #w_replies{ack_count = 0, deny_count = 0,
+               highest_write_round = pr:new(0,0)}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -1275,10 +1281,10 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
 add_read_deny(Entry, _DBSelector, _MyRound, LargerRound, _Cons) ->
     {retry, entry_set_my_round(Entry, LargerRound)}.
 
--spec add_write_reply(replies(), pr:pr(), Consistency::boolean())
-                     -> {Done::boolean(), replies()}.
+-spec add_write_reply(#w_replies{}, pr:pr(), Consistency::boolean())
+                     -> {Done::boolean(), #w_replies{}}.
 add_write_reply(Replies, Round, _Cons) ->
-    RepliesMaxWriteR = replies_max_write_r(Replies),
+    RepliesMaxWriteR = Replies#w_replies.highest_write_round,
     RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
     RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
     R1 =
@@ -1291,20 +1297,21 @@ add_write_reply(Replies, Round, _Cons) ->
 %%                ?DBG_ASSERT2(replies_num_acks(Entry) =< 0,
 %%                             {found_unexpected_acks, replies_num_acks(Entry)}),
                 %% set rack and store newer round
-                OldAcks = replies_num_acks(Replies),
-                T1Replies = replies_set_max_write_r(Replies, Round),
-                T2Replies = replies_set_num_acks(T1Replies, 0),
-                _T3Replies = replies_set_num_denies(
-                             T2Replies, OldAcks + replies_num_denies(T2Replies))
+                OldAcks = Replies#w_replies.ack_count,
+                OldDenies = Replies#w_replies.deny_count,
+                Replies#w_replies{highest_write_round=Round,
+                                  ack_count=0,
+                                  deny_count=OldAcks+OldDenies}
         end,
-    R2 = replies_inc_num_acks(R1),
-    Done = ?REDUNDANCY:quorum_accepted(replies_num_acks(R2)),
+    NewAckCount = R1#w_replies.ack_count + 1,
+    R2 = R1#w_replies{ack_count=NewAckCount},
+    Done = ?REDUNDANCY:quorum_accepted(NewAckCount),
     {Done, R2}.
 
--spec add_write_deny(replies(), pr:pr(), Consistency::boolean())
-                    -> {Done::boolean(), replies()}.
+-spec add_write_deny(#w_replies{}, pr:pr(), Consistency::boolean())
+                    -> {Done::boolean(), #w_replies{}}.
 add_write_deny(Replies, Round, _Cons) ->
-    RepliesMaxWriteR = replies_max_write_r(Replies),
+    RepliesMaxWriteR = Replies#w_replies.highest_write_round,
     RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
     RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
     R1 =
@@ -1312,14 +1319,15 @@ add_write_deny(Replies, Round, _Cons) ->
             false -> Replies;
             true ->
                 %% reset rack and store newer round
-                OldAcks = replies_num_acks(Replies),
-                T1Replies = replies_set_max_write_r(Replies, Round),
-                T2Replies = replies_set_num_acks(T1Replies, 0),
-                _T3Replies = replies_set_num_denies(
-                             T2Replies, OldAcks + replies_num_denies(T2Replies))
+                OldAcks = Replies#w_replies.ack_count,
+                OldDenies = Replies#w_replies.deny_count,
+                Replies#w_replies{highest_write_round=Round,
+                                  ack_count=0,
+                                  deny_count=OldAcks+OldDenies}
         end,
-    R2 = replies_inc_num_denies(R1),
-    Done = ?REDUNDANCY:quorum_denied(replies_num_denies(R2)),
+    NewDenyCount = R1#w_replies.deny_count + 1,
+    R2 = R1#w_replies{deny_count=NewDenyCount},
+    Done = ?REDUNDANCY:quorum_denied(NewDenyCount),
     {Done, R2}.
 
 -spec inform_client(qread_done | qwrite_done, entry(), any()) -> ok.
