@@ -82,7 +82,7 @@
                     highest_write_round :: pr:pr()              %% highest write round reveiced
                    }).
 
--type replies() :: gen_replies() | #rr_replies{} | #r_replies{} | #w_replies{}.
+-type replies() :: #rr_replies{} | #r_replies{} | #w_replies{}.
 
 -type entry() :: {any(), %% ReqId
                   any(), %% debug field
@@ -97,14 +97,6 @@
                   replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
                  }.
-
--type gen_replies() :: {
-                    non_neg_integer(), %% number of newest replies
-                    non_neg_integer(), %% number of acks
-                    non_neg_integer(), %% number of denies
-                    pr:pr(), %% highest accepted write round in replies
-                    any() %% value of highest seen round in replies
-                   }.
 
 -type check_next_step() :: fun((term(), term()) -> term()).
 
@@ -757,11 +749,11 @@ on({qread_write_through_done, ReadEntry, Filtering,
             _ -> Val
         end,
     Replies = entry_replies(ReadEntry),
-    NewReplies = replies_set_val(Replies, ClientVal),
+    NewReplies = Replies#r_replies{read_value=ClientVal},
     TReplyEntry = entry_set_replies(ReadEntry, NewReplies),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
     %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
-    inform_client(qread_done, ReplyEntry, replies_val(NewReplies)),
+    inform_client(qread_done, ReplyEntry, NewReplies#r_replies.read_value),
 
     State;
 
@@ -1073,7 +1065,7 @@ new_read_replies() ->
                highest_write_count = 0, highest_write_round = pr:new(0,0),
                read_value = empty_new_read_replies}.
 
--spec new_write_replies() -> gen_replies().
+-spec new_write_replies() -> #w_replies{}.
 new_write_replies() ->
     #w_replies{ack_count = 0, deny_count = 0,
                highest_write_round = pr:new(0,0)}.
@@ -1102,33 +1094,6 @@ entry_set_my_round(Entry, Round)  -> setelement(10, Entry, Round).
 entry_replies(Entry)              -> element(11, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
 entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
-
--spec replies_set_num_newest(replies(), non_neg_integer())  -> replies().
-replies_set_num_newest(Replies, Val)    -> setelement(1, Replies, Val).
--spec replies_inc_num_newest(replies()) -> replies().
-replies_inc_num_newest(Replies)         -> setelement(1, Replies, 1 + element(1, Replies)).
--spec replies_num_newest(replies())     -> non_neg_integer().
-replies_num_newest(Replies)             -> element(1, Replies).
--spec replies_num_acks(replies())       -> non_neg_integer().
-replies_num_acks(Replies)               -> element(2, Replies).
--spec replies_inc_num_acks(replies())   -> replies().
-replies_inc_num_acks(Replies)           -> setelement(2, Replies, element(2, Replies) + 1).
--spec replies_set_num_acks(replies(), non_neg_integer()) -> replies().
-replies_set_num_acks(Replies, Num)      -> setelement(2, Replies, Num).
--spec replies_num_denies(replies())     -> non_neg_integer().
-replies_num_denies(Replies)             -> element(3, Replies).
--spec replies_inc_num_denies(replies()) -> replies().
-replies_inc_num_denies(Replies)         -> setelement(3, Replies, element(3, Replies) + 1).
--spec replies_set_num_denies(replies(), non_neg_integer()) -> replies().
-replies_set_num_denies(Replies, Val)    -> setelement(3, Replies, Val).
--spec replies_max_write_r(replies())    -> pr:pr().
-replies_max_write_r(Replies)            -> element(4, Replies).
--spec replies_set_max_write_r(replies(), pr:pr()) -> replies().
-replies_set_max_write_r(Replies, Round) -> setelement(4, Replies, Round).
--spec replies_val(replies())            -> any().
-replies_val(Replies)                    -> element(5, Replies).
--spec replies_set_val(replies(), any()) -> replies().
-replies_set_val(Replies, Val)           -> setelement(5, Replies, Val).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
                    pr:pr(), pr:pr(), client_value(), module(),
@@ -1374,7 +1339,6 @@ get_db_for_id(DBName, Key) ->
 
 
 log_replies(Prefix, Entry) ->
-    Replies = entry_replies(Entry),
     ct:pal("################# ~.0p:~n"
            "ReqId           : ~p~n"
 %%           "Debug           : ~p~n"
@@ -1384,12 +1348,8 @@ log_replies(Prefix, Entry) ->
            "Module          : ~p~n"
            "Client          : ~p~n"
            "MyRound         : ~p~n"
-           "NumAcks         : ~p~n"
-           "NumDenies       : ~p~n"
-           "MaxWriteRound   : ~p~n"
-           "MaxWRoundVal    : ~p~n"
            "Filter          : ~p~n"
-           "NumNewestReplies: ~p~n"
+           "Replies         : ~p~n"
           , [Prefix,
              entry_reqid(Entry),
              entry_period(Entry),
@@ -1398,12 +1358,8 @@ log_replies(Prefix, Entry) ->
              entry_datatype(Entry),
              entry_client(Entry),
              entry_my_round(Entry),
-             replies_num_acks(Replies),
-             replies_num_denies(Replies),
-             replies_max_write_r(Replies),
-             replies_val(Replies),
-             entry_filters(Replies),
-             replies_num_newest(Replies)
+             entry_filters(Entry),
+             entry_replies(Entry)
             ]).
 
 
