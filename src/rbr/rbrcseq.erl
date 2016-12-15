@@ -497,15 +497,27 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
                     set_entry(NewEntry, tablename(State)),
                     State;
                 retry ->
+                    % we can no longer achieve a quorum accept because of a
+                    % concurrent request
+                    NextMsg = {qread,
+                               entry_client(NewEntry),
+                               entry_key(NewEntry),
+                               entry_datatype(NewEntry),
+                               entry_filters(NewEntry),
+                               entry_retrigger(NewEntry),
+                               1 + pr:get_r(entry_my_round(NewEntry))},
                     ?PDB:delete(ReqId, tablename(State)),
-                    %% retry read
-                    gen_component:post_op({qread,
-                                           entry_client(NewEntry),
-                                           entry_key(NewEntry),
-                                           entry_datatype(NewEntry),
-                                           entry_filters(NewEntry),
-                                           entry_retrigger(NewEntry),
-                                           1+pr:get_r(entry_my_round(NewEntry))}, State)
+
+                    case randoms:rand_uniform(1, 2) of
+                        1 ->
+                            %% retry read immediately
+                            gen_component:post_op(NextMsg, State);
+                        2 ->
+                            %% delay before retry
+                            Delay = 15 + randoms:rand_uniform(1, 10),
+                            comm:send_local_after(Delay, self(), NextMsg),
+                            State
+                    end
             end
     end;
 
