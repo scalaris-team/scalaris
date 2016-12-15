@@ -1,4 +1,4 @@
-%% @copyright 2012-2016 Zuse Institute Berlin
+%% @copyright 2013-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -355,8 +355,9 @@ tester_type_check_rbr(_Config) ->
              {set_entry, 2},     %% needs valid ets:tid()
              {add_rr_reply, 8},  %% needs client_value matching db_type
              {add_read_reply, 9},%% needs client_value matching db_type
+             {add_read_deny, 5}, %% needs valid entry()
              {add_write_reply, 3},%% needs valid entry()
-             {add_write_deny, 3} %% needs valid entry()}
+             {add_write_deny, 3} %% needs valid entry()
            ]},
           {replication,
            [ {get_read_value, 2},     %% cannot create funs

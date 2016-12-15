@@ -493,12 +493,17 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
         undefined ->
             State;
         Entry ->
-            case add_read_deny(Entry, db_selector(State), MyRwithId,
-                               LargerRound, Cons) of
-                {false, NewEntry} ->
+            Replies = entry_replies(Entry),
+            {Result, NewReplies, NewRound} =
+                add_read_deny(Replies, db_selector(State), entry_my_round(Entry),
+                              LargerRound, Cons),
+            TEntry = entry_set_my_round(Entry, NewRound),
+            NewEntry = entry_set_replies(TEntry, NewReplies),
+            case Result of
+                false ->
                     set_entry(NewEntry, tablename(State)),
                     State;
-                {retry, NewEntry} ->
+                retry ->
                     %%ct:pal("Retry with round (Was ID ~p)", [ReqId]),
                     ?PDB:delete(ReqId, tablename(State)),
                     %% retry read
@@ -1241,10 +1246,22 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
 
--spec add_read_deny(entry(), dht_node_state:db_selector(), pr:pr(), pr:pr(), boolean())
-                    -> {retry, entry()}.
-add_read_deny(Entry, _DBSelector, _MyRound, LargerRound, _Cons) ->
-    {retry, entry_set_my_round(Entry, LargerRound)}.
+-spec add_read_deny(#r_replies{}, dht_node_state:db_selector(), pr:pr(), pr:pr(), boolean())
+                    -> {retry | false, #r_replies{}, pr:pr()}.
+add_read_deny(Replies, _DBSelector, CurrentRound, ReceivedRound, _Cons) ->
+    %% increment deny count
+    NewDenies = Replies#r_replies.deny_count + 1,
+    R1 = Replies#r_replies{deny_count = NewDenies},
+
+    %% the entries new round will be the maximum received round
+    NewRound = erlang:max(CurrentRound, ReceivedRound),
+
+    %% retry the read if enough acceptors have denied
+    Result = case ?REDUNDANCY:quorum_denied(NewDenies) of
+                     true -> retry;
+                     false -> false
+             end,
+    {Result, R1, NewRound}.
 
 -spec add_write_reply(#w_replies{}, pr:pr(), Consistency::boolean())
                      -> {Done::boolean(), #w_replies{}}.
