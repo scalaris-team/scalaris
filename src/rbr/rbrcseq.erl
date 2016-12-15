@@ -301,7 +301,6 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% create local state for the request id
     Entry = entry_new_round_request(qread, ReqId, Key, DataType, Client,
                                     period(State), ReadFilter, RetriggerAfter),
-%%    log_entry(qread, Entry),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
     State;
@@ -393,7 +392,6 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State)
     %% create local state for the request id
     Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
                            ReadFilter, RetriggerAfter),
-%%    log_entry(qread, Entry),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
     State;
@@ -423,11 +421,9 @@ on({qread_collect,
             NewEntry = entry_set_replies(TE, NewReplies),
             case Result of
                 false ->
-%%                    log_entry(qread_collect_false, NewEntry),
                     set_entry(NewEntry, tablename(State)),
                     State;
                 true ->
-%%                    log_entry(qread_collect_true, NewEntry),
                     trace_mpath:log_info(self(),
                                          {qread_done,
                                           readval, NewReplies#r_replies.read_value}),
@@ -435,13 +431,10 @@ on({qread_collect,
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 write_through ->
-%%                    log_entry(qread_collect_WT, NewEntry),
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
                     trace_mpath:log_info(self(), {qread_write_through_necessary}),
-%%                    log:log("Write through necessary, newest: ~p", [entry_val(NewEntry)]),
-%%                    log_entry(qread_collect_write_through, NewEntry),
                     case randoms:rand_uniform(1,5) of
                         1 ->
                             %% delete entry, so outdated answers from minority
@@ -504,7 +497,6 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
                     set_entry(NewEntry, tablename(State)),
                     State;
                 retry ->
-                    %%ct:pal("Retry with round (Was ID ~p)", [ReqId]),
                     ?PDB:delete(ReqId, tablename(State)),
                     %% retry read
                     gen_component:post_op({qread,
@@ -533,8 +525,6 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% we need a new id to collect the answers of this write
             %% the client in this new id will be ourselves, so we can
             %% proceed, when we got enough replies.
-            %% log:pal("Write through without filtering ~p.~n",
-            %%        [entry_key(ReadEntry)]),
             This = comm:reply_as(
                      self(), 4,
                      {qread_write_through_done, ReadEntry, no_filtering, '_'}),
@@ -633,7 +623,7 @@ on({qread_write_through_collect, ReqId,
             State;
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
-            %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
+
             Replies = entry_replies(Entry),
             {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
@@ -659,12 +649,11 @@ on({qread_write_through_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            %% log:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
             Replies = entry_replies(Entry),
             {Done, NewReplies} = add_write_deny(Replies, NewerRound, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
-            %% log:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
+
             case Done of
                 false ->
                     set_entry(NewEntry, tablename(State)),
@@ -757,7 +746,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
     NewReplies = Replies#r_replies{read_value=ClientVal},
     TReplyEntry = entry_set_replies(ReadEntry, NewReplies),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
-    %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
+
     inform_client(qread_done, ReplyEntry, NewReplies#r_replies.read_value),
 
     State;
@@ -840,7 +829,6 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                   end
                   || {K, V} <- lists:zip(Keys, WrVals)];
                 {false, Reason} = _Err ->
-                  %% ct:pal("Content Check failed: ~p~n", [Reason]),
                   %% own proposal not possible as of content check
                   comm:send_local(entry_client(NewEntry),
                             {qwrite_deny, ReqId, Round, OldRFResultValue,

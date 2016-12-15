@@ -192,9 +192,6 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
     NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
-%%    log:log("read~n"
-%%            "Key: ~p~n"
-%%            "Val: ~p", [Key, NewKeyEntry]),
     _ = set_entry(NewKeyEntry2, TableName),
     TableName;
 
@@ -233,9 +230,6 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
 
             NewKeyEntry = entry_set_r_read(KeyEntry, ReadRound),
             NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
-            %%    log:log("read~n"
-            %%            "Key: ~p~n"
-            %%            "Val: ~p", [Key, NewKeyEntry]),
             _ = set_entry(NewKeyEntry2, TableName);
          _ ->
             msg_read_deny(Proposer, Cons, ReadRound, entry_r_read(KeyEntry))
@@ -276,9 +270,6 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
                         _    -> WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value)
                     end,
-%%                ct:pal("modify ~p: ~p -> ~p (~.0p > ~.0p)",
-%%                       [Key, entry_val(KeyEntry), NewVal,
-%%                        entry_r_write(KeyEntry), RoundForWrite]),
                 trace_mpath:log_info(self(), {'prbr:on(write)',
                                   %% key, Key,
                                   round, RoundForWrite,
@@ -286,14 +277,6 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
                                   val, Value,
                                   write_filter, WriteFilter,
                                   newval, NewVal}),
-%%                case kvx =/= _DB of
-%%                    true ->
-%%                log:log("write ok~n"
-%%                        "Key: ~p~n"
-%%                        "Ent: ~p~n"
-%%                        "Val: ~p", [Key, KeyEntry, NewVal]);
-%%                    _ -> ok
-%%                end,
                 [ msg_write_reply(P, Cons, Key, InRound,
                                   NextWriteRound, Ret)
                   || P <- entry_get_learner(NewKeyEntry) ],
@@ -313,13 +296,6 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
                     end,
                 set_entry(entry_set_val(NewKeyEntry2, NewVal), TableName);
             {dropped, NewerRound} ->
-%%                case kvx =/= _DB of
-%%                    true ->
-%%                log:log("write deny~n"
-%%                        "Key: ~p~n"
-%%                        "Val: ~p", [Key, KeyEntry]);
-%%                    _ -> ok
-%%                end,
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
                                   %% key, Key,
                                   round, RoundForWrite,
@@ -346,10 +322,6 @@ on({prbr, delete_key, _DB, Client, Key}, TableName) ->
     _ = delete_entry(TableName, Entry),
     comm:send_local(Client, {delete_key_reply, Key}),
     TableName;
-
-%% on({prbr, tab2list, DB, Client}, TableName) ->
-%%     comm:send_local(Client, {DB, tab2list(TableName)}),
-%%     TableName;
 
 on({prbr, get_entry, _DB, Client, Key}, TableName) ->
     comm:send_local(Client, {entry, get_entry(Key, TableName)}),
@@ -461,12 +433,6 @@ writable(Entry, InRound) ->
     if ((InRoundR =:= LatestSeenReadR andalso InRoundId=:= LatestSeenReadId)
         orelse (InRoundR > LatestSeenReadR))
        andalso (InRoundR > LatestSeenWriteR) ->
-           %%ct:pal("Accept~n"
-           %%       "InRound         ~.0p~n"
-           %%       "LatestSeenRead  ~.0p~n"
-           %%       "LatestSeenWrite ~.0p~n"
-           %%       "Value           ~.0p~n",
-           %%       [InRound, LatestSeenRead, LatestSeenWrite, entry_val(Entry)]),
            T1Entry = entry_set_r_write(Entry, InRound),
            %% prepare fast_paxos for this client:
            NextWriteRound = next_read_round(T1Entry,
@@ -476,12 +442,6 @@ writable(Entry, InRound) ->
            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
            {ok, T2Entry, NextWriteRound};
        true ->
-            %%ct:pal("Deny~n"
-            %%       "InRound         ~.0p~n"
-            %%       "LatestSeenRead  ~.0p~n"
-            %%       "LatestSeenWrite ~.0p~n"
-            %%       "Value           ~.0p~n",
-            %%       [InRound, LatestSeenRead, LatestSeenWrite, entry_val(Entry)]),
             %% proposer may not have latest value for a clean content
             %% check, and another proposer is concurrently active, so
             %% we do not prepare a fast_paxos for this client, but let
