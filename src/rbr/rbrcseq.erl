@@ -442,7 +442,7 @@ on({qread_collect,
                     trace_mpath:log_info(self(), {qread_write_through_necessary}),
 %%                    log:log("Write through necessary, newest: ~p", [entry_val(NewEntry)]),
 %%                    log_entry(qread_collect_write_through, NewEntry),
-                    case randoms:rand_uniform(1,3) of
+                    case randoms:rand_uniform(1,5) of
                         1 ->
                             %% delete entry, so outdated answers from minority
                             %% are not considered
