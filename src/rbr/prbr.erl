@@ -198,12 +198,12 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
     _ = set_entry(NewKeyEntry2, TableName),
     TableName;
 
-on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, ReadRound}, TableName) ->
-    ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
+on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, ReadRound}, TableName) ->
+    ?TRACE("prbr:read: ~p in round ~p~n", [Key, ReadRound]),
     KeyEntry = get_entry(Key, TableName),
 
-    case ReadRound > entry_r_read(KeyEntry) of
-        true ->
+    _ = case ReadRound > entry_r_read(KeyEntry) of
+         true ->
             {NewKeyEntryVal, ReadVal} =
                 case erlang:function_exported(DataType, prbr_read_handler, 3) of
                     true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
@@ -237,7 +237,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
             %%            "Key: ~p~n"
             %%            "Val: ~p", [Key, NewKeyEntry]),
             _ = set_entry(NewKeyEntry2, TableName);
-        _ ->
+         _ ->
             msg_read_deny(Proposer, Cons, ReadRound, entry_r_read(KeyEntry))
     end,
     TableName;

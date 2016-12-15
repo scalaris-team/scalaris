@@ -1353,31 +1353,3 @@ set_period(State, Val) -> setelement(3, State, Val).
 get_db_for_id(DBName, Key) ->
     {DBName, ?RT:get_key_segment(Key)}.
 
-
-%% @doc Helper function to print an entry
--spec log_replies(string(), entry()) -> ok.
-log_replies(Prefix, Entry) ->
-    ct:pal("################# ~.0p:~n"
-           "ReqId           : ~p~n"
-%%           "Debug           : ~p~n"
-           "LastRetrigger   : ~p~n"
-           "NextRetrigger   : ~p~n"
-           "Key             : ~p~n"
-           "Module          : ~p~n"
-           "Client          : ~p~n"
-           "MyRound         : ~p~n"
-           "Filter          : ~p~n"
-           "Replies         : ~p~n"
-          , [Prefix,
-             entry_reqid(Entry),
-             entry_period(Entry),
-             entry_retrigger(Entry),
-             entry_key(Entry),
-             entry_datatype(Entry),
-             entry_client(Entry),
-             entry_my_round(Entry),
-             entry_filters(Entry),
-             entry_replies(Entry)
-            ]).
-
-
