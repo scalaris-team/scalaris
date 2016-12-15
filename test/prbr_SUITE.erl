@@ -350,11 +350,13 @@ tester_type_check_rbr(_Config) ->
              {qwrite_fast, 8}, %% needs funs as input
              {qwrite_fast, 10}  %% needs funs as input
            ],
-           [ {inform_client, 2}, %% cannot create valid envelopes
+           [ {inform_client, 3}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid ets:tid()
              {set_entry, 2},     %% needs valid ets:tid()
-             {add_read_reply, 6},%% needs client_value matching db_type
-             {add_write_reply, 3}%% needs valid entry()
+             {add_rr_reply, 8},  %% needs client_value matching db_type
+             {add_read_reply, 9},%% needs client_value matching db_type
+             {add_write_reply, 3},%% needs valid entry()
+             {add_write_deny, 3} %% needs valid entry()}
            ]},
           {replication,
            [ {get_read_value, 2},     %% cannot create funs
@@ -378,13 +380,13 @@ modify_rbr_at_key(R, N) ->
                    %% let fill in whether lookup was consistent
                    LookupReadEnvelope = dht_node_lookup:envelope(
                                           4,
-                                          {prbr, read, kv_db, '_', comm:this(),
+                                          {prbr, round_request, kv_db, '_', comm:this(),
                                            Repl, kv_on_cseq, unittest_rbr_consistency1_id,
                                            fun prbr:noop_read_filter/1}),
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
                    receive
-                       {read_reply, _, AssignedRound, _, _} ->
+                       {round_request_reply, _, AssignedRound, _,  _} ->
                            AssignedRound
                    end
                end || Repl <- ?RT:get_replica_keys(R) ],
@@ -398,7 +400,7 @@ modify_rbr_at_key(R, N) ->
                              R, kv_on_cseq, HighestRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
-                             fun prbr:noop_write_filter/3}),
+                             fun prbr:noop_write_filter/3, false}),
     %% modify the replica at key R, therefore we use a lookup...
     comm:send_local(pid_groups:find_a(dht_node),
                     {?lookup_aux, R, 0, LookupWriteEnvelope}),
