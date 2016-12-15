@@ -337,8 +337,8 @@ on({qread_collect,
                     %% we can skip read with explicit round number and deliver directly
                     trace_mpath:log_info(self(),
                                           {qread_done, readval,
-                                           Replies#rr_replies.read_value}),
-                    inform_client(qread_done, NewEntry, Replies#rr_replies.read_value),
+                                           NewReplies#rr_replies.read_value}),
+                    inform_client(qread_done, NewEntry, NewReplies#rr_replies.read_value),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 true ->
@@ -351,7 +351,7 @@ on({qread_collect,
                                            entry_datatype(NewEntry),
                                            entry_filters(NewEntry),
                                            entry_retrigger(NewEntry),
-                                           1+pr:get_r(entry_my_round(Entry))}, State)
+                                           1+pr:get_r(entry_my_round(NewEntry))}, State)
             end
     end;
 
@@ -1101,7 +1101,6 @@ entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
                    -> {boolean() | consistant, #rr_replies{}, pr:pr()}.
 add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
              Datatype, Filters, _Cons) ->
-
     %% increment number of replies received
     ReplyCount = Replies#rr_replies.reply_count + 1,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
@@ -1158,7 +1157,6 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                         Collected = R3#rr_replies.read_value,
                         ReadValue = ?REDUNDANCY:get_read_value(Collected, ReadFilter),
                         T1 = R3#rr_replies{read_value=ReadValue},
-
                         {consistent, T1};
                     false ->
                         %% not a consistent quorum
