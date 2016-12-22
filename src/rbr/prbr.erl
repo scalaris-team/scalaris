@@ -199,7 +199,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ReadRound]),
     KeyEntry = get_entry(Key, TableName),
 
-    _ = case ReadRound > entry_r_read(KeyEntry) of
+    _ = case pr:get_r(ReadRound) > pr:get_r(entry_r_read(KeyEntry)) of
          true ->
             {NewKeyEntryVal, ReadVal} =
                 case erlang:function_exported(DataType, prbr_read_handler, 3) of
