@@ -367,8 +367,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                get_diff_with_dupes(FullKVList, CKVTree, [], [], SigSize, VSize,
                                    fun get_full_diff/4),
            ItemCountNI_p1 = ChunkSize + AddToChunkSize,
-           ?ALG_DEBUG("CheckCKV ~Bckv vs. ~Bcmp items, ~B dupes",
-                      [ItemCountNI_p1, MyDBSize1, length(_Dupes)]),
+           ?ALG_DEBUG("CheckCKV ~B+~Bckv vs. ~B+~Bcmp items",
+                      [ChunkSize, AddToChunkSize, MyDBSize1, length(_Dupes)]),
            ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
                         {non_unique_send_list, ToSend, _Dupes}),
            % note: the actual acc(phase1) may be different from what the non-initiator expected
@@ -430,8 +430,8 @@ on({process_db, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                              || KV <- FullKVList])
                end,
            ItemCountNI_p1 = ChunkSize + AddToChunkSize,
-           ?ALG_DEBUG("CheckSH ~Bckv vs. ~Bcmp items, ~B dupes",
-                      [ItemCountNI_p1, MyDBSize1, length(Dupes0)]),
+           ?ALG_DEBUG("CheckSH ~B+~Bckv vs. ~B+~Bcmp items",
+                      [ChunkSize, AddToChunkSize, MyDBSize1, length(Dupes0)]),
            {NewKVList, OtherDBChunk1} =
                shash_get_full_diff(FullKVList1, SHTree,
                                    [element(2, D) || D <- Dupes0], SigSize),
@@ -1649,7 +1649,7 @@ shash_bloom_perform_resolve(
     {ToSendKeys1, ToReqIdx1, DBChunkTree1, _Dupes} =
         get_diff_with_dupes(KVList, DBChunkTree, [], [], SigSize, VSize,
                             GetDiffFun),
-    ?ALG_DEBUG("CheckCKV ~B+~Bckv vs. ~Bcmp items (~B dupes)",
+    ?ALG_DEBUG("CheckCKV ~B+~Bckv vs. ~B+~Bcmp items",
                [mymaps:size(DBChunkTree), DupesCount,
                 length(KVList), length(_Dupes)]),
 
