@@ -1,0 +1,9 @@
+backend_version=R16
+compiler/raw={d, enable_debug}, {d, with_crypto_hash}, {d, with_rand}, {d, have_callback_support}, {d, with_maps}\n  , {d, 'HAVE_ERLANG_SENDFILE'}, {d, 'HAVE_CRYPTO_HASH'}
+eclipse.preferences.version=1
+external_includes=
+external_modules=
+include_dirs=contrib/yaws/include;contrib/log4erl/include;include;
+output_dir=ebin/eclipse
+source_dirs=test;src;src/comm_layer;src/json;src/rbr;src/tx;src/transactions;src/rrepair;src/cp;src/paxos;
+use_pathz=false
