@@ -1185,12 +1185,12 @@ calc_max_different_hashes(N, M, ExpDelta) when ExpDelta >= 0 andalso ExpDelta =<
     Differences0 = calc_max_different_hashes_(N, M, ExpDelta),
     % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
     MinDiff = erlang:abs(N - M),
-    if MinDiff < Differences0 ->
+    if MinDiff =< Differences0 ->
            Differences0;
        true ->
-           log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+           log:log("~w: [ ~.0p:~.0p ] expected delta ~B must be wrong,~n"
                    "  continuing with the minimum number of differences we know: ~B",
-                   [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+                   [?MODULE, pid_groups:my_groupname(), self(), Differences0, MinDiff]),
            MinDiff
     end.
 
@@ -1224,12 +1224,12 @@ calc_max_different_items_total(N, M, ExpDelta) ->
     % in case ExpDelta is wrong, at least |N-M| items must differ and are missing on one node
     MinDiff = erlang:abs(N - M),
     Differences =
-        if MinDiff < Differences0 ->
+        if MinDiff =< Differences0 ->
                Differences0;
            true ->
-               log:log("~w: [ ~.0p:~.0p ] expected delta must be wrong,~n"
+               log:log("~w: [ ~.0p:~.0p ] expected delta ~B must be wrong,~n"
                        "  continuing with the minimum number of differences we know: ~B",
-                       [?MODULE, pid_groups:my_groupname(), self(), MinDiff]),
+                       [?MODULE, pid_groups:my_groupname(), self(), Differences0, MinDiff]),
                MinDiff
         end,
 %%     log:pal("[ ~p ] MaxItems: ~B Differences: ~B -> ~B", [self(), MaxItems, Differences0, Differences]),
