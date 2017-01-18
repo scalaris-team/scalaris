@@ -354,7 +354,7 @@ get_load(State) -> ?PDB:get_load(State).
 tab2list(State) ->
     %% without prbr own data
     Entries = tab2list_raw(State),
-    [ {element(1,X), element(4,X)} || X <- Entries].
+    [ {entry_key(X), entry_val(X)} || X <- Entries].
 
 -spec tab2list_raw_unittest(state()) -> [entry()].
 tab2list_raw_unittest(State) ->
