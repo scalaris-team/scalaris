@@ -126,7 +126,7 @@ qread(CSeqPidName, Client, Key, DataType) ->
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), prbr:read_filter()) -> ok.
 qread(CSeqPidName, Client, Key, DataType, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qread, Client, Key, DataType, ReadFilter, _RetriggerAfter = 1})
+    comm:send_local(Pid, {qround_request, Client, Key, DataType, ReadFilter, read, _RetriggerAfter = 1})
     %% the process will reply to the client directly
     .
 
@@ -262,7 +262,7 @@ init(DBSelector) ->
 
 
 %% qread step 1: request the current read/write rounds of + values from replicas.
-on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
+on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:read step 1: round_request, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
@@ -274,7 +274,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:read step 1: round_request ReqId ~p~n", [ReqId]),
     %% initiate lookups for replicas(Key) and perform
     %% rbr reads there apply the content filter to only retrieve the required information
-    This = comm:reply_as(comm:this(), 2, {qread_collect, '_'}),
+    This = comm:reply_as(comm:this(), 2, {qround_request_collect, '_'}),
 
     %% add the ReqId in case we concurrently perform several requests
     %% for the same key from the same process, which may happen.
@@ -288,7 +288,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
               LookupEnvelope =
                   dht_node_lookup:envelope(
                     4,
-                    {prbr, round_request, DB, '_', This, X, DataType, MyId, ReadFilter}),
+                    {prbr, round_request, DB, '_', This, X, DataType, MyId, ReadFilter, OpType}),
               comm:send_local(Dest,
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
@@ -299,7 +299,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
     %% {next_period, ...}
 
     %% create local state for the request id
-    Entry = entry_new_round_request(qread, ReqId, Key, DataType, Client,
+    Entry = entry_new_round_request(qround_request, ReqId, Key, DataType, Client,
                                     period(State), ReadFilter, RetriggerAfter),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
@@ -308,7 +308,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter}, State) ->
 %% qread step 2: collect round_request replies (step 1) from replicas.
 %% If a majority replied and it is a consistent quorum (i.e. all received rounds are the same)
 %% we can deliver the read. If not, a qread with explicit round number is started.
-on({qread_collect,
+on({qround_request_collect,
     {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue}}, State) ->
     ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
 
@@ -618,8 +618,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op({qread, This, entry_key(ReadEntry), entry_datatype(ReadEntry),
-               fun prbr:noop_read_filter/1,
+            gen_component:post_op({qround_request, This, entry_key(ReadEntry), entry_datatype(ReadEntry),
+               fun prbr:noop_read_filter/1, write,
                entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
               State)
     end;
@@ -711,8 +711,8 @@ on({qread_write_through_collect, ReqId,
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op({qread, Client, Key, entry_datatype(Entry), Filter,
-                       entry_retrigger(Entry) - entry_period(Entry)},
+                    gen_component:post_op({qround_request, Client, Key, entry_datatype(Entry),
+                      Filter, write, entry_retrigger(Entry) - entry_period(Entry)},
                       State)
             end
     end;
@@ -743,7 +743,7 @@ on({qread_write_through_done, ReadEntry, _Filtering,
     RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
 
     gen_component:post_op(
-      {qread, Client, Key, DataType, ReadFilter, RetriggerAfter},
+      {qround_request, Client, Key, DataType, ReadFilter, write, RetriggerAfter},
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
@@ -776,7 +776,8 @@ on({qwrite, Client, Key, DataType, Filters, WriteValue, RetriggerAfter}, State) 
 
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     set_entry(Entry, tablename(State)),
-    gen_component:post_op({qread, This, Key, DataType, element(1, Filters), 1}, State);
+    gen_component:post_op({qround_request, This, Key, DataType,
+                           element(1, Filters), write, 1}, State);
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,

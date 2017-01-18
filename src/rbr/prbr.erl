@@ -116,6 +116,7 @@
 -type entry() :: { any(), %% key
                    pr:pr(), %% r_read
                    pr:pr(), %% r_write
+                   atom(), %% signals if last round request was part of a read or write
                    any(), %% value
                    [comm:mypid()] %% learner
                  }.
@@ -166,7 +167,7 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(message(), state()) -> state().
-on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, OpType}, TableName) ->
     ?TRACE("prbr:round_request: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
@@ -176,8 +177,18 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
             _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry))}
         end,
 
-    %% assign a valid next read round number
-    AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
+    %% Assign a valid next read round number
+    %% If the last round request was part of a read and this one is a
+    %% also part of a read, it is not necessary to increment the read round
+    %% number. This prevents sequencing of concurrent reads.
+    AssignedReadRound =
+        case OpType =:= read andalso entry_last_op_type(KeyEntry) =:= read of
+            true ->
+                OldRound = entry_r_read(KeyEntry),
+                pr:new(pr:get_r(OldRound), ProposerUID);
+            _ ->
+                next_read_round(KeyEntry, ProposerUID)
+        end,
     trace_mpath:log_info(self(), {'prbr:on(round_request)',
                                   %% key, Key,
                                   round, AssignedReadRound,
@@ -191,8 +202,9 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
                             EntryWriteRound, ReadVal),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
-    NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
-    _ = set_entry(NewKeyEntry2, TableName),
+    NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
+    NewKeyEntry3 = entry_set_last_op_type(NewKeyEntry2, OpType),
+    _ = set_entry(NewKeyEntry3, TableName),
     TableName;
 
 on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, ReadRound}, TableName) ->
@@ -229,7 +241,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
                            ReadVal, EntryWriteRound),
 
             NewKeyEntry = entry_set_r_read(KeyEntry, ReadRound),
-            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
+            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
             _ = set_entry(NewKeyEntry2, TableName);
          _ ->
             msg_read_deny(Proposer, Cons, ReadRound, entry_r_read(KeyEntry))
@@ -379,6 +391,7 @@ new(Key, Val) ->
      _R_Read = pr:new(0, '_'),
      %% Note: atoms < pids, so this is a good default.
      _R_Write = pr:new(0, '_'),
+     _LastOP = created,
      _Value = Val,
      _Learner = []}.
 
@@ -394,21 +407,25 @@ entry_set_r_read(Entry, Round) -> setelement(2, Entry, Round).
 entry_r_write(Entry) -> element(3, Entry).
 -spec entry_set_r_write(entry(), pr:pr()) -> entry().
 entry_set_r_write(Entry, Round) -> setelement(3, Entry, Round).
+-spec entry_set_last_op_type(entry(), atom()) -> entry().
+entry_set_last_op_type(Entry, OpType) -> setelement(4, Entry, OpType).
+-spec entry_last_op_type(entry()) -> atom().
+entry_last_op_type(Entry) -> element(4, Entry).
 -spec entry_val(entry()) -> any().
-entry_val(Entry) -> element(4, Entry).
+entry_val(Entry) -> element(5, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
-entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
+entry_set_val(Entry, Value) -> setelement(5, Entry, Value).
 -spec entry_add_learner(entry(), comm:mypid()) -> entry().
 entry_add_learner(Entry, Learner) ->
     OldLearner = entry_get_learner(Entry),
     case lists:member(Learner, OldLearner) of
         true -> Entry;
-        false -> setelement(5, Entry, [Learner | OldLearner])
+        false -> setelement(6, Entry, [Learner | OldLearner])
     end.
 -spec entry_set_learner(entry(), comm:mypid()) -> entry().
-entry_set_learner(Entry, Learner) -> setelement(5, Entry, [Learner]).
+entry_set_learner(Entry, Learner) -> setelement(6, Entry, [Learner]).
 -spec entry_get_learner(entry()) -> [comm:mypid()].
-entry_get_learner(Entry) -> element(5, Entry).
+entry_get_learner(Entry) -> element(6, Entry).
 
 -spec next_read_round(entry(), any()) -> pr:pr().
 next_read_round(Entry, ProposerUID) ->

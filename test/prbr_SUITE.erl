@@ -383,7 +383,7 @@ modify_rbr_at_key(R, N) ->
                                           4,
                                           {prbr, round_request, kv_db, '_', comm:this(),
                                            Repl, kv_on_cseq, unittest_rbr_consistency1_id,
-                                           fun prbr:noop_read_filter/1}),
+                                           fun prbr:noop_read_filter/1, write}),
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
                    receive
