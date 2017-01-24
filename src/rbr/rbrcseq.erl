@@ -988,11 +988,12 @@ on({next_period, NewPeriod}, State) ->
     set_period(State, NewPeriod).
 
 -spec req_for_retrigger(entry(), incdelay|noincdelay) ->
-                               {qread,
+                               {qround_request,
                                 Client :: comm:erl_local_pid(),
                                 Key :: ?RT:key(),
                                 DataType :: module(),
                                 Filters :: any(),
+                                OpType :: atom(),
                                 Delay :: non_neg_integer()}
                                | {qwrite,
                                 Client :: comm:erl_local_pid(),
@@ -1014,9 +1015,9 @@ req_for_retrigger(Entry, IncDelay) ->
             entry_filters(Entry), entry_write_val(Entry),
             RetriggerDelay};
        true -> %% read request
-           {qread, entry_client(Entry), entry_key(Entry),
+           {qround_request, entry_client(Entry), entry_key(Entry),
             entry_datatype(Entry), entry_filters(Entry),
-            RetriggerDelay}
+            retrigger, RetriggerDelay}
     end.
 
 -spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
