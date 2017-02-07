@@ -1,0 +1,312 @@
+%% @copyright 2013-2017 Zuse Institute Berlin
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+
+%% @author Jan Skrzypczak <skrzypczak@zib.de>
+%% @doc    Unit tests for rbrcseq which simulate specific interleaving of messages.
+%%         The tests depend on the gen_component breakpoint mechanism to delay specific messages.
+%% @end
+%% @version $Id$
+-module(rbr_interleaving_SUITE).
+-author('skrzypczak@zib.de').
+-vsn('$Id$').
+
+-compile(export_all).
+
+-define(TRACE(X,Y), ok).
+
+-include("scalaris.hrl").
+-include("unittest.hrl").
+-include("client_types.hrl").
+
+all() -> [
+          test_link_slowing,
+          test_link_slowing2,
+          test_interleaving
+         ].
+
+suite() -> [ {timetrap, {seconds, 400}} ].
+
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+init_per_testcase(_TestCase, Config) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir}]}]),
+    unittest_helper:check_ring_size_fully_joined(config:read(replication_factor)),
+    [{stop_ring, true} | Config].
+
+test_link_slowing(_Config) ->
+    %% Slow down a link. One replica should not receive any prbr messages during the
+    %% test. After the slow link is removed (messages will be flushed), all replicase should
+    %% be consistent.
+    get_notified_by_message(self(), 1, kv_db, 2, dht_node, write),
+    Link = slow_link(1, kv_db, 2, dht_node),
+    {ok, _} = write_via_node(1, "1", filter_list_append(), "TestWrite"),
+
+    %% replica 2 should be empty, and the other three have the value written
+    ?equals(prbr_values(), [[["TestWrite"]],
+                            [],
+                            [["TestWrite"]],
+                            [["TestWrite"]]]),
+
+    remove_slow_link(Link),
+    receive {message_received} -> ok end,
+
+    %% all replicas should have received the written value
+    ?equals(prbr_values(), [[["TestWrite"]],
+                            [["TestWrite"]],
+                            [["TestWrite"]],
+                            [["TestWrite"]]]).
+
+test_link_slowing2(_Config) ->
+    %% slow down one link, but use a different client to send write request
+    %% slow link should have no impact
+    slow_link(1, kv_db, 2, dht_node),
+
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) ||
+       I <- lists:seq(1, 4)],
+    {ok, _} = write_via_node(2, "1", filter_list_append(), "TestWrite"),
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 4)],
+
+    %% all replicas should have received the written value
+    ?equals(prbr_values(), [[["TestWrite"]],
+                            [["TestWrite"]],
+                            [["TestWrite"]],
+                            [["TestWrite"]]]).
+
+test_interleaving(_Config) ->
+    %% This test simulates the following interleaving of operations:
+    %% (4 nodes with r=4, the nodes are called 1,2,3,4)
+    %%
+    %% Three requests are made from three different clients.
+    %% 1. Client A Starts a write operation, but has only written replica 
+    %%      on node 1 so far (has read all replicas in its read phase)
+    %% 2. Client B Executes a read which only has read replicas 2,3,4 yet
+    %%      (read has returned since majority replied)
+    %% 3. Client C Executes a write. In its read phase and it gets replies
+    %%      from 2,3,4 first; After that write on every replica
+
+    Key = "A",
+
+    %% write of client A
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I<-lists:seq(2, 4)],
+    get_notified_by_message(self(), 1, kv_db, 1, dht_node, write),
+    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(2, 4)],
+    spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 4)],
+
+    %% read of client B
+    _LinkB = slow_link(2, kv_db, 1, dht_node),
+    {ok, _} = read_via_node(2, Key, element(1, filter_list_append())),
+
+    %% write of client C
+    get_notified_by_message(self(), 3, kv_db, 1, dht_node, write),
+    LinkC = slow_link(3, kv_db, 1, dht_node),
+    {ok, _} = write_via_node(3, Key, filter_list_append(), "WriteB"),
+    remove_slow_link(LinkC),
+    receive {message_received} -> ok end,
+
+    %% Test that there aren't two different values
+    %% with the same write round.
+    PrbrData = prbr_w_rounds_with_values(),
+    ValList = lists:usort(lists:map(fun hd/1, PrbrData)),
+    case ValList of
+        [A, B] ->
+            ?compare_w_note(fun(E1, E2) -> element(1, E1) =/= element(1, E2) end,
+                            A, B, "Same write round for different values!");
+        [_A] -> ok;
+        _ ->
+            ct:fail("More than two different values/rounds! ~nprbr data:~n~p", [PrbrData])
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Helper functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Simple set of filter which append the given value to a list
+filter_list_append() ->
+    RF = fun (prbr_bottom) -> [];
+             (DBEntry) -> DBEntry
+         end,
+    CC = fun (_ReadVal_, _WF, _WriteVal) -> {true, none} end,
+    WF = fun (prbr_bottom, _UI, WriteVal) -> {[WriteVal], none};
+             (DBEntry, _UI, WriteVal) -> {[WriteVal | DBEntry], none}
+         end,
+    {RF, CC, WF}.
+
+%% @doc Sends a read requests via node number ViaKvNr (lexicographically order by pid).
+%% Blocks until read is done.
+read_via_node(ViaKvNr, Key, ReadFilter) ->
+    comm:send_local(nth(ViaKvNr, kv_db),
+                    {qround_request, self(), ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1}),
+    receive
+        ?SCALARIS_RECV({qread_done, _, _, Value}, {ok, Value})
+    end.
+
+%% @doc Sends a write requests via node number ViaKvNr (lexicographically order by pid).
+%% Blocks until write is done.
+write_via_node(ViaKvNr, Key, Filter, Value) ->
+    comm:send_local(nth(ViaKvNr, kv_db),
+                    {qwrite, self(), ?RT:hash_key(Key), ?MODULE, Filter, Value, 20}),
+    receive
+        ?SCALARIS_RECV({qwrite_done, _, _, _, RetValue}, {ok, RetValue});
+        ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason}, Reason)
+    end.
+
+%% @doc Notifies process PidToNotify if process nth(ToId, ToType) received a message
+%% of type MessageType from process nth(FromId, FromType).
+%% ATTENTION: If the corresponding link is slowed by slow_link/[4,5,6] this method must be called
+%% BEFORE slow_link. Otherwise two notifications might be received for the same message.
+%% Todo? (Works only for ToType=dht_node so far).
+get_notified_by_message(PidToNotify, FromId, FromType, ToId, ToType, MessageType) ->
+    BpName = bp_name("notify_" ++ atom_to_list(MessageType), FromId, FromType, ToId, ToType),
+    ToPid = nth(ToId, ToType),
+    NotifyFun = notify_fun(PidToNotify, nth(FromId, FromType), ToPid,
+                            ToType, MessageType, BpName),
+    gen_component:bp_set_cond(ToPid, NotifyFun, BpName).
+
+notify_fun(PidToNotify, FromPid, ToPid, _ToType=dht_node, MessageType, BpName) ->
+    fun(Msg, _State) ->
+        case Msg of
+            _ when element(1, Msg) =:= prbr andalso
+                    element(2, Msg) =:= MessageType andalso
+                    element(3, element(1, element(5, Msg))) =:= FromPid ->
+                ?TRACE("Notify ~p message on ~p received: ~n~p", [PidToNotify, ToPid, Msg]),
+                gen_component:bp_del(ToPid, BpName),
+                comm:send_local(PidToNotify, {message_received}),
+                false;
+            _ -> false
+        end
+    end.
+
+%% @doc Gets all information stored in prbr for all nodes.
+prbr_data() ->
+     [begin
+        comm:send_local(N, {prbr, tab2list_raw, kv_db, self()}),
+        receive
+            {_, List} -> List
+        end
+      end || N <- lists:sort(pid_groups:find_all(dht_node))].
+
+%% @doc Returns all value for each node.
+prbr_values() ->
+    [
+        [element(5, E) || E <- Replica]
+    || Replica <- prbr_data()].
+
+%% @doc Returns all {write_round, value} tuples for each node.
+%%      Removes write_through infos
+prbr_w_rounds_with_values() ->
+    [
+     [{pr:set_wf(element(3, E), none), element(5,E)} || E <- Replica]
+    || Replica <- prbr_data()].
+
+%% @doc Flush all slow messages of a link
+flush_slow_link({_BPName, LoopPid, _Node}) ->
+    comm:send_local(LoopPid, {flush}).
+
+%% @doc Stops slowing messages down and flushes message queue.
+remove_slow_link({BPName, LoopPid, Node}) ->
+    gen_component:bp_del(Node, BPName),
+    comm:send_local(LoopPid, {flush_and_stop}).
+
+%% @doc See slow_link/5. But link is slow from the beginning.
+slow_link(From, FromType, To, ToType) ->
+    slow_link(From, FromType, To, ToType, always_slow).
+
+%% @doc Delays messages from From to To. Returns a link-info tuple.
+%%      Link behaves normally until a message of type FastUntilMessageType is received.
+%%      Starting with this message, all received messages between these two PIDs are queued
+%%      until flush_link/1 or remove_slow_link/1 is called.
+%%      From/To are integer ids representing the nths Pid in PidGroup FromType/ToType.
+%%      Affected messages in prbr are: round_request, read and write. Tab2list is not affected.
+%%      No messages are thrown away and the delivery order is unchanged.
+slow_link(From, FromType, To, ToType, FastUntilMessageType) ->
+    FromPid = nth(From, FromType),
+    ToPid = nth(To, ToType),
+    BpName = bp_name("slow_", From, FromType, To, ToType),
+    slow_link(FromPid, FromType, ToPid, ToType, BpName, FastUntilMessageType).
+
+slow_link(FromPid, FromType, ToPid, ToType, BPName, FastUntilMessageType) ->
+    {LoopPid, BpFun} = slow_link_fun(FromPid, FromType, ToPid, ToType, FastUntilMessageType),
+    gen_component:bp_set_cond(ToPid, BpFun, BPName),
+    {BPName, LoopPid, ToPid}.
+
+%% @doc Delays all round_request, write and read messages received by prbr from PID
+%%      From, on DHT node with PID To. The link starts delivering all queued messages as
+%%      soon as a flush message was received.
+%%      tab2list_raw messages are not delayed.
+slow_link_fun(From, _FromType, To, _ToType=dht_node, FastUntilMessageType) ->
+    LoopPid = spawn(?MODULE, slow_loop, [To, FastUntilMessageType]),
+    BpFun = fun (Msg, _State) ->
+        case Msg of
+            %% prbr round_request, write and read messages seventh
+            %% element is the datatype. This is abused to ensure that
+            %% a message is only delayed once
+            _ when element(7, Msg) =:= rbr_interleave_SUITE_dont_delay ->
+                ?TRACE("Deliver delayed message: ~n~p", [Msg]),
+                false;
+           %% delay a prbr round_request, write or read message if it commes
+           %% from PID From.
+            _ when element(1, Msg) =:= prbr andalso
+                       element(3, element(1, element(5, Msg))) =:= From ->
+                ?TRACE("Delay message: ~n~p", [Msg]),
+                %% change Datatype in message since it is not used in this unit test suite.
+                %% marks messages which where already delayed.
+                NewMsg = setelement(7, Msg, rbr_interleave_SUITE_dont_delay),
+                MsgType = element(2, Msg),
+                comm:send_local(LoopPid, {delay, MsgType, NewMsg}),
+                drop_single;
+            _ ->
+                false
+        end
+    end,
+    {LoopPid, BpFun}.
+
+slow_loop(To, always_slow) ->
+    slow_loop(To, always_slow, [], true);
+slow_loop(To, FastUntil) ->
+    slow_loop(To, FastUntil, [], false).
+slow_loop(To, FastUntil, MsgQueue, _IsSlow=false) ->
+    receive
+        {delay, FastUntil, Msg} ->
+            slow_loop(To, FastUntil, [Msg | MsgQueue], true);
+        {delay, _Type, Msg} ->
+            comm:send_local(To, Msg),
+            slow_loop(To, FastUntil, MsgQueue, false)
+    end;
+slow_loop(To, FastUntil, MsgQueue, _IsSlow=true) ->
+    receive
+        {delay, _Type, Msg} ->
+            slow_loop(To, FastUntil, [Msg | MsgQueue], true);
+        {flush} ->
+            [comm:send_local(To, Msg) || Msg <- lists:reverse(MsgQueue)],
+            slow_loop(To, FastUntil, [], true);
+        {flush_and_stop} ->
+            [comm:send_local(To, Msg) || Msg <- lists:reverse(MsgQueue)]
+    end.
+
+nth_dht_node(N) -> nth(N, dht_node).
+nth_kv_db(N) -> nth(N, kv_db).
+
+nth(N, PidGroup) -> nth_pid(N, pid_groups:find_all(PidGroup)).
+nth_pid(N, Pids) -> lists:nth(N, lists:sort(Pids)).
+
+%% @doc Generate a breakpoint name
+bp_name(Prefix, FromId, FromType, ToId, ToType) ->
+    BPNameString = Prefix ++ " " ++ integer_to_list(FromId) ++ "," ++ atom_to_list(FromType)
+                    ++ "|" ++ integer_to_list(ToId) ++ "," ++ atom_to_list(ToType),
+    list_to_atom(BPNameString). %% ugh, dynamic creation of atoms...
