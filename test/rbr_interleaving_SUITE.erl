@@ -14,6 +14,7 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Unit tests for rbrcseq which simulate specific interleaving of messages.
 %%         The tests depend on the gen_component breakpoint mechanism to delay specific messages.
+%%         Each test case assumes a specific replication factor (usually 4).
 %% @end
 %% @version $Id$
 -module(rbr_interleaving_SUITE).
@@ -44,14 +45,14 @@ end_per_suite(_Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir}]}]),
+    unittest_helper:make_symmetric_ring([{config, [{log_path, PrivDir}, {replication_factor, 4}]}]),
     unittest_helper:check_ring_size_fully_joined(config:read(replication_factor)),
     [{stop_ring, true} | Config].
 
 test_link_slowing(_Config) ->
     %% Slow down a link. One replica should not receive any prbr messages during the
     %% test. After the slow link is removed (messages will be flushed), all replicase should
-    %% be consistent.
+    %% be consistent. Assumes R=4.
     get_notified_by_message(self(), 1, kv_db, 2, dht_node, write),
     Link = slow_link(1, kv_db, 2, dht_node),
     {ok, _} = write_via_node(1, "1", filter_list_append(), "TestWrite"),
@@ -73,7 +74,7 @@ test_link_slowing(_Config) ->
 
 test_link_slowing2(_Config) ->
     %% slow down one link, but use a different client to send write request
-    %% slow link should have no impact
+    %% slow link should have no impact. Assumes R=4.
     slow_link(1, kv_db, 2, dht_node),
 
     [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) ||
@@ -89,7 +90,7 @@ test_link_slowing2(_Config) ->
 
 test_interleaving(_Config) ->
     %% This test simulates the following interleaving of operations:
-    %% (4 nodes with r=4, the nodes are called 1,2,3,4)
+    %% (4 nodes with R=4, the nodes are called 1,2,3,4)
     %%
     %% Three requests are made from three different clients.
     %% 1. Client A Starts a write operation, but has only written replica 
