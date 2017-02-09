@@ -273,7 +273,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Val
             _ ->
                 pr:set_wf(InRound, {WriteFilter, PassedToUpdate, Value})
         end,
-    _ = case writable(KeyEntry, RoundForWrite, OldWriteRound) of
+    _ = case writable(KeyEntry, RoundForWrite, OldWriteRound, WriteFilter) of
             {ok, NewKeyEntry, NextWriteRound} ->
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
@@ -435,11 +435,10 @@ next_read_round(Entry, ProposerUID) ->
 
 
 
--spec writable(entry(), pr:pr(), pr:pr()) -> {ok, entry(),
-                                     NextWriteRound :: pr:pr()} |
-                                    {dropped,
-                                     NewerSeenRound :: pr:pr()}.
-writable(Entry, InRound, OldWriteRound) ->
+-spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter()) ->
+          {ok, entry(),NextWriteRound :: pr:pr()} |
+          {dropped, NewerSeenRound :: pr:pr()}.
+writable(Entry, InRound, OldWriteRound, WF) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
     InRoundR = pr:get_r(InRound),
@@ -450,13 +449,15 @@ writable(Entry, InRound, OldWriteRound) ->
     LatestSeenWriteId = pr:get_id(LatestSeenWrite),
     OldWriteR = pr:get_r(OldWriteRound),
     OldWriteId = pr:get_id(OldWriteRound),
-    if ((InRoundR =:= LatestSeenReadR andalso InRoundId=:= LatestSeenReadId)
+    IsNotPartialWrite = not is_partial_write(WF),
+    if ((InRoundR =:= LatestSeenReadR andalso InRoundId =:= LatestSeenReadId)
         orelse (InRoundR > LatestSeenReadR))
        andalso (InRoundR > LatestSeenWriteR)
        %% make sure that no write filter operations are missing in the
        %% sequence of writes
-       andalso (OldWriteR =:= LatestSeenWriteR
-               andalso OldWriteId =:= LatestSeenWriteId) ->
+       andalso (IsNotPartialWrite orelse
+                    (OldWriteR =:= LatestSeenWriteR
+                    andalso OldWriteId =:= LatestSeenWriteId)) ->
 
            T1Entry = entry_set_r_write(Entry, InRound),
            %% prepare fast_paxos for this client:
@@ -475,6 +476,9 @@ writable(Entry, InRound, OldWriteRound) ->
             %% phase on its own (including a new content check).
             {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
     end.
+
+-spec is_partial_write(prbr:write_filter()) -> boolean().
+is_partial_write(Any) -> fun prbr:noop_write_filter/3 =:= Any.
 
 -spec get_wti_key(any())-> any().
 get_wti_key(Key) -> {Key, wti}.
