@@ -31,8 +31,8 @@
 
 all() -> [
           test_link_slowing,
-          test_link_slowing2
-          %test_interleaving    Fix in progress...
+          test_link_slowing2,
+          test_interleaving
          ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -120,10 +120,11 @@ test_interleaving(_Config) ->
     remove_slow_link(LinkC),
     receive {message_received} -> ok end,
 
+    ct:pal("PRBR state after interleaved operations: ~n~p", [prbr_data()]),
     %% Test that there aren't two different values
     %% with the same write round.
     PrbrData = prbr_w_rounds_with_values(),
-    ValList = lists:usort(lists:map(fun hd/1, PrbrData)),
+    ValList = lists:usort(lists:flatten(PrbrData)),
     case ValList of
         [A, B] ->
             ?compare_w_note(fun(E1, E2) -> element(1, E1) =/= element(1, E2) end,
@@ -131,7 +132,21 @@ test_interleaving(_Config) ->
         [_A] -> ok;
         _ ->
             ct:fail("More than two different values/rounds! ~nprbr data:~n~p", [PrbrData])
-    end.
+    end,
+
+    %% Do a read over replica 1, 2, 3
+    %% It should be an inconsistent read and currently diverging replica 1
+    %% should be repaired,
+    get_notified_by_message(self(), 4, kv_db, 4, dht_node, write),
+    LinkD = slow_link(4, kv_db, 4, dht_node),
+    {ok, _} = read_via_node(4, Key, element(1, filter_list_append())),
+    remove_slow_link(LinkD),
+    receive {message_received} -> ok end,
+
+    ct:pal("PRBR state after inconsistent read: ~n~p", [prbr_data()]),
+    PrbrData2 = prbr_w_rounds_with_values(),
+    ValList2 = lists:usort(lists:flatten(PrbrData2)),
+    ?equals_w_note(length(ValList2), 1, "All replicas should have the same value and write round").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper functions
