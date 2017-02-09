@@ -149,7 +149,7 @@ msg_write_deny(Client, Cons, Key, NewerRound) ->
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
 
--spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> {term(), none}.
+-spec noop_write_filter(Old :: term(), UpdateInfo :: term(), Val :: term()) -> {term(), none}.
 noop_write_filter(_, _, X) -> {X, none}.
 
 %% initialize: return initial state.
@@ -478,7 +478,7 @@ writable(Entry, InRound, OldWriteRound, WF) ->
     end.
 
 -spec is_partial_write(prbr:write_filter()) -> boolean().
-is_partial_write(Any) -> fun prbr:noop_write_filter/3 =:= Any.
+is_partial_write(Any) -> fun prbr:noop_write_filter/3 =/= Any.
 
 -spec get_wti_key(any())-> any().
 get_wti_key(Key) -> {Key, wti}.
