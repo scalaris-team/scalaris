@@ -228,9 +228,18 @@ qwrite(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
 qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
+
+    %% Writes need the old write round to ensure every replica has the same
+    %% sequence of applied write filter. A qwrite_fast is only sucessfull
+    %% if no other process has touched the the replica's in the mean time.
+    %% In this case, the round received (parameter Round) from the last
+    %% write is the used write round inrecemented by one.
+    OldWriteRound = pr:new(pr:get_r(Round)-1, pr:get_id(Round)),
+
     comm:send_local(Pid, {qwrite_fast, Client, Key,
                           DataType, {ReadFilter, ContentCheck, WriteFilter},
-                          Value, _RetriggerAfter = 20, Round, OldValue}),
+                          Value, _RetriggerAfter = 20, Round, OldWriteRound,
+                          OldValue}),
     %% the process will reply to the client directly
     ok.
 
@@ -336,8 +345,10 @@ on({qround_request_collect,
                     %% we can skip read with explicit round number and deliver directly
                     trace_mpath:log_info(self(),
                                           {qread_done, readval,
+                                           NewReplies#rr_replies.highest_write_round,
                                            NewReplies#rr_replies.read_value}),
-                    inform_client(qread_done, NewEntry, NewReplies#rr_replies.read_value),
+                    inform_client(qread_done, NewEntry, NewReplies#rr_replies.highest_write_round,
+                                    NewReplies#rr_replies.read_value),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 true ->
@@ -426,8 +437,10 @@ on({qread_collect,
                 true ->
                     trace_mpath:log_info(self(),
                                          {qread_done,
-                                          readval, NewReplies#r_replies.read_value}),
-                    inform_client(qread_done, NewEntry, NewReplies#r_replies.read_value),
+                                          readval, NewReplies#r_replies.highest_write_round,
+                                          NewReplies#r_replies.read_value}),
+                    inform_client(qread_done, NewEntry, NewReplies#r_replies.highest_write_round,
+                                   NewReplies#r_replies.read_value),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
                 write_through ->
@@ -598,6 +611,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                             {prbr, write, DB, '_', Collector, K,
                              entry_datatype(ReadEntry),
                              entry_my_round(ReadEntry),
+                             pr:new(0,0), %% dummy round
                              V,
                              WTUI,
                              WTWF, _IsWriteThrough = true}),
@@ -747,7 +761,7 @@ on({qread_write_through_done, ReadEntry, _Filtering,
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
-    {qread_done, _ReqId, Round, Val}}, State) ->
+    {qread_done, _ReqId, Round, OldWriteRound, Val}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_done qread_done ~p ~p~n", [_ReqId, ReadEntry]),
     ClientVal =
         case Filtering of
@@ -759,7 +773,8 @@ on({qread_write_through_done, ReadEntry, Filtering,
     TReplyEntry = entry_set_replies(ReadEntry, NewReplies),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
 
-    inform_client(qread_done, ReplyEntry, NewReplies#r_replies.read_value),
+    inform_client(qread_done, ReplyEntry, OldWriteRound,
+                  NewReplies#r_replies.read_value),
 
     State;
 
@@ -781,13 +796,13 @@ on({qwrite, Client, Key, DataType, Filters, WriteValue, RetriggerAfter}, State) 
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
-    {qread_done, _ReadId, Round, ReadValue}},
+    {qread_done, _ReadId, Round, OldWriteRound, ReadValue}},
    State) ->
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
-    gen_component:post_op({do_qwrite_fast, ReqId, Round, ReadValue}, State);
+    gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound, ReadValue}, State);
 
 on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
-    WriteValue, RetriggerAfter, Round, ReadFilterResultValue}, State) ->
+    WriteValue, RetriggerAfter, Round, OldWriteRound, ReadFilterResultValue}, State) ->
 
     %% create state and ReqId, store it and trigger 'do_qwrite_fast'
     %% which is also the write phase of a slow write.
@@ -800,10 +815,10 @@ on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
                             Filters, WriteValue, RetriggerAfter),
 
     set_entry(Entry, tablename(State)),
-    gen_component:post_op({do_qwrite_fast, ReqId, Round,
+    gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound,
                                   ReadFilterResultValue}, State);
 
-on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
+on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
     %% What if ReqId does no longer exist? Can that happen? How?
     %% a) Lets analyse the paths to do_qwrite_fast:
     %% b) Lets analyse when entries are removed from the database:
@@ -836,7 +851,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
                     LookupEnvelope =
                       dht_node_lookup:envelope(
                         4,
-                        {prbr, write, DB, '_', This, K, DataType, Round,
+                        {prbr, write, DB, '_', This, K, DataType, Round, OldWriteRound,
                         V, PassedToUpdate, WriteFilter, _IsWriteThrough = false}),
                     api_dht_raw:unreliable_lookup(K, LookupEnvelope)
                   end
@@ -1314,15 +1329,18 @@ add_write_deny(Replies, Round, _Cons) ->
     Done = ?REDUNDANCY:quorum_denied(NewDenyCount),
     {Done, R2}.
 
--spec inform_client(qread_done | qwrite_done, entry(), any()) -> ok.
-inform_client(qread_done, Entry, ReadValue) ->
+-spec inform_client(qread_done, entry(), pr:pr(), any()) -> ok.
+inform_client(qread_done, Entry, WriteRound, ReadValue) ->
+    WriteRoundNoWTI = pr:set_wf(WriteRound, none),
     comm:send_local(
       entry_client(Entry),
       {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
+       WriteRoundNoWTI, %% round which client must provide to ensure that full sequence of consensus is guaranteed
        ReadValue
-      });
+      }).
+-spec inform_client(qwrite_done, entry(), any()) -> ok.
 inform_client(qwrite_done, Entry, WriteRet) ->
     comm:send_local(
       entry_client(Entry),

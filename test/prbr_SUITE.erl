@@ -387,18 +387,23 @@ modify_rbr_at_key(R, N) ->
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
                    receive
-                       {round_request_reply, _, AssignedRound, _,  _} ->
-                           AssignedRound
+                       {round_request_reply, _, AssignedRound, OldWriteRound,  _} ->
+                           {AssignedRound, OldWriteRound}
                    end
                end || Repl <- ?RT:get_replica_keys(R) ],
-    HighestRound = lists:max(Rounds),
+    {ReadRounds, WriteRounds} = lists:foldl(fun({RR, WR}, {AccR, AccW}) ->
+                                                    {[RR|AccR], [WR|AccW]}
+                                            end, {[], []}, Rounds),
+    ct:pal("~p ~n~p", [ReadRounds, WriteRounds]),
+    {HighestReadRound, HighestWriteRound} = {lists:max(ReadRounds),
+                                             lists:max(WriteRounds)},
 
     %% perform a write
     %% let fill in whether lookup was consistent
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
                             {prbr, write, kv_db, '_', comm:this(),
-                             R, kv_on_cseq, HighestRound,
+                             R, kv_on_cseq, HighestReadRound, HighestWriteRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
                              fun prbr:noop_write_filter/3, false}),

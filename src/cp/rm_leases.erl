@@ -116,7 +116,7 @@ on({compare_and_fix, OldRange, NewRange,
 on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
-        {qread_done, _ReqId, _Round, Lease} ->
+        {qread_done, _ReqId, _Round, _OldWriteRound, Lease} ->
             LeaseId = l_on_cseq:get_id(Lease),
             Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
             %% log:log("rm_leases(~p): going to take over ~p~n", [self(), Lease]),

@@ -113,7 +113,7 @@ read(Key) ->
                   fun ?MODULE:rf_val/1),
     trace_mpath:thread_yield(),
     receive
-        ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, Value},
+        ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
                        case Value of
                            no_value_yet -> {fail, not_found};
                            _ -> {ok, Value}
@@ -122,7 +122,7 @@ read(Key) ->
     after 1000 ->
             log:log("read hangs ~p~n", [erlang:process_info(self(), messages)]),
                 receive
-                    ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, Value},
+                    ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
                                    case Value of
                                        no_value_yet -> {fail, not_found};
                                        _ -> {ok, Value}

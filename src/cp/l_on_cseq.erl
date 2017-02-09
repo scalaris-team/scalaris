@@ -1338,7 +1338,7 @@ read(Key) ->
     read(Key, self()),
     trace_mpath:thread_yield(),
     receive
-        ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
+        ?SCALARIS_RECV({qread_done, _ReqId, _Round, _OldWriteRound, Value},
                        case Value of
                            no_value_yet -> {fail, not_found};
                            _ -> {ok, Value}

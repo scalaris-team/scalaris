@@ -248,7 +248,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
     end,
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
+on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Value,
     PassedToUpdate, WriteFilter, IsWriteThrough}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     trace_mpath:log_info(self(), {prbr_on_write}),
@@ -273,7 +273,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, Value,
             _ ->
                 pr:set_wf(InRound, {WriteFilter, PassedToUpdate, Value})
         end,
-    _ = case writable(KeyEntry, RoundForWrite) of
+    _ = case writable(KeyEntry, RoundForWrite, OldWriteRound) of
             {ok, NewKeyEntry, NextWriteRound} ->
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
@@ -435,11 +435,11 @@ next_read_round(Entry, ProposerUID) ->
 
 
 
--spec writable(entry(), pr:pr()) -> {ok, entry(),
+-spec writable(entry(), pr:pr(), pr:pr()) -> {ok, entry(),
                                      NextWriteRound :: pr:pr()} |
                                     {dropped,
                                      NewerSeenRound :: pr:pr()}.
-writable(Entry, InRound) ->
+writable(Entry, InRound, OldWriteRound) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
     InRoundR = pr:get_r(InRound),
@@ -447,9 +447,17 @@ writable(Entry, InRound) ->
     LatestSeenReadR = pr:get_r(LatestSeenRead),
     LatestSeenReadId = pr:get_id(LatestSeenRead),
     LatestSeenWriteR = pr:get_r(LatestSeenWrite),
+    LatestSeenWriteId = pr:get_id(LatestSeenWrite),
+    OldWriteR = pr:get_r(OldWriteRound),
+    OldWriteId = pr:get_id(OldWriteRound),
     if ((InRoundR =:= LatestSeenReadR andalso InRoundId=:= LatestSeenReadId)
         orelse (InRoundR > LatestSeenReadR))
-       andalso (InRoundR > LatestSeenWriteR) ->
+       andalso (InRoundR > LatestSeenWriteR)
+       %% make sure that no write filter operations are missing in the
+       %% sequence of writes
+       andalso (OldWriteR =:= LatestSeenWriteR
+               andalso OldWriteId =:= LatestSeenWriteId) ->
+
            T1Entry = entry_set_r_write(Entry, InRound),
            %% prepare fast_paxos for this client:
            NextWriteRound = next_read_round(T1Entry,

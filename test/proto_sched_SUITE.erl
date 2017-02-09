@@ -519,6 +519,7 @@ test_kv_on_cseq_write_2(_Config) ->
 kv_on_cseq_write_2(_I) ->
     %% concurrently try to write the same key with two threads
     ?TRACE("New intance ~p", [_I]),
+
     Pid = self(),
     spawn(fun() ->
                   proto_sched:thread_begin(_I),
@@ -593,7 +594,7 @@ qwrite_qwrite_qread(_I) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     rbrcseq:qread(DB, Self, Id, l_on_cseq),
-    {test_rbr, {qread_done, _, _, Val}} = receive_answer(),
+    {test_rbr, {qread_done, _, _, _, Val}} = receive_answer(),
     %ct:pal("got ~p", [Val]),
     %ct:pal("~p", [Infos]),
     case Val of

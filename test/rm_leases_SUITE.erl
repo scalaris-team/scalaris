@@ -185,7 +185,7 @@ propose_new_neighbor(_Config) ->
 
     % fake death
     {_Pred, PredRange, Lease} = get_pred_info(DHTNodePid),
-    Result = {qread_done, fake_reqid, fake_round, Lease},
+    Result = {qread_done, fake_reqid, fake_round, fake_old_write_round, Lease},
     Msg = {read_after_rm_change, PredRange, Result},
     TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
     ct:pal("+wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
@@ -246,7 +246,7 @@ test_network_partition(_Config) ->
 
     %% propose takeover
     {_Pred, PredRange, Lease} = get_pred_info(DHTNodePid),
-    Result = {qread_done, fake_reqid, fake_round, Lease},
+    Result = {qread_done, fake_reqid, fake_round, fake_old_write_round, Lease},
     Msg = {read_after_rm_change, PredRange, Result},
     %comm:send_local(RMLeasesPid, Msg),
 

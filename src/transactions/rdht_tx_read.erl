@@ -400,7 +400,7 @@ on({client_is, Id, Pid, Key, Op}, {Reps, MajOk, MajDeny, Table} = State) ->
 
 %% used by new tx protocol
 on({work_phase_done, ClientPid, Key, Op,
-    {work_phase_async_done, Id, {qread_done, _, _, {Val, Vers}}}},
+    {work_phase_async_done, Id, {qread_done, _, _, _, {Val, Vers}}}},
    {_Reps, _MajOk, _MajDeny, Table} = State) ->
     Entry = get_entry(Id, Table),
     T1 = state_set_op(Entry, Op),
