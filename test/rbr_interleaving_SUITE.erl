@@ -75,7 +75,7 @@ test_link_slowing(_Config) ->
 test_link_slowing2(_Config) ->
     %% slow down one link, but use a different client to send write request
     %% slow link should have no impact. Assumes R=4.
-    slow_link(1, kv_db, 2, dht_node),
+    _Link = slow_link(1, kv_db, 2, dht_node),
 
     [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) ||
        I <- lists:seq(1, 4)],
@@ -154,7 +154,7 @@ read_via_node(ViaKvNr, Key, ReadFilter) ->
     comm:send_local(nth(ViaKvNr, kv_db),
                     {qround_request, self(), ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1}),
     receive
-        ?SCALARIS_RECV({qread_done, _, _, Value}, {ok, Value})
+        ?SCALARIS_RECV({qread_done, _, _, _, Value}, {ok, Value})
     end.
 
 %% @doc Sends a write requests via node number ViaKvNr (lexicographically order by pid).
