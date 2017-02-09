@@ -560,31 +560,28 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% round without retrying, so having no content check is
             %% fine here
             ReadReplies = entry_replies(ReadEntry),
+            ReadVal = ReadReplies#r_replies.read_value,
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
                 case pr:get_wf(ReadReplies#r_replies.highest_write_round) of
                     none ->
-                        {fun prbr:noop_write_filter/3, none,
-                         ReadReplies#r_replies.read_value};
-                    WTInfos ->
+                        {fun prbr:noop_write_filter/3, none, ReadVal};
+                    {WriteRet} ->
                         DataType = entry_datatype(ReadEntry),
                         %% Depending on the datatype the write through value might
                         %% not equal the read value e.g due to additionally
                         %% generated information or custom read/write handler
-                        WTI = case erlang:function_exported(DataType,
+                        WTV = case erlang:function_exported(DataType,
                                                             get_write_through_value, 1) of
-                                  true ->
-                                        setelement(3, WTInfos,
-                                                   DataType:get_write_through_value(
-                                                   ReadReplies#r_replies.read_value));
-                                  _    -> WTInfos
+                                  true -> DataType:get_write_through_value(ReadVal);
+                                  _    -> ReadVal
                               end,
-                        % WTInfo = write through infos
+                        WTI = {fun prbr:noop_write_filter/3, WriteRet, WTV},
                         ?TRACE("Setting write through write filter ~p",
                                [WTI]),
                         WTI
                  end,
             Filters = {fun prbr:noop_read_filter/1,
-                       fun(_,_,_) -> {true, none} end,
+                       fun(_,_,_) -> {true, WTUI} end,
                        WTWF},
 
             Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
@@ -611,7 +608,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                             {prbr, write, DB, '_', Collector, K,
                              entry_datatype(ReadEntry),
                              entry_my_round(ReadEntry),
-                             pr:new(0,0), %% dummy round
+                             pr:new(0,0), %% has no effect because write_through
                              V,
                              WTUI,
                              WTWF, _IsWriteThrough = true}),

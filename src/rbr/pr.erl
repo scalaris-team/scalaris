@@ -41,10 +41,9 @@
 -export_type([pr/0]).
 
 -type write_through_info() ::
-       { prbr:write_filter(),
-         UpdateInfo :: term(),
-         WriteValue :: term()
-       }.
+          {
+           WriteReturn :: any()
+          }.
 
 %% pr() has to be unique for this key system wide
 %% pr() has to be comparable with < and =<

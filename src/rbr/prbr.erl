@@ -149,8 +149,8 @@ msg_write_deny(Client, Cons, Key, NewerRound) ->
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
 
--spec noop_write_filter(Old :: term(), UpdateInfo :: term(), Val :: term()) -> {term(), none}.
-noop_write_filter(_, _, X) -> {X, none}.
+-spec noop_write_filter(Old :: term(), UpdateInfo :: term(), Val :: term()) -> {term(), term()}.
+noop_write_filter(_, UI, X) -> {X, UI}.
 
 %% initialize: return initial state.
 -spec init(atom() | tuple()) -> state().
@@ -263,17 +263,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Val
                        entry_add_learner(OrigKeyEntry, Proposer);
                    _ -> entry_set_learner(OrigKeyEntry, Proposer)
                end,
-    %% we store the writefilter to be able to reproduce the request in
-    %% write_throughs. We modify the InRound here to avoid duplicate
-    %% transfer of the Value etc.
-    RoundForWrite =
-        case fun prbr:noop_write_filter/3 =:= WriteFilter of
-            true ->
-                pr:set_wf(InRound, none);
-            _ ->
-                pr:set_wf(InRound, {WriteFilter, PassedToUpdate, Value})
-        end,
-    _ = case writable(KeyEntry, RoundForWrite, OldWriteRound, WriteFilter) of
+    _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter) of
             {ok, NewKeyEntry, NextWriteRound} ->
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
@@ -282,6 +272,11 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Val
                         _    -> WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value)
                     end,
+                %% store information to be able to reproduce the request in
+                %% write_throughs. We modify the InRound here to avoid duplicate
+                %% transfer of the Value etc.
+                RoundForWrite = pr:set_wf(InRound, {Ret}),
+
                 trace_mpath:log_info(self(), {'prbr:on(write)',
                                   %% key, Key,
                                   round, RoundForWrite,
@@ -310,7 +305,7 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Val
             {dropped, NewerRound} ->
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
                                   %% key, Key,
-                                  round, RoundForWrite,
+                                  round, InRound,
                                   newer_round, NewerRound}),
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 [ msg_write_deny(P, Cons, Key, NewerRound)
