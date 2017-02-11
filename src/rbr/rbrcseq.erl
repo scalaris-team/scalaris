@@ -555,6 +555,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      {qread_write_through_done, ReadEntry, no_filtering, '_'}),
 
             ReqId = uid:get_pids_uid(),
+            MyId = {my_id(), ReqId},
 
             %% we only try to re-write a consensus in exactly this
             %% round without retrying, so having no content check is
@@ -607,6 +608,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                             4,
                             {prbr, write, DB, '_', Collector, K,
                              entry_datatype(ReadEntry),
+                             MyId,
                              entry_my_round(ReadEntry),
                              pr:new(0,0), %% has no effect because write_through
                              V,
@@ -820,6 +822,7 @@ on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
     %% a) Lets analyse the paths to do_qwrite_fast:
     %% b) Lets analyse when entries are removed from the database:
     Entry = get_entry(ReqId, tablename(State)),
+    MyId = {my_id(), ReqId},
     _ = case Entry of
         undefined ->
           %% drop actions for unknown requests, as they must be
@@ -848,7 +851,7 @@ on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
                     LookupEnvelope =
                       dht_node_lookup:envelope(
                         4,
-                        {prbr, write, DB, '_', This, K, DataType, Round, OldWriteRound,
+                        {prbr, write, DB, '_', This, K, DataType, MyId, Round, OldWriteRound,
                         V, PassedToUpdate, WriteFilter, _IsWriteThrough = false}),
                     api_dht_raw:unreliable_lookup(K, LookupEnvelope)
                   end

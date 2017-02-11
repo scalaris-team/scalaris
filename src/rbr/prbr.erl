@@ -196,7 +196,7 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
                                   read_filter, ReadFilter}),
 
     %% for now do not send write through information in rr_replies
-    %% since they are not used. saves a bit bandwith. 
+    %% since they are not used. saves a bit bandwith.
     EntryWriteRound = pr:set_wf(entry_r_write(KeyEntry), none),
     msg_round_request_reply(Proposer, Cons, AssignedReadRound,
                             EntryWriteRound, ReadVal),
@@ -207,7 +207,7 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
     _ = set_entry(NewKeyEntry3, TableName),
     TableName;
 
-on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, ReadRound}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, ReadRound}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ReadRound]),
     KeyEntry = get_entry(Key, TableName),
 
@@ -236,11 +236,14 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
                         end;
                     _ -> entry_r_write(KeyEntry)
                 end,
+            % A prbr read has a different request ID than the previously executed
+            % round_request, and therefore a different ProposerUID.
+            NewReadRound = pr:new(pr:get_r(ReadRound), ProposerUID),
 
-            msg_read_reply(Proposer, Cons, ReadRound,
+            msg_read_reply(Proposer, Cons, NewReadRound,
                            ReadVal, EntryWriteRound),
 
-            NewKeyEntry = entry_set_r_read(KeyEntry, ReadRound),
+            NewKeyEntry = entry_set_r_read(KeyEntry, NewReadRound),
             NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
             _ = set_entry(NewKeyEntry2, TableName);
          _ ->
@@ -248,7 +251,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, _ProposerUID, ReadFilter, Re
     end,
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Value,
+on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWriteRound, Value,
     PassedToUpdate, WriteFilter, IsWriteThrough}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     trace_mpath:log_info(self(), {prbr_on_write}),
@@ -263,8 +266,9 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, InRound, OldWriteRound, Val
                        entry_add_learner(OrigKeyEntry, Proposer);
                    _ -> entry_set_learner(OrigKeyEntry, Proposer)
                end,
-    _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter) of
+    _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter, ProposerUID) of
             {ok, NewKeyEntry, NextWriteRound} ->
+
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
                         true -> DataType:prbr_write_handler(NewKeyEntry,
@@ -430,10 +434,10 @@ next_read_round(Entry, ProposerUID) ->
 
 
 
--spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter()) ->
+-spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter(), any()) ->
           {ok, entry(),NextWriteRound :: pr:pr()} |
           {dropped, NewerSeenRound :: pr:pr()}.
-writable(Entry, InRound, OldWriteRound, WF) ->
+writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
     InRoundR = pr:get_r(InRound),
@@ -454,10 +458,10 @@ writable(Entry, InRound, OldWriteRound, WF) ->
                     (OldWriteR =:= LatestSeenWriteR
                     andalso OldWriteId =:= LatestSeenWriteId)) ->
 
-           T1Entry = entry_set_r_write(Entry, InRound),
+           NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
+           T1Entry = entry_set_r_write(Entry, NewInRound),
            %% prepare fast_paxos for this client:
-           NextWriteRound = next_read_round(T1Entry,
-                                            pr:get_id(InRound)),
+           NextWriteRound = next_read_round(T1Entry, ProposerUID),
            %% assume this token was seen in a read already, so no one else
            %% can interfere without paxos noticing it
            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),

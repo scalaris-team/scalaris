@@ -376,13 +376,13 @@ modify_rbr_at_key(R, N) ->
 
     %% we ask all replicas to not get an outdated round number (select
     %% the highest one.
-
+    ProposerUID = unittest_rbr_consistency1_id,
     Rounds = [ begin
                    %% let fill in whether lookup was consistent
                    LookupReadEnvelope = dht_node_lookup:envelope(
                                           4,
                                           {prbr, round_request, kv_db, '_', comm:this(),
-                                           Repl, kv_on_cseq, unittest_rbr_consistency1_id,
+                                           Repl, kv_on_cseq, ProposerUID,
                                            fun prbr:noop_read_filter/1, write}),
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
@@ -402,8 +402,8 @@ modify_rbr_at_key(R, N) ->
     %% let fill in whether lookup was consistent
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
-                            {prbr, write, kv_db, '_', comm:this(),
-                             R, kv_on_cseq, HighestReadRound, HighestWriteRound,
+                            {prbr, write, kv_db, '_', comm:this(), R,
+                             kv_on_cseq, ProposerUID, HighestReadRound, HighestWriteRound,
                              {[], false, _Version = N-100, _Value = N},
                              null,
                              fun prbr:noop_write_filter/3, false}),
