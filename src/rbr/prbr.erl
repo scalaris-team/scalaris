@@ -27,14 +27,6 @@
 
 -define(PDB, db_prbr).
 
-%% Optimization for (log-structured) disk backends when writing
-%% large values. Each time and entry is read (e.g. due to a
-%% normal read operation), its read round is incremented and
-%% the entry is written to the backend. The write-through information
-%% contain the written value. Storing the WTI separate prevents
-%% that the complete value is written repeatedly.
--define(SEP_WTI, config:read(separate_write_through_info)).
-
 %%% the prbr has to be embedded into a gen_component using it.
 %%% The state it operates on has to be passed to the on handler
 %%% correctly. All messages it handles start with the token
@@ -237,19 +229,8 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
                                           round, ReadRound,
                                           val, NewKeyEntryVal,
                                           read_filter, ReadFilter}),
-            EntryWriteRound =
-                %% see macro definition for explanation
-                case ?SEP_WTI of
-                    true ->
-                        %% retrieve WTI from separate location
-                        case ?PDB:get(TableName, get_wti_key(Key)) of
-                            {} ->
-                                pr:set_wf(entry_r_write(KeyEntry), none);
-                            {_Key, WTI} ->
-                                pr:set_wf(entry_r_write(KeyEntry), WTI)
-                        end;
-                    _ -> entry_r_write(KeyEntry)
-                end,
+
+            EntryWriteRound = entry_r_write(KeyEntry),
             % A prbr read has a different request ID than the previously executed
             % round_request, and therefore a different ProposerUID.
             NewReadRound = pr:new(pr:get_r(ReadRound), ProposerUID),
@@ -305,21 +286,8 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWr
                 [ msg_write_reply(P, Cons, Key, InRound,
                                   NextWriteRound, Ret)
                   || P <- entry_get_learner(NewKeyEntry) ],
-                NewKeyEntry2 =
-                    %% see macro definition for explanation
-                    case ?SEP_WTI of
-                        true ->
-                            %% store WTI at separate location
-                            WriteRound = entry_r_write(NewKeyEntry),
-                            WriteRoundWTI = pr:get_wf(WriteRound),
-                            WTIKey= get_wti_key(entry_key(NewKeyEntry)),
-                            _ = ?PDB:set(TableName, {WTIKey, WriteRoundWTI}),
 
-                            entry_set_r_write(NewKeyEntry, pr:set_wf(WriteRound, none));
-                        _ ->
-                            NewKeyEntry
-                    end,
-                set_entry(entry_set_val(NewKeyEntry2, NewVal), TableName);
+                set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
                                   %% key, Key,
@@ -488,13 +456,9 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
 -spec is_partial_write(prbr:write_filter()) -> boolean().
 is_partial_write(Any) -> fun prbr:noop_write_filter/3 =/= Any.
 
--spec get_wti_key(any())-> any().
-get_wti_key(Key) -> {Key, wti}.
-
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
-check_config() ->
-    config:cfg_is_bool(separate_write_through_info).
+check_config() -> true.
 
 -spec tester_create_write_filter(0) -> write_filter().
 tester_create_write_filter(0) -> fun prbr:noop_write_filter/3.
