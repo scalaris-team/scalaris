@@ -318,7 +318,7 @@ on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, 
 %% If a majority replied and it is a consistent quorum (i.e. all received rounds are the same)
 %% we can deliver the read. If not, a qread with explicit round number is started.
 on({qround_request_collect,
-    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue}}, State) ->
+    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue, OpType}}, State) ->
     ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
 
     {_Round, ReqId} = pr:get_id(ReceivedReadRound),
@@ -331,7 +331,7 @@ on({qround_request_collect,
             Replies = entry_replies(Entry),
             {Result, NewReplies, NewRound} =
                 add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
-                             ReceivedWriteRound, ReadValue,
+                             ReceivedWriteRound, ReadValue, OpType,
                              entry_datatype(Entry), entry_filters(Entry), Cons),
             TEntry = entry_set_my_round(Entry, NewRound),
             NewEntry = entry_set_replies(TEntry, NewReplies),
@@ -1118,11 +1118,11 @@ entry_replies(Entry)              -> element(11, Entry).
 entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
-                   pr:pr(), pr:pr(), client_value(), module(),
-                   any(), boolean())
+                   pr:pr(), pr:pr(), client_value(), atom(),
+                   module(), any(), boolean())
                    -> {boolean() | consistant, #rr_replies{}, pr:pr()}.
 add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
-             Datatype, Filters, _Cons) ->
+             OpType, Datatype, Filters, _Cons) ->
     %% increment number of replies received
     ReplyCount = Replies#rr_replies.reply_count + 1,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
@@ -1172,8 +1172,11 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     {Result, R4} =
         case ?REDUNDANCY:quorum_accepted(ReplyCount) of
             true ->
-                case ReplyCount =:= R3#rr_replies.highest_read_count andalso
-                     ReplyCount =:= R3#rr_replies.highest_write_count of
+                case ReplyCount =:= R3#rr_replies.highest_write_count andalso
+                     %% If this round request is part of a read, then it does not matter if
+                     %% there is a write in progress which has not yet written the majority.
+                     %% Since the read and write are concurrent, the read can return the older value.
+                     (OpType =:= read orelse ReplyCount =:= R3#rr_replies.highest_read_count) of
                     true ->
                         %% consistent quorum
                         Collected = R3#rr_replies.read_value,

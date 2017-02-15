@@ -28,7 +28,7 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_rbr,
+         %   tester_type_check_rbr,
             rbr_concurrency_kv,
             rbr_concurrency_leases,
             rbr_consistency,
@@ -387,7 +387,7 @@ modify_rbr_at_key(R, N) ->
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
                    receive
-                       {round_request_reply, _, AssignedRound, OldWriteRound,  _} ->
+                       {round_request_reply, _, AssignedRound, OldWriteRound,  _Val, _OpType} ->
                            {AssignedRound, OldWriteRound}
                    end
                end || Repl <- ?RT:get_replica_keys(R) ],

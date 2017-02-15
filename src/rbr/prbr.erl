@@ -121,9 +121,9 @@
                  }.
 
 %% Messages to expect from this module
--spec msg_round_request_reply(comm:mypid(), boolean(), pr:pr(), pr:pr(), any()) -> ok.
-msg_round_request_reply(Client, Cons, ReadRound, WriteRound, Value) ->
-    comm:send(Client, {round_request_reply, Cons,  ReadRound, WriteRound, Value}).
+-spec msg_round_request_reply(comm:mypid(), boolean(), pr:pr(), pr:pr(), any(), atom()) -> ok.
+msg_round_request_reply(Client, Cons, ReadRound, WriteRound, Value, OpType) ->
+    comm:send(Client, {round_request_reply, Cons,  ReadRound, WriteRound, Value, OpType}).
 
 -spec msg_read_reply(comm:mypid(), Consistency::boolean(),
                      pr:pr(), any(), pr:pr())
@@ -198,7 +198,7 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
     %% since they are not used. saves a bit bandwith.
     EntryWriteRound = pr:set_wf(entry_r_write(KeyEntry), none),
     msg_round_request_reply(Proposer, Cons, AssignedReadRound,
-                            EntryWriteRound, ReadVal),
+                            EntryWriteRound, ReadVal, OpType),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
     NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
