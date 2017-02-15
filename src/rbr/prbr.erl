@@ -169,11 +169,14 @@ close_and_delete(State) -> ?PDB:close_and_delete(State).
 on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, OpType}, TableName) ->
     ?TRACE("prbr:round_request: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
-    {NewKeyEntryVal, ReadVal} =
+
+    %% custom prbr read handler might change value (e.g. due to GCing)
+    {NewKeyEntryVal, ReadVal, ValueHasChanged} =
         case erlang:function_exported(DataType, prbr_read_handler, 3) of
             true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
-            _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry))}
+            _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry)), false}
         end,
+
     %% Assign a valid next read round number
     %% If this round_request is part a read it is not necessary
     %% to increment the read round number, since a read does not
@@ -200,9 +203,20 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
     msg_round_request_reply(Proposer, Cons, AssignedReadRound,
                             EntryWriteRound, ReadVal, OpType),
 
-    NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
-    NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
-    _ = set_entry(NewKeyEntry2, TableName),
+    _ = case OpType =:= read andalso not ValueHasChanged of
+        true ->
+            %% No updates must be performed; save a DB write operation
+            %% (Above, the proposer UID of the read round is changed even
+            %% for a read. The new round must be returned to the client since
+            %% it contains the request id for the round_request, but it does
+            %% not have to be stored in DB since there are no follow-up requests
+            %% in a read and reads do not interfere with other ops)
+            ok;
+        false ->
+            NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
+            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
+            set_entry(NewKeyEntry2, TableName)
+    end,
 
     TableName;
 
@@ -212,10 +226,11 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
 
     _ = case pr:get_r(ReadRound) > pr:get_r(entry_r_read(KeyEntry)) of
          true ->
-            {NewKeyEntryVal, ReadVal} =
+             %% prbr read handler might change value (e.g. due to GCing)
+            {NewKeyEntryVal, ReadVal, _ValueHasChanged} =
                 case erlang:function_exported(DataType, prbr_read_handler, 3) of
                     true -> DataType:prbr_read_handler(KeyEntry, TableName, ReadFilter);
-                    _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry))}
+                    _    -> {entry_val(KeyEntry), ReadFilter(entry_val(KeyEntry)), false}
                 end,
             trace_mpath:log_info(self(), {'prbr:on(read)',
                                           %% key, Key,
@@ -243,7 +258,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
                            ReadVal, EntryWriteRound),
 
             NewKeyEntry = entry_set_r_read(KeyEntry, NewReadRound),
-            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal), % prbr read handler might change value (e.g. due to GCing)
+            NewKeyEntry2 = entry_set_val(NewKeyEntry, NewKeyEntryVal),
             _ = set_entry(NewKeyEntry2, TableName);
          _ ->
             msg_read_deny(Proposer, Cons, ReadRound, entry_r_read(KeyEntry))
