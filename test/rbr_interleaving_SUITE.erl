@@ -220,14 +220,14 @@ prbr_data() ->
 %% @doc Returns all value for each node.
 prbr_values() ->
     [
-        [element(5, E) || E <- Replica]
+        [prbr:entry_val(E) || E <- Replica]
     || Replica <- prbr_data()].
 
 %% @doc Returns all {write_round, value} tuples for each node.
 %%      Removes write_through infos
 prbr_w_rounds_with_values() ->
     [
-     [{pr:set_wf(element(3, E), none), element(5,E)} || E <- Replica]
+     [{pr:set_wf(element(3, E), none), prbr:entry_val(E)} || E <- Replica]
     || Replica <- prbr_data()].
 
 %% @doc Flush all slow messages of a link
