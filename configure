@@ -8875,9 +8875,9 @@ case `uname -s` in
      ;;
 esac
 
-GIT=`which git`
-STAT=`which stat`
-SHA1SUM=`which sha1sum`
+GIT=`command -v git`
+STAT=`command -v stat`
+SHA1SUM=`command -v sha1sum`
 SRC="download"
 CONFIGURESTATUS=""
 
