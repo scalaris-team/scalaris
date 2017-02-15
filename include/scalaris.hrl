@@ -1,4 +1,4 @@
-%  @copyright 2008-2016 Zuse Institute Berlin
+%  @copyright 2008-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@
 %% userdevguide-end scalaris:db
 
 %% when defined, use new tx protocol (which is not yet complete)
+%% can be enabled with ./configure --enable-txnew
 %% -define(TXNEW, true).
 
 %% userdevguide-begin scalaris:rm

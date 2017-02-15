@@ -792,6 +792,7 @@ enable_runuser
 with_systemd
 enable_native
 enable_debug
+enable_txnew
 with_rt
 with_java_functions
 with_build_classpath
@@ -1444,6 +1445,7 @@ Optional Features:
   --disable-runuser       disable support for runuser (use sudo instead)
   --enable-native         enable compilation to native code using HiPE
   --enable-debug          enable debugging mode
+  --enable-txnew          enable new transaction protocol
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -6253,6 +6255,22 @@ if test "${enable_debug+set}" = set; then :
   EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, enable_debug}"
                       EDOCMACROS="${EDOCMACROS}, {enable_debug, true}"
                       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Denable_debug"
+fi
+fi
+
+
+###########################################################
+#
+# enable new transaction protocol
+#
+###########################################################
+
+# Check whether --enable-txnew was given.
+if test "${enable_txnew+set}" = set; then :
+  enableval=$enable_txnew; if test "no" != "$enableval"; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, 'TXNEW'}"
+                      EDOCMACROS="${EDOCMACROS}, {'TXNEW', true}"
+                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -D'TXNEW'"
 fi
 fi
 

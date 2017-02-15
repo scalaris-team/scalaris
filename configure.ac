@@ -1,4 +1,4 @@
-#   Copyright 2007-2016 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2017 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -230,6 +230,19 @@ AC_ARG_ENABLE([debug],
                      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, enable_debug}"
                       EDOCMACROS="${EDOCMACROS}, {enable_debug, true}"
                       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Denable_debug"])])
+
+###########################################################
+#
+# enable new transaction protocol
+#
+###########################################################
+
+AC_ARG_ENABLE([txnew],
+              AS_HELP_STRING([--enable-txnew], [enable new transaction protocol]),
+              [AS_IF([test "no" != "$enableval"],
+                     [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, 'TXNEW'}"
+                      EDOCMACROS="${EDOCMACROS}, {'TXNEW', true}"
+                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -D'TXNEW'"])])
 
 ###########################################################
 #
