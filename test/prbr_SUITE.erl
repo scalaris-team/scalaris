@@ -28,7 +28,7 @@
 -include("client_types.hrl").
 
 all()   -> [
-         %   tester_type_check_rbr,
+            tester_type_check_rbr,
             rbr_concurrency_kv,
             rbr_concurrency_leases,
             rbr_consistency,
