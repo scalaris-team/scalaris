@@ -33,7 +33,9 @@
 
 %% when defined, use new tx protocol (which is not yet complete)
 %% can be enabled with ./configure --enable-txnew
-%% -define(TXNEW, true).
+-ifdef(enable_txnew).
+-define(TXNEW, true).
+-endif.
 
 %% userdevguide-begin scalaris:rm
 %%Standard chord ring maintenance

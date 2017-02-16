@@ -240,9 +240,9 @@ AC_ARG_ENABLE([debug],
 AC_ARG_ENABLE([txnew],
               AS_HELP_STRING([--enable-txnew], [enable new transaction protocol]),
               [AS_IF([test "no" != "$enableval"],
-                     [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, 'TXNEW'}"
-                      EDOCMACROS="${EDOCMACROS}, {'TXNEW', true}"
-                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -D'TXNEW'"])])
+                     [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, enable_txnew}"
+                      EDOCMACROS="${EDOCMACROS}, {enable_txnew, true}"
+                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -Denable_txnew"])])
 
 ###########################################################
 #

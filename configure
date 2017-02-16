@@ -6268,9 +6268,9 @@ fi
 # Check whether --enable-txnew was given.
 if test "${enable_txnew+set}" = set; then :
   enableval=$enable_txnew; if test "no" != "$enableval"; then :
-  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, 'TXNEW'}"
-                      EDOCMACROS="${EDOCMACROS}, {'TXNEW', true}"
-                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -D'TXNEW'"
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, enable_txnew}"
+                      EDOCMACROS="${EDOCMACROS}, {enable_txnew, true}"
+                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -Denable_txnew"
 fi
 fi
 
