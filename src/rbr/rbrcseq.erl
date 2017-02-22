@@ -446,7 +446,6 @@ on({qread_collect,
                 write_through ->
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
-
                     trace_mpath:log_info(self(), {qread_write_through_necessary}),
                     case randoms:rand_uniform(1,5) of
                         1 ->
@@ -562,11 +561,12 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% fine here
             ReadReplies = entry_replies(ReadEntry),
             ReadVal = ReadReplies#r_replies.read_value,
+            PreviousWTI = pr:get_wf(ReadReplies#r_replies.highest_write_round),
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
-                case pr:get_wf(ReadReplies#r_replies.highest_write_round) of
+                case PreviousWTI of
                     none ->
                         {fun prbr:noop_write_filter/3, none, ReadVal};
-                    {WriteRet} ->
+                    {WriteRet, _} ->
                         DataType = entry_datatype(ReadEntry),
                         %% Depending on the datatype the write through value might
                         %% not equal the read value e.g due to additionally
@@ -581,6 +581,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                                [WTI]),
                         WTI
                  end,
+            WriteRound = pr:set_wf(entry_my_round(ReadEntry), PreviousWTI),
+
             Filters = {fun prbr:noop_read_filter/1,
                        fun(_,_,_) -> {true, WTUI} end,
                        WTWF},
@@ -609,7 +611,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                             {prbr, write, DB, '_', Collector, K,
                              entry_datatype(ReadEntry),
                              MyId,
-                             entry_my_round(ReadEntry),
+                             WriteRound,
                              pr:new(0,0), %% has no effect because write_through
                              V,
                              WTUI,
@@ -664,7 +666,7 @@ on({qread_write_through_collect, ReqId,
     State;
 
 on({qread_write_through_collect, ReqId,
-    {write_deny, Cons, Key, NewerRound}}, State) ->
+    {write_deny, Cons, Key, RoundTried}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect deny ~p~n", [ReqId]),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
@@ -676,7 +678,7 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
             Replies = entry_replies(Entry),
-            {Done, NewReplies} = add_write_deny(Replies, NewerRound, Cons),
+            {Done, NewReplies} = add_write_deny(Replies, RoundTried, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
 
             case Done of
@@ -899,7 +901,7 @@ on({qwrite_collect, ReqId,
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_deny, Cons, _Key, NewerRound}}, State) ->
+    {write_deny, Cons, _Key, RoundTried}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_deny~n", []),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
@@ -910,8 +912,9 @@ on({qwrite_collect, ReqId,
             State;
         _ ->
             Replies = entry_replies(Entry),
-            {Done, NewReplies} = add_write_deny(Replies, NewerRound, Cons),
+            {Done, NewReplies} = add_write_deny(Replies, RoundTried, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
+            %NewEntry = entry_set_my_round(NewEntr, NewerRound),
             case Done of
                 false -> set_entry(NewEntry, TableName),
                                      State;
@@ -1293,43 +1296,56 @@ add_write_reply(Replies, Round, _Cons) ->
         case RoundCmp > RepliesRoundCmp of
             false -> Replies;
             true ->
-                %% this is the first reply with this round number.
-                %% Older replies are (already) counted as denies, so
-                %% we expect no accounted acks here.
-%%                ?DBG_ASSERT2(replies_num_acks(Entry) =< 0,
-%%                             {found_unexpected_acks, replies_num_acks(Entry)}),
-                %% set rack and store newer round
-                OldAcks = Replies#w_replies.ack_count,
-                OldDenies = Replies#w_replies.deny_count,
+                %% Running into this case can mean two things:
+                %% 1. This is the first reply received
+                %% 2. This is a reply of a write through which tries to repair the
+                %% partially written value of this request
+                %% If this is case 2, all previous received replies are obsolete.
                 Replies#w_replies{highest_write_round=Round,
                                   ack_count=0,
-                                  deny_count=OldAcks+OldDenies}
+                                  deny_count=0}
         end,
-    NewAckCount = R1#w_replies.ack_count + 1,
-    R2 = R1#w_replies{ack_count=NewAckCount},
-    Done = ?REDUNDANCY:quorum_accepted(NewAckCount),
+    R2 =
+        case RoundCmp >= RepliesRoundCmp of
+            %% We must ignore all replies based on the original write (older round), if
+            %% we already received write through replies.
+            false -> R1;
+            true ->
+                NewAckCount = R1#w_replies.ack_count + 1,
+                R1#w_replies{ack_count=NewAckCount}
+        end,
+    Done = ?REDUNDANCY:quorum_accepted(R2#w_replies.ack_count),
     {Done, R2}.
 
 -spec add_write_deny(#w_replies{}, pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), #w_replies{}}.
-add_write_deny(Replies, Round, _Cons) ->
+add_write_deny(Replies, RoundTried, _Cons) ->
     RepliesMaxWriteR = Replies#w_replies.highest_write_round,
     RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
-    RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
+    RoundCmp = {pr:get_r(RoundTried), pr:get_id(RoundTried)},
     R1 =
         case RoundCmp > RepliesRoundCmp of
             false -> Replies;
             true ->
-                %% reset rack and store newer round
-                OldAcks = Replies#w_replies.ack_count,
-                OldDenies = Replies#w_replies.deny_count,
-                Replies#w_replies{highest_write_round=Round,
+                %% Running into this case can mean two things:
+                %% 1. This is the first reply received
+                %% 2. This is a reply of a write through which tries to repair the
+                %% partially written value of this request
+                %% If this is case 2, all previous received replies are obsolete.
+                Replies#w_replies{highest_write_round=RoundTried,
                                   ack_count=0,
-                                  deny_count=OldAcks+OldDenies}
+                                  deny_count=0}
         end,
-    NewDenyCount = R1#w_replies.deny_count + 1,
-    R2 = R1#w_replies{deny_count=NewDenyCount},
-    Done = ?REDUNDANCY:quorum_denied(NewDenyCount),
+    R2 =
+        case RoundCmp >= RepliesRoundCmp of
+            %% We must ignore all replies based on the original write (older round), if
+            %% we already received write through replies.
+            false -> R1;
+            true ->
+                NewDenyCount = R1#w_replies.deny_count + 1,
+                R1#w_replies{deny_count=NewDenyCount}
+        end,
+    Done = ?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
     {Done, R2}.
 
 -spec inform_client(qread_done, entry(), pr:pr(), any()) -> ok.

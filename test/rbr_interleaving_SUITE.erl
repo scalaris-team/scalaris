@@ -32,7 +32,8 @@
 all() -> [
           test_link_slowing,
           test_link_slowing2,
-          test_interleaving
+          test_interleaving,
+          test_write_through_notifies_original_proposer
          ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -148,7 +149,39 @@ test_interleaving(_Config) ->
     ValList2 = lists:usort(lists:flatten(PrbrData2)),
     ?equals_w_note(length(ValList2), 1, "All replicas should have the same value and write round").
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_write_through_notifies_original_proposer(_Config) ->
+    %% This tests case tests if a write through correctly notifies the original proposer
+    %% of the write.
+    %% Write A is started, but does not finish because two write messages are delayed.
+    %% A subsequent write (or read) should detect the write in progress and triggers a
+    %% write through which will finish write A before B is started.
+    TestPid = self(),
+    Key = "1234",
+
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I <- lists:seq(1,2)],
+    _LinkA = slow_link(1, kv_db, 3, dht_node, write),
+    _LinkB = slow_link(1, kv_db, 4, dht_node, write),
+
+    % start write A which will not finish since it only gets two write ack.
+    spawn(fun() ->
+            {ok, _} = write_via_node(1, Key, filter_list_append(), "WriteA"),
+            TestPid ! {write_a_done}
+          end),
+
+    % wait until A has written the two remaining replicas
+    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+
+    % write B should now trigger a write through which should finish write A
+    {ok, _} = write_via_node(2, Key, filter_list_append(), "WriteB"),
+
+    receive {write_a_done} -> ok
+    after 10000 ->
+        ?ct_fail("Write through has not notified original proposer in a timely manner", [])
+    end,
+    {ok, Value} = read_via_node(3, Key, element(1, filter_list_append())),
+    ?equals_w_note(Value, ["WriteB", "WriteA"], "Values must match exactly due to interleaving").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

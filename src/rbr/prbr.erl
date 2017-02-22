@@ -108,8 +108,7 @@
 -type entry() :: { any(), %% key
                    pr:pr(), %% r_read
                    pr:pr(), %% r_write
-                   any(), %% value
-                   [comm:mypid()] %% learner
+                   any() %% value
                  }.
 
 %% Messages to expect from this module
@@ -134,8 +133,8 @@ msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteR
 
 -spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), pr:pr())
                     -> ok.
-msg_write_deny(Client, Cons, Key, NewerRound) ->
-    comm:send(Client, {write_deny, Cons, Key, NewerRound}).
+msg_write_deny(Client, Cons, Key, WriteRoundTried) ->
+    comm:send(Client, {write_deny, Cons, Key, WriteRoundTried}).
 
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
@@ -250,20 +249,20 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWr
     PassedToUpdate, WriteFilter, IsWriteThrough}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     trace_mpath:log_info(self(), {prbr_on_write}),
-    OrigKeyEntry = get_entry(Key, TableName),
-    %% update learners:
-    %% when IsWriteThrough add current proposer as learner
-    %% otherwise clean registered learners by setting current proposer
-    %% as learner as we start a new consensus.
-    KeyEntry = case IsWriteThrough of
-                   true ->
-                       %% ct:pal("WriteThrough~n"),
-                       entry_add_learner(OrigKeyEntry, Proposer);
-                   _ -> entry_set_learner(OrigKeyEntry, Proposer)
-               end,
+    KeyEntry = get_entry(Key, TableName),
+
+    %% When this is part of a write through keep the old proposer,
+    %% so that the original proposer of the write gets notified of
+    %% write progress as well.
+    Learner = case IsWriteThrough of
+                false ->
+                    [Proposer];
+                true ->
+                    {_, OldLearner} = pr:get_wf(InRound),
+                    [Proposer | OldLearner]
+              end,
     _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter, ProposerUID) of
             {ok, NewKeyEntry, NextWriteRound} ->
-
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
                         true -> DataType:prbr_write_handler(NewKeyEntry,
@@ -271,38 +270,37 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWr
                         _    -> WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value)
                     end,
+
                 %% store information to be able to reproduce the request in
                 %% write_throughs. We modify the InRound here to avoid duplicate
                 %% transfer of the Value etc.
-                RoundForWrite = pr:set_wf(InRound, {Ret}),
+                NewWriteRound = entry_r_write(NewKeyEntry),
+                NewWriteRound2 = pr:set_wf(NewWriteRound, {Ret, Learner}),
+                NewKeyEntry2 = entry_set_r_write(NewKeyEntry, NewWriteRound2),
 
                 trace_mpath:log_info(self(), {'prbr:on(write)',
                                   %% key, Key,
-                                  round, RoundForWrite,
+                                  round, NewWriteRound2,
                                   passed_to_update, PassedToUpdate,
                                   val, Value,
                                   write_filter, WriteFilter,
                                   newval, NewVal}),
-                [ msg_write_reply(P, Cons, Key, InRound,
+                [ msg_write_reply(P, Cons, Key, NewWriteRound2,
                                   NextWriteRound, Ret)
-                  || P <- entry_get_learner(NewKeyEntry) ],
+                  || P <- Learner],
 
-                set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
-            {dropped, NewerRound} ->
+                set_entry(entry_set_val(NewKeyEntry2, NewVal), TableName);
+            {dropped, WriteRoundTried} ->
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
                                   %% key, Key,
-                                  round, InRound,
-                                  newer_round, NewerRound}),
-                %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
-                [ msg_write_deny(P, Cons, Key, NewerRound)
-                  || P <- entry_get_learner(KeyEntry) ],
-                %% we added proposers to the KeyEntry, so we have to store it
+                                  round, WriteRoundTried}),
 
-
-                %% for a deny update the read round to the max(InRound
-                %% and entryroiundr)
-
-                set_entry(KeyEntry, TableName)
+                %% When the client recieves enough denies, it must completely restart
+                %% its write, therefore it is not necessary to send any "newer round".
+                %% The round the client used to write is send back, because the client
+                %% must distinguish between denies from its own request and possible
+                %% write through attempts based on its partially completed write.
+                [msg_write_deny(P, Cons, Key, WriteRoundTried) || P <- Learner]
         end,
     TableName;
 
@@ -372,8 +370,8 @@ new(Key, Val) ->
      _R_Read = pr:new(0, '_'),
      %% Note: atoms < pids, so this is a good default.
      _R_Write = pr:new(0, '_'),
-     _Value = Val,
-     _Learner = []}.
+     _Value = Val
+     }.
 
 -spec entry_key(entry()) -> any().
 entry_key(Entry) -> element(1, Entry).
@@ -391,17 +389,6 @@ entry_set_r_write(Entry, Round) -> setelement(3, Entry, Round).
 entry_val(Entry) -> element(4, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
 entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
--spec entry_add_learner(entry(), comm:mypid()) -> entry().
-entry_add_learner(Entry, Learner) ->
-    OldLearner = entry_get_learner(Entry),
-    case lists:member(Learner, OldLearner) of
-        true -> Entry;
-        false -> setelement(5, Entry, [Learner | OldLearner])
-    end.
--spec entry_set_learner(entry(), comm:mypid()) -> entry().
-entry_set_learner(Entry, Learner) -> setelement(5, Entry, [Learner]).
--spec entry_get_learner(entry()) -> [comm:mypid()].
-entry_get_learner(Entry) -> element(5, Entry).
 
 -spec next_read_round(entry(), any()) -> pr:pr().
 next_read_round(Entry, ProposerUID) ->
@@ -413,7 +400,7 @@ next_read_round(Entry, ProposerUID) ->
 
 -spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter(), any()) ->
           {ok, entry(),NextWriteRound :: pr:pr()} |
-          {dropped, NewerSeenRound :: pr:pr()}.
+          {dropped, WriteRoundTried :: pr:pr()}.
 writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
@@ -450,7 +437,8 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
             %% the other proposer the chance to pass read and write
             %% phase.  The denied proposer has to perform a read and write
             %% phase on its own (including a new content check).
-            {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
+            NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
+            {dropped, NewInRound}
     end.
 
 -spec is_partial_write(prbr:write_filter()) -> boolean().

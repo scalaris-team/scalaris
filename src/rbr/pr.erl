@@ -42,7 +42,8 @@
 
 -type write_through_info() ::
           {
-           WriteReturn :: any()
+           WriteReturn :: any(),
+           Learner :: [any()]
           }.
 
 %% pr() has to be unique for this key system wide

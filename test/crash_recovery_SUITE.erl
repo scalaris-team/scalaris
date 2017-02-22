@@ -231,14 +231,14 @@ change_owner_pid(Pid, State, DBName) ->
                  prbr:set_entry({Key,
                                  {ReadRound, ReadClientId, ReadWriteFilter},
                                  {WriteRound, WriteClientId, WriteWriteFilter},
-                                 l_on_cseq:set_owner(Lease, Pid), Learner}, LeaseDB);
+                                 l_on_cseq:set_owner(Lease, Pid)}, LeaseDB);
              false ->
                  ct:fail("the lease db contains a ~p, which is not a lease record", [Lease])
          end
       || {Key,
           {ReadRound, ReadClientId, ReadWriteFilter},
           {WriteRound, WriteClientId, WriteWriteFilter},
-          Lease, Learner}
+          Lease}
              <- prbr:tab2list_raw_unittest(LeaseDB)],
     ok.
 
@@ -246,6 +246,6 @@ change_owner_pid(Pid, State, DBName) ->
 reset_read_and_write_rounds(State, DBName) ->
     LeaseDB = dht_node_state:get(State, DBName),
     _ = [ prbr:set_entry(prbr:new(Key, Value), LeaseDB)
-          || {Key, _R_Read, _R_Write, Value, _Learner}
+          || {Key, _R_Read, _R_Write, Value}
                  <- prbr:tab2list_raw_unittest(LeaseDB)],
     ok.
