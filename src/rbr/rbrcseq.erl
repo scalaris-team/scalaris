@@ -1135,7 +1135,8 @@ entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
                    pr:pr(), pr:pr(), client_value(), atom(),
                    module(), any(), boolean())
-                   -> {boolean() | consistant, #rr_replies{}, pr:pr()}.
+                   -> {consistent | inconsistent | write_through,
+                       #rr_replies{}, pr:pr()}.
 add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
              OpType, Datatype, Filters, _Cons) ->
     %% increment number of replies received
