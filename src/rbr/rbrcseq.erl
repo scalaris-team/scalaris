@@ -351,7 +351,7 @@ on({qround_request_collect,
                                     NewReplies#rr_replies.read_value),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
-                true ->
+                inconsistent ->
                     %% majority replied, but we do not have a consistent quorum ->
                     %% do a qread with highest received read round + 1
                     ?PDB:delete(ReqId, tablename(State)),
@@ -361,7 +361,19 @@ on({qround_request_collect,
                                            entry_datatype(NewEntry),
                                            entry_filters(NewEntry),
                                            entry_retrigger(NewEntry),
-                                           1+pr:get_r(entry_my_round(NewEntry))}, State)
+                                           1+pr:get_r(entry_my_round(NewEntry))}, State);
+                write_through ->
+                    %% majority replied, we have not a consistent quorum, but we can
+                    %% skip qread phase and go directly to write through
+
+                    % transform reply record to r_replies since that is what WT expects
+                    RReplies = #r_replies{highest_write_count=NewReplies#rr_replies.highest_write_count,
+                                         highest_write_round=NewReplies#rr_replies.highest_write_round,
+                                         read_value=NewReplies#rr_replies.read_value},
+                    NewEntry2 = entry_set_replies(NewEntry, RReplies),
+                    ?PDB:delete(ReqId, tablename(State)),
+                    gen_component:post_op({qread_initiate_write_through, NewEntry2},
+                                           State)
             end
     end;
 
@@ -1169,28 +1181,39 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
             {RF, _, _}   -> RF;
             RF           -> RF
         end,
-
+    IsNoopRead = ReadFilter =:= fun prbr:noop_read_filter/1,
     %% If enough replicas have replied, decide on the next action
     %% to take.
     {Result, R4} =
         case ?REDUNDANCY:quorum_accepted(ReplyCount) of
             true ->
-                case ReplyCount =:= R3#rr_replies.highest_write_count andalso
-                     %% If this round request is part of a read, then it does not matter if
-                     %% there is a write in progress which has not yet written the majority.
-                     %% Since the read and write are concurrent, the read can return the older value.
-                     (OpType =:= read orelse ReplyCount =:= R3#rr_replies.highest_read_count) of
+                if ReplyCount =/= R3#rr_replies.highest_write_count andalso not IsNoopRead ->
+                       %% There is a write in progress and we do not use a noop read filter
+                       %% It is verly likely (although not 100% certain) that the qread
+                       %% will also see inconsistent write rounds. Since we do not use
+                       %% a noop read filter, write through initiate will start a new read
+                       %% anyway. Therefore, we can safely skip qread and go directly to
+                       %% write through initiate and prevent doing the same thing twice.
+                       {write_through, R3};
+                   ReplyCount =/= R3#rr_replies.highest_write_count ->
+                       %% Inconsitent quorum due to write round discrepancy,
+                       %% proceed to qread.
+                       {inconsistent, R3};
+                   ReplyCount =/= R3#rr_replies.highest_read_count andalso OpType =/= read ->
+                       %% Inconsitent quorum due to read round discrepancy.
+                       %% If this round request is part of a read, then it does not matter if
+                       %% there is a write in progress which has not yet written the majority.
+                       %% Since the read and write are concurrent and the read does not interfere
+                       %% with writes, the read can return the older value. -> As far as reads
+                       %% are concerned, we still have a consistent quorum, therefore use the case
+                       %% below.
+                       {inconsistent, R3};
                     true ->
-                        %% consistent quorum
+                        %% Consistent quorum. Deliver the result to client
                         Collected = R3#rr_replies.read_value,
                         ReadValue = ?REDUNDANCY:get_read_value(Collected, ReadFilter),
                         T1 = R3#rr_replies{read_value=ReadValue},
-                        {consistent, T1};
-                    false ->
-                        %% not a consistent quorum
-                        %% we do not have to calculate the final value since a
-                        %% new read request will be started anyway.
-                        {true, R3}
+                        {consistent, T1}
                 end;
             false ->
                 %% no majority yet
