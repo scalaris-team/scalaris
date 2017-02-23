@@ -367,9 +367,10 @@ on({qround_request_collect,
                     %% skip qread phase and go directly to write through
 
                     % transform reply record to r_replies since that is what WT expects
-                    RReplies = #r_replies{highest_write_count=NewReplies#rr_replies.highest_write_count,
-                                         highest_write_round=NewReplies#rr_replies.highest_write_round,
-                                         read_value=NewReplies#rr_replies.read_value},
+                    RReplies = #r_replies{ack_count = 0, deny_count = 0, % doesn't matter..
+                                          highest_write_count=NewReplies#rr_replies.highest_write_count,
+                                          highest_write_round=NewReplies#rr_replies.highest_write_round,
+                                          read_value=NewReplies#rr_replies.read_value},
                     NewEntry2 = entry_set_replies(NewEntry, RReplies),
                     ?PDB:delete(ReqId, tablename(State)),
                     gen_component:post_op({qread_initiate_write_through, NewEntry2},
@@ -1135,7 +1136,7 @@ entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
                    pr:pr(), pr:pr(), client_value(), atom(),
                    module(), any(), boolean())
-                   -> {consistent | inconsistent | write_through,
+                   -> {false | consistent | inconsistent | write_through,
                        #rr_replies{}, pr:pr()}.
 add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
              OpType, Datatype, Filters, _Cons) ->
