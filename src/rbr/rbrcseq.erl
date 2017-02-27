@@ -1375,13 +1375,12 @@ add_write_deny(Replies, RoundTried, _Cons) ->
 
 -spec inform_client(qread_done, entry(), pr:pr(), any()) -> ok.
 inform_client(qread_done, Entry, WriteRound, ReadValue) ->
-    WriteRoundNoWTI = pr:set_wf(WriteRound, none),
     comm:send_local(
       entry_client(Entry),
       {qread_done,
        entry_reqid(Entry),
        entry_my_round(Entry), %% here: round for client's next fast qwrite
-       WriteRoundNoWTI, %% round which client must provide to ensure that full sequence of consensus is guaranteed
+       WriteRound, %% round which client must provide to ensure that full sequence of consensus is guaranteed
        ReadValue
       }).
 -spec inform_client(qwrite_done, entry(), any()) -> ok.

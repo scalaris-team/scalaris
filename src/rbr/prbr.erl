@@ -26,6 +26,9 @@
 -include("scalaris.hrl").
 
 -define(PDB, db_prbr).
+-define(REPAIR, config:read(prbr_repair_on_write)).
+-define(REPAIR_DELAY, 100). % in ms
+-define(REDUNDANCY, config:read(redundancy_module)).
 
 %%% the prbr has to be embedded into a gen_component using it.
 %%% The state it operates on has to be passed to the on handler
@@ -188,11 +191,8 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
                                   val, NewKeyEntryVal,
                                   read_filter, ReadFilter}),
 
-    %% for now do not send write through information in rr_replies
-    %% since they are not used. saves a bit bandwith.
-    EntryWriteRound = pr:set_wf(entry_r_write(KeyEntry), none),
     msg_round_request_reply(Proposer, Cons, AssignedReadRound,
-                            EntryWriteRound, ReadVal, OpType),
+                            KeyEntry, ReadVal, OpType),
 
     _ = case OpType =:= read andalso not ValueHasChanged of
         true ->
@@ -245,7 +245,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFilter, Rea
     end,
     TableName;
 
-on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWriteRound, Value,
+on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWriteRound, Value,
     PassedToUpdate, WriteFilter, IsWriteThrough}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     trace_mpath:log_info(self(), {prbr_on_write}),
@@ -290,10 +290,24 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWr
                   || P <- Learner],
 
                 set_entry(entry_set_val(NewKeyEntry2, NewVal), TableName);
-            {dropped, WriteRoundTried} ->
+            {dropped, RepairRequired, WriteRoundTried} ->
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
                                   %% key, Key,
                                   round, WriteRoundTried}),
+
+                case RepairRequired of
+                    true ->
+                        %% Start repair on write
+                        ?TRACE("Initiating on-write repair for entry~n~p", [KeyEntry]),
+                        comm:send_local_after(?REPAIR_DELAY, self(),
+                                              {prbr,
+                                               init_repair_on_write,
+                                               DB,
+                                               entry_key(KeyEntry),
+                                               entry_r_write(KeyEntry)}),
+                        ok;
+                    _ -> ok
+                end,
 
                 %% When the client recieves enough denies, it must completely restart
                 %% its write, therefore it is not necessary to send any "newer round".
@@ -302,6 +316,51 @@ on({prbr, write, _DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWr
                 %% write through attempts based on its partially completed write.
                 [msg_write_deny(P, Cons, Key, WriteRoundTried) || P <- Learner]
         end,
+    TableName;
+
+on({prbr, init_repair_on_write, DB, Key, KnownWriteRound}, TableName) ->
+    %% Triggers a repair process for this replica.
+    %% The repair process will send a qread to retrieve the most recent rounds
+    %% and value. This data will be used to refresh the replica under the condition
+    %% that no other process has written on this replica in the meantime (because
+    %% this is only possible if the most recent value was already established).
+    KeyEntry = get_entry(Key, TableName),
+    case KnownWriteRound =:= entry_r_write(KeyEntry) of
+        true ->
+            Client = self(),
+            _ = spawn(fun() ->
+                    This = self(),
+                    ?TRACE("Starting read for on-write repair on key~n~p", [Key]),
+                    rbrcseq:qread(DB, This, Key, prbr_on_use_repair),
+                    receive
+                        ?SCALARIS_RECV({qread_done, _ReqId, ReadRound, WriteRound, Value},
+                                        comm:send_local(Client,
+                                                       {prbr,
+                                                        repair_on_write,
+                                                        DB,
+                                                        Key,
+                                                        KnownWriteRound,
+                                                        ReadRound,
+                                                        WriteRound,
+                                                        Value}))
+                    after 1000 -> ok
+                    end
+                end);
+        false -> ok
+    end,
+    TableName;
+on({prbr, repair_on_write, _DB, Key, KnownWriteRound, CurrentReadRound,
+    CurrentWriteRound, CurrentValue}, TableName) ->
+    KeyEntry = get_entry(Key, TableName),
+    case KnownWriteRound =:= entry_r_write(KeyEntry) of
+        true ->
+            ?TRACE("On-write repair of replica on key ~n~p", [Key]),
+            KeyEntry2 = entry_set_r_read(KeyEntry, CurrentReadRound),
+            KeyEntry3 = entry_set_r_write(KeyEntry2, CurrentWriteRound),
+            KeyEntry4 = entry_set_val(KeyEntry3, CurrentValue),
+            _ = set_entry(KeyEntry4, TableName);
+        false -> ok
+    end,
     TableName;
 
 on({prbr, delete_key, _DB, Client, Key}, TableName) ->
@@ -400,7 +459,7 @@ next_read_round(Entry, ProposerUID) ->
 
 -spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter(), any()) ->
           {ok, entry(),NextWriteRound :: pr:pr()} |
-          {dropped, WriteRoundTried :: pr:pr()}.
+          {dropped, boolean(), WriteRoundTried :: pr:pr()}.
 writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
@@ -413,14 +472,16 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
     OldWriteR = pr:get_r(OldWriteRound),
     OldWriteId = pr:get_id(OldWriteRound),
     IsNotPartialWrite = not is_partial_write(WF),
+    %% make sure that no write filter operations are missing in the
+    %% sequence of writes
+    GaplessWriteSequence = IsNotPartialWrite orelse
+                               (OldWriteR =:= LatestSeenWriteR andalso
+                                    OldWriteId =:= LatestSeenWriteId),
+
     if ((InRoundR =:= LatestSeenReadR andalso InRoundId =:= LatestSeenReadId)
-        orelse (InRoundR > LatestSeenReadR))
+            orelse (InRoundR > LatestSeenReadR))
        andalso (InRoundR > LatestSeenWriteR)
-       %% make sure that no write filter operations are missing in the
-       %% sequence of writes
-       andalso (IsNotPartialWrite orelse
-                    (OldWriteR =:= LatestSeenWriteR
-                    andalso OldWriteId =:= LatestSeenWriteId)) ->
+       andalso GaplessWriteSequence ->
 
            NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
            T1Entry = entry_set_r_write(Entry, NewInRound),
@@ -431,6 +492,15 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
            {ok, T2Entry, NextWriteRound};
        true ->
+            %% If this replica is empty due to node failure, and
+            %% therefore lags behind other replicas, a repair process
+            %% can be started which will send a qread to the other
+            %% replicas to refresh its rounds and value.
+            RepairRequired = ?REPAIR
+                                andalso ?REDUNDANCY =:= replication
+                                andalso not GaplessWriteSequence
+                                andalso LatestSeenWriteR =:= 0,
+
             %% proposer may not have latest value for a clean content
             %% check, and another proposer is concurrently active, so
             %% we do not prepare a fast_paxos for this client, but let
@@ -438,7 +508,7 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
             %% phase.  The denied proposer has to perform a read and write
             %% phase on its own (including a new content check).
             NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
-            {dropped, NewInRound}
+            {dropped, RepairRequired, NewInRound}
     end.
 
 -spec is_partial_write(prbr:write_filter()) -> boolean().
@@ -446,7 +516,9 @@ is_partial_write(Any) -> fun prbr:noop_write_filter/3 =/= Any.
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
-check_config() -> true.
+check_config() ->
+    config:cfg_is_atom(redundancy_module) andalso
+        config:cfg_is_bool(prbr_repair_on_write).
 
 -spec tester_create_write_filter(0) -> write_filter().
 tester_create_write_filter(0) -> fun prbr:noop_write_filter/3.
