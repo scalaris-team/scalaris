@@ -1,0 +1,20 @@
+MAKEFLAGS=-k $MAKEFLAGS
+GNUPLOT=gnuplot
+
+.PHONY: all clean
+
+all: .eval_fprob.gp-done
+
+.eval_fprob.gp-done: <dat> ../eval_merkle.gp Makefile
+	@echo ">plot using [eval_merkle.gp]"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>;maxMerkleBranch=16;maxMerkleBucket=16;destDir='./'" "../eval_merkle.gp"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>;maxMerkleBranch=8;maxMerkleBucket=8;destDir='./';filename='v8_b8'" "../eval_merkle.gp"
+	@touch $@
+
+<dat>: v*/<dat>
+	@awk '$$2 == "Columns:" {print;exit}' $^ > "$@"
+	@awk 'NF > 0 && $$1 != "#"' $^ | sort -n -k7 -k8 >> "$@"
+
+clean: $(SUBDIRS_DIR_CLEAN)
+	rm -f *.pdf
+	rm -f .*.gp-done

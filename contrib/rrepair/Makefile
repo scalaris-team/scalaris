@@ -398,15 +398,27 @@ merkle_effective_prob/%/merkle_custom.dat: merkle_effective_prob/Makefile
 	@mkdir -p "$(@D)"
 	V=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_V)) ; B=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_B)) ; FR=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_FR)) ; D=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_D)) ; START=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_START)) ; END=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_END)) ; STEPSIZE=$(shell expr match "$*" $(MERKLE_EFF_PROB_EXTRACT_STEPSIZE)) ; STEPS=`expr '(' $$END - $$START ')' / $$STEPSIZE` ; ./rr_eval.sh -a merkle_custom -n "$$START" -c "$$V,$$B,$$FR,as_fprob,[random],[random],$$STEPSIZE,$$STEPS,[update,regen],$$D,data_count" -t "merkle_{v$$V, b$$B, FR$$FR}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
-MERKLE_2_EXTRACT_V='v\([0-9][0-9]*\)'
+MERKLE_PARAMETER_SWEEP_EXTRACT_V='v\([0-9][0-9]*\)'
 
-merkle_2_fr0.1_expDas_fprob/%/merkle_custom.dat: merkle_2_fr0.1_expDas_fprob/Makefile
-	@echo " executing merkle_2_fr0.1_expDas_fprob $*"
-	@mkdir -p "$(@D)"
-	V=$(shell expr match "$*" $(MERKLE_2_EXTRACT_V)) ; FR=0.1 ; D=2 ; STEPSIZE=1 ; STEPS=15 ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE)" -c "$$V,1,$$FR,as_fprob,[random],[random],$$STEPSIZE,$$STEPS,[update,regen],$$D,merkle_bucket" -t "merkle_{v$$V, FR0.1}" -d "$(@D)" -r $(EVAL_REPEATS) -s "$$STEPSIZE" > "$(@D)/eval.log"
 
-merkle_2_fr0.1_expDas_fprob-all: merkle_2_fr0.1_expDas_fprob/Makefile $(foreach V, $(shell seq -s" " 2 16), merkle_2_fr0.1_expDas_fprob/v$(V)/merkle_custom.dat)
-	
+define MERKLE_PARAMETER_SWEEP
+merkle_$(1)_fr$(2)_expDas_fprob/%/merkle_custom.dat: merkle_$(1)_fr$(2)_expDas_fprob/Makefile
+	@echo " executing merkle_$(1)_fr$(2)_expDas_fprob $$*"
+	@mkdir -p "$$(@D)"
+	V=$$(shell expr match "$$*" $(MERKLE_PARAMETER_SWEEP_EXTRACT_V)) ; FR=$(2) ; D=$(1) ; STEPSIZE=1 ; STEPS=15 ; ./rr_eval.sh -a merkle_custom -n "$(SYSTEM_SIZE)" -c "$$$$V,1,$$$$FR,as_fprob,[random],[random],$$$$STEPSIZE,$$$$STEPS,[update,regen],$$$$D,merkle_bucket" -t "merkle_{v$$$$V, FR$$$$FR}" -d "$$(@D)" -r $(EVAL_REPEATS) -s "$$$$STEPSIZE" > "$$(@D)/eval.log"
+
+merkle_$(1)_fr$(2)_expDas_fprob-all: merkle_$(1)_fr$(2)_expDas_fprob/Makefile $(foreach V, $(shell seq -s" " 2 16), merkle_$(1)_fr$(2)_expDas_fprob/v$(V)/merkle_custom.dat)
+
+merkle_$(1)_fr$(2)_expDas_fprob/Makefile: Makefile.tmpl3 merkle_$(1)_fr$(2)_expDas_fprob/.gitignore Makefile
+	@mkdir -p "$$(@D)"
+	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
+         -e 's|<dat>|merkle_custom.dat|g' \
+         -e 's|<title1|merkle|g' \
+         -e 's|<morecommands>|absoluteRedundancy=1;|g' < $$< > $$@
+endef
+$(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach FR, $(ALL_FR), \
+$(eval $(call MERKLE_PARAMETER_SWEEP,$(EXP_DELTA),$(FR)))\
+))
 
 # note: we must have the same dependencies as the specific rules
 #       -> otherwise this rule may be chosen instead
