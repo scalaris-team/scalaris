@@ -192,7 +192,7 @@ on({prbr, round_request, _DB, Cons, Proposer, Key, DataType, ProposerUID, ReadFi
                                   read_filter, ReadFilter}),
 
     msg_round_request_reply(Proposer, Cons, AssignedReadRound,
-                            KeyEntry, ReadVal, OpType),
+                            entry_r_write(KeyEntry), ReadVal, OpType),
 
     _ = case OpType =:= read andalso not ValueHasChanged of
         true ->
@@ -325,8 +325,8 @@ on({prbr, init_repair_on_write, DB, Key, KnownWriteRound}, TableName) ->
     %% that no other process has written on this replica in the meantime (because
     %% this is only possible if the most recent value was already established).
     KeyEntry = get_entry(Key, TableName),
-    case KnownWriteRound =:= entry_r_write(KeyEntry) of
-        true ->
+    _ = case KnownWriteRound =:= entry_r_write(KeyEntry) of
+          true ->
             Client = self(),
             _ = spawn(fun() ->
                     This = self(),
@@ -346,21 +346,21 @@ on({prbr, init_repair_on_write, DB, Key, KnownWriteRound}, TableName) ->
                     after 1000 -> ok
                     end
                 end);
-        false -> ok
-    end,
+          false -> ok
+        end,
     TableName;
 on({prbr, repair_on_write, _DB, Key, KnownWriteRound, CurrentReadRound,
     CurrentWriteRound, CurrentValue}, TableName) ->
     KeyEntry = get_entry(Key, TableName),
-    case KnownWriteRound =:= entry_r_write(KeyEntry) of
-        true ->
-            ?TRACE("On-write repair of replica on key ~n~p", [Key]),
-            KeyEntry2 = entry_set_r_read(KeyEntry, CurrentReadRound),
-            KeyEntry3 = entry_set_r_write(KeyEntry2, CurrentWriteRound),
-            KeyEntry4 = entry_set_val(KeyEntry3, CurrentValue),
-            _ = set_entry(KeyEntry4, TableName);
-        false -> ok
-    end,
+    _ = case KnownWriteRound =:= entry_r_write(KeyEntry) of
+            true ->
+                ?TRACE("On-write repair of replica on key ~n~p", [Key]),
+                KeyEntry2 = entry_set_r_read(KeyEntry, CurrentReadRound),
+                KeyEntry3 = entry_set_r_write(KeyEntry2, CurrentWriteRound),
+                KeyEntry4 = entry_set_val(KeyEntry3, CurrentValue),
+                _ = set_entry(KeyEntry4, TableName);
+            false -> ok
+        end,
     TableName;
 
 on({prbr, delete_key, _DB, Client, Key}, TableName) ->
