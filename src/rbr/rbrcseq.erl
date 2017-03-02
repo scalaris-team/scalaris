@@ -580,16 +580,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                     none ->
                         {fun prbr:noop_write_filter/3, none, ReadVal};
                     {WriteRet, _} ->
-                        DataType = entry_datatype(ReadEntry),
-                        %% Depending on the datatype the write through value might
-                        %% not equal the read value e.g due to additionally
-                        %% generated information or custom read/write handler
-                        WTV = case erlang:function_exported(DataType,
-                                                            get_write_through_value, 1) of
-                                  true -> DataType:get_write_through_value(ReadVal);
-                                  _    -> ReadVal
-                              end,
-                        WTI = {fun prbr:noop_write_filter/3, WriteRet, WTV},
+                        WTI = {fun prbr:noop_write_filter/3, WriteRet, ReadVal},
                         ?TRACE("Setting write through write filter ~p",
                                [WTI]),
                         WTI
