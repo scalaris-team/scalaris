@@ -119,6 +119,16 @@ end_per_group(Group, Config) ->
     ok = file:delete(WorkingDir ++ "schema.DAT"),
     unittest_helper:end_per_group(Group, Config).
 
+init_per_testcase(_TestCase = remove_node, Config) ->
+    case config:read(replication_factor) of
+        3 ->
+           {skip, "single node failure might cause data loss in aysmmetric rings for R=3."};
+        _ ->
+            Config
+    end;
+init_per_testcase(_TestCase, Config) ->
+    Config.
+
 rw_suite_runs(N) ->
     erlang:min(N, 200).
 
