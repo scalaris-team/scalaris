@@ -47,7 +47,9 @@
                           BW_RS_KVV   :: integer(),   % number of kvv-triple send
                           Fr_p1       :: float() | '-', % effective worst-case probability of phase 1
                           Fr_p2       :: float() | '-', % effective worst-case probability of phase 2
-                          Fr          :: float() | '-'  % effective total worst-case probability
+                          Fr          :: float() | '-', % effective total worst-case probability
+                          MerkleInner :: non_neg_integer() | '-', % number of inner nodes on the initiator in case of Merkle sync
+                          MerkleLeaf  :: non_neg_integer() | '-'  % number of leaf nodes on the initiator in case of Merkle sync
                           }.
 
 -type eval_point() :: {
@@ -135,7 +137,17 @@
                        MinFr            :: float() | '-',
                        MaxFr            :: float() | '-',
                        % misc
-                       ExpectedDelta    :: number()
+                       ExpectedDelta    :: number(),
+                       % AVG, STD, MIN, MAX number of merkle tree inner nodes
+                       MeanMerkleInner  :: float() | '-',
+                       ErrMerkleInner   :: float() | '-',
+                       MinMerkleInner   :: float() | '-',
+                       MaxMerkleInner   :: float() | '-',
+                       % AVG, STD, MIN, MAX number of merkle tree leaf nodes
+                       MeanMerkleLeaf   :: float() | '-',
+                       ErrMerkleLeaf    :: float() | '-',
+                       MinMerkleLeaf    :: float() | '-',
+                       MaxMerkleLeaf    :: float() | '-'
                       }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -169,7 +181,9 @@ column_names() ->
      fr_p1, sd_fr_p1, min_fr_p1, max_fr_p1,
      fr_p2, sd_fr_p2, min_fr_p2, max_fr_p2,
      fr, sd_fr, min_fr, max_fr,
-     expected_delta
+     expected_delta,
+     merkle_inner, sd_merkle_inner, min_merkle_inner, max_merkle_inner,
+     merkle_leaf, sd_merkle_leaf, min_merkle_leaf, max_merkle_leaf
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -179,7 +193,8 @@ column_names() ->
 mp_column_names() ->
     [id, iteration, round, missing, regen, outdated, updated,
      bw_rc_size, bw_rc_msg, bw_rc2_size, bw_rc2_msg,
-     bw_rs_size, bw_rs_msg, bw_rs_kvv, fr_p1, fr_p2, fr].
+     bw_rs_size, bw_rs_msg, bw_rs_kvv, fr_p1, fr_p2, fr,
+     merkle_inner, merkle_leaf].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -237,6 +252,15 @@ generate_ep(ID,
         catch _:_ -> {'-', '-', '-', '-'}
         end,
 
+    {MeanMerkleI, ErrMerkleI, MinMerkleI, MaxMerkleI} =
+        try mean_w_error(18, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
+    {MeanMerkleL, ErrMerkleL, MinMerkleL, MaxMerkleL} =
+        try mean_w_error(19, MP)
+        catch _:_ -> {'-', '-', '-', '-'}
+        end,
+
     {ID,
      NC, 4 * DC, FRate, element(3, hd(MP)),
      RcFR, MBU, MBR, ArtCF, ArtLF, ArtIF,
@@ -252,7 +276,9 @@ generate_ep(ID,
      MeanFr_p1, ErrFr_p1, MinFr_p1, MaxFr_p1,
      MeanFr_p2, ErrFr_p2, MinFr_p2, MaxFr_p2,
      MeanFr, ErrFr, MinFr, MaxFr,
-     ExpDelta}.
+     ExpDelta,
+     MeanMerkleI, ErrMerkleI, MinMerkleI, MaxMerkleI,
+     MeanMerkleL, ErrMerkleL, MinMerkleL, MaxMerkleL}.
 
 -spec dist_to_name(Dist::random | uniform | {binomial, P::float()}) -> atom().
 dist_to_name({binomial, P}) ->
