@@ -66,6 +66,7 @@
 -type mt_bucket()       :: [mt_bucket_entry()].
 -type mt_size()         :: {InnerNodes::non_neg_integer(),
                             LeafNodes::non_neg_integer(),
+                            EmptyLeafNodes::non_neg_integer(),
                             Items::non_neg_integer()}.
 -type leaf_hash_fun()   :: fun((mt_bucket(), intervals:interval()) -> binary()).
 -type inner_hash_fun()  :: fun(([mt_node_key(),...]) -> mt_node_key()).
@@ -471,31 +472,34 @@ node_size({_H, _ICnt, _Bkt, _I}) ->
 % @doc Returns a triple with number of inner nodes, leaf nodes and hashed items.
 -spec size_detail(merkle_tree() | [mt_node()]) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
-    Result = {_Inner, _Leafs, _Items} = size_detail_node([Root], 0, 0, 0),
-    ?DBG_ASSERT(_Leafs =:= get_leaf_count(Root)),
-    ?DBG_ASSERT(_Items =:= get_item_count(Root)),
-    Result;
+    size_detail_node([Root], 0, 0, 0, 0);
 size_detail(Nodes) when is_list(Nodes) ->
-    Result = {_Inner, _Leafs, _Items} = size_detail_node(Nodes, 0, 0, 0),
-    ?DBG_ASSERT(_Leafs =:= lists:sum([get_leaf_count(N) || N <- Nodes])),
-    ?DBG_ASSERT(_Items =:= lists:sum([get_item_count(N) || N <- Nodes])),
+    Result = {_Inner, _Leafs, _EmptyLeafs, _Items} = size_detail_node(Nodes, 0, 0, 0, 0),
+    % already tested via unit test:
+%%     ?DBG_ASSERT(_Leafs =:= lists:sum([get_leaf_count(N) || N <- Nodes])),
+%%     ?DBG_ASSERT(_Items =:= lists:sum([get_item_count(N) || N <- Nodes])),
     Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),
-                       Leafs::non_neg_integer(), Items::non_neg_integer())
+                       Leafs::non_neg_integer(), EmptyLeafs::non_neg_integer(),
+                       Items::non_neg_integer())
         -> mt_size().
-size_detail_node([{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R], Inner, Leafs, Items) ->
-    size_detail_node([Childs | R], Inner + 1, Leafs, Items);
-size_detail_node([{_H, ICnt, _Bkt, _I} | R], Inner, Leafs, Items) ->
-    size_detail_node(R, Inner, Leafs + 1, Items + ICnt);
-size_detail_node([], InnerNodes, Leafs, Items) ->
-    {InnerNodes, Leafs, Items};
-size_detail_node([[{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs, Items) ->
-    size_detail_node([Childs, R1 | R2], Inner + 1, Leafs, Items);
-size_detail_node([[{_H, ICnt, _Bkt, _I} | R1] | R2], Inner, Leafs, Items) ->
-    size_detail_node([R1 | R2], Inner, Leafs + 1, Items + ICnt);
-size_detail_node([[] | R2], Inner, Leafs, Items) ->
-    size_detail_node(R2, Inner, Leafs, Items).
+size_detail_node([{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node([Childs | R], Inner + 1, Leafs, EmptyLeafs, Items);
+size_detail_node([{_H, _ICnt = 0, _Bkt = [], _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node(R, Inner, Leafs + 1, EmptyLeafs + 1, Items);
+size_detail_node([{_H, ICnt, _Bkt = [_|_], _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node(R, Inner, Leafs + 1, EmptyLeafs, Items + ICnt);
+size_detail_node([], InnerNodes, Leafs, EmptyLeafs, Items) ->
+    {InnerNodes, Leafs, EmptyLeafs, Items};
+size_detail_node([[{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node([Childs, R1 | R2], Inner + 1, Leafs, EmptyLeafs, Items);
+size_detail_node([[{_H, _ICnt = 0, _Bkt = [], _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node([R1 | R2], Inner, Leafs + 1, EmptyLeafs + 1, Items);
+size_detail_node([[{_H, ICnt, _Bkt = [_|_], _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node([R1 | R2], Inner, Leafs + 1, EmptyLeafs, Items + ICnt);
+size_detail_node([[] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+    size_detail_node(R2, Inner, Leafs, EmptyLeafs, Items).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

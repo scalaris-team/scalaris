@@ -39,7 +39,7 @@
 -record(rr_recon_stats,
         {
          session_id         = ?required(rr_recon_stats, session_id) :: rrepair:session_id(),
-         tree_size          = {0,0,0} :: merkle_tree:mt_size(),
+         tree_size          = {0,0,0,0} :: merkle_tree:mt_size(),
          tree_nodesCompared = 0       :: non_neg_integer(),
          tree_compareSkipped= 0       :: non_neg_integer(),
          tree_leavesSynced  = 0       :: non_neg_integer(),
@@ -85,9 +85,9 @@ inc([], Stats) ->
 inc([{K, V} | L], Stats) ->
     NS = case K of
              tree_size ->
-                 {OldIn, OldLn, OldIt} = Stats#rr_recon_stats.tree_size,
-                 {IncIn, IncLn, IncIt} = V,
-                 X = {OldIn + IncIn, OldLn + IncLn, OldIt + IncIt},
+                 {OldIn, OldLn, OldELn, OldIt} = Stats#rr_recon_stats.tree_size,
+                 {IncIn, IncLn, IncELn, IncIt} = V,
+                 X = {OldIn + IncIn, OldLn + IncLn, OldELn + IncELn, OldIt + IncIt},
                  Stats#rr_recon_stats{tree_size = X};
              tree_nodesCompared ->
                  X = V + Stats#rr_recon_stats.tree_nodesCompared,
@@ -120,8 +120,8 @@ set([{K, V} | L], Stats) ->
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
-             fail_rate_p1          -> Stats#rr_recon_stats{fail_rate_p1 = V};
-             fail_rate_p2          -> Stats#rr_recon_stats{fail_rate_p2 = V};
+             fail_rate_p1        -> Stats#rr_recon_stats{fail_rate_p1 = V};
+             fail_rate_p2        -> Stats#rr_recon_stats{fail_rate_p2 = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
              rs_expected         -> Stats#rr_recon_stats{rs_expected = V};

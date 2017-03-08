@@ -972,10 +972,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = {}, initiator 
     Stats1 = rr_recon_stats:set([{tree_size, MTSize}], Stats),
     Stats2 = rr_recon_stats:inc([{build_time, BuildTime1 + BuildTime2}], Stats1),
     ?ALG_DEBUG("merkle (NI) - NextNodes: ~B~n"
-               "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-               [length(SyncStruct), MTSize,
-                length([ok || L <- merkle_tree:get_leaves(SyncStruct),
-                              merkle_tree:is_empty(L)])]),
+               "  Inner/Leaf/EmptyLeaves/Items: ~p",
+               [length(SyncStruct), MTSize]),
     
     State#rr_recon_state{struct = SyncStruct,
                          stats = Stats2, params = MySyncParams,
@@ -998,10 +996,8 @@ begin_sync(State = #rr_recon_state{method = merkle_tree, params = Params, initia
     MyMaxItemCount =
         lists:max([0 | [merkle_tree:get_item_count(Node) || Node <- MySyncStruct]]),
     ?ALG_DEBUG("merkle (I) - NextNodes: ~B~n"
-               "  Inner/Leaf/Items: ~p, EmptyLeaves: ~B",
-               [length(MySyncStruct), MTSize,
-                length([ok || L <- merkle_tree:get_leaves(MySyncStruct),
-                              merkle_tree:is_empty(L)])]),
+               "  Inner/Leaf/EmptyLeaves/Items: ~p",
+               [length(MySyncStruct), MTSize]),
     FRTotal_p1 = calc_n_subparts_FR(2, FRTotal),
     FRTotal_p1_perNode = calc_n_subparts_FR(NumTrees, FRTotal_p1),
     MaxAffectedItems = calc_max_different_items_total(

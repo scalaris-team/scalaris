@@ -1340,14 +1340,14 @@ get_measure_point(Id, Iter, Round, {Miss, Outd}, Trace, NodeList, SessionStats) 
     Fr_p1 = rr_recon_stats:get(fail_rate_p1, RCStats),
     Fr_p2 = rr_recon_stats:get(fail_rate_p2, RCStats),
     Fr = rr_recon_stats:get(fail_rate, RCStats),
-    {MerkleInner, MerkleLeaf, _MerkleItems} = rr_recon_stats:get(tree_size, RCStats),
+    {MerkleInner, MerkleLeaf, MerkleEmptyLeaf, _MerkleItems} = rr_recon_stats:get(tree_size, RCStats),
 %%     log:pal(" Stats: ~p", [rr_recon_stats:print(RCStats)]),
     
     {Id, Iter, Round,
      Miss, Miss - M,
      Outd, Outd - O,
      RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, Fr_p1, Fr_p2, Fr,
-     MerkleInner, MerkleLeaf}.
+     MerkleInner, MerkleLeaf, MerkleEmptyLeaf}.
 
 -spec get_mp_round(rr_eval_point:point_id(), Iteration::non_neg_integer(),
                    Round::non_neg_integer(), init_mp(),
@@ -1359,7 +1359,7 @@ get_mp_round(Id, Iter, Round, {Miss, Outd}, Trace, NodeList) ->
     {Id, Iter, Round,
      ActLoad, ActLoad - Miss,
      ActOut, Outd - ActOut,
-     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, '-', '-', '-', '-', '-'}.
+     RC_S, RC_Msg, RC2_S, RC2_Msg, RS_S, RS_Msg, RS_KVV, '-', '-', '-', '-', '-', '-'}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
