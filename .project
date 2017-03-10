@@ -28,12 +28,111 @@
 	</natures>
 	<filteredResources>
 		<filter>
-			<id>1318159539372</id>
+			<id>1489147896928</id>
 			<name></name>
 			<type>10</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
 				<arguments>1.0-name-matches-false-false-java-api</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896931</id>
+			<name></name>
+			<type>14</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-*ct*@*</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896934</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-ct_*.log</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896937</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-TAGS*</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896939</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-all_runs.html</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896942</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-ct_default.css</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896944</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-jquery-latest.js</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896946</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-jquery.tablesorter.min.js</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896948</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-ct_log_cache</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896950</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-config.log</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896952</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-config.status</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1489147896954</id>
+			<name></name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-true-false-index.html</arguments>
 			</matcher>
 		</filter>
 		<filter>
