@@ -41,3 +41,5 @@ contrib/slurm/slurm-*.out
 /.maven
 /priv/*.so
 /priv/*.so.dSYM/
+/contrib/log4erl/src/log4erl_lex.erl
+/contrib/log4erl/src/log4erl_parser.erl
