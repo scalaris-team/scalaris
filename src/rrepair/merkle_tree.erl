@@ -486,17 +486,17 @@ size_detail(Nodes) when is_list(Nodes) ->
         -> mt_size().
 size_detail_node([{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node([Childs | R], Inner + 1, Leafs, EmptyLeafs, Items);
-size_detail_node([{_H, _ICnt = 0, _Bkt = [], _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
+size_detail_node([{_H, _ICnt = 0, _Bkt, _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node(R, Inner, Leafs + 1, EmptyLeafs + 1, Items);
-size_detail_node([{_H, ICnt, _Bkt = [_|_], _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
+size_detail_node([{_H, ICnt, _Bkt, _I} | R], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node(R, Inner, Leafs + 1, EmptyLeafs, Items + ICnt);
 size_detail_node([], InnerNodes, Leafs, EmptyLeafs, Items) ->
     {InnerNodes, Leafs, EmptyLeafs, Items};
 size_detail_node([[{_H, _Cnt, _ICnt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node([Childs, R1 | R2], Inner + 1, Leafs, EmptyLeafs, Items);
-size_detail_node([[{_H, _ICnt = 0, _Bkt = [], _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+size_detail_node([[{_H, _ICnt = 0, _Bkt, _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node([R1 | R2], Inner, Leafs + 1, EmptyLeafs + 1, Items);
-size_detail_node([[{_H, ICnt, _Bkt = [_|_], _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
+size_detail_node([[{_H, ICnt, _Bkt, _I} | R1] | R2], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node([R1 | R2], Inner, Leafs + 1, EmptyLeafs, Items + ICnt);
 size_detail_node([[] | R2], Inner, Leafs, EmptyLeafs, Items) ->
     size_detail_node(R2, Inner, Leafs, EmptyLeafs, Items).
