@@ -273,8 +273,7 @@ scan_string([$\\,$u,U1,U2,U3,U4|Rest], A, X)
     case erlang:list_to_integer([U1,U2,U3,U4], 16) of
         Codepoint when Codepoint > 0 andalso
                        (Codepoint < 16#d800 orelse Codepoint > 16#dfff) ->
-            C = binary_to_list(unicode:characters_to_binary([Codepoint],utf8)),
-            scan_string(Rest, lists:reverse(C)++A, X);
+            scan_string(Rest, [Codepoint | A], X);
         _ ->
             Bad = [$\\,$u,U1,U2,U3,U4],
             {done, {error, {bad_utf8_char, Bad}}, X}

@@ -6,8 +6,8 @@
    src/yaws_generated.erl to <scalaris>/contrib/yaws/src
 5a) fix absolute include path in mime_types.erl to "yaws.hrl"
 5b) remove src/*.hrl.in
-5c) reverse yaws-2e86da12b3.patch in <scalaris>/contrib/yaws:
-    patch -Rp1 < ../yaws-2e86da12b3.patch
+5c) apply yaws-revert-broken-utf8-decoding.patch in <scalaris>/contrib/yaws:
+    patch -p1 < ../yaws-revert-broken-utf8-decoding.patch
 6) in <scalaris>/contrib/yaws:
     rm ebin/Makefile.*, include/Makefile.*, src/Makefile.*
     echo "/*.beam" > ebin/.gitignore

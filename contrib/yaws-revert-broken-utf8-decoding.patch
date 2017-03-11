@@ -1,0 +1,17 @@
+This reverts commit 2e86da12b3ecc4482fd81d454cb4d70bc85269fa from the yaws
+sources that broke utf8 decoding for us. It applies to yaws 2.0.4.
+
+diff --git a/src/json2.erl b/src/json2.erl
+index 64a8a4f94..5f395b5dd 100644
+--- a/src/json2.erl
++++ b/src/json2.erl
+@@ -273,8 +273,7 @@ scan_string([$\\,$u,U1,U2,U3,U4|Rest], A, X)
+     case erlang:list_to_integer([U1,U2,U3,U4], 16) of
+         Codepoint when Codepoint > 0 andalso
+                        (Codepoint < 16#d800 orelse Codepoint > 16#dfff) ->
+-            C = binary_to_list(unicode:characters_to_binary([Codepoint],utf8)),
+-            scan_string(Rest, lists:reverse(C)++A, X);
++            scan_string(Rest, [Codepoint | A], X);
+         _ ->
+             Bad = [$\\,$u,U1,U2,U3,U4],
+             {done, {error, {bad_utf8_char, Bad}}, X}
