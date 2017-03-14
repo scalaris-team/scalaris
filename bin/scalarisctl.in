@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2016 Zuse Institute Berlin
+# Copyright 2007-2017 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -678,6 +678,7 @@ scalarisstart(){
         echo "You can change the name by the -n option (see -h)."
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
         echo "We were trying to run: erl -noinput -name $NODE_NAME -eval 'halt(0).'"
+        list_erlang_processes
         exit 1
     fi
     erl_flags="$ERL_SCHED_FLAGS $erl_flags"
