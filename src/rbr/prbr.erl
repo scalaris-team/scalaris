@@ -327,37 +327,24 @@ on({prbr, init_repair_on_write, DB, Key, KnownWriteRound}, TableName) ->
     KeyEntry = get_entry(Key, TableName),
     _ = case KnownWriteRound =:= entry_r_write(KeyEntry) of
           true ->
-            Client = self(),
-            _ = spawn(fun() ->
-                    This = self(),
-                    ?TRACE("Starting read for on-write repair on key~n~p", [Key]),
-                    rbrcseq:qread(DB, This, Key, prbr_on_use_repair),
-                    receive
-                        ?SCALARIS_RECV({qread_done, _ReqId, ReadRound, WriteRound, Value},
-                                        comm:send_local(Client,
-                                                       {prbr,
-                                                        repair_on_write,
-                                                        DB,
-                                                        Key,
-                                                        KnownWriteRound,
-                                                        ReadRound,
-                                                        WriteRound,
-                                                        Value}))
-                    after 1000 -> ok
-                    end
-                end);
+            ?TRACE("Starting read for on-write repair on key~n~p", [Key]),
+            Envelope = {prbr, repair_on_write, DB, Key, KnownWriteRound, '_'},
+            SendTo = comm:reply_as(self(), 6, Envelope),
+            rbrcseq:qread(DB, SendTo, Key, prbr_on_use_repair);
           false -> ok
         end,
     TableName;
-on({prbr, repair_on_write, _DB, Key, KnownWriteRound, CurrentReadRound,
-    CurrentWriteRound, CurrentValue}, TableName) ->
+
+on({prbr, repair_on_write, _DB, Key, KnownWriteRound,
+    {qread_done, _ReqId, ReadRound, WriteRound, Value}}, TableName) ->
     KeyEntry = get_entry(Key, TableName),
     _ = case KnownWriteRound =:= entry_r_write(KeyEntry) of
             true ->
+                %% Change only if this replica was not modified yet
                 ?TRACE("On-write repair of replica on key ~n~p", [Key]),
-                KeyEntry2 = entry_set_r_read(KeyEntry, CurrentReadRound),
-                KeyEntry3 = entry_set_r_write(KeyEntry2, CurrentWriteRound),
-                KeyEntry4 = entry_set_val(KeyEntry3, CurrentValue),
+                KeyEntry2 = entry_set_r_read(KeyEntry, ReadRound),
+                KeyEntry3 = entry_set_r_write(KeyEntry2, WriteRound),
+                KeyEntry4 = entry_set_val(KeyEntry3, Value),
                 _ = set_entry(KeyEntry4, TableName);
             false -> ok
         end,
