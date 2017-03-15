@@ -1,4 +1,4 @@
-% @copyright 2012-2016 Zuse Institute Berlin,
+% @copyright 2012-2017 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@
             true ->
                 ok
         end).
+
+-define(DELTA, (config:read(leases_delta))).
+%% -define(DELTA, (10)).
 
 -export([read/1, read/2]).
 %%-export([write/2]).
@@ -127,7 +130,7 @@
                                Next::lease_t()} | null}).
 
 -spec delta() -> pos_integer().
-delta() -> 10.
+delta() -> ?DELTA.
 
 -spec unittest_get_delta() -> pos_integer().
 unittest_get_delta() ->
