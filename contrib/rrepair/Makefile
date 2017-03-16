@@ -413,7 +413,7 @@ merkle_$(1)_fr$(2)_expDas_fprob/Makefile: Makefile.tmpl3 merkle_$(1)_fr$(2)_expD
 	@mkdir -p "$$(@D)"
 	@sed -e 's|<sys_size>|$(SYSTEM_SIZE)|g' \
          -e 's|<dat>|merkle_custom.dat|g' \
-         -e 's|<title1|merkle|g' \
+         -e 's|<title>|merkle|g' \
          -e 's|<morecommands>|absoluteRedundancy=1;|g' < $$< > $$@
 endef
 $(foreach EXP_DELTA, $(EXP_DELTA_LIST), $(foreach FR, $(ALL_FR), \
