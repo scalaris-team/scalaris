@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include <boost/program_options.hpp>
 
@@ -8,6 +9,8 @@
 using namespace std;
 using namespace scalaris;
 namespace po = boost::program_options;
+
+const int N = 100;
 
 namespace std {
   istream& operator>>(istream& in, std::pair<std::string,std::string>& ss) {
@@ -64,6 +67,7 @@ int main(int argc, char **argv) {
     ("help", "produce help message")
     ("read", po::value<std::string>(), "read key")
     ("write", po::value<pair<string, string>>(), "write key,value")
+    ("bench", "bench")
     ;
 
   po::variables_map vm;
@@ -95,6 +99,27 @@ int main(int argc, char **argv) {
           op.write(key,value);
         };
         exec_call(p);
+      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
+        cout << "could not convert write parameter to a pair of strings" << endl;
+        exit(EXIT_FAILURE);
+      }
+    } else if (vm.count("bench")) {
+      try {
+        string key = "bench-key";
+        string value = "bench-value";
+        auto start = std::chrono::high_resolution_clock::now();
+        for(int i = 0; i < N; i++) {
+          auto p = [key,value](TransactionSingleOp& op) {
+            op.write(key,value);
+          };
+          exec_call(p);
+        }
+        auto stop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> diff = stop - start;
+        const double duration = diff.count();
+        const double latency = duration / N * 1000;
+        printf("executed %d key-value pairs updates using the transaction mechanism\n", N);
+        printf("duration=%es, latency=%fms\n", duration, latency);
       } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
         cout << "could not convert write parameter to a pair of strings" << endl;
         exit(EXIT_FAILURE);
