@@ -258,8 +258,15 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 false ->
                     [Proposer];
                 true ->
-                    {_, OldLearner} = pr:get_wf(InRound),
-                    [Proposer | OldLearner]
+                    {_, [OrigLearner | _WTLearner]=_Learners} = pr:get_wf(InRound),
+                    %% The follow-up behaviour of a WT does not change if it is
+                    %% successful or denied. In both cases the original request
+                    %% is retried. Therefore we do need to keep old WT learner around
+                    %% since sending updated progress is of no benefit. This prevents
+                    %% a long list of WT-Learner caused by write throughs followed by
+                    %% write throughs due to duelling requests (which is likely for a
+                    %% high replication factor with a high number of concurrent requests).
+                    [OrigLearner, Proposer]
               end,
     _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter, ProposerUID) of
             {ok, NewKeyEntry, NextWriteRound} ->
