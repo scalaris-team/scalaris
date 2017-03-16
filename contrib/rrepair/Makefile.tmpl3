@@ -7,8 +7,8 @@ all: .eval_fprob.gp-done
 
 .eval_fprob.gp-done: <dat> ../eval_merkle.gp Makefile
 	@echo ">plot using [eval_merkle.gp]"
-	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>;maxMerkleBranch=16;maxMerkleBucket=16;destDir='./'" "../eval_merkle.gp"
-	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>;maxMerkleBranch=8;maxMerkleBucket=8;destDir='./';filename='v8_b8'" "../eval_merkle.gp"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>maxMerkleBranch=16;maxMerkleBucket=16;destDir='./'" "../eval_merkle.gp"
+	$(GNUPLOT) -e "colDefFile='../coldefs_eval_point.gp';systemSize=<sys_size>;srcFile1='<dat>';srcFile1_title='<title>';<morecommands>maxMerkleBranch=8;maxMerkleBucket=8;destDir='./';filename='v8_b8'" "../eval_merkle.gp"
 	@touch $@
 
 <dat>: v*/<dat>
