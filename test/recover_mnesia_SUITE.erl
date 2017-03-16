@@ -94,7 +94,9 @@ init_per_group(Group, Config) ->
                                                       {leases, true},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
-    unittest_helper:init_per_group(Group, Config3).
+    LeasesTimeout = config:read(leases_delta) * 1000 + 1000,
+    Config4 = [{leases_timeout, LeasesTimeout} | Config3],
+    unittest_helper:init_per_group(Group, Config4).
 
 end_per_group(recover_data_group = Group, Config) ->
     unittest_helper:end_per_group(Group, Config);
@@ -138,8 +140,7 @@ rw_suite_runs(N) ->
 test_make_ring(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:stop_ring(),
-    %% wait for leases to expire
-    timer:sleep(11000),
+    wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
                                                  {leases, true},
                                                  {db_backend, db_mnesia},
@@ -164,8 +165,7 @@ read(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     lease_checker2:get_kv_db(),
     unittest_helper:stop_ring(),
-    %% wait for leases to expire
-    timer:sleep(11000),
+    wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
                                                   {leases, true},
                                                   {db_backend, db_mnesia},
@@ -178,7 +178,7 @@ read(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% test remove_node/1 remove a node and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-remove_node(_Config) ->
+remove_node(Config) ->
     ct:pal("wait for check_leases"),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     %% delete random node from ring
@@ -194,7 +194,7 @@ remove_node(_Config) ->
     {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
     %% wait for leases to expire
     ct:pal("wait for leases to expire"),
-    timer:sleep(11000),
+    wait_for_expired_leases(Config),
     _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
     ct:pal("wait for check_leases"),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
@@ -244,3 +244,7 @@ repair_replicas() ->
         false ->
             ok
     end.
+
+wait_for_expired_leases(Config) ->
+    {leases_timeout, LeasesTimeout} = lists:keyfind(leases_timeout, 1, Config),
+    timer:sleep(LeasesTimeout).
