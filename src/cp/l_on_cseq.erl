@@ -47,6 +47,8 @@
 -define(DELTA, (config:read(leases_delta))).
 %% -define(DELTA, (10)).
 
+-export([check_config/0]).
+
 -export([read/1, read/2]).
 %%-export([write/2]).
 
@@ -1592,3 +1594,14 @@ update_lease(ReplyTo, ContentCheck, Old, New, State) ->
 renew_and_update_round(Lease, Round, _Mode, State) ->
     %lease_renew(self(), Lease, Mode),
     lease_list:update_next_round(l_on_cseq:get_id(Lease), Round, State).
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    case config:read(leases) of
+        true ->
+            config:cfg_is_integer(leases_delta) andalso
+                config:cfg_is_greater_than(leases_delta, 0);
+        _ ->
+            true
+    end.
