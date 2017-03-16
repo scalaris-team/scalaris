@@ -8849,6 +8849,8 @@ elif test -f /etc/debian_version ; then
   LINUXVERSION=`cat /etc/debian_version`
 elif test -f /etc/gentoo-release ; then
   LINUXVERSION=`cat /etc/gentoo-release`
+elif test -f /etc/arch-release ; then
+  LINUXVERSION=`uname -a`
 fi
 
 OS=""
