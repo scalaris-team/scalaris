@@ -50,4 +50,7 @@ clean:
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST:.o=.d)
 
-.PHONY: clean test libscalaris
+.PHONY: clean test libscalaris beautify
+
+beautify:
+        @CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
