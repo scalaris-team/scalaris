@@ -1,5 +1,5 @@
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 #include <boost/program_options.hpp>
 
@@ -13,25 +13,25 @@ namespace po = boost::program_options;
 const int N = 100;
 
 namespace std {
-  istream& operator>>(istream& in, std::pair<std::string,std::string>& ss) {
-  string s;
-  in >> s;
-  const size_t sep = s.find(',');
-  if (sep==string::npos) {
-    ss.first = s;
-    ss.second = string();
-  } else {
-    ss.first  = s.substr(0,sep);
-    ss.second = s.substr(sep+1);
+  istream& operator>>(istream& in, std::pair<std::string, std::string>& ss) {
+    string s;
+    in >> s;
+    const size_t sep = s.find(',');
+    if (sep == string::npos) {
+      ss.first = s;
+      ss.second = string();
+    } else {
+      ss.first = s.substr(0, sep);
+      ss.second = s.substr(sep + 1);
+    }
+    return in;
   }
-  return in;
-}}
+}
 
-template<typename F>
-void exec_call(F& f){
+template <typename F> void exec_call(F& f) {
   try {
-    Connection c { "localhost" };
-    TransactionSingleOp op = { c };
+    Connection c{"localhost"};
+    TransactionSingleOp op = {c};
     f(op);
   } catch (std::runtime_error& e) {
     cout << "std::runtime_error: " << e.what() << endl;
@@ -60,15 +60,13 @@ void exec_call(F& f){
   }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   // Declare the supported options.
   po::options_description desc("Allowed options");
-  desc.add_options()
-    ("help", "produce help message")
-    ("read", po::value<std::string>(), "read key")
-    ("write", po::value<pair<string, string>>(), "write key,value")
-    ("bench", "bench")
-    ;
+  desc.add_options()("help", "produce help message")(
+      "read", po::value<std::string>(),
+      "read key")("write", po::value<pair<string, string>>(),
+                  "write key,value")("bench", "bench");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -86,42 +84,59 @@ int main(int argc, char **argv) {
           cout << value << endl;
         };
         exec_call(p);
-      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
+      } catch (const boost::exception_detail::clone_impl<
+               boost::exception_detail::error_info_injector<
+                   boost::bad_any_cast>>& e) {
         cout << "could not convert read parameter to a string" << endl;
         exit(EXIT_FAILURE);
       }
     } else if (vm.count("write")) {
       try {
-        pair<string,string> kv = vm["write"].as<pair<string,string>>();
+        pair<string, string> kv = vm["write"].as<pair<string, string>>();
         string key = get<0>(kv);
         string value = get<1>(kv);
-        auto p = [key,value](TransactionSingleOp& op) {
-          op.write(key,value);
+        auto p = [key, value](TransactionSingleOp& op) {
+          op.write(key, value);
         };
         exec_call(p);
-      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
-        cout << "could not convert write parameter to a pair of strings" << endl;
+      } catch (const boost::exception_detail::clone_impl<
+               boost::exception_detail::error_info_injector<
+                   boost::bad_any_cast>>& e) {
+        cout << "could not convert write parameter to a pair of strings"
+             << endl;
         exit(EXIT_FAILURE);
       }
     } else if (vm.count("bench")) {
       try {
         string key = "bench-key";
         string value = "bench-value";
+        vector<double> latencies;
+        latencies.resize(N);
         auto start = std::chrono::high_resolution_clock::now();
-        for(int i = 0; i < N; i++) {
-          auto p = [key,value](TransactionSingleOp& op) {
-            op.write(key,value);
-          };
-          exec_call(p);
+        for (int i = 0; i < N; i++) {
+          auto start = std::chrono::high_resolution_clock::now();
+          {
+            auto p = [key, value](TransactionSingleOp& op) {
+              op.write(key, value);
+            };
+            exec_call(p);
+          }
+          auto stop = std::chrono::high_resolution_clock::now();
+          const std::chrono::duration<double> diff = stop - start;
+          const double duration = diff.count();
+          latencies[i] = duration;
         }
-        auto stop = std::chrono::high_resolution_clock::now();
-        const std::chrono::duration<double> diff = stop - start;
-        const double duration = diff.count();
-        const double latency = duration / N * 1000;
-        printf("executed %d key-value pairs updates using the transaction mechanism\n", N);
-        printf("duration=%es, latency=%fms\n", duration, latency);
-      } catch(const boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_any_cast> >& e) {
-        cout << "could not convert write parameter to a pair of strings" << endl;
+        sort(latencies.begin(), latencies.end());
+        const double latency = latencies[N / 2] * 1000;
+        printf("executed %d key-value pairs updates using the transaction "
+               "mechanism\n",
+               N);
+        printf("median latency=%fms\n", latency);
+      } catch (const boost::exception_detail::clone_impl<
+               boost::exception_detail::error_info_injector<
+                   boost::bad_any_cast>>& e) {
+        cout << "could not convert write parameter to a pair of strings"
+             << endl;
         exit(EXIT_FAILURE);
       }
     } else {
