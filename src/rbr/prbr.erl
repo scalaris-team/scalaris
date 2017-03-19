@@ -268,42 +268,46 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                     %% high replication factor with a high number of concurrent requests).
                     [OrigLearner, Proposer]
               end,
-    _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter, ProposerUID) of
-            {ok, NewKeyEntry, NextWriteRound} ->
+    _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter) of
+            true ->
                 {NewVal, Ret} =
                     case erlang:function_exported(DataType, prbr_write_handler, 5) of
-                        true -> DataType:prbr_write_handler(NewKeyEntry,
-                                     PassedToUpdate, Value, TableName, WriteFilter);
-                        _    -> WriteFilter(entry_val(NewKeyEntry),
-                                     PassedToUpdate, Value)
+                        true ->
+                            DataType:prbr_write_handler(KeyEntry, PassedToUpdate,
+                                                        Value, TableName, WriteFilter);
+                        _    ->
+                            WriteFilter(entry_val(KeyEntry), PassedToUpdate, Value)
                     end,
 
+                TWriteRound = pr:new(pr:get_r(InRound), ProposerUID),
                 %% store information to be able to reproduce the request in
                 %% write_throughs. We modify the InRound here to avoid duplicate
                 %% transfer of the Value etc.
-                NewWriteRound = entry_r_write(NewKeyEntry),
-                NewWriteRound2 = pr:set_wf(NewWriteRound, {Ret, Learner}),
-                NewKeyEntry2 = entry_set_r_write(NewKeyEntry, NewWriteRound2),
+                NewWriteRound = pr:set_wf(TWriteRound, {Ret, Learner}),
+                TEntry = entry_set_r_write(KeyEntry, NewWriteRound),
+
+                %% prepare for fast write 
+                NextWriteRound = next_read_round(TEntry, ProposerUID),
+                NewEntry = entry_set_r_read(TEntry, NextWriteRound),
 
                 trace_mpath:log_info(self(), {'prbr:on(write)',
-                                  %% key, Key,
-                                  round, NewWriteRound2,
-                                  passed_to_update, PassedToUpdate,
-                                  val, Value,
-                                  write_filter, WriteFilter,
-                                  newval, NewVal}),
-                [ msg_write_reply(P, Cons, Key, NewWriteRound2,
+                                              round, NewWriteRound,
+                                              passed_to_update, PassedToUpdate,
+                                              val, Value,
+                                              write_filter, WriteFilter,
+                                              newval, NewVal}),
+                [msg_write_reply(P, Cons, Key, NewWriteRound,
                                   NextWriteRound, Ret)
-                  || P <- Learner],
+                 || P <- Learner],
 
-                set_entry(entry_set_val(NewKeyEntry2, NewVal), TableName);
-            {dropped, RepairRequired, WriteRoundTried} ->
+                set_entry(entry_set_val(NewEntry, NewVal), TableName);
+            {false, Reason} ->
+                RoundTried = pr:new(pr:get_r(InRound), ProposerUID),
                 trace_mpath:log_info(self(), {'prbr:on(write) denied',
-                                  %% key, Key,
-                                  round, WriteRoundTried}),
+                                              round, RoundTried}),
 
-                case RepairRequired of
-                    true ->
+                case Reason of
+                    repair_required ->
                         %% Start repair on write
                         ?TRACE("Initiating on-write repair for entry~n~p", [KeyEntry]),
                         comm:send_local_after(?REPAIR_DELAY, self(),
@@ -321,7 +325,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 %% The round the client used to write is send back, because the client
                 %% must distinguish between denies from its own request and possible
                 %% write through attempts based on its partially completed write.
-                [msg_write_deny(P, Cons, Key, WriteRoundTried) || P <- Learner]
+                [msg_write_deny(P, Cons, Key, RoundTried) || P <- Learner]
         end,
     TableName;
 
@@ -451,10 +455,9 @@ next_read_round(Entry, ProposerUID) ->
 
 
 
--spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter(), any()) ->
-          {ok, entry(),NextWriteRound :: pr:pr()} |
-          {dropped, boolean(), WriteRoundTried :: pr:pr()}.
-writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
+-spec writable(entry(), pr:pr(), pr:pr(), prbr:write_filter()) ->
+          true | {false, repair_required | denied}.
+writable(Entry, InRound, OldWriteRound, WF) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
     InRoundR = pr:get_r(InRound),
@@ -477,14 +480,7 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
        andalso (InRoundR > LatestSeenWriteR)
        andalso GaplessWriteSequence ->
 
-           NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
-           T1Entry = entry_set_r_write(Entry, NewInRound),
-           %% prepare fast_paxos for this client:
-           NextWriteRound = next_read_round(T1Entry, ProposerUID),
-           %% assume this token was seen in a read already, so no one else
-           %% can interfere without paxos noticing it
-           T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
-           {ok, T2Entry, NextWriteRound};
+            true;
        true ->
             %% If this replica is empty due to node failure, and
             %% therefore lags behind other replicas, a repair process
@@ -494,15 +490,12 @@ writable(Entry, InRound, OldWriteRound, WF, ProposerUID) ->
                                 andalso ?REDUNDANCY =:= replication
                                 andalso not GaplessWriteSequence
                                 andalso LatestSeenWriteR =:= 0,
+            Reason = case RepairRequired of
+                        true -> repair_required;
+                        false -> denied
+                     end,
 
-            %% proposer may not have latest value for a clean content
-            %% check, and another proposer is concurrently active, so
-            %% we do not prepare a fast_paxos for this client, but let
-            %% the other proposer the chance to pass read and write
-            %% phase.  The denied proposer has to perform a read and write
-            %% phase on its own (including a new content check).
-            NewInRound = pr:new(pr:get_r(InRound), ProposerUID),
-            {dropped, RepairRequired, NewInRound}
+            {false, Reason}
     end.
 
 -spec is_partial_write(prbr:write_filter()) -> boolean().
