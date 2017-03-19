@@ -254,11 +254,12 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
     %% When this is part of a write through keep the old proposer,
     %% so that the original proposer of the write gets notified of
     %% write progress as well.
-    Learner = case IsWriteThrough of
+    {LearnerToNotify, LearnerForWTI} =
+            case IsWriteThrough of
                 false ->
-                    [Proposer];
+                    {[Proposer], Proposer};
                 true ->
-                    {_, [OrigLearner | _WTLearner]=_Learners} = pr:get_wf(InRound),
+                    {_, OrigLearner} = pr:get_wf(InRound),
                     %% The follow-up behaviour of a WT does not change if it is
                     %% successful or denied. In both cases the original request
                     %% is retried. Therefore we do need to keep old WT learner around
@@ -266,7 +267,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                     %% a long list of WT-Learner caused by write throughs followed by
                     %% write throughs due to duelling requests (which is likely for a
                     %% high replication factor with a high number of concurrent requests).
-                    [OrigLearner, Proposer]
+                    {[OrigLearner, Proposer], OrigLearner}
               end,
     _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter) of
             true ->
@@ -283,7 +284,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 %% store information to be able to reproduce the request in
                 %% write_throughs. We modify the InRound here to avoid duplicate
                 %% transfer of the Value etc.
-                NewWriteRound = pr:set_wf(TWriteRound, {Ret, Learner}),
+                NewWriteRound = pr:set_wf(TWriteRound, {Ret, LearnerForWTI}),
                 TEntry = entry_set_r_write(KeyEntry, NewWriteRound),
 
                 %% prepare for fast write 
@@ -298,7 +299,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                                               newval, NewVal}),
                 [msg_write_reply(P, Cons, Key, NewWriteRound,
                                   NextWriteRound, Ret)
-                 || P <- Learner],
+                 || P <- LearnerToNotify],
 
                 set_entry(entry_set_val(NewEntry, NewVal), TableName);
             {false, Reason} ->
@@ -325,7 +326,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 %% The round the client used to write is send back, because the client
                 %% must distinguish between denies from its own request and possible
                 %% write through attempts based on its partially completed write.
-                [msg_write_deny(P, Cons, Key, RoundTried) || P <- Learner]
+                [msg_write_deny(P, Cons, Key, RoundTried) || P <- LearnerToNotify]
         end,
     TableName;
 
