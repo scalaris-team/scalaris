@@ -260,7 +260,7 @@ prbr_values() ->
 %%      Removes write_through infos
 prbr_w_rounds_with_values() ->
     [
-     [{pr:set_wf(element(3, E), none), prbr:entry_val(E)} || E <- Replica]
+     [{pr:set_wti(element(3, E), none), prbr:entry_val(E)} || E <- Replica]
     || Replica <- prbr_data()].
 
 %% @doc Flush all slow messages of a link

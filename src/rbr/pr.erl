@@ -27,7 +27,7 @@
 -export([new/2]).
 -export([get_r/1]).
 -export([get_id/1]).
--export([get_wf/1, set_wf/2]).
+-export([get_wti/1, set_wti/2]).
 %% let users retrieve their smallest possible round for fast_write on
 %% entry creation.
 -export([smallest_round/1]).
@@ -69,11 +69,11 @@ get_r(RwId) -> element(1, RwId).
 -spec get_id(pr()) -> any().
 get_id(RwId) -> element(2, RwId).
 
--spec get_wf(pr()) -> none | write_through_info().
-get_wf(RwId) -> element(3, RwId).
+-spec get_wti(pr()) -> none | write_through_info().
+get_wti(RwId) -> element(3, RwId).
 
--spec set_wf(pr(), none | write_through_info()) -> pr().
-set_wf(R, WF) -> setelement(3, R, WF).
+-spec set_wti(pr(), none | write_through_info()) -> pr().
+set_wti(R, WTI) -> setelement(3, R, WTI).
 
 %% As the round number contains the client's pid, they are still
 %% unique.  Two clients using their smallest_round for a fast write

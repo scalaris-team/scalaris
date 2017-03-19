@@ -259,7 +259,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 false ->
                     {[Proposer], Proposer};
                 true ->
-                    {_, OrigLearner} = pr:get_wf(InRound),
+                    {_, OrigLearner} = pr:get_wti(InRound),
                     %% The follow-up behaviour of a WT does not change if it is
                     %% successful or denied. In both cases the original request
                     %% is retried. Therefore we do need to keep old WT learner around
@@ -284,7 +284,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 %% store information to be able to reproduce the request in
                 %% write_throughs. We modify the InRound here to avoid duplicate
                 %% transfer of the Value etc.
-                NewWriteRound = pr:set_wf(TWriteRound, {Ret, LearnerForWTI}),
+                NewWriteRound = pr:set_wti(TWriteRound, {Ret, LearnerForWTI}),
                 TEntry = entry_set_r_write(KeyEntry, NewWriteRound),
 
                 %% prepare for fast write 

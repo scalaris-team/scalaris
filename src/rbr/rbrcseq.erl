@@ -574,7 +574,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% fine here
             ReadReplies = entry_replies(ReadEntry),
             ReadVal = ReadReplies#r_replies.read_value,
-            PreviousWTI = pr:get_wf(ReadReplies#r_replies.highest_write_round),
+            PreviousWTI = pr:get_wti(ReadReplies#r_replies.highest_write_round),
             {WTWF, WTUI, WTVal} = %% WT.. means WriteThrough here
                 case PreviousWTI of
                     none ->
@@ -585,7 +585,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                                [WTI]),
                         WTI
                  end,
-            WriteRound = pr:set_wf(entry_my_round(ReadEntry), PreviousWTI),
+            WriteRound = pr:set_wti(entry_my_round(ReadEntry), PreviousWTI),
 
             Filters = {fun prbr:noop_read_filter/1,
                        fun(_,_,_) -> {true, WTUI} end,
@@ -1230,8 +1230,8 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     %% extract write through info for round comparisons since
     %% they can be key-dependent if something different than
     %% replication is used for redundancy
-    PrevMaxWriteRNoWTInfo = pr:set_wf(PrevMaxWriteR, none),
-    SeenWriteRoundNoWTInfo = pr:set_wf(SeenWriteRound, none),
+    PrevMaxWriteRNoWTInfo = pr:set_wti(PrevMaxWriteR, none),
+    SeenWriteRoundNoWTInfo = pr:set_wti(SeenWriteRound, none),
     PrevReadValue = Replies#r_replies.read_value,
     R1 =
         if SeenWriteRoundNoWTInfo > PrevMaxWriteRNoWTInfo ->
