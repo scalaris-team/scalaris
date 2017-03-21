@@ -1148,27 +1148,16 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                 R1
         end,
 
-    %% update number of newest write rounds received
-    PrevMaxWriteR = Replies#rr_replies.highest_write_round,
-    PrevReadValue = R2#rr_replies.read_value,
-    R3 =
-        if PrevMaxWriteR =:= SeenWriteRound ->
-                MaxWCount = R2#rr_replies.highest_write_count + 1,
-                NewVal = ?REDUNDANCY:collect_read_value(PrevReadValue,
-                                                        Value, Datatype),
-                R2#rr_replies{highest_write_count=MaxWCount,
-                              read_value=NewVal};
-           PrevMaxWriteR < SeenWriteRound ->
-                NewVal = ?REDUNDANCY:collect_newer_read_value(PrevReadValue,
-                                                              Value, Datatype),
-                R2#rr_replies{highest_write_count=1,
-                             highest_write_round=SeenWriteRound,
-                             read_value=NewVal};
-           true ->
-                NewVal = ?REDUNDANCY:collect_older_read_value(PrevReadValue,
-                                                              Value, Datatype),
-                R2#rr_replies{read_value=NewVal}
-        end,
+    %% update write rounds and value
+    {NewHighestWriteRound, NewHighestWriteCount, NewValue} =
+        update_highest_write_round(Replies#rr_replies.highest_write_round,
+                                   Replies#rr_replies.highest_write_count,
+                                   Replies#rr_replies.read_value,
+                                   SeenWriteRound, Value, Datatype),
+    R3 = R2#rr_replies{highest_write_round=NewHighestWriteRound,
+                       highest_write_count=NewHighestWriteCount,
+                       read_value=NewValue},
+
     ReadFilter =
         case Filters of
             {RF, _, _}   -> RF;
@@ -1226,34 +1215,17 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     %% Otherwise we decide on a consistent quorum (a majority agrees
     %% on the same version). We ensure this by write_through on odd
     %% cases.
-    PrevMaxWriteR = Replies#r_replies.highest_write_round,
-    %% extract write through info for round comparisons since
-    %% they can be key-dependent if something different than
-    %% replication is used for redundancy
-    PrevMaxWriteRNoWTInfo = pr:set_wti(PrevMaxWriteR, none),
-    SeenWriteRoundNoWTInfo = pr:set_wti(SeenWriteRound, none),
-    PrevReadValue = Replies#r_replies.read_value,
-    R1 =
-        if SeenWriteRoundNoWTInfo > PrevMaxWriteRNoWTInfo ->
-                NewVal = ?REDUNDANCY:collect_newer_read_value(PrevReadValue,
-                                                              Val, Datatype),
-                Replies#r_replies{highest_write_count=1,
-                                  highest_write_round=SeenWriteRound,
-                                  read_value=NewVal};
-           SeenWriteRoundNoWTInfo =:= PrevMaxWriteRNoWTInfo ->
-                NewHighestWriteCount = Replies#r_replies.highest_write_count + 1,
-                NewVal = ?REDUNDANCY:collect_read_value(PrevReadValue,
-                                                        Val, Datatype),
-                Replies#r_replies{highest_write_count=NewHighestWriteCount,
-                                  read_value=NewVal};
-           true ->
-               NewVal = ?REDUNDANCY:collect_older_read_value(PrevReadValue,
-                                                             Val, Datatype),
-               Replies#r_replies{read_value=NewVal}
-    end,
+    NewAckCount = Replies#r_replies.ack_count + 1,
+    R1 = Replies#r_replies{ack_count=NewAckCount},
 
-    NewAckCount = R1#r_replies.ack_count + 1,
-    R2 = R1#r_replies{ack_count=NewAckCount},
+    {NewHighestWriteRound, NewHighestWriteCount, NewVal} =
+        update_highest_write_round(R1#r_replies.highest_write_round,
+                                   R1#r_replies.highest_write_count,
+                                   R1#r_replies.read_value,
+                                   SeenWriteRound, Val, Datatype),
+    R2 = R1#r_replies{highest_write_round=NewHighestWriteRound,
+                      highest_write_count=NewHighestWriteCount,
+                      read_value=NewVal},
 
     ReadFilter =
         case Filters of
@@ -1284,6 +1256,27 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
 
     NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
+
+-spec update_highest_write_round(pr:pr(), non_neg_integer(), any(), pr:pr(), any(), module()) ->
+          {pr:pr(), non_neg_integer(), any()}.
+update_highest_write_round(CurrentHighestRound, HighestWriteCount, CurrentValue,
+                            SeenRound, SeenValue, Datatype) ->
+    %% extract write through info for round comparisons since
+    %% they can be key-dependent if something different than
+    %% replication is used for redundancy
+    CurrentRoundNoWTI = pr:set_wti(CurrentHighestRound, none),
+    SeenRoundNoWTI = pr:set_wti(SeenRound, none),
+
+    if CurrentRoundNoWTI =:= SeenRoundNoWTI ->
+           {CurrentHighestRound, HighestWriteCount + 1,
+            ?REDUNDANCY:collect_read_value(CurrentValue, SeenValue, Datatype)};
+       CurrentRoundNoWTI < SeenRoundNoWTI ->
+           {SeenRound, 1,
+            ?REDUNDANCY:collect_newer_read_value(CurrentValue, SeenValue, Datatype)};
+       true ->
+           {CurrentHighestRound, HighestWriteCount,
+            ?REDUNDANCY:collect_older_read_value(CurrentValue, SeenValue, Datatype)}
+    end.
 
 -spec add_read_deny(#r_replies{}, dht_node_state:db_selector(), pr:pr(), pr:pr(), boolean())
                     -> {retry | false, #r_replies{}, pr:pr()}.
