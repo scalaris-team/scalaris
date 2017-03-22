@@ -88,6 +88,7 @@ init_per_group(Group, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
     unittest_helper:make_ring(RingSize, [{config, [{log_path, PrivDir},
                                                       {leases, true},
+                                                      {leases_delta, 1},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
     LeasesTimeout = config:read(leases_delta) * 1000 + 1000,
