@@ -1,0 +1,6 @@
+BasedOnStyle: LLVM
+IndentWidth: 2
+AccessModifierOffset: -2
+PointerAlignment: Left
+SortIncludes: true
+NamespaceIndentation: All
