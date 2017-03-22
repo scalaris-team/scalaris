@@ -53,4 +53,4 @@ clean:
 .PHONY: clean test libscalaris beautify
 
 beautify:
-        @CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
+	@CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
