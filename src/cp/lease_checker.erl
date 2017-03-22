@@ -125,7 +125,7 @@ lease_checker(TargetSize) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%@doc returns a random node, which covers 0.25 or less of the key-space
+%@doc returns a random node which covers a minority of the key-space
 -spec get_random_save_node() -> comm:mypid().
 get_random_save_node() ->
     R = config:read(replication_factor),
