@@ -27,6 +27,7 @@
 -compile(export_all).
 
 -define(CLOSE, close).
+-define(LEASES_DELTA, 1).
 
 num_executions() ->
     5.
@@ -88,7 +89,7 @@ init_per_group(Group, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
     unittest_helper:make_ring(RingSize, [{config, [{log_path, PrivDir},
                                                       {leases, true},
-                                                      {leases_delta, 1},
+                                                      {leases_delta, ?LEASES_DELTA},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
     LeasesTimeout = config:read(leases_delta) * 1000 + 1000,
@@ -140,6 +141,7 @@ test_make_ring(Config) ->
     wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
                                                  {leases, true},
+                                                 {leases_delta, ?LEASES_DELTA},
                                                  {db_backend, db_mnesia},
                                                  {start_type, recover}]}]),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
@@ -165,6 +167,7 @@ read(Config) ->
     wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
                                                   {leases, true},
+                                                  {leases_delta, ?LEASES_DELTA},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
