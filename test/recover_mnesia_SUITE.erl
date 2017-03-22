@@ -1,4 +1,4 @@
-%% @copyright 2015, 2016 Zuse Institute Berlin
+%% @copyright 2015-2017 Zuse Institute Berlin
 
 %%   Licensed under the Apache License, Version 2.0 (the "License");
 %%   you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ num_executions() ->
     5.
 
 repeater_num_executions() ->
-    10.
+    1000.
 
 ring_size() ->
     config:read(replication_factor).
@@ -48,14 +48,10 @@ groups() ->
      {remove_node_group, [sequence], [write, {group, remove_node}]},
      {remove_node, [sequence, {repeat, num_executions()}], [remove_node]},
 
-     {make_ring_group_repeater, [sequence], [test_make_ring, write,
-                                             {group, recover_data_group_repeater}]},
-     {recover_data_group_repeater, [sequence, {repeat, repeater_num_executions()}], [read]},
      {remove_node_group_repeater, [sequence], [write, {group, remove_node_repeater}]},
      {remove_node_repeater, [sequence, {repeat, repeater_num_executions()}], [remove_node]},
 
-     {repeater, [{repeat, 10}], [{group, make_ring_group_repeater},
-                                 {group, remove_node_group_repeater}]}
+     {repeater, [{group, remove_node_group_repeater}]}
 
     ].
 
