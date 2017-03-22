@@ -127,13 +127,22 @@ lease_checker(TargetSize) ->
 get_random_save_node() ->
     R = config:read(replication_factor),
     SaveFraction = quorum:minority(R) / R,
-    SaveNodes = [Node || Node <- all_dht_nodes(),
-                         {true, LL} <- [get_dht_node_state(Node, lease_list)],
-                         lease_list:get_active_lease(LL) =/= empty andalso
-                         get_relative_range(
-                           l_on_cseq:get_range(
-                             lease_list:get_active_lease(LL))) =< SaveFraction],
-    util:randomelem(SaveNodes).
+    LeaseNodes = [{ActiveLease, Node} || Node <- all_dht_nodes(),
+                                         {true, LL} <- [get_dht_node_state(Node, lease_list)],
+                                         ActiveLease <- [lease_list:get_active_lease(LL)],
+                                            ActiveLease =/= empty],
+
+    SaveNodes = [{Range, Node} || {Lease, Node} <- LeaseNodes,
+                                   Range <- [get_relative_range(l_on_cseq:get_range(Lease))],
+                                    Range =< SaveFraction],
+
+    Rand = rand:uniform(),
+    ReturnNode = if Rand < 0.5 ->
+                        _UnsafestSafeNode = lists:max(SaveNodes);
+                    true ->
+                        _RandomSafeNode = util:randomelem(SaveNodes)
+                 end,
+    element(2, ReturnNode).
 
 -spec is_disjoint([intervals:interval()]) -> boolean().
 is_disjoint([]) ->
