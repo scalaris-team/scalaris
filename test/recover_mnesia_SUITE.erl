@@ -39,7 +39,7 @@ ring_size() ->
     config:read(replication_factor).
 
 all() -> [
-        %  {group, make_ring_group},
+          {group, make_ring_group},
           {group, remove_node_group}
          ].
 groups() ->
