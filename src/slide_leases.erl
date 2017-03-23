@@ -1,4 +1,4 @@
-%% @copyright 2010-2014, 2016 Zuse Institute Berlin
+%% @copyright 2010-2016 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -36,9 +36,6 @@
          finish_delta1/3, finish_delta2/3,
          finish_delta_ack1/3, finish_delta_ack2/4,
          abort_slide/4]).
-
-% for tester
--export([tester_create_dht_node_state/0]).
 
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
@@ -266,9 +263,3 @@ find_lease(State, SlideOp, Mode) ->
                     error
             end
     end.
-
-% @doc create dht_node state for tester
--spec tester_create_dht_node_state() -> dht_node_state:state().
-tester_create_dht_node_state() ->
-    DHTNode = pid_groups:find_a(dht_node),
-    gen_component:get_state(DHTNode).
