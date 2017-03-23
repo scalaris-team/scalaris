@@ -129,6 +129,11 @@ init_per_testcase(_TestCase = remove_node, Config) ->
 init_per_testcase(_TestCase, Config) ->
     Config.
 
+remove_node() ->
+     [
+      {timetrap,{seconds,180}}
+     ].
+
 rw_suite_runs(N) ->
     erlang:min(N, 200).
 
