@@ -50,7 +50,10 @@ clean:
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST:.o=.d)
 
-.PHONY: clean test libscalaris beautify
+.PHONY: all cpp-test clean tests beautify tidy
 
 beautify:
 	@CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
+
+tidy:
+	@CLANGTIDY@ src/cli.cpp $(filter-out src/jsoncpp.cpp, $(SRC_CPP)) $(TEST_SRC_CPP) -- $(CXXFLAGS)

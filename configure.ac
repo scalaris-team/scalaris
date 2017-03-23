@@ -72,12 +72,14 @@ elif test -f /bin/bash; then
   CXXSHELL=/bin/bash
 fi
 
-AC_PATH_PROG(CLANGFORMAT, clang-format, $TRUE)
+AC_PATH_PROG(CLANGFORMAT, clang-format, $ac_cv_path_TRUE)
+AC_PATH_PROG(CLANGTIDY, clang-tidy, $ac_cv_path_TRUE)
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
 AC_SUBST(CXXSHELL)
 AC_SUBST(CLANGFORMAT)
+AC_SUBST(CLANGTIDY)
 
 ###########################################################
 #
