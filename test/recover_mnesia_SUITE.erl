@@ -39,7 +39,7 @@ ring_size() ->
     config:read(replication_factor).
 
 all() -> [
-          {group, make_ring_group},
+        %  {group, make_ring_group},
           {group, remove_node_group}
          ].
 groups() ->
@@ -193,12 +193,16 @@ remove_node(Config) ->
             io:format("show prbr statistics for node to be killed~n"),
             lease_checker2:get_kv_db(RandomNode),
 
+            ct:pal("PRBR state before node is removed"),
+            print_prbr_data(),
+
             %% get relative range of node to remove and check if it is not to large
             {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
             NodeRange = l_on_cseq:get_range(lease_list:get_active_lease(LL)),
             RelativeRange = lease_checker:get_relative_range_unittest(NodeRange),
-            ct:pal("Interval of node to be removed:~nNode Interval ~p~n"
-                   "Relative Range ~p", [NodeRange, RelativeRange]),
+            ct:pal("Statistics of removed node ~p~n"
+                   "Interval of node to be removed:~nNode Interval ~p~n"
+                   "Relative Range ~p", [RandomNode, NodeRange, RelativeRange]),
 
             R = config:read(replication_factor),
             SaveFraction = quorum:minority(R) / R,
@@ -209,9 +213,9 @@ remove_node(Config) ->
             %% prbr data of node for diagnostic purpose...
             comm:send_local(RandomNode, {prbr, tab2list_raw, kv_db, self()}),
             receive
-                {_, PrbrData} -> PrbrData
+                {_, NodeData} -> NodeData
             end,
-            Values = [prbr:entry_val(E) || E <- PrbrData],
+            Values = [prbr:entry_val(E) || E <- NodeData],
             ct:pal("Number of values: ~p~nNumber of unique values: ~p~nValue list:~p",
                    [length(Values), length(lists:usort(Values)), lists:sort(Values)]),
 
@@ -227,12 +231,20 @@ remove_node(Config) ->
             _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
             ct:pal("wait for check_leases"),
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
+
+            ct:pal("PRBR state after leases expired"),
+            print_prbr_data(),
+
             %% check data integrity
             ct:pal("check data integrity"),
             _ = check_data_integrity(),
             %% "repair" replicas
             ct:pal("repair replicas"),
             _ = repair_replicas(),
+
+            ct:pal("PRBR state after calling repair_replicas"),
+            print_prbr_data(),
+
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
             _ = admin:add_nodes(1),
@@ -242,6 +254,10 @@ remove_node(Config) ->
             unittest_helper:check_ring_size_fully_joined(ring_size()),
             ct:pal("wait for check_leases"),
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
+
+            ct:pal("PRBR state after node was inserted"),
+            print_prbr_data(),
+
             true
     end.
 
@@ -260,6 +276,8 @@ check_data_integrity() ->
             true;
         X ->
             ct:pal("found ~p of 100 elements", [X]),
+            Missing = lists:subtract(lists:seq(1, 100), Elements),
+            ct:pal("Missing elements are:~n~p", [Missing]),
             100 = X
     end.
 
@@ -278,3 +296,24 @@ repair_replicas() ->
 wait_for_expired_leases(Config) ->
     {leases_timeout, LeasesTimeout} = lists:keyfind(leases_timeout, 1, Config),
     timer:sleep(LeasesTimeout).
+
+%%@doc Prints a list of tuples showing which value is stored in which dht node
+%%     Format : [{Value, [list_of_dht_nodes_value_is_stored_in]}]
+print_prbr_data() ->
+    DhtNodes = lists:sort(pid_groups:find_all(dht_node)),
+    %% get list of all {value, dht_node_idx} pairs
+    PrbrData = lists:flatten(
+                   [begin
+                       comm:send_local(ThisNode, {prbr, tab2list_raw, kv_db, self()}),
+                       receive
+                           {_, List} -> [{prbr:entry_val(E), ThisNode} || E <- List]
+                       after 1000 ->
+                           ct:pal("DHT node ~p does not reply...", [ThisNode]),
+                           []
+                       end
+                   end || ThisNode <- DhtNodes]),
+    GroupedByValueDict = lists:foldl(fun({K, V}, D) -> dict:append(K, V, D) end,
+                                             dict:new(), PrbrData),
+    GroupedValues = lists:sort(dict:to_list(GroupedByValueDict)),
+    ct:pal("PRBR state:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
+           "~100p", [GroupedValues]).
