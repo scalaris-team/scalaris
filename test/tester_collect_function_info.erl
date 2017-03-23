@@ -1,4 +1,4 @@
-%  @copyright 2010-2016 Zuse Institute Berlin
+%  @copyright 2010-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -294,6 +294,8 @@ parse_type({atom, _Line, Atom}, _Module, ParseState) ->
     {{atom, Atom}, ParseState};
 parse_type({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
     {{integer, -Value}, ParseState};
+parse_type({op, _Line1,'-',FirstType, {integer,_Line2,Value}}, Module, ParseState) ->
+    {{diff_type, parse_type(FirstType, Module, ParseState), Value}, ParseState};
 parse_type({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
 parse_type({type, _Line, array, []}, _Module, ParseState) ->
