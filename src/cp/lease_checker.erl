@@ -1,4 +1,4 @@
-% @copyright 2012-2014 Zuse Institute Berlin,
+% @copyright 2012-2017 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ lease_checker(TargetSize) ->
 
 
 %@doc returns a random node which covers a minority of the key-space
--spec get_random_save_node() -> comm:mypid().
+-spec get_random_save_node() -> comm:mypid() | failed.
 get_random_save_node() ->
     R = config:read(replication_factor),
     SaveFraction = quorum:minority(R) / R,
@@ -139,13 +139,18 @@ get_random_save_node() ->
                                    Range <- [get_relative_range(l_on_cseq:get_range(Lease))],
                                     Range =< SaveFraction],
 
-    Rand = rand:uniform(),
-    ReturnNode = if Rand < 0.5 ->
-                        _UnsafestSafeNode = lists:max(SaveNodes);
-                    true ->
-                        _RandomSafeNode = util:randomelem(SaveNodes)
-                 end,
-    element(2, ReturnNode).
+    case SaveNodes of
+        [] ->
+            failed;
+        _ ->
+            Rand = randoms:uniform(),
+            ReturnNode = if Rand < 0.5 ->
+                                 _UnsafestSafeNode = lists:max(SaveNodes);
+                            true ->
+                                 _RandomSafeNode = util:randomelem(SaveNodes)
+                         end,
+            element(2, ReturnNode)
+    end.
 
 -spec is_disjoint([intervals:interval()]) -> boolean().
 is_disjoint([]) ->

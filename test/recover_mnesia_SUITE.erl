@@ -181,64 +181,69 @@ read(Config) ->
 remove_node(Config) ->
     ct:pal("wait for check_leases"),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
-    RandomNode = comm:make_local(lease_checker:get_random_save_node()),
-    io:format("show prbr statistics for the ring~n"),
-    lease_checker2:get_kv_db(),
+    SaveNode = lease_checker:get_random_save_node(),
+    case SaveNode of
+        failed ->
+            true;
+        _ ->
+            RandomNode = comm:make_local(SaveNode),
+            io:format("show prbr statistics for the ring~n"),
+            lease_checker2:get_kv_db(),
 
-    io:format("show prbr statistics for node to be killed~n"),
-    lease_checker2:get_kv_db(RandomNode),
+            io:format("show prbr statistics for node to be killed~n"),
+            lease_checker2:get_kv_db(RandomNode),
 
-    %% get relative range of node to remove and check if it is not to large
-    {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
-    NodeRange = l_on_cseq:get_range(lease_list:get_active_lease(LL)),
-    RelativeRange = lease_checker:get_relative_range_unittest(NodeRange),
-    ct:pal("Interval of node to be removed:~nNode Interval ~p~n"
-           "Relative Range ~p", [NodeRange, RelativeRange]),
+            %% get relative range of node to remove and check if it is not to large
+            {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
+            NodeRange = l_on_cseq:get_range(lease_list:get_active_lease(LL)),
+            RelativeRange = lease_checker:get_relative_range_unittest(NodeRange),
+            ct:pal("Interval of node to be removed:~nNode Interval ~p~n"
+                   "Relative Range ~p", [NodeRange, RelativeRange]),
 
-    R = config:read(replication_factor),
-    SaveFraction = quorum:minority(R) / R,
-    ct:pal("Safe relative range to remove ~p", [SaveFraction]),
-    ?assert_w_note(RelativeRange =< SaveFraction, "Removing a safe node means that only"
-                                                  " one replica should be affected"),
+            R = config:read(replication_factor),
+            SaveFraction = quorum:minority(R) / R,
+            ct:pal("Safe relative range to remove ~p", [SaveFraction]),
+            ?assert_w_note(RelativeRange =< SaveFraction, "Removing a safe node means that only"
+                           " one replica should be affected"),
 
-    %% prbr data of node for diagnostic purpose...
-    comm:send_local(RandomNode, {prbr, tab2list_raw, kv_db, self()}),
-    receive
-        {_, PrbrData} -> PrbrData
-    end,
-    Values = [prbr:entry_val(E) || E <- PrbrData],
-    ct:pal("Number of values: ~p~nNumber of unique values: ~p~nValue list:~p",
-           [length(Values), length(lists:usort(Values)), lists:sort(Values)]),
+            %% prbr data of node for diagnostic purpose...
+            comm:send_local(RandomNode, {prbr, tab2list_raw, kv_db, self()}),
+            receive
+                {_, PrbrData} -> PrbrData
+            end,
+            Values = [prbr:entry_val(E) || E <- PrbrData],
+            ct:pal("Number of values: ~p~nNumber of unique values: ~p~nValue list:~p",
+                   [length(Values), length(lists:usort(Values)), lists:sort(Values)]),
 
-
-    %% The tests starts here...
-    PidGroup = pid_groups:group_of(RandomNode),
-    PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
-                             element(2, db_util:parse_table_name(Table)) =:= PidGroup],
-    ct:pal("kill node"),
-    {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
-    %% wait for leases to expire
-    ct:pal("wait for leases to expire"),
-    wait_for_expired_leases(Config),
-    _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
-    ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
-    %% check data integrity
-    ct:pal("check data integrity"),
-    _ = check_data_integrity(),
-    %% "repair" replicas
-    ct:pal("repair replicas"),
-    _ = repair_replicas(),
-    %% add node to reform ring_size() node ring
-    ct:pal("add node"),
-    _ = admin:add_nodes(1),
-    ct:pal("sleep"),
-    timer:sleep(3000),
-    ct:pal("check_ring_size_fully_joined"),
-    unittest_helper:check_ring_size_fully_joined(ring_size()),
-    ct:pal("wait for check_leases"),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
-    true.
+            %% The tests starts here...
+            PidGroup = pid_groups:group_of(RandomNode),
+            PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
+                                     element(2, db_util:parse_table_name(Table)) =:= PidGroup],
+            ct:pal("kill node"),
+            {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
+            %% wait for leases to expire
+            ct:pal("wait for leases to expire"),
+            wait_for_expired_leases(Config),
+            _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
+            ct:pal("wait for check_leases"),
+            lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
+            %% check data integrity
+            ct:pal("check data integrity"),
+            _ = check_data_integrity(),
+            %% "repair" replicas
+            ct:pal("repair replicas"),
+            _ = repair_replicas(),
+            %% add node to reform ring_size() node ring
+            ct:pal("add node"),
+            _ = admin:add_nodes(1),
+            ct:pal("sleep"),
+            timer:sleep(3000),
+            ct:pal("check_ring_size_fully_joined"),
+            unittest_helper:check_ring_size_fully_joined(ring_size()),
+            ct:pal("wait for check_leases"),
+            lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
+            true
+    end.
 
 check_data_integrity() ->
     io:format("show prbr statistics for the ring~n"),

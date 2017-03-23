@@ -1,4 +1,4 @@
-%% @copyright 2015, 2016 Zuse Institute Berlin
+%% @copyright 2015-2017 Zuse Institute Berlin
 
 %%   Licensed under the Apache License, Version 2.0 (the "License");
 %%   you may not use this file except in compliance with the License.
@@ -158,37 +158,43 @@ half_leave_and_recover(Config, MsgTag) ->
                                block)
      || Pid <- pid_groups:find_all(dht_node)],
     %% kill node
-    RandomNode = comm:make_local(lease_checker:get_random_save_node()),
-    PidGroup = pid_groups:group_of(RandomNode),
-    PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
-                             element(2, db_util:parse_table_name(Table)) =:= PidGroup],
-    ct:pal("kill node"),
-    {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
-    %% wait for break point
-    receive
-        {dropped, MsgTag} -> ok
-    end,
-    %% stop ring
-    unittest_helper:stop_ring(),
-    %% wait for leases to expire
-    timer:sleep(11000),
-    %% remove database files
-    _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
-    %% recover
-    unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
-                                                  {leases, true},
-                                                  {db_backend, db_mnesia},
-                                                  {start_type, recover}]}]),
-    lease_checker2:wait_for_clean_leases(500, [{ring_size, config:read(replication_factor)-1}]),
-    io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
-    io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
-    lease_checker2:get_kv_db(),
-    io:format("api_vm:number_of_nodes: ~p~n", [api_vm:number_of_nodes()]),
-    io:format("pid_groups:find_all(dht_node): ~p~n", [pid_groups:find_all(dht_node)]),
-    io:format("pid_groups:find_all(routing_table): ~p~n", [pid_groups:find_all(routing_table)]),
-    %% ring restored -> checking KV data integrity
-    _ = check_data_integrity(),
-    true.
+    SaveNode = lease_checker:get_random_save_node(),
+    case SaveNode of
+        failed ->
+            true;
+        _ ->
+            RandomNode = comm:make_local(SaveNode),
+            PidGroup = pid_groups:group_of(RandomNode),
+            PidGroupTabs = [Table || Table <- db_mnesia:get_persisted_tables(),
+                                     element(2, db_util:parse_table_name(Table)) =:= PidGroup],
+            ct:pal("kill node"),
+            {[PidGroup], _Not_found} = admin:del_nodes_by_name([PidGroup], false),
+            %% wait for break point
+            receive
+                {dropped, MsgTag} -> ok
+            end,
+            %% stop ring
+            unittest_helper:stop_ring(),
+            %% wait for leases to expire
+            timer:sleep(11000),
+            %% remove database files
+            _ = [?ASSERT(db_mnesia:close_and_delete(db_mnesia:open(X))) || X <- PidGroupTabs],
+            %% recover
+            unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
+                                                          {leases, true},
+                                                          {db_backend, db_mnesia},
+                                                          {start_type, recover}]}]),
+            lease_checker2:wait_for_clean_leases(500, [{ring_size, config:read(replication_factor)-1}]),
+            io:format("admin:check_ring(): ~p~n", [admin:check_ring()]),
+            io:format("admin:check_ring_deep(): ~p~n", [admin:check_ring_deep()]),
+            lease_checker2:get_kv_db(),
+            io:format("api_vm:number_of_nodes: ~p~n", [api_vm:number_of_nodes()]),
+            io:format("pid_groups:find_all(dht_node): ~p~n", [pid_groups:find_all(dht_node)]),
+            io:format("pid_groups:find_all(routing_table): ~p~n", [pid_groups:find_all(routing_table)]),
+            %% ring restored -> checking KV data integrity
+            _ = check_data_integrity(),
+            true
+    end.
 
 block(Owner, MsgTag) ->
     %% blocking qwrite_done and qwrite_deny

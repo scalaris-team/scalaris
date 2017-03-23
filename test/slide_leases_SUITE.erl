@@ -1,4 +1,4 @@
-%% @copyright 2012-2016 Zuse Institute Berlin
+%% @copyright 2012-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -220,14 +220,19 @@ leave_until(TargetSize, TargetSize) ->
     ok;
 leave_until(CurrentSize, TargetSize) ->
     Node = lease_checker:get_random_save_node(),
-    Group = pid_groups:group_of(comm:make_local(Node)),
-    ct:pal("shuting down node: ~p ~w", [Group, Node]),
-    ok = api_vm:kill_node(Group),
-    lease_helper:wait_for_ring_size(CurrentSize - 1),
-    ct:pal("wait for ring to stabilize after shutdown"),
-    util:wait_for(fun admin:check_leases/0, 10000),
-    ct:pal("shuting down node: success"),
-    leave_until(CurrentSize - 1, TargetSize).
+    case Node of
+        failed ->
+            ok;
+        _ ->
+            Group = pid_groups:group_of(comm:make_local(Node)),
+            ct:pal("shuting down node: ~p ~w", [Group, Node]),
+            ok = api_vm:kill_node(Group),
+            lease_helper:wait_for_ring_size(CurrentSize - 1),
+            ct:pal("wait for ring to stabilize after shutdown"),
+            util:wait_for(fun admin:check_leases/0, 10000),
+            ct:pal("shuting down node: success"),
+            leave_until(CurrentSize - 1, TargetSize)
+    end.
 
 %% listen_for_split(Pid) ->
 %%     fun (Message, _State) ->
