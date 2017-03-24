@@ -239,7 +239,6 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after leases expired"),
             print_prbr_data(),
-
             %% check data integrity
             ct:pal("check data integrity"),
             _ = check_data_integrity(),
@@ -282,7 +281,11 @@ check_data_integrity() ->
         X ->
             ct:pal("found ~p of 100 elements", [X]),
             Missing = lists:subtract(lists:seq(1, 100), Elements),
-            ct:pal("Missing elements are:~n~p", [Missing]),
+            ct:pal("Missing elements are:~n~w", [Missing]),
+            ct:pal("Printing missing element data..."),
+            [print_element_data(E) || E <- Missing],
+            print_prbr_data(),
+
             100 = X
     end.
 
@@ -305,20 +308,45 @@ wait_for_expired_leases(Config) ->
 %%@doc Prints a list of tuples showing which value is stored in which dht node
 %%     Format : [{Value, [list_of_dht_nodes_value_is_stored_in]}]
 print_prbr_data() ->
-    DhtNodes = lists:sort(pid_groups:find_all(dht_node)),
-    %% get list of all {value, dht_node_idx} pairs
-    PrbrData = lists:flatten(
-                   [begin
-                       comm:send_local(ThisNode, {prbr, tab2list_raw, kv_db, self()}),
-                       receive
-                           {_, List} -> [{prbr:entry_val(E), ThisNode} || E <- List]
-                       after 1000 ->
-                           ct:pal("DHT node ~p does not reply...", [ThisNode]),
-                           []
-                       end
-                   end || ThisNode <- DhtNodes]),
+    PrbrData = get_prbr_data(fun(NodePid, E) ->
+                                {prbr:entry_val(E), NodePid}
+                             end),
     GroupedByValueDict = lists:foldl(fun({K, V}, D) -> dict:append(K, V, D) end,
                                              dict:new(), PrbrData),
     GroupedValues = lists:sort(dict:to_list(GroupedByValueDict)),
+
     ct:pal("PRBR state:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
-           "~100p", [GroupedValues]).
+           "~100p", [GroupedValues]),
+    ok.
+
+print_element_data(Id) ->
+    HashedKey = ?RT:hash_key(integer_to_list(Id)),
+    ReplicaKeyList = replication:get_keys(HashedKey),
+    PrbrData = get_prbr_data(fun(NodePid, E) ->
+                                {prbr:entry_key(E),
+                                 prbr:entry_val(E),
+                                 NodePid}
+                             end),
+    IdData = lists:filter(fun(E) ->
+                            lists:member(element(1, E), ReplicaKeyList)
+                          end, PrbrData),
+
+    ct:pal("Printing data for ID=~p~nReplica key list:~n~p~n"
+           "Entries found in prbr:~n~100p",
+           [Id, lists:sort(ReplicaKeyList), lists:sort(IdData)]),
+    ok.
+
+%% get all elements stored in prbr as flattened list.
+%% applies DataExtractFun(DhtNodePidEFoundOn, E) for every entry E.
+get_prbr_data(DataExtractFun) ->
+    DhtNodes = pid_groups:find_all(dht_node),
+    lists:flatten(
+        [begin
+            comm:send_local(ThisNode, {prbr, tab2list_raw, kv_db, self()}),
+            receive
+                {_, List} -> [DataExtractFun(ThisNode, E) || E <- List]
+            after 1000 ->
+                ct:pal("DHT node ~p does not reply...", [ThisNode]),
+                []
+            end
+         end || ThisNode <- DhtNodes]).
