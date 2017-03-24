@@ -292,10 +292,14 @@ parse_type({ann_type, _Line, [{var, _Line, _Varname}, Type]}, Module, ParseState
     parse_type(Type, Module, ParseState);
 parse_type({atom, _Line, Atom}, _Module, ParseState) ->
     {{atom, Atom}, ParseState};
-parse_type({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
+parse_type({op, _Line1, '-', {integer,_Line2,Value}}, _Module, ParseState) ->
     {{integer, -Value}, ParseState};
-parse_type({op, _Line1,'-',FirstType, {integer,_Line2,Value}}, Module, ParseState) ->
-    {{diff_type, parse_type(FirstType, Module, ParseState), Value}, ParseState};
+parse_type({op, _Line1, '-', FirstType, {integer,_Line2,Value}}, Module, ParseState) ->
+    {{op_diff, parse_type(FirstType, Module, ParseState), {integer, Value}}, ParseState};
+parse_type({op, _Line1, 'bsl', FirstType, SecondType}, Module, ParseState) ->
+    First = parse_type(FirstType, Module, ParseState),
+    Second = parse_type(SecondType, Module, ParseState),
+    {{op_bsl, First, Second}, ParseState};
 parse_type({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
 parse_type({type, _Line, array, []}, _Module, ParseState) ->
