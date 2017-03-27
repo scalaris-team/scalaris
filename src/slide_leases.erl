@@ -1,4 +1,4 @@
-%% @copyright 2010-2016 Zuse Institute Berlin
+%% @copyright 2010-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -258,8 +258,8 @@ find_lease(State, SlideOp, Mode) ->
                 [Lease] ->
                     {ok, Lease};
                 _ ->
-                    log:log("did not found requested lease in passive list: ~w ~w",
-                            [Interval, PassiveLeases]),
+                    log:log("did not found requested lease in passive list: ~w ~w ~w ",
+                            [Interval, ActiveLease, PassiveLeases]),
                     error
             end
     end.
