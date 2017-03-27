@@ -199,7 +199,11 @@ remove_node(Config) ->
             lease_checker2:get_kv_db(RandomNode),
 
             ct:pal("PRBR state before node is removed"),
-            print_prbr_data(),
+            print_prbr_data(kv_db),
+            print_prbr_data({lease_db, 1}),
+            print_prbr_data({lease_db, 2}),
+            print_prbr_data({lease_db, 3}),
+            print_prbr_data({lease_db, 4}),
 
             %% get relative range of node to remove and check if it is not to large
             {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
@@ -238,7 +242,12 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
 
             ct:pal("PRBR state after leases expired"),
-            print_prbr_data(),
+            print_prbr_data(kv_db),
+            print_prbr_data({lease_db, 1}),
+            print_prbr_data({lease_db, 2}),
+            print_prbr_data({lease_db, 3}),
+            print_prbr_data({lease_db, 4}),
+
             %% check data integrity
             ct:pal("check data integrity"),
             _ = check_data_integrity(),
@@ -247,7 +256,11 @@ remove_node(Config) ->
             _ = repair_replicas(),
 
             ct:pal("PRBR state after calling repair_replicas"),
-            print_prbr_data(),
+            print_prbr_data(kv_db),
+            print_prbr_data({lease_db, 1}),
+            print_prbr_data({lease_db, 2}),
+            print_prbr_data({lease_db, 3}),
+            print_prbr_data({lease_db, 4}),
 
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
@@ -260,7 +273,11 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
 
             ct:pal("PRBR state after node was inserted"),
-            print_prbr_data(),
+            print_prbr_data(kv_db),
+            print_prbr_data({lease_db, 1}),
+            print_prbr_data({lease_db, 2}),
+            print_prbr_data({lease_db, 3}),
+            print_prbr_data({lease_db, 4}),
 
             true
     end.
@@ -283,8 +300,8 @@ check_data_integrity() ->
             Missing = lists:subtract(lists:seq(1, 100), Elements),
             ct:pal("Missing elements are:~n~w", [Missing]),
             ct:pal("Printing missing element data..."),
-            [print_element_data(E) || E <- Missing],
-            print_prbr_data(),
+            [print_element_data(E, kv_db) || E <- Missing],
+            print_prbr_data(kv_db),
 
             100 = X
     end.
@@ -307,26 +324,26 @@ wait_for_expired_leases(Config) ->
 
 %%@doc Prints a list of tuples showing which value is stored in which dht node
 %%     Format : [{Value, [list_of_dht_nodes_value_is_stored_in]}]
-print_prbr_data() ->
+print_prbr_data(DB) ->
     PrbrData = get_prbr_data(fun(NodePid, E) ->
                                 {prbr:entry_val(E), NodePid}
-                             end),
+                             end, DB),
     GroupedByValueDict = lists:foldl(fun({K, V}, D) -> dict:append(K, V, D) end,
                                              dict:new(), PrbrData),
     GroupedValues = lists:sort(dict:to_list(GroupedByValueDict)),
 
-    ct:pal("PRBR state:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
-           "~100p", [GroupedValues]),
+    ct:pal("PRBR state ~w:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
+           "~100p", [DB, GroupedValues]),
     ok.
 
-print_element_data(Id) ->
+print_element_data(Id, DB) ->
     HashedKey = ?RT:hash_key(integer_to_list(Id)),
     ReplicaKeyList = replication:get_keys(HashedKey),
     PrbrData = get_prbr_data(fun(NodePid, E) ->
                                 {prbr:entry_key(E),
                                  prbr:entry_val(E),
                                  NodePid}
-                             end),
+                             end, DB),
     IdData = lists:filter(fun(E) ->
                             lists:member(element(1, E), ReplicaKeyList)
                           end, PrbrData),
@@ -338,11 +355,11 @@ print_element_data(Id) ->
 
 %% get all elements stored in prbr as flattened list.
 %% applies DataExtractFun(DhtNodePidEFoundOn, E) for every entry E.
-get_prbr_data(DataExtractFun) ->
+get_prbr_data(DataExtractFun, DB) ->
     DhtNodes = pid_groups:find_all(dht_node),
     lists:flatten(
         [begin
-            comm:send_local(ThisNode, {prbr, tab2list_raw, kv_db, self()}),
+            comm:send_local(ThisNode, {prbr, tab2list_raw, DB, self()}),
             receive
                 {_, List} -> [DataExtractFun(ThisNode, E) || E <- List]
             after 1000 ->
