@@ -325,7 +325,7 @@ print_prbr_data(DB) ->
     ok.
 
 print_leases_data() ->
-    _ = [print_prbr_data({lease_db, I}) || I <- lists:seq(1, config:read(replication_factor))].
+    _ = [print_prbr_data({lease_db, I}) || I <- lists:seq(1, config:read(replication_factor))].
 
 print_element_data(Id, DB) ->
     HashedKey = ?RT:hash_key(integer_to_list(Id)),
