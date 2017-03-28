@@ -258,7 +258,7 @@ find_lease(State, SlideOp, Mode) ->
                 [Lease] ->
                     {ok, Lease};
                 _ ->
-                    log:log("did not found requested lease in passive list: ~w ~w ~w ",
+                    log:log("did not found requested lease in passive list:~n~w~n~w~n~w~n",
                             [Interval, ActiveLease, PassiveLeases]),
                     error
             end

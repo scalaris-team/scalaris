@@ -200,10 +200,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state before node is removed"),
             print_prbr_data(kv_db),
-            print_prbr_data({lease_db, 1}),
-            print_prbr_data({lease_db, 2}),
-            print_prbr_data({lease_db, 3}),
-            print_prbr_data({lease_db, 4}),
+            print_leases_data(),
 
             %% get relative range of node to remove and check if it is not to large
             {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
@@ -243,10 +240,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after leases expired"),
             print_prbr_data(kv_db),
-            print_prbr_data({lease_db, 1}),
-            print_prbr_data({lease_db, 2}),
-            print_prbr_data({lease_db, 3}),
-            print_prbr_data({lease_db, 4}),
+            print_leases_data(),
 
             %% check data integrity
             ct:pal("check data integrity"),
@@ -257,10 +251,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after calling repair_replicas"),
             print_prbr_data(kv_db),
-            print_prbr_data({lease_db, 1}),
-            print_prbr_data({lease_db, 2}),
-            print_prbr_data({lease_db, 3}),
-            print_prbr_data({lease_db, 4}),
+            print_leases_data(),
 
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
@@ -274,10 +265,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after node was inserted"),
             print_prbr_data(kv_db),
-            print_prbr_data({lease_db, 1}),
-            print_prbr_data({lease_db, 2}),
-            print_prbr_data({lease_db, 3}),
-            print_prbr_data({lease_db, 4}),
+            print_leases_data(),
 
             true
     end.
@@ -335,6 +323,9 @@ print_prbr_data(DB) ->
     ct:pal("PRBR state ~w:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
            "~100p", [DB, GroupedValues]),
     ok.
+
+print_leases_data() ->
+    _ = [print_prbr_data({lease_db, I}) || I <- lists:seq(1, config:read(replication_factor))].
 
 print_element_data(Id, DB) ->
     HashedKey = ?RT:hash_key(integer_to_list(Id)),
