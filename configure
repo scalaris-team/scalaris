@@ -8470,6 +8470,18 @@ as_fn_error $? "cannot start the crypto subsystem
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 
+crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(crypto,rand_uniform,2)]), erlang:halt().' | tail -1`
+if test "${crypto_randuniform}" = "true"; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_crypto_randuniform_support}"
+       EDOCMACROS="${EDOCMACROS}, {have_crypto_randuniform_support, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_crypto_randuniform_support"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:rand_uniform/2 is available" >&5
+$as_echo "$as_me: crypto:rand_uniform/2 is available" >&6;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:rand_uniform/2 is not available" >&5
+$as_echo "$as_me: crypto:rand_uniform/2 is not available" >&6;}
+fi
+
 crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [erlang:function_exported(crypto,hash,2)]), erlang:halt().' | tail -1`
 if test "${crypto_hash}" = "true"; then :
   EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_hash}"

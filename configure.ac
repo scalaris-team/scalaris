@@ -438,6 +438,14 @@ AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],
       [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
+crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(crypto,rand_uniform,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${crypto_randuniform}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_crypto_randuniform_support}"
+       EDOCMACROS="${EDOCMACROS}, {have_crypto_randuniform_support, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_crypto_randuniform_support"
+       AC_MSG_NOTICE([crypto:rand_uniform/2 is available])],
+      [AC_MSG_NOTICE([crypto:rand_uniform/2 is not available])])
+
 crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,hash,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_hash}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_hash}"
