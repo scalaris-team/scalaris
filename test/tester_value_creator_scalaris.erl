@@ -1,4 +1,4 @@
-%  @copyright 2014 Zuse Institute Berlin
+%  @copyright 2014-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ create_value({typedef, comm, mypid_with_reply_as, []} = Type, Size, ParseState) 
     {value, {Pid, e, Pos, setelement(Pos, Env, '_')}};
 create_value({typedef, comm, mypid_plain, []}, _Size, _ParseState) ->
     ?ASSERT2(is_pid(whereis(tester_pseudo_proc)), process__tester_pseudo_proc__must_exist),
-    case crypto:rand_uniform(0, 2) of
+    case randoms:rand_uniform(0, 2) of
         0 -> {value, comm:make_global(whereis(tester_pseudo_proc))};
         1 -> {value, comm:make_global(tester_pseudo_proc)}
     end;

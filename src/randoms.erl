@@ -1,4 +1,4 @@
-%  @copyright 2007-2016 Zuse Institute Berlin
+%  @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ getRandomString() ->
 %% @doc Generates a random integer in the range 1 =&lt; Id &lt; 2^32
 -spec getRandomInt() -> pos_integer().
 getRandomInt() ->
-    rand_uniform(1, 16#100000000).
+    crypto:bytes_to_integer(crypto:strong_rand_bytes(4)).
 
 -spec rand_uniform_feeder(integer(), integer()) -> {Lo::integer(), Hi::integer()}.
 rand_uniform_feeder(X, Y) when X > Y -> {Y, X};
@@ -51,7 +51,7 @@ rand_uniform_feeder(X, X) -> {X, X + 1}.
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
 rand_uniform(Lo, Hi) ->
-    crypto:rand_uniform(Lo, Hi).
+    crypto_rand_uniform(Lo, Hi).
 
 -spec rand_uniform_feeder(integer(), integer(), Count::1..1000)
         -> {Lo::integer(), Hi::integer(), Count::non_neg_integer()}.
@@ -63,7 +63,7 @@ rand_uniform_feeder(X, X, C) -> {X, X + 1, C}.
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer(), Count::non_neg_integer()) -> [integer()].
 rand_uniform(Lo, Hi, Count) when Lo < Hi ->
-    util:for_to_ex(1, Count, fun(_) -> crypto:rand_uniform(Lo, Hi) end).
+    util:for_to_ex(1, Count, fun(_) -> crypto_rand_uniform(Lo, Hi) end).
 
 %% @doc Stops the crypto module's server.
 -spec stop() -> ok.
@@ -85,4 +85,15 @@ uniform(X) ->
 -else.
 uniform(X) ->
     random:uniform(X).
+-endif.
+
+-ifdef(have_crypto_randuniform_support).
+crypto_rand_uniform(Lo, Hi) ->
+    crypto:rand_uniform(Lo, Hi).
+-else.
+crypto_rand_uniform(Lo, Hi) ->
+    Range = Hi - Lo,
+    Result = uniform(Range) + Lo - 1,
+    %% ct:pal("~w-~w:~w -> ~w~n", [Hi, Lo, Range, Result]),
+    Result.
 -endif.

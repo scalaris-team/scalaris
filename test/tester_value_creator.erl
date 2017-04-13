@@ -1,4 +1,4 @@
-%  @copyright 2010-2016 Zuse Institute Berlin
+%  @copyright 2010-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ create_value_wo_scalaris(Type, Size, ParseState) ->
 create_value_(atom, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_atoms/1,
-      fun() -> lists:nth(crypto:rand_uniform(1, 5), [one, two, three, four]) end);
+      fun() -> lists:nth(randoms:rand_uniform(1, 5), [one, two, three, four]) end);
 create_value_({atom, Value}, _Size, _ParseState) ->
     Value;
 create_value_({binary, []}, Size, ParseState) ->
@@ -84,11 +84,11 @@ create_value_({binary, []}, Size, ParseState) ->
       fun() -> list_to_binary(create_value({list, {range, {integer, 0}, {integer, 16#ff}}}, Size, ParseState)) end);
 create_value_({builtin_type, bitstring}, Size, ParseState) ->
     Binary = create_value_({binary, []}, Size, ParseState),
-    RandByte = crypto:rand_uniform(0, 256),
-    RandBits = crypto:rand_uniform(0, 8),
+    RandByte = randoms:rand_uniform(0, 256),
+    RandBits = randoms:rand_uniform(0, 8),
     <<Binary/binary,RandByte:RandBits>>;
 create_value_(bool, _Size, _ParseState) ->
-    case crypto:rand_uniform(0, 2) of
+    case randoms:rand_uniform(0, 2) of
         0 -> false;
         1 -> true
     end;
@@ -112,21 +112,21 @@ create_value_({builtin_type, maybe_improper_list}, Size, ParseState) ->
     create_value_({list, {typedef, tester, test_any, []}}, Size, ParseState);
 create_value_({builtin_type, module}, _Size, _ParseState) ->
     Values = [element(1, X) || X <- code:all_loaded()],
-    lists:nth(crypto:rand_uniform(1, length(Values) + 1), Values);
+    lists:nth(randoms:rand_uniform(1, length(Values) + 1), Values);
 create_value_({field_type, _Name, Type}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
 create_value_(float, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_floats/1,
-      fun() -> crypto:rand_uniform(-5, 5) * (crypto:rand_uniform(0, 30323) / 30323.0) end);
+      fun() -> randoms:rand_uniform(-5, 5) * (randoms:rand_uniform(0, 30323) / 30323.0) end);
 create_value_(integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_integers/1,
-      fun() -> crypto:rand_uniform(integer_min(), integer_max() * 2 + 1) - integer_max() end);
+      fun() -> randoms:rand_uniform(integer_min(), integer_max() * 2 + 1) - integer_max() end);
 create_value_({integer, Value}, _Size, _ParseState) ->
     Value;
 create_value_({list, Type}, Size, ParseState) ->
-    ListLength = erlang:min(Size, crypto:rand_uniform(list_length_min(),
+    ListLength = erlang:min(Size, randoms:rand_uniform(list_length_min(),
                                                list_length_max() + 1)),
     case ListLength of
         0 ->
@@ -143,14 +143,14 @@ create_value_(node, _Size, _ParseState) ->
 create_value_({nonempty_list, Type}, Size, ParseState) ->
     ListLength =
         erlang:max(1, erlang:min(Size,
-                                 crypto:rand_uniform(1, list_length_max() + 1))),
+                                 randoms:rand_uniform(1, list_length_max() + 1))),
     NewSize = erlang:max(1, (Size - ListLength) div ListLength),
     [create_value(Type, NewSize, ParseState) || _ <- lists:seq(1, ListLength)];
 create_value_(nonempty_string, Size, ParseState) ->
     RandStringFun =
         fun() ->
-                ListLength0 = crypto:rand_uniform(list_length_min(),
-                                                  list_length_max() + 1),
+                ListLength0 = randoms:rand_uniform(list_length_min(),
+                                                   list_length_max() + 1),
                 ListLength = erlang:max(1, erlang:min(Size, ListLength0)),
                 Type = {range, {integer, 0}, {integer, 16#10ffff}},
                 NewSize = erlang:max(1, (Size - ListLength) div ListLength),
@@ -163,7 +163,7 @@ create_value_(nonempty_string, Size, ParseState) ->
 create_value_(non_neg_integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_non_neg_integers/1,
-      fun() -> crypto:rand_uniform(0, integer_max() + 1) end);
+      fun() -> randoms:rand_uniform(0, integer_max() + 1) end);
 create_value_(pid, _Size, _ParseState) ->
     case erlang:whereis(tester_pseudo_proc) of
         Pid when is_pid(Pid) -> Pid
@@ -172,19 +172,19 @@ create_value_(pid, _Size, _ParseState) ->
 create_value_(pos_integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_pos_integers/1,
-      fun() -> crypto:rand_uniform(1, integer_max() + 1) end);
+      fun() -> randoms:rand_uniform(1, integer_max() + 1) end);
 % ..-1
 create_value_(neg_integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_neg_integers/1,
-      fun() -> -(crypto:rand_uniform(1, integer_max() + 1)) end);
+      fun() -> -(randoms:rand_uniform(1, integer_max() + 1)) end);
 create_value_({product, []}, _Size, _ParseState) ->
     [];
 create_value_({product, Types}, Size, ParseState) ->
     NewSize = erlang:max(1, (Size - length(Types)) div length(Types)),
     [create_value(Type, NewSize, ParseState) || Type <- Types];
 create_value_({range, {integer, Low}, {integer, High}}, _Size, _ParseState) ->
-    crypto:rand_uniform(Low, High + 1);
+    randoms:rand_uniform(Low, High + 1);
 create_value_({record, Module, TypeName}, Size, ParseState) ->
     case tester_parse_state:lookup_type({record, Module, TypeName}, ParseState) of
         {value, {var_type, [], RecordType}} ->
@@ -233,7 +233,7 @@ create_value_({typed_record_field, _Name, Type}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
 create_value_({union, Types}, Size, ParseState) ->
     Length = length(Types),
-    create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),
+    create_value(lists:nth(randoms:rand_uniform(1, Length + 1), Types),
                  Size, ParseState);
 create_value_(Unknown , _Size, _ParseState) ->
     ct:pal("Cannot create type (you could register a custom value creator):~n"
@@ -258,12 +258,12 @@ create_record_value(RecordName, {record, Types}, Size, ParseState) ->
         Getter::fun((tester_parse_state:state()) -> {Length::non_neg_integer(), Values::[T]}),
         RandValFun::fun(() -> T)) -> T.
 create_val_50rand_50coll(ParseState, Getter, RandValFun) ->
-    case crypto:rand_uniform(0, 2) of
+    case randoms:rand_uniform(0, 2) of
         0 -> % take one of the collected values (if possible)
             {Length, Values} = Getter(ParseState),
             case Length of
                 0 -> RandValFun();
-                _ -> lists:nth(crypto:rand_uniform(1, Length + 1), Values)
+                _ -> lists:nth(randoms:rand_uniform(1, Length + 1), Values)
             end;
         1 ->
             RandValFun()

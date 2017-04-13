@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  @copyright 2008-2014 Zuse Institute Berlin
+%  @copyright 2008-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -247,7 +247,7 @@ shutdown(_State) ->
 -spec random_coordinate() -> network_coordinate().
 random_coordinate() ->
     % note: network coordinates are float vectors!
-    [ float(crypto:rand_uniform(1, 10)) || _ <- lists:seq(1, vivaldi_dimensions()) ].
+    [ float(randoms:rand_uniform(1, 10)) || _ <- lists:seq(1, vivaldi_dimensions()) ].
 
 
 -spec update_coordinate(network_coordinate(), est_error(), latency(),
