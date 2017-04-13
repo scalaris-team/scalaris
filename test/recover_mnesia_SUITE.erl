@@ -200,7 +200,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state before node is removed"),
             print_prbr_data(kv_db),
-            print_leases_data(),
+            ok = print_leases_data(),
 
             %% get relative range of node to remove and check if it is not to large
             {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
@@ -240,7 +240,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after leases expired"),
             print_prbr_data(kv_db),
-            print_leases_data(),
+            ok = print_leases_data(),
 
             %% check data integrity
             ct:pal("check data integrity"),
@@ -251,7 +251,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after calling repair_replicas"),
             print_prbr_data(kv_db),
-            print_leases_data(),
+            ok = print_leases_data(),
 
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
@@ -265,7 +265,7 @@ remove_node(Config) ->
 
             ct:pal("PRBR state after node was inserted"),
             print_prbr_data(kv_db),
-            print_leases_data(),
+            ok = print_leases_data(),
 
             true
     end.
