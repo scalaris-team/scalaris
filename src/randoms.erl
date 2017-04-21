@@ -39,8 +39,13 @@ getRandomString() ->
 
 %% @doc Generates a random integer in the range 1 =&lt; Id &lt; 2^32
 -spec getRandomInt() -> pos_integer().
+-ifdef(with_crypto_bytes_to_integer).
 getRandomInt() ->
-    crypto:bytes_to_integer(crypto:strong_rand_bytes(4)).
+    util:min(1 + crypto:bytes_to_integer(crypto:strong_rand_bytes(4)), 16#100000000).
+-else.
+getRandomInt() ->
+    rand_uniform(1, 16#100000000).
+-endif.
 
 -spec rand_uniform_feeder(integer(), integer()) -> {Lo::integer(), Hi::integer()}.
 rand_uniform_feeder(X, Y) when X > Y -> {Y, X};

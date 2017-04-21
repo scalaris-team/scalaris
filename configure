@@ -8470,8 +8470,8 @@ as_fn_error $? "cannot start the crypto subsystem
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 
-crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(crypto,rand_uniform,2)]), erlang:halt().' | tail -1`
-if test "${crypto_randuniform}" = "true"; then :
+crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [erlang:function_exported(crypto,rand_uniform,2)]), erlang:halt().' | tail -1`
+if test "${crypto_rand_uniform}" = "true"; then :
   EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_crypto_randuniform_support}"
        EDOCMACROS="${EDOCMACROS}, {have_crypto_randuniform_support, true}"
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_crypto_randuniform_support"
@@ -8492,6 +8492,18 @@ $as_echo "$as_me: crypto:hash/2 is available and usable" >&6;}
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&5
 $as_echo "$as_me: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&6;}
+fi
+
+crypto_bytes_to_integer=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [erlang:function_exported(crypto,bytes_to_integer,1)]), erlang:halt().' | tail -1`
+if test "${crypto_bytes_to_integer}" = "true"; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_bytes_to_integer}"
+       EDOCMACROS="${EDOCMACROS}, {with_crypto_bytes_to_integer, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_crypto_bytes_to_integer"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:bytes_to_integer/1 is available and usable" >&5
+$as_echo "$as_me: crypto:bytes_to_integer/1 is available and usable" >&6;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:bytes_to_integer/1 is not available or not usable, falling back to rand:uniform/2" >&5
+$as_echo "$as_me: crypto:bytes_to_integer/1 is not available or not usable, falling back to rand:uniform/2" >&6;}
 fi
 
 ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(ct_line,parse_transform,2)]), erlang:halt().' | tail -1`

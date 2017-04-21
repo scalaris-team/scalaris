@@ -438,8 +438,8 @@ AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],
       [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(crypto,rand_uniform,2)]]), erlang:halt().' | tail -1`
-AS_IF([test "${crypto_randuniform}" = "true"],
+crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,rand_uniform,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${crypto_rand_uniform}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_crypto_randuniform_support}"
        EDOCMACROS="${EDOCMACROS}, {have_crypto_randuniform_support, true}"
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_crypto_randuniform_support"
@@ -453,6 +453,14 @@ AS_IF([test "${crypto_hash}" = "true"],
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_crypto_hash"
        AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
       [AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
+
+crypto_bytes_to_integer=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,bytes_to_integer,1)]]), erlang:halt().' | tail -1`
+AS_IF([test "${crypto_bytes_to_integer}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_bytes_to_integer}"
+       EDOCMACROS="${EDOCMACROS}, {with_crypto_bytes_to_integer, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_crypto_bytes_to_integer"
+       AC_MSG_NOTICE([crypto:bytes_to_integer/1 is available and usable])],
+      [AC_MSG_NOTICE([crypto:bytes_to_integer/1 is not available or not usable, falling back to rand:uniform/2])])
 
 ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(ct_line,parse_transform,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${ct_line}" = "true"],
