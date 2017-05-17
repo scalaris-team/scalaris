@@ -19,6 +19,10 @@
 
 namespace scalaris {
 
+  /// Exception to report when a key was not found
+  class NotFoundError : public std::exception {
+  };
+
   /// Exception to report when a rpc-call is not supported
   class NotSupportedError : public std::exception {
   };
