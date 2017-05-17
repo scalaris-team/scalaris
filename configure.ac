@@ -28,6 +28,8 @@ AC_SUBST(FALSE)
 AC_PATH_PROG(TRUE, true)
 AC_SUBST(TRUE)
 AC_PROG_SED
+AC_PATH_PROG(DOXYGEN, doxygen)
+AC_SUBST(DOXYGEN)
 
 ###########################################################
 #
