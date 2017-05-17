@@ -1,4 +1,4 @@
-// Copyright 2015, 2016 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 
 namespace scalaris {
 
+  /// represents a TCP connection to Scalaris to execute JSON-RPC requests
   class Connection {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
@@ -34,18 +35,32 @@ namespace scalaris {
     std::string link;
     bool closed=false;
   public:
+    /**
+     * creates a connection instance
+     * @param _hostname the host name of the Scalaris instance
+     * @param _link the URL for JSON-RPC
+     * @param port the TCP port of the Scalaris instance
+     */
     Connection(std::string _hostname,
                std::string _link  = "jsonrpc.yaws",
                std::string port = Connection::get_port());
 
     ~Connection();
 
+    /// checks whether the TCP connection is alive
     bool isOpen() const;
 
+    /// closes the TCP connection
     void close();
 
+    /// returns the server port of the TCP connection
     static std::string get_port();
 
+    /**
+     * performs a JSON-RPC request
+     * @param methodname the name of the function to call
+     * @param args the list of arguments of the function call
+     */
     template<typename... Args>
     Json::Value rpc(const std::string& methodname, Args... args) {
       std::array<Json::Value, sizeof...(args)> arg_list = {{Converter<Args>::to_value(args)... }};

@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,11 +25,22 @@
 #include "req_list.hpp"
 
 namespace scalaris {
+  /// \brief Executes a single read or write.
+  ///
+  /// Transactions instead execute a sequence of reads and writes.
   class TransactionSingleOp {
     Connection& c;
   public:
+    /**
+     * Creates a <code>TransactionSingleOp</code> instance
+     * @param _c the Connection object
+     */
     TransactionSingleOp(Connection& _c) : c(_c) {}
 
+    /**
+     * Reads a key-value pair
+     * @param key the key to lookup in Scalaris
+     */
     std::string read(const std::string key) {
       RequestList reqlist;
       reqlist.add_read(key);
@@ -88,6 +99,11 @@ namespace scalaris {
         return the_value.asString();
     }
 
+    /**
+     * Writes a key-value pair
+     * @param key the key to update in Scalaris
+     * @param value the value to store under <code>key</code>
+     */
     void write(const std::string key, const std::string value) {
       RequestList reqlist;
       reqlist.add_write(key, value);

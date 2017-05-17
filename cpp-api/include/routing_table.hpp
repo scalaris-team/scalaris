@@ -1,4 +1,4 @@
-// Copyright 2015, 2016 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,11 +20,18 @@
 #include "connection.hpp"
 
 namespace scalaris {
+
+  /// gives access to information about routing tables
   class RoutingTable {
     Connection& c;
   public:
-    RoutingTable(Connection& _c);
+    /**
+     * Creates a RoutingTable instance
+     * @param _c the connection object used for Scalaris access
+     */
+     RoutingTable(Connection& _c);
 
+    /// retrieves the replication factor of the Scalaris instance
     int get_replication_factor() throw (std::runtime_error, Json::LogicError,
                                         Json::RuntimeError);
   };
