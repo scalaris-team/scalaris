@@ -1,4 +1,4 @@
-%  @copyright 2010-2016 Zuse Institute Berlin
+%  @copyright 2010-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc    check whether a given value is of a given type
 %% @end
-%% @version $Id$
 -module(tester_type_checker).
 -author('schuett@zib.de').
 -author('schintke@zib.de').
@@ -202,6 +201,8 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
+        {typedef, ets, tid, []} -> % tid is reference in R20+
+            inner_check_(Value, integer, CheckStack, ParseState);
         {typedef, orddict, orddict, []} ->
             check_list(orddict:to_list(Value), % [Key,Value]
                        {list, {tuple,
@@ -213,7 +214,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_union(Value, Type, CheckStack, ParseState);
         {var_type, [], InnerType} ->
             % @todo add substitution
-            inner_check_(Value, InnerType, CheckStack, ParseState);            
+            inner_check_(Value, InnerType, CheckStack, ParseState);
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
             ?DBG_ASSERT2(false, "unknown type"),

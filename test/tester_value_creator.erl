@@ -208,6 +208,8 @@ create_value_({tuple, {typedef, tester, test_any, []}}, Size, ParseState) ->
     erlang:list_to_tuple(Values);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
+create_value_({typedef, ets, tid, []}, Size, ParseState) -> % reference since R20
+    create_value_(integer, Size, ParseState);
 create_value_({typedef, orddict, orddict, []}, Size, ParseState) ->
     KVs = create_value({list,
                         {tuple,
