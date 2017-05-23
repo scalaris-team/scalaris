@@ -64,7 +64,7 @@
             <!-- Scalaris does not set its dependencies correctly, add here: -->
             <groupId>org.erlang.otp</groupId>
             <artifactId>jinterface</artifactId>
-            <version>[1.5-6-custom,)</version>
+            <version>[1.5.6-custom,)</version>
         </dependency>
     </dependencies>
 
