@@ -49,7 +49,7 @@ start_ring(){
             let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
         fi
 
-        ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start "${WITHSSL}"
+        ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start $WITHSSL
 
     done
     ./bin/scalarisctl -n "${NODEPREFIX}1" dbg-check-ring $RINGSIZE 30
