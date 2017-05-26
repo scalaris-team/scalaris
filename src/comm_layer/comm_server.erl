@@ -1,4 +1,4 @@
-% @copyright 2008-2015 Zuse Institute Berlin
+% @copyright 2008-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -175,7 +175,7 @@ init([]) ->
 %% @doc message handler
 -spec on(message(), State::null) -> null.
 on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
-    % helper for comm_acceptor as we need to synchronise the creation of
+    % helper for comm_[tcp|ssl]_acceptor as we need to synchronise the creation of
     % connections in order to prevent multiple connections to/from a single IP
     {Channel, Dir} = case Channel of
                          main -> {main, 'rcv'};
