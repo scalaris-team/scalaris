@@ -112,13 +112,10 @@ server(LS) ->
 
 -spec open_listen_port(comm_server:tcp_port(), IP::inet:ip_address()) -> inet:socket() | abort.
 open_listen_port(Port, IP) ->
-    Fun = fun (OtpCert, Event, UserState) -> verify_ssl(OtpCert, Event, UserState) end,
     case ssl:listen(Port, [
                            {certfile, config:read(certfile)},
                            {keyfile, config:read(keyfile)},
                            {secure_renegotiate, true},
-                           %%{verify, verify_none}, %% debug only
-                           {verify_fun, {Fun, []}},
                            binary,
                            {packet, 4},
                            {ip, IP},
@@ -133,19 +130,11 @@ open_listen_port(Port, IP) ->
             abort
     end.
 
-%% fun(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() | {revoked, atom()}} | {extension, #'Extension'{}}, InitialUserState :: term()) ->
-%% {valid, UserState :: term()} |
-%% {valid_peer, UserState :: term()} |
-%% {fail, Reason :: term()} |
-%% {unknown, UserState :: term()}.
-
-verify_ssl(OtpCert, Event, UserState) ->
-    io:format("verify_ssl: ~p~n", [Event]),
-    {valid, UserState}.
-
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
+    config:cfg_is_in(comm_backend, [ssl, gen_tcp]) and
+    config:cfg_exists(certfile) and
+    config:cfg_exists(keyfile) and
     config:cfg_is_port(port) and
     config:cfg_is_ip(listen_ip, true).
-

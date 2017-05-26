@@ -226,7 +226,7 @@ tcp_options(Channel) ->
 
 %% @doc Synchronous call to create (or get) a connection for the given Address+Port using Socket.
 -spec create_connection(Address::inet:ip_address(), Port::tcp_port(),
-                        Socket::inet:socket(), Channel::comm:channel()) -> pid().
+                        Socket::inet:socket() | ssl:socket(), Channel::comm:channel()) -> pid().
 create_connection(Address, Port, Socket, Channel) ->
     ?MODULE ! {create_connection, Address, Port, Socket, Channel, self()},
     receive {create_connection_done, ConnPid} -> ConnPid end.

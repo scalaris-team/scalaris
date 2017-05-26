@@ -1,4 +1,4 @@
-% @copyright 2008-2015 Zuse Institute Berlin
+% @copyright 2008-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -133,5 +133,6 @@ first_ip() ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
+    config:cfg_is_in(comm_backend, [ssl, gen_tcp]) and
     config:cfg_is_port(port) and
     config:cfg_is_ip(listen_ip, true).

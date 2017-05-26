@@ -505,8 +505,15 @@ new_connection(Address, Port, MyPort, Channel) ->
                      non_neg_integer())
         -> inet:socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel, Retries) ->
+    SSLOpts = case ?COMM of
+                  ssl -> [{certfile, config:read(certfile)},
+                          {keyfile, config:read(keyfile)},
+                          {secure_renegotiate, true}
+                         ];
+                  gen_tcp -> []
+              end,
     case ?COMM:connect(Address, Port, [binary, {packet, 4}]
-                         ++ comm_server:tcp_options(Channel),
+                         ++ comm_server:tcp_options(Channel) ++ SSLOpts,
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
             % send end point data (the other node needs to know my listen port
