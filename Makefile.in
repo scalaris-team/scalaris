@@ -1,5 +1,5 @@
 
-# Copyright 2007-2016 Zuse Institute Berlin
+# Copyright 2007-2017 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -471,7 +471,7 @@ interop-test: compile java java-scalaris.test.compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n "$(SCALARIS_JTEST_NAME)" -m -s -t first start ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" $(PYTHON2) python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.stderr.log && \
