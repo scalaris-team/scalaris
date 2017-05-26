@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2015 Zuse Institute Berlin
+# Copyright 2007-2017 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -15,12 +15,14 @@
 
 RINGSIZE=4
 NODEPREFIX=ebench_node
+WITHSSL=""
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
 SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
 usage(){
     echo "usage: setup-ring-for-benchmarks [options] <cmd>"
     echo " options:"
     echo "    --ring-size <number>   - the number of nodes"
+    echo "    --ssl                  - enable ssl"
     echo " <cmd>:"
     echo "    start       - start a ring"
     echo "    stop        - stop a ring"
@@ -47,7 +49,7 @@ start_ring(){
             let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
         fi
 
-        ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
+        ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start "${WITHSSL}"
 
     done
     ./bin/scalarisctl -n "${NODEPREFIX}1" dbg-check-ring $RINGSIZE 30
@@ -65,6 +67,9 @@ until [ -z "$1" ]; do
         "--help")
             shift
             usage 0;;
+        "--ssl")
+            WITHSSL="-s scalaris.local.ssl.cfg"
+            shift;;
         "--ring-size")
             shift
             RINGSIZE=$1
