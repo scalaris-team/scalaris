@@ -1,4 +1,4 @@
-%% @copyright 2008-2015 Zuse Institute Berlin
+%% @copyright 2008-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,8 +55,16 @@ childs([]) ->
         sup:worker_desc(comm_server, comm_server, start_link,
                              [CommLayerGroup]),
     CommAcceptor =
-        sup:worker_desc(comm_acceptor, comm_acceptor, start_link,
-                             [CommLayerGroup]),
+        case config:read(ssl) of
+            true ->
+                ssl:start(),
+                sup:worker_desc(comm_ssl_acceptor, comm_ssl_acceptor, start_link,
+                                [CommLayerGroup]);
+            _ ->
+                sup:worker_desc(comm_tcp_acceptor, comm_tcp_acceptor, start_link,
+                                [CommLayerGroup])
+        end,
+
     CommLogger =
         sup:worker_desc(comm_logger, comm_logger, start_link),
     [

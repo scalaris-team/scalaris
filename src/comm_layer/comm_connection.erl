@@ -35,6 +35,8 @@
 %% keep only tag (uncomment to keep msg)
 -define(KEEP_TAG, true).
 
+-define(COMM, (config:read(comm_backend))). %% comm_layer backend
+
 -compile({inline, [dest_ip/1, dest_port/1, local_listen_port/1, channel/1,
                    socket/1, set_socket/2,
                    started/1,
@@ -171,38 +173,17 @@ on({send, DestPid, Message, Options}, State) ->
     end;
 
 on({tcp, Socket, Data}, State) ->
-    DeliverMsg = ?COMM_DECOMPRESS_MSG(Data, State),
-    NewState =
-        case DeliverMsg of
-            {?deliver, ?unpack_msg_bundle, Message} ->
-                ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
-                ?TRACE("Received message ~.0p", [Message]),
-                lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg, State) end,
-                            ok, Message),
-                %% may fail, when tcp just closed
-                _ = inet:setopts(Socket, [{active, once}]),
-                save_n_msgs(Message, fun set_last_msg_received/2, State);
-            {?deliver, Process, Message} ->
-                ?TRACE("Received message ~.0p", [Message]),
-                ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
-                forward_msg(Process, Message, State),
-                %% may fail, when tcp just closed
-                _ = inet:setopts(Socket, [{active, once}]),
-                save_n_msgs(Message, fun set_last_msg_received/2, State);
-            {user_close} ->
-                log:log(warn,"[ CC ~p (~p) ] tcp user_close request", [self(), pid_groups:my_pidname()]),
-                close_connection(Socket, State);
-            Unknown ->
-                log:log(warn,"[ CC ~p (~p) ] unknown message ~.0p", [self(), pid_groups:my_pidname(), Unknown]),
-                %% may fail, when tcp just closed
-                _ = inet:setopts(Socket, [{active, once}]),
-                State
-        end,
-    New2State = set_time_last_msg_seen(NewState),
-    send_bundle_if_ready(New2State);
+    handle_data(Socket, Data, State);
+
+on({ssl, Socket, Data}, State) -> %% copy of tcp ...
+    handle_data(Socket, Data, State);
 
 on({tcp_closed, Socket}, State) ->
     log:log(info,"[ CC ~p (~p) ] tcp closed", [self(), pid_groups:my_pidname()]),
+    close_connection(Socket, State);
+
+on({ssl_closed, Socket}, State) ->
+    log:log(info,"[ CC ~p (~p) ] ssl closed", [self(), pid_groups:my_pidname()]),
     close_connection(Socket, State);
 
 on({tcp_error, Socket, Reason}, State) ->
@@ -263,15 +244,15 @@ on({web_debug_info, Requestor}, State) ->
             SendAgv = SendCnt = SendBytes = "n/a",
             ok;
         Socket ->
-            case inet:sockname(Socket) of
+            case sockname(Socket) of
                 {ok, {MyAddress, MyPort}} -> ok;
                 {error, _Reason1}          -> MyAddress = MyPort = "n/a"
             end,
-            case inet:peername(Socket) of
+            case peername(Socket) of
                 {ok, {PeerAddress, PeerPort}} -> ok;
                 {error, _Reason2}              -> PeerAddress = PeerPort = "n/a"
             end,
-            case inet:getstat(Socket, [recv_avg, recv_cnt, recv_oct,
+            case getstat(Socket, [recv_avg, recv_cnt, recv_oct,
                                        send_avg, send_cnt, send_oct]) of
                 {ok, [{recv_avg, RcvAgv}, {recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
                       {send_avg, SendAgv}, {send_cnt, SendCnt}, {send_oct, SendBytes}]} -> ok;
@@ -347,8 +328,8 @@ report_stats(State) ->
     case socket(State) of
         notconnected -> State;
         Socket ->
-            case inet:getstat(Socket, [recv_cnt, recv_oct,
-                                       send_cnt, send_oct]) of
+            case getstat(Socket, [recv_cnt, recv_oct,
+                                  send_cnt, send_oct]) of
                 {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
                       {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
                     PrevStat = last_stat_report(State),
@@ -453,7 +434,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
             set_socket(reset_msg_counters(State), notconnected);
         Socket ->
             ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
-            case gen_tcp:send(Socket, BinaryMessage) of
+            case ?COMM:send(Socket, BinaryMessage) of
                 ok ->
                     ?TRACE("~.0p Sent message ~.0p~n",
                            [pid_groups:my_pidname(), Message]),
@@ -524,13 +505,13 @@ new_connection(Address, Port, MyPort, Channel) ->
                      non_neg_integer())
         -> inet:socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel, Retries) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
+    case ?COMM:connect(Address, Port, [binary, {packet, 4}]
                          ++ comm_server:tcp_options(Channel),
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
             % send end point data (the other node needs to know my listen port
             % in order to have only a single connection to me)
-            case inet:sockname(Socket) of
+            case sockname(Socket) of
                 {ok, {MyAddress, _SocketPort}} ->
                     case comm_server:get_local_address_port() of
                         {undefined,_} ->
@@ -539,13 +520,13 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
                     end,
                     Message = term_to_binary({endpoint, MyAddress, MyPort, Channel},
                                              [{compressed, 2}, {minor_version, 1}]),
-                    _ = gen_tcp:send(Socket, Message),
+                    _ = ?COMM:send(Socket, Message),
                     Socket;
                 {error, Reason} ->
                     % note: this should not occur since the socket was just created with 'ok'
                     log:log(error,"[ CC ~p (~p) ] reconnect because socket is ~.0p",
                             [self(), pid_groups:my_pidname(), Reason]),
-                    gen_tcp:close(Socket),
+                    ?COMM:close(Socket),
                     new_connection(Address, Port, MyPort, Channel, Retries + 1)
             end;
         {error, Reason} ->
@@ -568,7 +549,7 @@ reconnect(State) ->
 
 -spec close_connection(Socket::inet:socket(), State::state()) -> state().
 close_connection(Socket, State) ->
-    gen_tcp:close(Socket),
+    ?COMM:close(Socket),
     case socket(State) of
         Socket ->
             % report stats out of the original schedule
@@ -808,3 +789,66 @@ zip_and_foldr(_F, [], []) ->
 zip_and_foldr(F, [El1 | R1] , [El2 | R2]) ->
     zip_and_foldr(F, R1, R2),
     F(El1, El2).
+
+sockname(Socket) ->
+    case ?COMM of
+        ssl ->
+            ssl:sockname(Socket);
+        gen_tcp ->
+            inet:sockname(Socket)
+    end.
+
+peername(Socket) ->
+    case ?COMM of
+        ssl ->
+            ssl:peername(Socket);
+        gen_tcp ->
+            inet:peername(Socket)
+    end.
+
+getstat(Socket, Options) ->
+    case ?COMM of
+        ssl ->
+            ssl:getstat(Socket, Options);
+        gen_tcp ->
+            inet:getstat(Socket, Options)
+    end.
+
+setopts(Socket, Options) ->
+    case ?COMM of
+        ssl ->
+            ssl:setopts(Socket, Options);
+        gen_tcp ->
+            inet:setopts(Socket, Options)
+    end.
+
+handle_data(Socket, Data, State) ->
+    DeliverMsg = ?COMM_DECOMPRESS_MSG(Data, State),
+    NewState =
+        case DeliverMsg of
+            {?deliver, ?unpack_msg_bundle, Message} ->
+                ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
+                ?TRACE("Received message ~.0p", [Message]),
+                lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg, State) end,
+                            ok, Message),
+                %% may fail, when tcp just closed
+                _ = setopts(Socket, [{active, once}]),
+                save_n_msgs(Message, fun set_last_msg_received/2, State);
+            {?deliver, Process, Message} ->
+                ?TRACE("Received message ~.0p", [Message]),
+                ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
+                forward_msg(Process, Message, State),
+                %% may fail, when tcp just closed
+                _ = setopts(Socket, [{active, once}]),
+                save_n_msgs(Message, fun set_last_msg_received/2, State);
+            {user_close} ->
+                log:log(warn,"[ CC ~p (~p) ] tcp user_close request", [self(), pid_groups:my_pidname()]),
+                close_connection(Socket, State);
+            Unknown ->
+                log:log(warn,"[ CC ~p (~p) ] unknown message ~.0p", [self(), pid_groups:my_pidname(), Unknown]),
+                %% may fail, when tcp just closed
+                _ = setopts(Socket, [{active, once}]),
+                State
+        end,
+    New2State = set_time_last_msg_seen(NewState),
+    send_bundle_if_ready(New2State).

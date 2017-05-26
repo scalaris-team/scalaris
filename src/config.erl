@@ -1,4 +1,4 @@
-%  @copyright 2007-2014 Zuse Institute Berlin
+%  @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -182,7 +182,8 @@ check_config() ->
                          fun lb_psv_split:check_config/0,
                          fun lb_psv_gossip:check_config/0,
                          fun gossip:check_config/0,
-                         fun comm_acceptor:check_config/0,
+                         fun comm_tcp_acceptor:check_config/0,
+                         fun comm_ssl_acceptor:check_config/0,
                          fun monitor:check_config/0,
                          fun monitor_perf:check_config/0,
                          fun rrd:check_config/0,
