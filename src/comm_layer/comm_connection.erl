@@ -1,4 +1,4 @@
-%% @copyright 2007-2015 Zuse Institute Berlin
+%% @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -798,6 +798,7 @@ sockname(Socket) ->
             inet:sockname(Socket)
     end.
 
+-spec peername(Socket::inet:socket()|ssl:socket()) -> term().
 peername(Socket) ->
     case ?COMM of
         ssl ->
@@ -814,6 +815,7 @@ getstat(Socket, Options) ->
             inet:getstat(Socket, Options)
     end.
 
+-spec setopts(Socket::inet:socket()|ssl:socket(), list()) -> term().
 setopts(Socket, Options) ->
     case ?COMM of
         ssl ->
