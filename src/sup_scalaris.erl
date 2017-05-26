@@ -1,4 +1,4 @@
-%  @copyright 2007-2015 Zuse Institute Berlin
+%  @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ start_link() -> start_link([]).
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
     ServiceGroup = basic_services,
+    Pid = spawn(fun() -> timer:sleep(5*1000), dump_processes() end),
     Link = sup:sup_start({local, main_sup}, ?MODULE,
                          [{service_group, ServiceGroup} | Options]),
     case Link of
@@ -62,6 +63,7 @@ start_link(Options) ->
                     end
             end,
             add_additional_nodes(),
+            exit(Pid, kill),
             case util:is_unittest() of
                 true -> ok;
                 _    -> io:format("Scalaris started successfully."
@@ -276,13 +278,17 @@ stop_first_services() ->
     ok.
 
 -spec start_mnesia() -> ok.
-
-start_mnesia() -> 
+start_mnesia() ->
   case config:read(db_backend) of
     db_mnesia -> db_mnesia:start();
     _ -> ok
   end.
 
+dump_processes() ->
+    Processes = [ {X, process_info(X, [initial_call,current_location, current_stacktrace])}
+                  || X <- processes()],
+    io:format("~p~n", [lists:last(Processes)]),
+    ok.
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
