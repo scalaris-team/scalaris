@@ -8665,6 +8665,25 @@ fi
 
 ###########################################################
 #
+# check for ssl:getstat/2 for ssl
+#
+###########################################################
+SSL_GETSTAT=false
+ssl_getstat=`"${ERL}" -noshell -eval 'io:format("~p~n", [erlang:function_exported(ssl,getstat,2)]), erlang:halt().' | tail -1`
+if test "${ssl_getstat}" = "true"; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ssl_getstat}"
+       EDOCMACROS="${EDOCMACROS}, {have_ssl_getstat, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_ssl_getstat"
+       SSL_GETSTAT=true
+       { $as_echo "$as_me:${as_lineno-$LINENO}: ssl:getstat() is available" >&5
+$as_echo "$as_me: ssl:getstat() is available" >&6;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: ssl:getstat() is not available" >&5
+$as_echo "$as_me: ssl:getstat() is not available" >&6;}
+fi
+
+###########################################################
+#
 # all defines together...
 #
 ###########################################################
@@ -10408,6 +10427,12 @@ if test "x$ERLANG_TOKE_FLAGS" = "x" ; then
   echo "  toke                 : no"
 else
   echo "  toke                 : yes"
+fi
+
+if test "x$SSL_GETSTAT_FLAGS" = "xtrue" ; then
+  echo "  ssl                  : no"
+else
+  echo "  ssl                  : yes"
 fi
 
 if test "x$enabled_cxx" = "x0" ; then

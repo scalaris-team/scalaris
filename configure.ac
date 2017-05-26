@@ -544,6 +544,21 @@ AS_IF([test "${erlang_timestamp}" = "true"],
 
 ###########################################################
 #
+# check for ssl:getstat/2 for ssl
+#
+###########################################################
+SSL_GETSTAT=false
+ssl_getstat=`"${ERL}" -noshell -eval 'io:format("~p~n", [[erlang:function_exported(ssl,getstat,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${ssl_getstat}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ssl_getstat}"
+       EDOCMACROS="${EDOCMACROS}, {have_ssl_getstat, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_ssl_getstat"
+       SSL_GETSTAT=true
+       AC_MSG_NOTICE([ssl:getstat() is available])],
+      [AC_MSG_NOTICE([ssl:getstat() is not available])])
+
+###########################################################
+#
 # all defines together...
 #
 ###########################################################
@@ -787,6 +802,12 @@ if test "x$ERLANG_TOKE_FLAGS" = "x" ; then
   echo "  toke                 : no"
 else
   echo "  toke                 : yes"
+fi
+
+if test "x$SSL_GETSTAT_FLAGS" = "xtrue" ; then
+  echo "  ssl                  : no"
+else
+  echo "  ssl                  : yes"
 fi
 
 if test "x$enabled_cxx" = "x0" ; then
