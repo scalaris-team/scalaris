@@ -63,6 +63,7 @@ DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
 cmd=""
 NODES_PER_VM=""
+SCALARIS_LOCAL_CFG="scalaris.local.cfg"
 
 usage(){
     echo "usage: scalarisctl [options] <cmd>"
@@ -87,6 +88,7 @@ usage(){
     echo "                - number of Scalaris nodes to start inside the VM"
     echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart|first_nostart"
     echo "    -m          - start global Scalaris management server"
+    echo "    -s <file>   - use the given file name as the scalaris.local.cfg"
     echo " <cmd>:"
     echo "    checkinstallation"
     echo "                - test installation"
@@ -276,13 +278,13 @@ checkinstallation() {
         exit 1
     fi
 
-    if [ -e $ETCDIR/scalaris.local.cfg ]; then
-        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
+    if [ -e $ETCDIR/$SCALARIS_LOCAL_CFG ]; then
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/$SCALARIS_LOCAL_CFG\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo -e "$MSG_FAILED"
-            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
-            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            echo "ERROR: there is a syntax error in: $ETCDIR/$SCALARIS_LOCAL_CFG"
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/$SCALARIS_LOCAL_CFG\"), io:format(\"~p~n\", [A]), halt(0) end\""
             exit 1
         fi
     fi
@@ -358,7 +360,7 @@ checkinstallation() {
 
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
          -scalaris config \"$ETCDIR/scalaris.cfg\" \
-         -scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+         -scalaris local_config \"$ETCDIR/$SCALARIS_LOCAL_CFG\" \
          -scalaris start_type nostart \
          -s scalaris load -eval "config:init([]), halt(0)." 2>&1`
     FAILED=$?
@@ -369,7 +371,7 @@ checkinstallation() {
         echo "We were trying to run: \
           $ERL -noinput -pa $BEAMDIR \
 -scalaris config \"$ETCDIR/scalaris.cfg\" \
--scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+-scalaris local_config \"$ETCDIR/$SCALARIS_LOCAL_CFG\" \
 -scalaris start_type nostart \
 -s scalaris load -eval \"config:init([]), halt(0).\""
         exit 1
@@ -731,7 +733,7 @@ scalarisstart(){
  -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
  -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
- -scalaris local_config \"\\\"$ETCDIR/scalaris.local.cfg\\\"\"\
+ -scalaris local_config \"\\\"$ETCDIR/$SCALARIS_LOCAL_CFG\\\"\"\
  -connect_all false -hidden -name $NODE_NAME\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
@@ -857,7 +859,7 @@ until [ -z "$1" ]; do
       DBG_CHECK_RING_TIMEOUT=$1
       shift;;
     *)
-      if getopts "dhifqmsvn:p:y:k:j:e:c:l:t:" optionName; then
+      if getopts "dhifqmvn:p:y:k:j:e:c:l:s:t:" optionName; then
         case "$optionName" in
             c) SCALARIS_COOKIE=$OPTARG;;
             e) erl_flags=$OPTARG;;
@@ -871,6 +873,7 @@ until [ -z "$1" ]; do
             p) port=$OPTARG;;
             y) yaws_port=$OPTARG;;
             m) start_mgmt_server=1;;
+            s) SCALARIS_LOCAL_CFG=$OPTARG;;
             t) start_type=$OPTARG;;
             v) echo setting verbose from cli
                verbose=1;;
