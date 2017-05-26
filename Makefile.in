@@ -154,6 +154,8 @@ test-skipped: skipped_TESTS
 
 test-repeated: repeated_TESTS
 
+test-ssl: ssl_TESTS
+
 SUITES := $(patsubst test/%.erl,%,$(wildcard test/*_SUITE.erl))
 
 ${SUITES}: compile
