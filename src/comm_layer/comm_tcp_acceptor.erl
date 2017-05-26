@@ -18,7 +18,7 @@
 %%      This module accepts new connections and starts corresponding
 %%      comm_connection processes.
 %% @version $Id$
--module(comm_acceptor).
+-module(comm_tcp_acceptor).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
