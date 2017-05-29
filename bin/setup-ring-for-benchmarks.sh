@@ -15,6 +15,7 @@
 
 RINGSIZE=4
 NODEPREFIX=ebench_node
+BADNODES=0
 WITHSSL=""
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
 SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
@@ -23,6 +24,8 @@ usage(){
     echo " options:"
     echo "    --ring-size <number>   - the number of nodes"
     echo "    --ssl                  - enable ssl"
+    echo "    --ssl-strict           - enable ssl with CA"
+    echo "    --bad-nodes <number>   - the number of nodes with different CA"
     echo " <cmd>:"
     echo "    start       - start a ring"
     echo "    stop        - stop a ring"
@@ -52,11 +55,24 @@ start_ring(){
         ./bin/scalarisctl -d -k $key -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start $WITHSSL
 
     done
+
+    for nodes in `seq 1 $BADNODES`; do
+        let idx+=1
+        let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx-1
+        let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
+        ./bin/scalarisctl -d -n "${NODEPREFIX}$idx" -p $TESTPORT -y $YAWSPORT -t joining -s scalaris.local.ssl.bad.cfg start
+    done
+
+    if [ $BADNODES -ne 0 ]; then
+        sleep 5 ## give bad nodes a chance to join
+    fi
+
     ./bin/scalarisctl -n "${NODEPREFIX}1" dbg-check-ring $RINGSIZE 30
 }
 
 stop_ring(){
-    for idx in `seq 1 $RINGSIZE`; do
+    let NODES=$RINGSIZE+$BADNODES
+    for idx in `seq 1 $NODES`; do
         ./bin/scalarisctl -n "${NODEPREFIX}$idx" stop
     done
 }
@@ -72,6 +88,10 @@ until [ -z "$1" ]; do
             shift;;
         "--ssl-strict")
             WITHSSL="-s scalaris.local.ssl.good.cfg"
+            shift;;
+        "--bad-nodes")
+            shift
+            BADNODES=$1
             shift;;
         "--ring-size")
             shift
