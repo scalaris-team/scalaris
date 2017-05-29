@@ -70,6 +70,9 @@ until [ -z "$1" ]; do
         "--ssl")
             WITHSSL="-s scalaris.local.ssl.cfg"
             shift;;
+        "--ssl-strict")
+            WITHSSL="-s scalaris.local.ssl.good.cfg"
+            shift;;
         "--ring-size")
             shift
             RINGSIZE=$1
