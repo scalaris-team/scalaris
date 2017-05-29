@@ -112,6 +112,13 @@ server(LS) ->
 
 -spec open_listen_port(comm_server:tcp_port(), IP::inet:ip_address()) -> inet:socket() | abort.
 open_listen_port(Port, IP) ->
+    StrictOpts =
+        case config:read(ssl_mode) of
+            strict -> [{cacertfile, config:read(cacertfile)},
+                       {password, config:read(ssl_password)},
+                       {verify, verify_peer}];
+            normal -> []
+        end,
     case ssl:listen(Port, [
                            {certfile, config:read(certfile)},
                            {keyfile, config:read(keyfile)},
@@ -121,7 +128,7 @@ open_listen_port(Port, IP) ->
                            {ip, IP},
                            {backlog, 128}
                           ]
-                    ++ comm_server:tcp_options(main)) of
+                    ++ StrictOpts ++ comm_server:tcp_options(main)) of
         {ok, ListenSocket} ->
             log:log(info,"[ CC ] listening on ~p:~p", [IP, Port]),
             ListenSocket;
@@ -138,3 +145,6 @@ check_config() ->
     config:cfg_exists(keyfile) and
     config:cfg_is_port(port) and
     config:cfg_is_ip(listen_ip, true).
+
+
+%% @doc https://gist.github.com/mtigas/952344

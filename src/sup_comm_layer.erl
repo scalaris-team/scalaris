@@ -55,12 +55,12 @@ childs([]) ->
         sup:worker_desc(comm_server, comm_server, start_link,
                              [CommLayerGroup]),
     CommAcceptor =
-        case config:read(ssl) of
-            true ->
+        case config:read(comm_backend) of
+            ssl ->
                 ok = ssl:start(), % ssl was requested otherwise fail
                 sup:worker_desc(comm_ssl_acceptor, comm_ssl_acceptor, start_link,
                                 [CommLayerGroup]);
-            _ ->
+            gen_tcp ->
                 sup:worker_desc(comm_tcp_acceptor, comm_tcp_acceptor, start_link,
                                 [CommLayerGroup])
         end,

@@ -505,6 +505,12 @@ new_connection(Address, Port, MyPort, Channel) ->
                      non_neg_integer())
         -> inet:socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel, Retries) ->
+    StrictOpts =
+        case config:read(ssl_mode) of
+            strict -> [{cacertfile, config:read(cacertfile)},
+                       {password, config:read(ssl_password)}];
+            normal -> []
+        end,
     SSLOpts = case ?COMM of
                   ssl -> [{certfile, config:read(certfile)},
                           {keyfile, config:read(keyfile)},
@@ -513,7 +519,7 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
                   gen_tcp -> []
               end,
     case ?COMM:connect(Address, Port, [binary, {packet, 4}]
-                         ++ comm_server:tcp_options(Channel) ++ SSLOpts,
+                         ++ comm_server:tcp_options(Channel) ++ StrictOpts ++ SSLOpts,
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
             % send end point data (the other node needs to know my listen port
