@@ -147,4 +147,4 @@ check_config() ->
     config:cfg_is_ip(listen_ip, true).
 
 
-%% @doc https://gist.github.com/mtigas/952344
+%% https://gist.github.com/mtigas/952344
