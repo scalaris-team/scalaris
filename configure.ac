@@ -547,6 +547,7 @@ AS_IF([test "${erlang_timestamp}" = "true"],
 # check for ssl:getstat/2 for ssl
 #
 ###########################################################
+## https://github.com/erlang/otp/commit/84fd2c325c9e38b5ea2307b6133c3d15b33a3241
 SSL_GETSTAT=false
 ssl_getstat=`"${ERL}" -noshell -eval 'io:format("~p~n", [[erlang:function_exported(ssl,getstat,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${ssl_getstat}" = "true"],
