@@ -811,7 +811,7 @@ sockname(Socket) ->
             inet:sockname(Socket)
     end.
 
--spec peername(Socket::inet:socket()|ssl:socket()) -> term().
+-spec peername(Socket::inet:socket()|ssl:sslsocket()) -> term().
 peername(Socket) ->
     case ?COMM of
         ssl ->
@@ -828,7 +828,7 @@ getstat(Socket, Options) ->
             inet:getstat(Socket, Options)
     end.
 
--spec setopts(Socket::inet:socket()|ssl:socket(), list()) -> term().
+-spec setopts(Socket::inet:socket()|ssl:sslsocket(), list()) -> term().
 setopts(Socket, Options) ->
     case ?COMM of
         ssl ->

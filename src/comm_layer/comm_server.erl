@@ -42,7 +42,8 @@
 
 -type tcp_port() :: 0..65535.
 -type message() ::
-    {create_connection, Address::inet:ip_address(), Port::tcp_port(), Socket::inet:socket() | notconnected, Channel::comm:channel(), Client::pid()} |
+    {create_connection, Address::inet:ip_address(), Port::tcp_port(),
+     Socket::inet:socket() | ssl:sslsocket(), Channel::comm:channel(), Client::pid()} |
     {send, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Message::comm:message()} |
     {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Client::pid()} |
     {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
@@ -226,7 +227,7 @@ tcp_options(Channel) ->
 
 %% @doc Synchronous call to create (or get) a connection for the given Address+Port using Socket.
 -spec create_connection(Address::inet:ip_address(), Port::tcp_port(),
-                        Socket::inet:socket() | ssl:socket(), Channel::comm:channel()) -> pid().
+                        Socket::inet:socket() | ssl:sslsocket(), Channel::comm:channel()) -> pid().
 create_connection(Address, Port, Socket, Channel) ->
     ?MODULE ! {create_connection, Address, Port, Socket, Channel, self()},
     receive {create_connection_done, ConnPid} -> ConnPid end.
