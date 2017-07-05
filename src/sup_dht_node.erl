@@ -1,4 +1,4 @@
-%  @copyright 2007-2015 Zuse Institute Berlin
+%  @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -76,6 +76,9 @@ childs([{DHTNodeGroup, Options}]) ->
     Gossip =
         sup:worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
 
+    VivaldiLatency =
+        sup:worker_desc(vivaldi_latency, vivaldi_latency, start_link, [DHTNodeGroup]),
+
     GossipCyclonFeeder =
         sup:worker_desc(gossip_cyclon_feeder, gossip_cyclon_feeder, start_link, [DHTNodeGroup]),
 
@@ -123,6 +126,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     DeadNodeCache,
                     RoutingTable,
                     DC_Clustering,
+                    VivaldiLatency,
                     Gossip,
                     GossipCyclonFeeder,
                     SnapshotLeader,

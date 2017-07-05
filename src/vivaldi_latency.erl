@@ -1,4 +1,4 @@
-%  @copyright 2009-2015 Zuse Institute Berlin
+%  @copyright 2009-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -24,14 +24,19 @@
 
 -include("scalaris.hrl").
 
--export([on/2, init/1]).
+-export([start_link/1, on/2, init/1]).
 
 -export([measure_latency/3, check_config/0]).
 
 -include("gen_component.hrl").
 
-% state of the vivaldi loop
--type state() ::
+%% state of the vivaldi loop
+-type state() :: {gb_trees:tree(task_id(), task_state()), task_id()}.
+
+-type task_id() :: non_neg_integer().
+
+%% state per task
+-type task_state() ::
     {Owner::comm:erl_local_pid(),
      RemotePid::comm:mypid(),
      Token::{gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()},
@@ -39,12 +44,13 @@
      Count::non_neg_integer(),
      Latencies::[gossip_vivaldi:latency()]}.
 
+-type token() :: {gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()}.
+
 % accepted messages of vivaldi_latency processes
 -type message() ::
-    {{pong, PidName::pid_groups:pidname() | undefined}, Count::pos_integer()} |
-    {start_ping} |
-    {shutdown} |
-    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
+    {ping_reply, {pong, term()}, TaskId::task_id()} |
+    {start_ping, Owner::comm:erl_local_pid(), RemotePid::comm:mypid(), Token::token()} |
+    {shutdown, TaskId::task_id()}.
 
 -define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
 
@@ -54,63 +60,73 @@
 
 %% @doc message handler
 -spec on(Message::message(), State::state()) -> state().
-on({ping_reply, {pong, gossip}, Count},
-   {Owner, RemotePid, Token, Start, Count, Latencies})
-  when Start =/= unknown ->
-    Stop = os:timestamp(),
-    NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
-    case Count =:= config:read(gossip_vivaldi_count_measurements) of
-        true ->
-            Msg = {cb_msg, {gossip_vivaldi, default},
-                   {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}},
-            comm:send_local(Owner, Msg),
-            kill;
-        false ->
-            msg_delay:send_local(config:read(gossip_vivaldi_measurements_delay),
-                                 self(), {start_ping}),
-            {Owner, RemotePid, Token, unknown, Count, NewLatencies}
+on({ping_reply, {pong, gossip}, TaskId}, State = {Tasks, NextTask}) ->
+    case gb_trees:lookup(TaskId, Tasks) of
+        {value, Task} ->
+            {Owner, RemotePid, Token, Start, Count, Latencies} = Task,
+            Stop = os:timestamp(),
+            NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
+            case Count =:= config:read(gossip_vivaldi_count_measurements) of
+                true ->
+                    Msg = {cb_msg, {gossip_vivaldi, default},
+                           {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}},
+                    comm:send_local(Owner, Msg),
+                    {gb_trees:delete(TaskId, Tasks), NextTask};
+                false ->
+                    SPid = comm:reply_as(comm:this(), 2, {ping_reply, '_', TaskId}),
+                    comm:send(RemotePid, {ping, SPid}, ?SEND_OPTIONS),
+                    UpdatedTask = {Owner, RemotePid, Token, os:timestamp(),
+                                   Count+1, NewLatencies},
+                    {gb_trees:enter(TaskId, UpdatedTask, Tasks), NextTask}
+            end;
+        none ->
+            State
     end;
 
-on({ping_reply, {pong, _PidName}, _Count}, State) ->
+on({ping_reply, {pong, _PidName}, _TaskId}, State) ->
     % ignore unrelated pong messages
     State;
 
-on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
-    NewCount = Count + 1,
-    SPid = comm:reply_as(comm:this(), 2, {ping_reply, '_', NewCount}),
+on({start_ping, Owner, RemotePid, Token}, {Tasks, NextTask}) ->
+    %%NewCount = Count + 1,
+    SPid = comm:reply_as(comm:this(), 2, {ping_reply, '_', NextTask}),
     comm:send(RemotePid, {ping, SPid}, ?SEND_OPTIONS),
-    {Owner, RemotePid, Token, os:timestamp(), NewCount, Latencies};
+    Count = config:read(gossip_vivaldi_count_measurements),
+    msg_delay:send_local(Count * config:read(gossip_vivaldi_latency_timeout),
+                         self(), {shutdown, NextTask}, [{?quiet}]),
+    Task = {Owner, RemotePid, Token, os:timestamp(), 1, []},
+    {gb_trees:enter(NextTask, Task, Tasks), NextTask+1};
 
-on({shutdown}, _State) ->
-    log:log(info, "shutdown vivaldi_latency due to timeout", []),
-    kill;
+on({shutdown, TaskId}, {Tasks, NextTask}) ->
+    %% log:log(info, "shutdown vivaldi_latency due to timeout", []),
+    {gb_trees:delete_any(TaskId, Tasks), NextTask};
 
-on({'DOWN', MonitorRef, process, Owner, _Info},
-   {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
-    log:log(info, "shutdown vivaldi_latency due to vivaldi shutting down", []),
-    gen_component:demonitor(MonitorRef),
-    kill.
+on(Msg, State) ->
+    io:format("vivaldi unknown message: ~p~n", [Msg]),
+    State.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({pid(), comm:mypid(), {gossip_vivaldi:network_coordinate(),
-                                  gossip_vivaldi:est_error()}}) -> state().
-init({Owner, RemotePid, Token}) ->
-    msg_delay:send_local(config:read(gossip_vivaldi_latency_timeout),
-                         self(), {shutdown}, [{?quiet}]),
-    comm:send_local(self(), {start_ping}),
-    gen_component:monitor(Owner),
-    {Owner, RemotePid, Token, unknown, 0, []}.
+-spec init(Args::term()) -> state().
+init([]) ->
+    %% {Owner, RemotePid, Token, unknown, 0, []}.
+    {gb_trees:empty(), 0}.
+
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, vivaldi_latency},
+                              {wait_for_init}]).
 
 -spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(),
-                      gossip_vivaldi:est_error()) -> {ok, pid()}.
+                      gossip_vivaldi:est_error()) -> ok.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
-    PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, RemotePid, randoms:getRandomString()])),
-    gen_component:start(?MODULE, fun ?MODULE:on/2,
-                        {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}},
-                        [{pid_groups_join_as, pid_groups:my_groupname(),
-                          {short_lived, PidName}}]).
+    Pid = pid_groups:find_a(vivaldi_latency),
+    Token = {RemoteCoordinate, RemoteConfidence},
+    comm:send_local(Pid, {start_ping, self(), RemotePid, Token}),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
