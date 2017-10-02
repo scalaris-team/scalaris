@@ -749,6 +749,6 @@ get_commuting_wf_for_rf(RF) ->
              fun ?MODULE:wf_unset_wl/3];
         {?MODULE, rf_wl_vers} ->
             [fun ?MODULE:wf_set_rl/3,
-             fun ?MODULE:wf_unset_rf/3];
+             fun ?MODULE:wf_unset_rl/3];
         _ -> []
     end.
