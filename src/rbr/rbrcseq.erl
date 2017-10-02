@@ -1188,40 +1188,46 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                         RF           -> RF
                     end,
 
-                IsNoopRead = ReadFilter =:= fun prbr:noop_read_filter/1,
-                IsCommutingRead = OpType =:= read andalso
-                                      is_read_commuting(ReadFilter, NewHighestWF, Datatype),
+                ConsReadRounds = ReplyCount =:= R3#rr_replies.highest_read_count,
+                ConsWriteRounds = ReplyCount =:= NewWriteState#write_state.highest_write_count,
+                ConsQuorum = ConsReadRounds andalso ConsWriteRounds,
 
-                if IsCommutingRead ->
-                       {consistent, R3};
-                   ReplyCount =/= NewWriteState#write_state.highest_write_count
-                        andalso not IsNoopRead ->
-                       %% There is a write in progress and we do not use a noop read filter
-                       %% It is verly likely (although not 100% certain) that the qread
-                       %% will also see inconsistent write rounds. Since we do not use
-                       %% a noop read filter, write through initiate will start a new read
-                       %% anyway. Therefore, we can safely skip qread and go directly to
-                       %% write through initiate and prevent doing the same thing twice.
-                       {write_through, R3};
-                   ReplyCount =/= NewWriteState#write_state.highest_write_count ->
-                       %% Inconsitent quorum due to write round discrepancy,
-                       %% proceed to qread.
-                       {inconsistent, R3};
-                   ReplyCount =/= R3#rr_replies.highest_read_count andalso OpType =/= read ->
-                       %% Inconsitent quorum due to read round discrepancy.
-                       %% If this round request is part of a read, then it does not matter if
-                       %% there is a write in progress which has not yet written the majority.
-                       %% Since the read and write are concurrent and the read does not interfere
-                       %% with writes, the read can return the older value. -> As far as reads
-                       %% are concerned, we still have a consistent quorum, therefore use the case
-                       %% below.
-                       {inconsistent, R3};
-                    true ->
-                        %% Consistent quorum. Deliver the result to client
+                IsRead = OpType =:= read,
+                IsCommutingRead = IsRead andalso is_read_commuting(ReadFilter, NewHighestWF, Datatype),
+                UsedPartialReadFilter = ReadFilter =/= fun prbr:noop_read_filter/1,
+
+                if  %% A consistent quorum is the base case for successful delivery
+                    ConsQuorum orelse
+                    %% Reads never interfere with writes. Here, read rounds are inconsistent
+                    %% which means there is a write in progress. But we can be certain that
+                    %% the write is not done because the write rounds are consistent. Thus,
+                    %% this read is concurrent to the write and the 'old' state can be safely
+                    %% delivered.
+                    (IsRead andalso ConsWriteRounds) orelse
+                    %% this is a read operation that commutes with in-progress write
+                    IsCommutingRead ->
+                        %% construct value from received replies (has no effect when
+                        %% data is simply replicated).
                         CollectedVal = NewWriteState#write_state.value,
                         ReadValue = ?REDUNDANCY:get_read_value(CollectedVal, ReadFilter),
                         T1 = R3#rr_replies{write_state=NewWriteState#write_state{value=ReadValue}},
-                        {consistent, T1}
+                        {consistent, T1};
+
+                    %% There is a write in progress (however, a majority might have
+                    %% already accepted the proposal). It is very likely that a
+                    %% subsequent qread will also see inconsistent write rounds
+                    %% which will trigger a WriteThrough. Since this request does
+                    %% not use a noop read filter, write_through_initiate will start
+                    %% a new read anyway. Therefore, we can safely skip qread here
+                    %% and proceed directly to the WriteThrough to prevent doing the
+                    %% same thing twice.
+                    not ConsWriteRounds andalso UsedPartialReadFilter ->
+                        {write_through, R3};
+
+                    %% For everything else, the default is starting a qread which
+                    %% might receive a consistent state
+                    true ->
+                        {inconsistent, R3}
                 end;
             false ->
                 %% no majority yet
