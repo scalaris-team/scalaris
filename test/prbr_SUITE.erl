@@ -316,7 +316,8 @@ tester_type_check_rbr(_Config) ->
            [ {commit_read, 5},  %% tested via feeder
              {commit_write, 5}, %% tested via feeder
              {abort_read, 5},   %% tested via feeder
-             {abort_write, 5}], %% tested via feeder
+             {abort_write, 5},  %% tested via feeder
+             {get_commuting_wf_for_rf, 1}], %% cannot create funs
            []},
           {pr,
            [
@@ -334,7 +335,7 @@ tester_type_check_rbr(_Config) ->
              {tab2list, 1},         %% needs valid ets:tid()
              {tab2list_raw_unittest, 1} %% needs valid ets:tid()
           ],
-           [ {msg_read_reply, 5},  %% sends messages
+           [ {msg_read_reply, 6},  %% sends messages
              {msg_write_reply, 6}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
              {tab2list_raw, 1}     %% needs valid ets:tid()
@@ -353,12 +354,13 @@ tester_type_check_rbr(_Config) ->
            [ {inform_client, 3}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid ets:tid()
              {set_entry, 2},     %% needs valid ets:tid()
-             {add_rr_reply, 9},  %% needs client_value matching db_type
-             {add_read_reply, 9},%% needs client_value matching db_type
-             {update_highest_write_round, 6}, %% needs client_value matching db_type
+             {add_rr_reply, 10},  %% needs client_value matching db_type
+             {add_read_reply, 11},%% needs client_value matching db_type
+             {update_highest_write_round, 8}, %% needs client_value matching db_type
              {add_read_deny, 5}, %% needs valid entry()
              {add_write_reply, 3},%% needs valid entry()
-             {add_write_deny, 3} %% needs valid entry()
+             {add_write_deny, 3}, %% needs valid entry()
+             {is_read_commuting, 3} %% cannot create funs
            ]},
           {replication,
            [ {get_read_value, 2},     %% cannot create funs
@@ -388,7 +390,7 @@ modify_rbr_at_key(R, N) ->
                    comm:send_local(pid_groups:find_a(dht_node),
                                    {?lookup_aux, Repl, 0, LookupReadEnvelope}),
                    receive
-                       {round_request_reply, _, AssignedRound, OldWriteRound,  _Val, _OpType} ->
+                       {round_request_reply, _, AssignedRound, OldWriteRound,  _Val, _LastWF} ->
                            {AssignedRound, OldWriteRound}
                    end
                end || Repl <- ?RT:get_replica_keys(R) ],

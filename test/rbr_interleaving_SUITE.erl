@@ -33,7 +33,8 @@ all() -> [
           test_link_slowing,
           test_link_slowing2,
           test_interleaving,
-          test_write_through_notifies_original_proposer
+          test_write_through_notifies_original_proposer,
+          test_read_write_commuting
          ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -181,9 +182,62 @@ test_write_through_notifies_original_proposer(_Config) ->
     {ok, Value} = read_via_node(3, Key, element(1, filter_list_append())),
     ?equals_w_note(Value, ["WriteB", "WriteA"], "Values must match exactly due to interleaving").
 
+test_read_write_commuting(_Config) ->
+    Key = "123",
+
+    % write baseline
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+    _ = write_via_node(1, Key, {fun prbr:noop_read_filter/1,
+                                fun ?MODULE:cc_noop/3,
+                                fun prbr:noop_write_filter/3},
+                       {"A", "B"}),
+
+    [receive {message_received} -> ok end || _ <- lists:seq(1,4)],
+
+    _ = slow_link(1, kv_db, 4, dht_node, write),
+    _ = write_via_node(1, Key, {fun ?MODULE:rf_second/1,
+                                fun ?MODULE:cc_noop/3,
+                                fun ?MODULE:wf_second/3}, "C"),
+
+    PrbrDataBeforeRead = prbr_data(),
+    _ = slow_link(4, kv_db, 1, dht_node),
+    {ok, "A"} = read_via_node(4, Key, fun ?MODULE:rf_first/1),
+    PrbrDataAfterRead = prbr_data(),
+    ?equals_w_note(PrbrDataBeforeRead, PrbrDataAfterRead,
+                   "Read was independent from write and thus should not have caused a "
+                   "write through"),
+    ok.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec get_commuting_wf_for_rf(prbr:read_filter()) ->
+        [prbr:write_filter()].
+get_commuting_wf_for_rf(ReadFilter) ->
+    {name, Name} = erlang:fun_info(ReadFilter, name),
+    {module, Module} = erlang:fun_info(ReadFilter, module),
+    case {Module, Name} of
+        {?MODULE, rf_first} ->
+            [fun ?MODULE:wf_second/3];
+        _ ->
+            ct:pal("~p", [[Name, Module]]),
+            []
+    end.
+
+-spec rf_first(prbr_bottom | {any(), any()}) -> any().
+rf_first(prbr_bottom) -> prbr_bottom;
+rf_first({A, _B}) -> A.
+-spec rf_second(prbr_bottom | {any(), any()}) -> any().
+rf_second(prbr_bottom) -> prbr_bottom;
+rf_second({_A,B}) -> B.
+
+-spec cc_noop(any(), any(), any()) ->
+        {true, none}.
+cc_noop(_, _, _) -> {true, none}.
+-spec wf_second({any(), any()}, any(), any()) ->
+        {{any(), any()}, none}.
+wf_second({A, _B}, _UI, WriteVal) -> {{A, WriteVal}, none}.
 
 %% @doc Simple set of filter which append the given value to a list
 filter_list_append() ->

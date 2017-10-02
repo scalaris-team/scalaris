@@ -63,6 +63,7 @@
                      highest_read_round :: pr:pr(),             %% highest read round received in replies
                      highest_write_count :: non_neg_integer(),  %% number of replies with current highest write round
                      highest_write_round :: pr:pr(),            %% highest write round recieved in replies
+                     highest_write_filter :: prbr:write_filter(),% WF used in last with the highest w round
                      read_value :: any()                        %% value returned from the round_request
                     }).
 
@@ -73,6 +74,7 @@
                     deny_count :: non_neg_integer(),            %% number of denies received
                     highest_write_count :: non_neg_integer(),   %% number of replies with current highest write round
                     highest_write_round :: pr:pr(),             %% highest write round received
+                    highest_write_filter :: prbr:write_filter(),%% WF used last in reply with the highest w round
                     read_value :: any()                         %% value returned frm read request
                    }).
 
@@ -93,6 +95,7 @@
                   comm:erl_local_pid(), %% client
                   any(), %% filter (read) or tuple of filters (write)
                   is_read | any(), %% value to write if entry belongs to write
+                  read | write, %% operation type
                   pr:pr(), %% my round
                   replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
@@ -309,7 +312,7 @@ on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, 
 
     %% create local state for the request id
     Entry = entry_new_round_request(qround_request, ReqId, Key, DataType, Client,
-                                    period(State), ReadFilter, RetriggerAfter),
+                                    period(State), ReadFilter, RetriggerAfter, OpType),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
     State;
@@ -318,7 +321,7 @@ on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, 
 %% If a majority replied and it is a consistent quorum (i.e. all received rounds are the same)
 %% we can deliver the read. If not, a qread with explicit round number is started.
 on({qround_request_collect,
-    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue, OpType}}, State) ->
+    {round_request_reply, Cons, ReceivedReadRound, ReceivedWriteRound, ReadValue, LastWF}}, State) ->
     ?TRACE("rbrcseq:on round_request_collect reply with r_round: ~p~n", [ReceivedReadRound]),
 
     {_Round, ReqId} = pr:get_id(ReceivedReadRound),
@@ -331,7 +334,7 @@ on({qround_request_collect,
             Replies = entry_replies(Entry),
             {Result, NewReplies, NewRound} =
                 add_rr_reply(Replies, db_selector(State), ReceivedReadRound,
-                             ReceivedWriteRound, ReadValue, OpType,
+                             ReceivedWriteRound, ReadValue, entry_optype(Entry), LastWF,
                              entry_datatype(Entry), entry_filters(Entry), Cons),
             TEntry = entry_set_my_round(Entry, NewRound),
             NewEntry = entry_set_replies(TEntry, NewReplies),
@@ -361,7 +364,8 @@ on({qround_request_collect,
                                            entry_datatype(NewEntry),
                                            entry_filters(NewEntry),
                                            entry_retrigger(NewEntry),
-                                           1+pr:get_r(entry_my_round(NewEntry))}, State);
+                                           1+pr:get_r(entry_my_round(NewEntry)),
+                                           entry_optype(NewEntry)}, State);
                 write_through ->
                     %% majority replied, we have not a consistent quorum, but we can
                     %% skip qread phase and go directly to write through
@@ -379,7 +383,7 @@ on({qround_request_collect,
     end;
 
 %% qread step 3 with explicit read round number
-on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State) ->
+on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound, OpType}, State) ->
     ?TRACE("rbrcseq:on qread ReqId ~p~n", [ReqId]),
     %% if the caller process may handle more than one request at a
     %% time for the same key, the pids id has to be unique for each
@@ -403,7 +407,8 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State)
               LookupEnvelope =
                   dht_node_lookup:envelope(
                     4,
-                    {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter, pr:new(ReadRound, MyId)}),
+                    {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter,
+                     pr:new(ReadRound, MyId)}),
               comm:send_local(Dest,
                               {?lookup_aux, X, 0,
                                LookupEnvelope})
@@ -415,7 +420,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State)
 
     %% create local state for the request id
     Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
-                           ReadFilter, RetriggerAfter),
+                           ReadFilter, RetriggerAfter, OpType),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
     State;
@@ -426,7 +431,7 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound}, State)
 %%                  -> trigger write_through to stabilize an open consens
 %%               otherwise just register the reply.
 on({qread_collect,
-    {read_reply, Cons, MyRwithId, Val, SeenWriteRound}}, State) ->
+    {read_reply, Cons, MyRwithId, Val, SeenWriteRound, SeenLastWF}}, State) ->
     ?TRACE("rbrcseq:on qread_collect read_reply MyRwithId: ~p~n", [MyRwithId]),
     %% collect a majority of answers and select that one with the highest
     %% round number.
@@ -440,7 +445,8 @@ on({qread_collect,
             Replies = entry_replies(Entry),
             {Result, NewReplies, NewRound} =
                 add_read_reply(Replies, db_selector(State), MyRwithId, Val, SeenWriteRound,
-                               entry_my_round(Entry), entry_datatype(Entry), entry_filters(Entry), Cons),
+                               entry_my_round(Entry), entry_optype(Entry), SeenLastWF,
+                               entry_datatype(Entry), entry_filters(Entry), Cons),
             TE = entry_set_my_round(Entry, NewRound),
             NewEntry = entry_set_replies(TE, NewReplies),
             case Result of
@@ -488,7 +494,8 @@ on({qread_collect,
                                                    entry_datatype(NewEntry),
                                                    entry_filters(NewEntry),
                                                    entry_retrigger(NewEntry),
-                                                   1+pr:get_r(entry_my_round(NewEntry))}, State);
+                                                   1+pr:get_r(entry_my_round(NewEntry)),
+                                                   entry_optype(NewEntry)}, State);
                         5 ->
                             ?PDB:delete(ReqId, tablename(State)),
                             %% retry read
@@ -499,7 +506,8 @@ on({qread_collect,
                                                    entry_datatype(NewEntry),
                                                    entry_filters(NewEntry),
                                                    entry_retrigger(NewEntry),
-                                                   1+pr:get_r(entry_my_round(NewEntry))}),
+                                                   1+pr:get_r(entry_my_round(NewEntry)),
+                                                   entry_optype(NewEntry)}),
                             State
                         end
             end
@@ -530,7 +538,8 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
                                entry_datatype(NewEntry),
                                entry_filters(NewEntry),
                                entry_retrigger(NewEntry),
-                               1 + pr:get_r(entry_my_round(NewEntry))},
+                               1 + pr:get_r(entry_my_round(NewEntry)),
+                               entry_optype(NewEntry)},
                     ?PDB:delete(ReqId, tablename(State)),
 
                     case randoms:rand_uniform(1, 2) of
@@ -1003,7 +1012,7 @@ on({next_period, NewPeriod}, State) ->
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             11 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+             12 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -1029,7 +1038,7 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 11),
+    ?ASSERT(erlang:tuple_size(Entry) =:= 12),
     Filters = entry_filters(Entry),
     if is_tuple(Filters) -> %% write request
            {qwrite, entry_client(Entry),
@@ -1039,7 +1048,7 @@ req_for_retrigger(Entry, IncDelay) ->
        true -> %% read request
            {qround_request, entry_client(Entry), entry_key(Entry),
             entry_datatype(Entry), entry_filters(Entry),
-            retrigger, RetriggerDelay}
+            entry_optype(Entry), RetriggerDelay}
     end.
 
 -spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
@@ -1060,26 +1069,26 @@ set_entry(NewEntry, TableName) ->
 %% abstract data type to collect quorum read/write replies
 -spec entry_new_round_request(any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
-                     non_neg_integer())
+                     non_neg_integer(), read | write)
                     -> entry().
-entry_new_round_request(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+entry_new_round_request(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0,0), new_rr_replies()}.
+     Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), new_rr_replies()}.
 
 -spec entry_new_read(any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
-                     non_neg_integer())
+                     non_neg_integer(), read | write)
                     -> entry().
-entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter) ->
+entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
     {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     Filter, _ValueToWrite = is_read, _MyRound = pr:new(0,0), new_read_replies()}.
+     Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), new_read_replies()}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
     {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
-     Filters, _ValueToWrite = Value, _MyRound = pr:new(0,0), new_write_replies()}.
+     Filters, _ValueToWrite = Value, write, _MyRound = pr:new(0,0), new_write_replies()}.
 
 -spec new_rr_replies() -> #rr_replies{}.
 new_rr_replies() ->
@@ -1115,22 +1124,24 @@ entry_client(Entry)               -> element(7, Entry).
 entry_filters(Entry)              -> element(8, Entry).
 -spec entry_write_val(entry())    -> is_read | any().
 entry_write_val(Entry)            -> element(9, Entry).
+-spec entry_optype(entry())       -> read | write.
+entry_optype(Entry)               -> element(10, Entry).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(10, Entry).
+entry_my_round(Entry)             -> element(11, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(10, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(11, Entry, Round).
 -spec entry_replies(entry())      -> replies().
-entry_replies(Entry)              -> element(11, Entry).
+entry_replies(Entry)              -> element(12, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
-entry_set_replies(Entry, Replies) -> setelement(11, Entry, Replies).
+entry_set_replies(Entry, Replies) -> setelement(12, Entry, Replies).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
-                   pr:pr(), pr:pr(), client_value(), atom(),
+                   pr:pr(), pr:pr(), client_value(), atom(), prbr:write_filter(),
                    module(), any(), boolean())
                    -> {false | consistent | inconsistent | write_through,
                        #rr_replies{}, pr:pr()}.
 add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
-             OpType, Datatype, Filters, _Cons) ->
+             OpType, SeenLastWF, Datatype, Filters, _Cons) ->
     %% increment number of replies received
     ReplyCount = Replies#rr_replies.reply_count + 1,
     R1 = Replies#rr_replies{reply_count=ReplyCount},
@@ -1149,13 +1160,15 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
         end,
 
     %% update write rounds and value
-    {NewHighestWriteRound, NewHighestWriteCount, NewValue} =
+    {NewHighestWriteRound, NewHighestWriteCount, NewHighestWF, NewValue} =
         update_highest_write_round(Replies#rr_replies.highest_write_round,
                                    Replies#rr_replies.highest_write_count,
+                                   Replies#rr_replies.highest_write_filter,
                                    Replies#rr_replies.read_value,
-                                   SeenWriteRound, Value, Datatype),
+                                   SeenWriteRound, SeenLastWF, Value, Datatype),
     R3 = R2#rr_replies{highest_write_round=NewHighestWriteRound,
                        highest_write_count=NewHighestWriteCount,
+                       highest_write_filter=NewHighestWF,
                        read_value=NewValue},
 
     ReadFilter =
@@ -1169,7 +1182,13 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     {Result, R4} =
         case ?REDUNDANCY:quorum_accepted(ReplyCount) of
             true ->
-                if ReplyCount =/= R3#rr_replies.highest_write_count andalso not IsNoopRead ->
+
+                IsCommutingRead = OpType =:= read andalso
+                                      is_read_commuting(ReadFilter, NewHighestWF, Datatype),
+
+                if IsCommutingRead ->
+                       {consistent, R3};
+                   ReplyCount =/= R3#rr_replies.highest_write_count andalso not IsNoopRead ->
                        %% There is a write in progress and we do not use a noop read filter
                        %% It is verly likely (although not 100% certain) that the qread
                        %% will also see inconsistent write rounds. Since we do not use
@@ -1204,11 +1223,11 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     {Result, R4, R4#rr_replies.highest_read_round}.
 
 -spec add_read_reply(#r_replies{}, dht_node_state:db_selector(),
-                     pr:pr(),  client_value(),  pr:pr(),
-                     pr:pr(), module(), any(), Consistency::boolean())
+                     pr:pr(),  client_value(),  pr:pr(), pr:pr(), atom(),
+                     prbr:write_filter(), module(), any(), Consistency::boolean())
                     -> {Done::boolean() | write_through, #r_replies{}, pr:pr()}.
 add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
-               CurrentRound, Datatype, Filters, _Cons) ->
+               CurrentRound, OpType, SeenLastWF, Datatype, Filters, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
@@ -1218,13 +1237,15 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     NewAckCount = Replies#r_replies.ack_count + 1,
     R1 = Replies#r_replies{ack_count=NewAckCount},
 
-    {NewHighestWriteRound, NewHighestWriteCount, NewVal} =
+    {NewHighestWriteRound, NewHighestWriteCount, NewHighestWF, NewVal} =
         update_highest_write_round(R1#r_replies.highest_write_round,
                                    R1#r_replies.highest_write_count,
+                                   R1#r_replies.highest_write_filter,
                                    R1#r_replies.read_value,
-                                   SeenWriteRound, Val, Datatype),
+                                   SeenWriteRound, SeenLastWF, Val, Datatype),
     R2 = R1#r_replies{highest_write_round=NewHighestWriteRound,
                       highest_write_count=NewHighestWriteCount,
+                      highest_write_filter=NewHighestWF,
                       read_value=NewVal},
 
     ReadFilter =
@@ -1236,16 +1257,19 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     {Result, R4} =
         case ?REDUNDANCY:quorum_accepted(NewAckCount) of
             true ->
+                IsCommutingRead = OpType =:= read andalso
+                                      is_read_commuting(ReadFilter, NewHighestWF, Datatype),
                 %% we have majority of acks
                 %% construct read value from replies
                 Collected = R2#r_replies.read_value,
                 Constructed = ?REDUNDANCY:get_read_value(Collected, ReadFilter),
                 R3 = R2#r_replies{read_value=Constructed},
 
-                Done = case R3#r_replies.highest_write_count =:= NewAckCount orelse
+                Done = case IsCommutingRead orelse
+                            R3#r_replies.highest_write_count =:= NewAckCount orelse
                             ?REDUNDANCY:skip_write_through(Constructed) of
-                            true -> true; %% done
-                            _ -> write_through
+                                true -> true; %% done
+                                _ -> write_through
                        end,
 %%% FS add read_retry as possibility
 
@@ -1257,10 +1281,11 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
 
--spec update_highest_write_round(pr:pr(), non_neg_integer(), any(), pr:pr(), any(), module()) ->
-          {pr:pr(), non_neg_integer(), any()}.
-update_highest_write_round(CurrentHighestRound, HighestWriteCount, CurrentValue,
-                            SeenRound, SeenValue, Datatype) ->
+-spec update_highest_write_round(pr:pr(), non_neg_integer(), any(), prbr:write_filter(),
+                                 pr:pr(), any(), prbr:write_filter(), module()) ->
+          {pr:pr(), non_neg_integer(), prbr:write_filter(), any()}.
+update_highest_write_round(CurrentHighestRound, HighestWriteCount, CurrentLastWF, CurrentValue,
+                            SeenRound, SeenLastWF, SeenValue, Datatype) ->
     %% extract write through info for round comparisons since
     %% they can be key-dependent if something different than
     %% replication is used for redundancy
@@ -1268,13 +1293,13 @@ update_highest_write_round(CurrentHighestRound, HighestWriteCount, CurrentValue,
     SeenRoundNoWTI = pr:set_wti(SeenRound, none),
 
     if CurrentRoundNoWTI =:= SeenRoundNoWTI ->
-           {CurrentHighestRound, HighestWriteCount + 1,
+           {CurrentHighestRound, HighestWriteCount + 1, CurrentLastWF,
             ?REDUNDANCY:collect_read_value(CurrentValue, SeenValue, Datatype)};
        CurrentRoundNoWTI < SeenRoundNoWTI ->
-           {SeenRound, 1,
+           {SeenRound, 1, SeenLastWF,
             ?REDUNDANCY:collect_newer_read_value(CurrentValue, SeenValue, Datatype)};
        true ->
-           {CurrentHighestRound, HighestWriteCount,
+           {CurrentHighestRound, HighestWriteCount, CurrentLastWF,
             ?REDUNDANCY:collect_older_read_value(CurrentValue, SeenValue, Datatype)}
     end.
 
@@ -1356,6 +1381,32 @@ add_write_deny(Replies, RoundTried, _Cons) ->
         end,
     Done = ?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
     {Done, R2}.
+
+-spec is_read_commuting(prbr:read_filter(), prbr:write_filter(), module()) -> boolean().
+is_read_commuting(ReadFilter, HighestWriteFilterSeen, Datatype) ->
+    %% A WF is considered commuting to a RF iff RF(v) =:= RF(WF(v)) for any v
+    %% To decide if a read can be can be deliverd when seeing inconsistent
+    %% write rounds, it is enough to check if the latest WF of the highest received
+    %% reply does commute with the RF of the current read.
+    %% Proof sketch:
+    %% (v_x, wf_x -> value/write_filter of reply with write round x)
+    %% Assume a set of replies with arbitrary write rounds. h* -> highest round recieved
+    %% Assume wf_h* commutes with current RF (therefore it is not a write through)
+    %% Assume knowing the previous write round in replica of h* -> let this round be c
+    %% - There once was a consistent write quorum in round c
+    %% - All replies with rounds smaller c can be ignored (a newer val was delivered)
+    %% - For every round h greater c but smaller h* it can be shown:
+    %%      - h was and will never be consistent quorum
+    %%      - the previous write round in its replica was also c
+    %%      - therefore wf_h(v_c) =:= v_h
+    %%      - no read with RF rf delivered v_h if rf(v_c) =/= rf(v_h)
+    case erlang:function_exported(Datatype, get_commuting_wf_for_rf, 1) of
+        true ->
+            CommutingWF = Datatype:get_commuting_wf_for_rf(ReadFilter),
+            lists:member(HighestWriteFilterSeen, CommutingWF);
+        false ->
+            false
+    end.
 
 -spec inform_client(qread_done, entry(), pr:pr(), any()) -> ok.
 inform_client(qread_done, Entry, WriteRound, ReadValue) ->

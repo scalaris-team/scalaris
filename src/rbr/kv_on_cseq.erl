@@ -74,6 +74,9 @@
 -export([wf_unset_wl/3]).
 -export([wf_val_unset_wl/3]).
 
+-export([get_commuting_wf_for_rf/1]).
+
+
 -type txid() :: ?RT:key().
 
 -type readlock()  :: [txid()].
@@ -723,4 +726,29 @@ max(A, B) ->
            %% values whether locks are set or not?
            %% @TODO Further think about it...
            B
+    end.
+
+-spec get_commuting_wf_for_rf(prbr:read_filter()) ->
+        [prbr:write_filter()].
+get_commuting_wf_for_rf(RF) ->
+    {name, Name} = erlang:fun_info(RF, name),
+    {module, Module} = erlang:fun_info(RF, module),
+    case {Module, Name} of
+        {?MODULE, rf_val} ->
+            [fun ?MODULE:wf_set_rl/3,
+             fun ?MODULE:wf_unset_rl/3,
+             fun ?MODULE:wf_set_wl/3,
+             fun ?MODULE:wf_unset_wl/3];
+        {?MODULE, rf_val_vers} ->
+            [fun ?MODULE:wf_set_rl/3,
+             fun ?MODULE:wf_unset_rl/3,
+             fun ?MODULE:wf_set_wl/3,
+             fun ?MODULE:wf_unset_wl/3];
+        {?MODULE, rf_rl_vers} ->
+            [fun ?MODULE:wf_set_wl/3,
+             fun ?MODULE:wf_unset_wl/3];
+        {?MODULE, rf_wl_vers} ->
+            [fun ?MODULE:wf_set_rl/3,
+             fun ?MODULE:wf_unset_rf/3];
+        _ -> []
     end.
