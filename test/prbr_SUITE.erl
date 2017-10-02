@@ -356,7 +356,7 @@ tester_type_check_rbr(_Config) ->
              {set_entry, 2},     %% needs valid ets:tid()
              {add_rr_reply, 10},  %% needs client_value matching db_type
              {add_read_reply, 11},%% needs client_value matching db_type
-             {update_highest_write_round, 8}, %% needs client_value matching db_type
+             {update_write_state, 5}, %% needs client_value matching db_type
              {add_read_deny, 5}, %% needs valid entry()
              {add_write_reply, 3},%% needs valid entry()
              {add_write_deny, 3}, %% needs valid entry()
