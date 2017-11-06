@@ -34,9 +34,11 @@ script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - kerl list installations
   - echo $TRAVIS_OTP_RELEASE
+  - env | grep OTP
   - CXX=clang++ ./configure
   - touch TAGS.root
-  - ls /usr/lib/erlang/erts-5.10.4/include
+  - ls /usr/lib/erlang/
+  - ls /usr/lib/erlang/erts-*/include
   - make
   - make cpp
   - make python
