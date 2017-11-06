@@ -3,7 +3,7 @@ language: generic
 matrix:
   include:
     - os: osx
-      osx_image: xcode8
+      osx_image: xcode9.1
       env:
         - OSX_PACKAGES="boost erlang python python3 ant bash coreutils"
     - os: linux
@@ -30,6 +30,7 @@ install:
 
 script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+  - echo $TRAVIS_OTP_RELEASE
   - CXX=clang++ ./configure
   - touch TAGS.root
   - make
