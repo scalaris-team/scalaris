@@ -49,11 +49,19 @@
 
 -type json() :: map().
 
+%% @doc A JSON patch is list of sequentially executed patch commands.
 -type patch() :: [patch_cmd()].
--type patch_cmd() :: {patch_cmd_type(), path()} |
-                     {patch_cmd_type(), path(), any()}.
 
--type patch_cmd_type() :: add | remove | replace | move | copy | test.
+%% @doc Valid patch commands as per RFC 6902.
+%% Consult https://tools.ietf.org/html/rfc6902 for the effects of the respective
+%% commands on a given JSON object.
+-type patch_cmd() :: {Op :: remove, Path :: path()} |
+                     {Op :: add | replace | test, Path :: path(), Value :: any()} |
+                     {Op :: move | copy, From :: path(), Path :: path()}.
+
+%% @doc JSON Path similar to RFC 6901 (https://tools.ietf.org/html/rfc6902).
+%% Howerver, instead of strings ("/this/is/a/path"), lists are used
+%% ([this, is, a, path]).
 -type path() :: [any()].
 
 %% @doc Read full JSON object stored at given key.
@@ -85,7 +93,7 @@ write(Key, Value) ->
 %%      ok                  - The patch was successfully applied
 %%      {error, ErrorList}  - At least one patch command failed.
 %%      {fail, Reason}      - The write was denied by scalaris.
--spec patch(client_key(), patch() | patch_cmd()) ->
+-spec patch(client_key(), patch_cmd() | patch()) ->
     ok | {fail | error,any()}.
 patch(Key, PatchCommand) when not is_list(PatchCommand) ->
     patch(Key, [PatchCommand]);
