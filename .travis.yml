@@ -3,7 +3,7 @@ language: generic
 matrix:
   include:
     - os: osx
-      osx_image: xcode8
+      osx_image: xcode9.1
       env:
         - OSX_PACKAGES="boost erlang python python3 ant bash coreutils"
     - os: linux
@@ -17,6 +17,8 @@ matrix:
             - clang
             - libboost1.55-all-dev
             - python3
+            - erlang
+            - erlang-dev
 
 install:
   - |
@@ -30,6 +32,7 @@ install:
 
 script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+  - env | grep TRAVIS
   - CXX=clang++ ./configure
   - touch TAGS.root
   - make
