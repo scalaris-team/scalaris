@@ -56,64 +56,21 @@
 -type patch_cmd_type() :: add | remove | replace | move | copy | test.
 -type path() :: [any()].
 
-%% TODO: Checking at write/read of object is really a json?
 %% @doc Read full JSON object stored at given key.
+%% Returns
+%%      {ok, JsonObject}    - JSON Object stored at given key.
+%%      {fail, not_fount}   - No value at this key exists.
 -spec read(client_key()) -> {ok, client_value()} | {fail, not_found}.
 read(Key) ->
-    rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
-                  fun ?MODULE:rf_val/1),
-    trace_mpath:thread_yield(),
-    receive
-        ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
-                       case Value of
-                           ?NON_EXIST_VAL -> {fail, not_found};
-                           _ -> {ok, Value}
-                           end
-                      )
-    after 1000 ->
-        log:log("read hangs ~p~n", [erlang:process_info(self(), messages)]),
-        receive
-            ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
-                            case Value of
-                                ?NON_EXIST_VAL -> {fail, not_found};
-                                _ -> {ok, Value}
-                            end
-                          )
-        end
-    end.
+    read_helper(Key, fun ?MODULE:rf_val/1).
 
 %% @doc Write full JSON object to a given key.
--spec write(client_key(), json()) -> ok | {fail, reason}.
+%% Returns:
+%%      ok                  - JSON Object was successfully written
+%%      {fail, Reason}      - The write was denied by scalaris.
+-spec write(client_key(), json()) -> ok | {fail, any()}.
 write(Key, Value) ->
-    rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
-                    fun ?MODULE:rf_empty/1,
-                    fun ?MODULE:cc_noop/3,
-                    fun ?MODULE:wf_val/3, Value),
-    trace_mpath:thread_yield(),
-    receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, _WriteRet}, ok);
-        ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
-                        begin
-                            log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
-                            {fail, Reason}
-                        end)
-    after 1000 ->
-        log:log("~p write hangs at key ~p, ~p~n",
-                [self(), Key, erlang:process_info(self(), messages)]),
-        receive
-            ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value, _WriteRet},
-                            begin
-                                log:log("~p write was only slow at key ~p~n", [self(), Key]),
-                                ok
-                            end);
-            ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
-                            begin
-                                log:log("~p Write failed: ~p~n", [self(), Reason]),
-                                {fail, Reason}
-                            end)
-            end
-    end.
-
+    write_helper(Key, Value, fun ?MODULE:wf_val/3).
 
 %% %%%%%%%%%%%%%%%%
 %% JSON PATCH SPECIFIC API
@@ -129,39 +86,11 @@ write(Key, Value) ->
 %%      {error, ErrorList}  - At least one patch command failed.
 %%      {fail, Reason}      - The write was denied by scalaris.
 -spec patch(client_key(), patch() | patch_cmd()) ->
-    ok | {fail, any()} | {error, [any()]}.
+    ok | {fail | error,any()}.
 patch(Key, PatchCommand) when not is_list(PatchCommand) ->
     patch(Key, [PatchCommand]);
 patch(Key, Patch) ->
-    rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
-                    fun ?MODULE:rf_empty/1,
-                    fun ?MODULE:cc_noop/3,
-                    fun ?MODULE:wf_patch/3, Patch),
-    trace_mpath:thread_yield(),
-    receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, Result}, Result);
-        ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
-                        begin
-                            log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
-                            {fail, Reason}
-                        end)
-    after 1000 ->
-        log:log("~p write hangs at key ~p, ~p~n",
-                [self(), Key, erlang:process_info(self(), messages)]),
-        receive
-            ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, Result},
-                            begin
-                                log:log("~p write was only slow at key ~p~n", [self(), Key]),
-                                Result
-                            end);
-            ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
-                            begin
-                                log:log("~p Write failed: ~p~n", [self(), Reason]),
-                                {fail, Reason}
-                            end)
-            end
-    end.
-
+    write_helper(Key, Patch, fun ?MODULE:wf_patch/3).
 
 
 %% %%%%%%%%%%%%%%%%
@@ -202,3 +131,69 @@ wf_patch(Json, _UI, Patch) ->
         {error, _, Errors} -> {Json, {error, Errors}}
     end.
 
+
+%% %%%%%%%%%%%%%%%%
+%% INTERNAL HELPER
+%% %%%%%%%%%%%%%%%%
+-spec read_helper(client_key(), prbr:read_filter()) ->
+    {ok, client_value()} | {fail, not_found}.
+read_helper(Key, ReadFilter) ->
+    rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE, ReadFilter),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
+                       case Value of
+                           ?NON_EXIST_VAL -> {fail, not_found};
+                           _ -> {ok, Value}
+                           end
+                      )
+    after 1000 ->
+        log:log("read hangs ~p~n", [erlang:process_info(self(), messages)]),
+        receive
+            ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
+                            case Value of
+                                ?NON_EXIST_VAL -> {fail, not_found};
+                                _ -> {ok, Value}
+                            end
+                          )
+        end
+    end.
+
+
+
+-spec write_helper(client_key(), client_value(), prbr:write_filter()) ->
+    ok | {fail | error, any()}.
+write_helper(Key, Value, WriteFilter) ->
+    write_helper(Key, Value, fun ?MODULE:rf_empty/1, fun ?MODULE:cc_noop/3,
+                  WriteFilter).
+
+-spec write_helper(client_key(), client_value(), prbr:read_filter(),
+                   fun((any(), any(), any()) -> any()), prbr:write_filter()) ->
+    ok | {fail | error, any()}.
+write_helper(Key, Value, ReadFilter, ContentCheck, WriteFilter) ->
+    rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
+                   ReadFilter, ContentCheck, WriteFilter, Value),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, WriteRet}, WriteRet);
+        ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
+                        begin
+                            log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
+                            {fail, Reason}
+                        end)
+    after 1000 ->
+        log:log("~p write hangs at key ~p, ~p~n",
+                [self(), Key, erlang:process_info(self(), messages)]),
+        receive
+            ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value, WriteRet},
+                            begin
+                                log:log("~p write was only slow at key ~p~n", [self(), Key]),
+                                WriteRet
+                            end);
+            ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
+                            begin
+                                log:log("~p Write failed: ~p~n", [self(), Reason]),
+                                {fail, Reason}
+                            end)
+            end
+    end.
