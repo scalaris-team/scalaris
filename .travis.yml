@@ -8,8 +8,6 @@ matrix:
         - OSX_PACKAGES="boost erlang python python3 ant bash coreutils"
     - os: linux
       sudo: false
-      otp_release:
-      - 18.2.1
       addons:
         apt:
           sources:
@@ -19,6 +17,8 @@ matrix:
             - clang
             - libboost1.55-all-dev
             - python3
+            - erlang
+            - erlang-dev
 
 install:
   - |
@@ -38,6 +38,7 @@ script:
   - CXX=clang++ ./configure
   - touch TAGS.root
   - ls /usr/lib/erlang/
+  - ls /usr/lib/erlang/erts-*
   - ls /usr/lib/erlang/erts-*/include
   - make
   - make cpp
