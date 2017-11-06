@@ -74,6 +74,14 @@
   {outdir, "contrib/log4erl/ebin/"},
   {i, "contrib/log4erl/include"}
  ]}.
+{"contrib/dotto/src/*",
+ [debug_info,
+  inline_list_funcs,
+  nowarn_obsolete_guard,
+  nowarn_unused_function,
+  nowarn_unused_vars,
+  {outdir, "contrib/dotto/ebin/"}
+ ]}.
 {"contrib/yaws/src/*",
  [debug_info,
   inline_list_funcs,
