@@ -36,6 +36,7 @@ script:
   - echo $TRAVIS_OTP_RELEASE
   - CXX=clang++ ./configure
   - touch TAGS.root
+  - ls /usr/lib/erlang/erts-5.10.4/include
   - make
   - make cpp
   - make python
