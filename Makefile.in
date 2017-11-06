@@ -78,6 +78,10 @@ PYTHON3SITELIBDIR=$(DESTDIR)@PYTHON3SITELIBDIR@
 # paths of source files for make doc
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
 
+# paths to contrib ebins that will be added to erlangs code path when
+# executing a test related make target
+CONTRIB_EBIN_PATHS = `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin `pwd`/contrib/dotto/ebin
+
 # libraries needed to build a plt suitable for the dialyzer target
 # (only add them if they are available (via wildcard call which
 # results in nothing when no match exists))
@@ -114,6 +118,7 @@ DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/wx-*/ebin)
 DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/xmerl-*/ebin)
 DIALYZER_PLT_LIBS += $(wildcard contrib/log4erl/ebin)
 DIALYZER_PLT_LIBS += $(wildcard contrib/yaws/ebin)
+DIALYZER_PLT_LIBS += $(wildcard contrib/dotto/ebin)
 DIALYZER_PLT_LIBS += $(wildcard @BITCASK_LIBS@/ebin)
 
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
@@ -133,12 +138,15 @@ all: Makefile nifs compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
-compile: .Emakefile contrib/log4erl/src/log4erl_parser.erl contrib/log4erl/src/log4erl_lex.erl
+compile: .Emakefile contrib/dotto/ebin/dotto.app contrib/log4erl/src/log4erl_parser.erl contrib/log4erl/src/log4erl_lex.erl
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 .Emakefile: Emakefile
 	$(MAKE) erlang-clean
 	touch $@
+
+contrib/dotto/ebin/dotto.app: contrib/dotto/src/dotto.erl
+	cd contrib/dotto && $(MAKE)
 
 contrib/log4erl/src/log4erl_parser.erl: contrib/log4erl/src/log4erl_parser.yrl
 	cd contrib/log4erl/src && $(ERLC) log4erl_parser.yrl
@@ -162,7 +170,7 @@ ${SUITES}: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 # define targets for single test cases of the form <test-suite>:<test-case>:
@@ -172,26 +180,26 @@ $(1)\:%_GROUP: compile
 # use non standard ports to run a single SUITE's test case so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_GROUP_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $(1) -group $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*_GROUP.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_GROUP_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS)  -suite $(1) -group $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*_GROUP.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$(1).$$*_GROUP.log
 
 # single test case
 $(1)\:%: compile
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$(1).$$*.log
 endef
 $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 
 %_SUITE-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`-$(CONTRIB_EBIN_PATHS) -suite $*_SUITE -cover test/scalaris.coverspec -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 %_TESTS: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 test-vts: compile
-	@RUN_TEST@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
+	@RUN_TEST@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ -ct_hooks scalaris_cth
 
 test-clean:
 	-rm -rf ct_run.*@* ct.log ct-skipped.log ct_*_TESTS.log ct_*_SUITE.log ct_*_SUITE.*.log index.html all_runs.html variables-*@* ct_log_cache ct_default.css \
@@ -612,6 +620,7 @@ erlang-clean:
 	-rm -f contrib/log4erl/ebin/*.beam
 	-rm -f contrib/log4erl/src/log4erl_lex.erl
 	-rm -f contrib/log4erl/src/log4erl_parser.erl
+	-rm -f contrib/dotto/ebin/*
 	-rm -f test/*.beam
 	-rm -f doc/*.html
 	-rm -f doc/*.css

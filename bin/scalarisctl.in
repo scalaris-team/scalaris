@@ -727,6 +727,7 @@ scalarisstart(){
     START_CMD="\"$ERL\" -setcookie \"$SCALARIS_COOKIE\"\
  -pa $SCALARISDIR/contrib/yaws/ebin\
  -pa $SCALARISDIR/contrib/log4erl/ebin\
+ -pa $SCALARISDIR/contrib/dotto/ebin\
  -pa $BEAMDIR $ERLANG_ADDITIONAL_FLAGS $BACKGROUND\
  -sasl sasl_error_logger false\
  -yaws embedded true\
