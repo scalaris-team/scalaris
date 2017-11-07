@@ -50,17 +50,17 @@
 %% TODO: proper type spec for dict? dict() was removed in 18.0
 -type json() :: tuple().
 
-%% @doc A JSON patch is list of sequentially executed patch commands.
+%% A JSON patch is list of sequentially executed patch commands.
 -type patch() :: [patch_cmd()].
 
-%% @doc Valid patch commands as per RFC 6902.
+%% Valid patch commands as per RFC 6902.
 %% Consult https://tools.ietf.org/html/rfc6902 for the effects of the respective
 %% commands on a given JSON object.
 -type patch_cmd() :: {Op :: remove, Path :: path()} |
                      {Op :: add | replace | test, Path :: path(), Value :: any()} |
                      {Op :: move | copy, From :: path(), Path :: path()}.
 
-%% @doc JSON Path similar to RFC 6901 (https://tools.ietf.org/html/rfc6902).
+%% JSON Path similar to RFC 6901 (https://tools.ietf.org/html/rfc6902).
 %% Howerver, instead of strings ("/this/is/a/path"), lists are used
 %% ([this, is, a, path]).
 -type path() :: [any()].
