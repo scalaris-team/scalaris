@@ -1,4 +1,9 @@
 -module(dotto).
+
+%% Hacky guard check for dicts since it relies on dicts internal
+%% structure which might change in the future...
+-define(IS_DICT(X), is_tuple(X) andalso element(1, X) =:= dict).
+
 -export([apply/2, add/3, remove/2, replace/3, move/3, copy/3,
          test/3,
          fetch/2, fetch/3]).
@@ -139,12 +144,8 @@ fetch(Obj, Path, Default) ->
 % private api
 
 
-% TODO: make this an option
-add_(Obj, Field, Value) when is_map(Obj) andalso is_integer(Field) ->
-    {ok, maps:put(integer_to_binary(Field), Value, Obj)};
-
-add_(Obj, Field, Value) when is_map(Obj) ->
-    {ok, maps:put(Field, Value, Obj)};
+add_(Obj, Field, Value) when ?IS_DICT(Obj) ->
+    {ok, set_element(Obj, Field, Value)};
 
 add_(Obj, <<"-">>, Value) when is_list(Obj) ->
     {ok, Obj ++ [Value]};
@@ -156,8 +157,8 @@ add_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) ->
 add_(Obj, Field, Value) ->
     {error, {cantset, Obj, Field, Value}}.
 
-set_(Obj, Field, Value) when is_map(Obj) ->
-    {ok, maps:put(Field, Value, Obj)};
+set_(Obj, Field, Value) when ?IS_DICT(Obj) ->
+    {ok, set_element(Obj, Field, Value)};
 
 set_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) ->
     Result = case lists:split(Field, Obj) of
@@ -172,8 +173,8 @@ set_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) ->
 set_(Obj, Field, Value) ->
     {error, {cantset, Obj, Field, Value}}.
 
-del_(Obj, Field) when is_map(Obj) ->
-    {ok, maps:remove(Field, Obj)};
+del_(Obj, Field) when ?IS_DICT(Obj) ->
+    {ok, dict:erase(Field, Obj)};
 
 % XXX not sure if this case is in RFC 6902
 del_(Obj, <<"-">>) when is_list(Obj) ->
@@ -190,8 +191,8 @@ del_(Obj, Field) when is_list(Obj) andalso is_integer(Field) ->
 del_(Obj, Field) ->
     {error, {cantremove, Obj, Field}}.
 
-get_(Obj, Field) when is_map(Obj) ->
-    case maps:find(Field, Obj) of
+get_(Obj, Field) when ?IS_DICT(Obj) ->
+    case dict:find(Field, Obj) of
         {ok, Value} -> {ok, Value};
         error -> notfound
     end;
@@ -207,3 +208,6 @@ get_(Obj, Field) when is_list(Obj) andalso is_integer(Field) ->
 
 get_(_Obj, _Field) ->
     notfound.
+
+set_element(Obj, Field, NewValue) when ?IS_DICT(Obj) ->
+    dict:update(Field, fun (_Old) -> NewValue end, NewValue, Obj).

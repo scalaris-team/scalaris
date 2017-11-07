@@ -15,10 +15,10 @@
 %% @author Jan Skrzypczak  <skrzypczak@zib.de>
 %% @doc    Replicated storage of JSON objects based on rbrcseq. Implements
 %%         a superset of RFC 6902 (JSON Patch) which allows  partial updates on
-%%         the stored objects. This is based on dotto:
-%%              https://github.com/marianoguerra/dotto
+%%         the stored objects. This is based on dotto. See scalaris/contrib or:
+%%              https://github.com/rumoe/dotto
 %%
-%%         In its current state, erlang maps are used to represent JSON objects.
+%%         In its current state, erlang dicts are used to represent JSON objects.
 %% @end
 %% @version $Id$
 -module(json_on_cseq).
@@ -47,7 +47,8 @@
 -export([wf_val/3]).
 -export([wf_patch/3]).
 
--type json() :: map().
+%% TODO: proper type spec for dict? dict() was removed in 18.0
+-type json() :: tuple().
 
 %% @doc A JSON patch is list of sequentially executed patch commands.
 -type patch() :: [patch_cmd()].
@@ -130,9 +131,9 @@ cc_noop(_ReadVal, _WriteFilter, _ValToWrite) -> {true, none}.
 wf_val(_OldVal, _UpdateInfo, ValToWrite) -> {ValToWrite, ok}.
 
 %% @doc WriteFilter that applies a list of patch commands to a JSON object.
-%% A non-existing JSON object is treated as an empty object (#{}).
+%% A non-existing JSON object is treated as an empty object (dict:new()).
 -spec wf_patch(json() | prbr_bottom, any(), patch()) ->  {json(), ok | {error, [any()]}}.
-wf_patch(prbr_bottom, UI, Patch) -> wf_patch(#{}, UI, Patch);
+wf_patch(prbr_bottom, UI, Patch) -> wf_patch(dict:new(), UI, Patch);
 wf_patch(Json, _UI, Patch) ->
     case dotto:apply(Patch, Json) of
         {ok, ResultJson} -> {ResultJson, ok};

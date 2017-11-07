@@ -6,6 +6,9 @@ patcho dotto...
 a data driven data structure manipulation library for erlang, a superset of
 `json patch <http://tools.ietf.org/html/rfc6902>`_
 
+The primary change of this fork is the replacement of maps with
+dicts to support older erlang versions.
+
 tests
 -----
 
@@ -13,10 +16,13 @@ tests
 
     make tests
 
-this are just basic tests, the library is also tested in `json-patch.erl <https://github.com/marianoguerra/json-patch.erl>`_
+this are just basic, hardcoded tests
 
 usage
 -----
+
+TODO: Due to compatibility with older erlang versions, maps where replaced
+with dicts.
 
 ::
 
@@ -51,12 +57,6 @@ extra methods::
 
     fetch(Obj, Path): {ok, Value} if found, {error, Reason} otherwise
     fetch(Obj, Path, Default): {ok, Value} if found, {ok, Default} otherwise
-
-caveats
--------
-
-* for the moment integer keys on maps are added as strings, this is to match js
-  behavior, in the future it will be an option
 
 License
 -------
