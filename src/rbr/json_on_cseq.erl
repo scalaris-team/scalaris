@@ -60,7 +60,7 @@
                      {Op :: add | replace | test, Path :: path(), Value :: any()} |
                      {Op :: move | copy, From :: path(), Path :: path()}.
 
-%% JSON Path similar to RFC 6901 (https://tools.ietf.org/html/rfc6902).
+%% JSON Path similar to RFC 6901 (https://tools.ietf.org/html/rfc6901).
 %% Howerver, instead of strings ("/this/is/a/path"), lists are used
 %% ([this, is, a, path]).
 -type path() :: [any()].
