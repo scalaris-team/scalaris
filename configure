@@ -8602,6 +8602,20 @@ else
 $as_echo "$as_me: maps are not available or not usable, falling back to gb_trees" >&6;}
 fi
 
+echo "-module(dict_type_check_tmp). -type test() :: dict:dict()." > dict_type_check_tmp.erl
+${ERLC} dict_type_check_tmp.erl > /dev/null 2>&1
+if test $? = 0; then :
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, namespaced_dict}"
+       EDOCMACROS="${EDOCMACROS}, {namespaced_dict, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnamespaced_dict"
+       rm dict_type_check_tmp.beam
+       { $as_echo "$as_me:${as_lineno-$LINENO}: erlang dict type is defined as dict:dict()" >&5
+$as_echo "$as_me: erlang dict type is defined as dict:dict()" >&6;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang dict type is defined as dict()" >&5
+$as_echo "$as_me: erlang dict type is defined as dict()" >&6;}
+fi
+rm dict_type_check_tmp.erl
 
 ###########################################################
 #

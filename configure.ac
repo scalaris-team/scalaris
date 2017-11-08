@@ -496,6 +496,16 @@ AS_IF([test "${maps_module}" = "true"],
        AC_MSG_NOTICE([maps are available and seem to be usable])],
       [AC_MSG_NOTICE([maps are not available or not usable, falling back to gb_trees])])
 
+echo "-module(dict_type_check_tmp). -type test() :: dict:dict()." > dict_type_check_tmp.erl
+${ERLC} dict_type_check_tmp.erl > /dev/null 2>&1
+AS_IF([test $? = 0],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, namespaced_dict}"
+       EDOCMACROS="${EDOCMACROS}, {namespaced_dict, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnamespaced_dict"
+       rm -f dict_type_check_tmp.beam
+       AC_MSG_NOTICE([erlang dict type is defined as dict:dict()])],
+      [AC_MSG_NOTICE([erlang dict type is defined as dict()])])
+rm -f dict_type_check_tmp.erl
 
 ###########################################################
 #

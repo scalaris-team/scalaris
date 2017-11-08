@@ -47,8 +47,11 @@
 -export([wf_val/3]).
 -export([wf_patch/3]).
 
-%% TODO: proper type spec for dict? dict() was removed in 18.0
--type json() :: tuple().
+-ifdef(namespaced_dict).
+-type json() :: dict:dict().
+-else.
+-type json() :: dict().
+-endif.
 
 %% A JSON patch is list of sequentially executed patch commands.
 -type patch() :: [patch_cmd()].
