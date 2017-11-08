@@ -106,7 +106,7 @@ write(Key, Value) ->
 %%      {error, ErrorList}  - At least one patch command failed.
 %%      {fail, Reason}      - The write was denied by scalaris.
 -spec patch(client_key(), patch_cmd() | patch()) ->
-    ok | {fail | error,any()}.
+    ok | {fail, any()} | {error, [{error, any()}]}.
 patch(Key, PatchCommand) when not is_list(PatchCommand) ->
     patch(Key, [PatchCommand]);
 patch(Key, Patch) ->
