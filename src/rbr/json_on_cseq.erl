@@ -33,10 +33,16 @@
 
 %% PUBLIC API
 -export([read/1]).
--export([write/2]).
--export([patch/2]).
-
 -export([fetch/2]).
+-export([write/2]).
+
+-export([patch/2]).
+-export([add/3]).
+-export([remove/2]).
+-export([replace/3]).
+-export([move/3]).
+-export([copy/3]).
+-export([test/3]).
 
 %% READ FILTER
 -export([rf_empty/1]).
@@ -112,6 +118,35 @@ patch(Key, PatchCommand) when not is_list(PatchCommand) ->
 patch(Key, Patch) ->
     write_helper(Key, Patch, fun ?MODULE:wf_patch/3).
 
+-spec add(client_key(), path(), client_value()) ->
+    ok | {fail | error, any()}.
+add(Key, Path, Value) ->
+    unpack_if_error_list(patch(Key, {add, Path, Value})).
+
+-spec remove(client_key(), path()) ->
+    ok | {fail | error, any()}.
+remove(Key, Path) ->
+    unpack_if_error_list(patch(Key, {remove, Path})).
+
+-spec replace(client_key(), path(), client_value()) ->
+    ok | {fail | error, any()}.
+replace(Key, Path, Value) ->
+    unpack_if_error_list(patch(Key, {replace, Path, Value})).
+
+-spec move(client_key(), path(), path()) ->
+    ok | {fail | error, any()}.
+move(Key, From, Path) ->
+    unpack_if_error_list(patch(Key, {move, From, Path})).
+
+-spec copy(client_key(), path(), client_value()) ->
+    ok | {fail | error, any()}.
+copy(Key, From, Path) ->
+    unpack_if_error_list(patch(Key, {copy, From, Path})).
+
+-spec test(client_key(), path(), client_value()) ->
+    {ok, boolean()} | {fail | error, any()}.
+test(Key, Path, Value) ->
+    read_helper(Key, get_rf_test_fun(Path, Value)).
 
 %% %%%%%%%%%%%%%%%%
 %% READ FILTER
@@ -137,6 +172,18 @@ get_rf_fetch_fun(Path) ->
             end
     end.
 
+%% @doc Returns a ReadFilter which tests the existens of a value
+%% in a stored JSON object.
+-spec get_rf_test_fun(path(), client_value()) -> prbr:read_filter().
+get_rf_test_fun(Path, Value) ->
+    fun
+        (prbr_bottom) -> ?NON_EXIST_VAL;
+        (Obj)         ->
+            case dotto:test(Obj, Path, Value) of
+                {ok, Result} -> Result;
+                Any -> Any
+            end
+    end.
 
 %% %%%%%%%%%%%%%%%%
 %% CONTENT CHECK
@@ -229,3 +276,9 @@ write_helper(Key, Value, ReadFilter, ContentCheck, WriteFilter) ->
                             end)
             end
     end.
+
+%% @doc Helper that unpacks a list of errors if this list contains only one
+%% error. Does nothing otherwise.
+-spec unpack_if_error_list(any()) -> any().
+unpack_if_error_list({error, [{error, Reason}]}) -> {error, Reason};
+unpack_if_error_list(Any) -> Any.
