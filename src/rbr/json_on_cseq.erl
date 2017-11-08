@@ -36,6 +36,8 @@
 -export([write/2]).
 -export([patch/2]).
 
+-export([fetch/2]).
+
 %% READ FILTER
 -export([rf_empty/1]).
 -export([rf_val/1]).
@@ -76,6 +78,12 @@
 read(Key) ->
     read_helper(Key, fun ?MODULE:rf_val/1).
 
+%% @doc Partially read a JSON object stored at a given key.
+-spec fetch(client_key(), path()) ->
+    {ok, client_value()} | {fail, not_fount} | {error, any()}.
+fetch(Key, Path) ->
+    read_helper(Key, get_rf_fetch_fun(Path)).
+
 %% @doc Write full JSON object to a given key.
 %% Returns:
 %%      ok                  - JSON Object was successfully written
@@ -115,7 +123,19 @@ rf_empty(_Any) -> none.
 %% @doc ReadFilter returning the full JSON object
 -spec rf_val(json() | prbr_bottom) -> client_value() | ?NON_EXIST_VAL.
 rf_val(prbr_bottom) -> ?NON_EXIST_VAL;
-rf_val(X)          -> X.
+rf_val(X)           -> X.
+
+%% @doc Returns a ReadFilter to partially read a JSON object.
+-spec get_rf_fetch_fun(path()) -> prbr:read_filter().
+get_rf_fetch_fun(Path) ->
+    fun
+        (prbr_bottom) -> ?NON_EXIST_VAL;
+        (Obj)         ->
+            case dotto:fetch(Obj, Path) of
+                {ok, Result} -> Result;
+                Any -> Any
+            end
+    end.
 
 
 %% %%%%%%%%%%%%%%%%
@@ -148,7 +168,7 @@ wf_patch(Json, _UI, Patch) ->
 %% INTERNAL HELPER
 %% %%%%%%%%%%%%%%%%
 -spec read_helper(client_key(), prbr:read_filter()) ->
-    {ok, client_value()} | {fail, not_found}.
+    {ok, client_value()} | {fail, not_found} | {error, any()}.
 read_helper(Key, ReadFilter) ->
     rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE, ReadFilter),
     trace_mpath:thread_yield(),
@@ -156,6 +176,7 @@ read_helper(Key, ReadFilter) ->
         ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
                        case Value of
                            ?NON_EXIST_VAL -> {fail, not_found};
+                           {error, Reason} -> {error, Reason};
                            _ -> {ok, Value}
                            end
                       )
@@ -165,13 +186,12 @@ read_helper(Key, ReadFilter) ->
             ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
                             case Value of
                                 ?NON_EXIST_VAL -> {fail, not_found};
+                                {error, Reason} -> {error, Reason};
                                 _ -> {ok, Value}
                             end
                           )
         end
     end.
-
-
 
 -spec write_helper(client_key(), client_value(), prbr:write_filter()) ->
     ok | {fail | error, any()}.
