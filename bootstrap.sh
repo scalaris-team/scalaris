@@ -1,12 +1,12 @@
 #!/bin/bash
 # Copyright 2007-2016 Zuse Institute Berlin
-# 
+#
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
 #    You may obtain a copy of the License at
-# 
+#
 #        http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #    Unless required by applicable law or agreed to in writing, software
 #    distributed under the License is distributed on an "AS IS" BASIS,
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +18,7 @@
 VERSION=`cat VERSION`
 VERSION_NOPLUS=`echo "${VERSION}" | tr + _`
 if [[ "$VERSION" == *git* ]]; then
-  ## maven snapshot versions must have revision incremented by 1 so that 
+  ## maven snapshot versions must have revision incremented by 1 so that
   ## maven sees them as a newer version than the release
   VERSION_NOGIT=${VERSION%+git*}
   MAJOR_MINOR=${VERSION_NOGIT%.*}
