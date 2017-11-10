@@ -496,16 +496,15 @@ AS_IF([test "${maps_module}" = "true"],
        AC_MSG_NOTICE([maps are available and seem to be usable])],
       [AC_MSG_NOTICE([maps are not available or not usable, falling back to gb_trees])])
 
-echo "-module(dict_type_check_tmp). -type test() :: dict:dict()." > dict_type_check_tmp.erl
-${ERLC} dict_type_check_tmp.erl > /dev/null 2>&1
-AS_IF([test $? = 0],
+# creates forms specifying a minimal erlang module which spezifies a
+# type based on dict:dict() and checks if compilation of this module fails
+dict_type=`"${ERL}" -noshell -eval 'X = fun(S) -> element(2,erl_parse:parse_form(element(2,erl_scan:string(S)))) end, io:format("~p~n", [[element(1, compile:forms([X("-module(test)."), X("-type test() :: dict:dict().")]))]]), erlang:halt().' 2> /dev/null | tail -1`
+AS_IF([test "${dict_type}" = "ok"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, namespaced_dict}"
        EDOCMACROS="${EDOCMACROS}, {namespaced_dict, true}"
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnamespaced_dict"
-       rm -f dict_type_check_tmp.beam
        AC_MSG_NOTICE([erlang dict type is defined as dict:dict()])],
       [AC_MSG_NOTICE([erlang dict type is defined as dict()])])
-rm -f dict_type_check_tmp.erl
 
 ###########################################################
 #

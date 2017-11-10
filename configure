@@ -8602,20 +8602,19 @@ else
 $as_echo "$as_me: maps are not available or not usable, falling back to gb_trees" >&6;}
 fi
 
-echo "-module(dict_type_check_tmp). -type test() :: dict:dict()." > dict_type_check_tmp.erl
-${ERLC} dict_type_check_tmp.erl > /dev/null 2>&1
-if test $? = 0; then :
+# creates forms specifying a minimal erlang module which spezifies a
+# type based on dict:dict() and checks if compilation of this module fails
+dict_type=`"${ERL}" -noshell -eval 'X = fun(S) -> element(2,erl_parse:parse_form(element(2,erl_scan:string(S)))) end, io:format("~p~n", [element(1, compile:forms([X("-module(test)."), X("-type test() :: dict:dict().")]))]), erlang:halt().' 2> /dev/null | tail -1`
+if test "${dict_type}" = "ok"; then :
   EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, namespaced_dict}"
        EDOCMACROS="${EDOCMACROS}, {namespaced_dict, true}"
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnamespaced_dict"
-       rm dict_type_check_tmp.beam
        { $as_echo "$as_me:${as_lineno-$LINENO}: erlang dict type is defined as dict:dict()" >&5
 $as_echo "$as_me: erlang dict type is defined as dict:dict()" >&6;}
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: erlang dict type is defined as dict()" >&5
 $as_echo "$as_me: erlang dict type is defined as dict()" >&6;}
 fi
-rm dict_type_check_tmp.erl
 
 ###########################################################
 #
