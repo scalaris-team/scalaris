@@ -30,6 +30,10 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
+-export_type([json/0]).
+-export_type([path/0]).
+-export_type([patch/0]).
+-export_type([patch_cmd/0]).
 
 %% PUBLIC API
 -export([read/1]).
