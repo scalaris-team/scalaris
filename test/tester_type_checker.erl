@@ -203,6 +203,11 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
         {typedef, ets, tid, []} -> % tid is reference in R20+
             inner_check_(Value, integer, CheckStack, ParseState);
+        {typedef, dict, dict, []} ->
+            check_list(dict:to_list(Value), % [Key,Value]
+                       {list, {tuple,
+                               [{typedef, tester, test_any, []}, {typedef, tester, test_any, []}]}},
+                       CheckStack, ParseState);
         {typedef, orddict, orddict, []} ->
             check_list(orddict:to_list(Value), % [Key,Value]
                        {list, {tuple,
