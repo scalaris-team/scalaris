@@ -36,6 +36,8 @@
 -export_type([patch_cmd/0]).
 
 %% PUBLIC API
+-export([new_json/0]).
+
 -export([read/1]).
 -export([fetch/2]).
 -export([write/2]).
@@ -59,6 +61,10 @@
 -export([wf_val/3]).
 -export([wf_patch/3]).
 
+%% TESTER
+-export([create_rand_json/1]).
+-export([is_json/1]).
+
 -ifdef(namespaced_dict).
 -type json() :: dict:dict().
 -else.
@@ -79,6 +85,10 @@
 %% Howerver, instead of strings ("/this/is/a/path"), lists are used
 %% ([this, is, a, path]).
 -type path() :: [any()].
+
+%% @doc Creates a new, empty JSON object.
+-spec new_json() -> json().
+new_json() -> dict:new().
 
 %% @doc Read full JSON object stored at given key.
 %% Returns
@@ -284,5 +294,16 @@ write_helper(Key, Value, ReadFilter, ContentCheck, WriteFilter) ->
 %% @doc Helper that unpacks a list of errors if this list contains only one
 %% error. Does nothing otherwise.
 -spec unpack_if_error_list(any()) -> any().
-unpack_if_error_list({error, [{error, Reason}]}) -> {error, Reason};
+unpack_if_error_list({error, [Error]}) -> {error, Error};
 unpack_if_error_list(Any) -> Any.
+
+%% %%%%%%%%%%%%%%%%
+%% TESTER
+%% %%%%%%%%%%%%%%%%
+
+-spec is_json(term()) -> boolean().
+is_json({dict, _, _, _, _, _, _ ,_, _}) -> true;
+is_json(_) -> false.
+
+-spec create_rand_json(integer()) -> json().
+create_rand_json(_Seed) -> new_json(). %% TODO
