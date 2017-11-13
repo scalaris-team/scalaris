@@ -225,6 +225,9 @@ parse_type({type, _Line, list, [Type]}, Module, ParseState) ->
 parse_type({type, _Line, nonempty_list, [Type]}, Module, ParseState) ->
     {ListType, ParseState2} = parse_type(Type, Module, ParseState),
     {{nonempty_list, ListType}, ParseState2};
+parse_type({type, _Line, nonempty_improper_list, Types = [_Type1, _Type2]}, Module, ParseState) ->
+    {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
+    {{nonempty_improper_list, TypeList}, ParseState2};
 parse_type({type, _Line, list, []}, _Module, ParseState) ->
     {{list, {typedef, tester, test_any, []}}, ParseState};
 parse_type([], _Module, ParseState) ->
