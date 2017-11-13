@@ -100,7 +100,7 @@ read(Key) ->
 
 %% @doc Partially read a JSON object stored at a given key.
 -spec fetch(client_key(), path()) ->
-    {ok, client_value()} | {fail, not_fount} | {error, any()}.
+    {ok, client_value()} | {fail, not_found} | {error, any()}.
 fetch(Key, Path) ->
     read_helper(Key, get_rf_fetch_fun(Path)).
 
@@ -126,7 +126,7 @@ write(Key, Value) ->
 %%      {error, ErrorList}  - At least one patch command failed.
 %%      {fail, Reason}      - The write was denied by scalaris.
 -spec patch(client_key(), patch_cmd() | patch()) ->
-    ok | {fail, any()} | {error, [{error, any()}]}.
+    ok | {fail, any()} | {error, [any()]}.
 patch(Key, PatchCommand) when not is_list(PatchCommand) ->
     patch(Key, [PatchCommand]);
 patch(Key, Patch) ->
@@ -152,7 +152,7 @@ replace(Key, Path, Value) ->
 move(Key, From, Path) ->
     unpack_if_error_list(patch(Key, {move, From, Path})).
 
--spec copy(client_key(), path(), client_value()) ->
+-spec copy(client_key(), path(), path()) ->
     ok | {fail | error, any()}.
 copy(Key, From, Path) ->
     unpack_if_error_list(patch(Key, {copy, From, Path})).
