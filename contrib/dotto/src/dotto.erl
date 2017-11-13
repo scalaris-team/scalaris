@@ -36,9 +36,14 @@ do_apply([Op|Ops], Obj, Errors) ->
         {error, Error} -> do_apply(Ops, Obj, [Error|Errors])
     end.
 
-% this will only match if you try to replace the whole document with an empty path
-add(_Obj, [], Val) ->
+% This will only match if you try to replace the whole document with an empty path
+% When strictly following the RFC, Val is allowed to be anything. However,
+% if it is not a valid JSON than the result is not a JSON as well which we want
+% to prevent in our use case.
+add(_Obj, [], Val) when ?IS_DICT(Val)->
     {ok, Val};
+add(Obj, [], Val) ->
+    {error, {cantset, Obj, [], Val}};
 add(Obj, [Field], Val) ->
     add_(Obj, Field, Val);
 
@@ -53,6 +58,11 @@ add(Obj, [Field|Fields], Val) ->
         notfound -> {error, {notfound, Obj, Field}};
         Other -> Other
     end.
+
+% calling remove with an empty path (i.e the documents root) removes all
+% elements. This is equivalent to a new, empty object
+remove(Obj, []) ->
+    {ok, dict:new()};
 
 remove(Obj, [Field]) ->
     case get_(Obj, Field) of
@@ -74,8 +84,11 @@ remove(Obj, [Field|Fields]) ->
     end.
 
 % this will only match if you try to replace the whole document with an empty path
-replace(_Obj, [], Val) ->
+% However, this is only allowed if the resulting document is a valid JSON as well
+replace(_Obj, [], Val) when ?IS_DICT(Val)->
     {ok, Val};
+replace(Obj, [], Val) ->
+    {error, {cantset, Obj, [], Val}};
 replace(Obj, [Field], Val) ->
     case get_(Obj, Field) of
         {ok, _FieldObj} ->
@@ -150,7 +163,8 @@ add_(Obj, Field, Value) when ?IS_DICT(Obj) ->
 add_(Obj, <<"-">>, Value) when is_list(Obj) ->
     {ok, Obj ++ [Value]};
 
-add_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) ->
+add_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) andalso
+                             length(Obj) >= Field andalso Field >= 0->
     {L1, L2} = lists:split(Field, Obj),
     {ok, L1 ++ [Value|L2]};
 
@@ -160,7 +174,8 @@ add_(Obj, Field, Value) ->
 set_(Obj, Field, Value) when ?IS_DICT(Obj) ->
     {ok, set_element(Obj, Field, Value)};
 
-set_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field) ->
+set_(Obj, Field, Value) when is_list(Obj) andalso is_integer(Field)
+                             andalso length(Obj) >= Field andalso Field >= 0->
     Result = case lists:split(Field, Obj) of
                  {[], [_|T]} -> [Value] ++ T;
                  {H1, [_|T]} -> H1 ++ [Value] ++ T;
@@ -180,7 +195,8 @@ del_(Obj, Field) when ?IS_DICT(Obj) ->
 del_(Obj, <<"-">>) when is_list(Obj) ->
     {ok, lists:droplast(Obj)};
 
-del_(Obj, Field) when is_list(Obj) andalso is_integer(Field) ->
+del_(Obj, Field) when is_list(Obj) andalso is_integer(Field)
+                      andalso length(Obj) >= Field andalso Field >= 0->
     Result = case lists:split(Field, Obj) of
                  {[], [_|T]} -> T;
                  {H1, [_|T]} -> H1 ++ T;
