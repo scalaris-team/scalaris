@@ -29,6 +29,7 @@
 
 all()   -> [
             tester_type_check_rbr,
+            rbr_increment,
             rbr_concurrency_kv,
             rbr_concurrency_leases,
             rbr_consistency,
@@ -80,6 +81,39 @@ end_per_testcase(_TestCase, _Config) ->
 
 %% TODO: unittest for: retrigger on read works
 %% TODO: unittest for: retrigger on write works
+
+rbr_increment(_Config) ->
+    %% start random number of nodes
+    %% select a key to operate on
+    %% start random number of increments (non transactional)
+    %% check if number of increments = value in key
+    Key = randoms:getRandomString(),
+
+    Parallel = randoms:rand_uniform(5, 11),
+    Count = 1000 div Parallel,
+    ct:pal("Starting concurrent writers: ~p~n"
+           "Performing iterations: ~p~n",
+           [Parallel, Count]),
+    UnitTestPid = self(),
+    _Pids = [ spawn(fun() ->
+                            _ = [ begin
+                                      {ok} = inc_on_cseq:inc(Key)
+                                  end
+                                  || _I <- lists:seq(1, Count)],
+                           UnitTestPid ! {done}
+                   end)
+             || _Nth <- lists:seq(1, Parallel)],
+
+    _ = [ receive {done} ->
+                      ct:pal("Finished ~p/~p.~n", [Nth, Parallel]),
+                      ok
+          end || Nth <- lists:seq(1, Parallel)],
+
+    {ok, Result} = inc_on_cseq:read(Key),
+    ct:pal("Planned ~p increments, done ~p - discrepancy is NOT ok~n",
+           [Count*Parallel, Result]),
+    ?equals(Count*Parallel, Result),
+    ok.
 
 rbr_concurrency_kv(_Config) ->
     %% start random number of nodes
