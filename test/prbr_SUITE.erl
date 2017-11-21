@@ -353,6 +353,7 @@ tester_type_check_rbr(_Config) ->
              {abort_write, 5},  %% tested via feeder
              {get_commuting_wf_for_rf, 1}], %% cannot create funs
            []},
+          {inc_on_cseq, [],[]},
           {pr,
            [
            ],

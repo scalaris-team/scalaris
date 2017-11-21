@@ -22,6 +22,7 @@
 -vsn('$Id:$ ').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -export([read/1]).
 -export([inc/1]).
@@ -31,6 +32,7 @@
 -export([cc_noop/3]).
 -export([wf_inc/3]).
 
+-spec read(client_key()) -> {ok, client_value()} | {fail, not_found}.
 read(Key) ->
     rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE, fun ?MODULE:rf_val/1),
     receive
@@ -52,6 +54,9 @@ read(Key) ->
        end
  end.
 
+%% increments value stored at Key. For simplicity, does not fail if current
+%% value is not an integer. Instead, the value will be replaced by 1.
+-spec inc(client_key()) -> {ok}.
 inc(Key) ->
     rbrcseq:qwrite(kv_db, self(), ?RT:hash_key(Key), ?MODULE,
                    fun ?MODULE:rf_none/1, fun ?MODULE:cc_noop/3, fun ?MODULE:wf_inc/3, 1),
@@ -60,7 +65,7 @@ inc(Key) ->
         ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, _Value, _WriteRet}, {ok});
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
                        begin log:log("Write failed on key ~p: ~p~n", [Key, Reason]),
-                       {ok} end) %% TODO: extend write_result type {fail, Reason} )
+                       {ok} end)
     after 1000 ->
             log:log("~p write hangs at key ~p, ~p~n",
                     [self(), Key, erlang:process_info(self(), messages)]),
@@ -78,11 +83,17 @@ inc(Key) ->
                 end
     end.
 
-
+-spec rf_val(prbr_bottom | non_neg_integer()) -> non_neg_integer().
 rf_val(prbr_bottom) -> 0;
 rf_val(X) -> X.
+
+-spec rf_none(any()) -> none.
 rf_none(_) -> none.
+
+-spec cc_noop(any(), any(), any()) -> {true, none}.
 cc_noop(_,_,_) -> {true, none}.
 
+-spec wf_inc(prbr_bottom | non_neg_integer(), none, non_neg_integer()) -> {non_neg_integer(), none}.
 wf_inc(prbr_bottom, none, ToAdd) -> {ToAdd, none};
+wf_inc(Val, none, ToAdd) when not is_integer(Val) -> {ToAdd, none};
 wf_inc(Val, none, ToAdd) ->  {Val + ToAdd, none}.
