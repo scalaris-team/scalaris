@@ -289,7 +289,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 NewWriteRound = pr:set_wti(TWriteRound, {Ret, LearnerForWTI}),
                 TEntry = entry_set_r_write(KeyEntry, NewWriteRound),
 
-                %% prepare for fast write 
+                %% prepare for fast write
                 NextWriteRound = next_read_round(TEntry, ProposerUID),
                 T2Entry = entry_set_r_read(TEntry, NextWriteRound),
 
