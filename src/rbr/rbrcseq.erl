@@ -1,4 +1,4 @@
-% @copyright 2012-2016 Zuse Institute Berlin,
+% @copyright 2012-2017 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -94,6 +94,7 @@
 -type replies() :: #rr_replies{} | #r_replies{} | #w_replies{}.
 
 -type entry() :: {any(), %% ReqId
+                  any(), %% key of entry keeping track of open requests for this client
                   any(), %% debug field
                   non_neg_integer(), %% period of last retriggering / starting
                   non_neg_integer(), %% period of next retriggering
@@ -102,7 +103,7 @@
                   comm:erl_local_pid(), %% client
                   any(), %% filter (read) or tuple of filters (write)
                   is_read | any(), %% value to write if entry belongs to write
-                  read | write, %% operation type
+                  read | write | denied_write, %% operation type
                   pr:pr(), %% my round
                   replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
@@ -136,9 +137,12 @@ qread(CSeqPidName, Client, Key, DataType) ->
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), module(), prbr:read_filter()) -> ok.
 qread(CSeqPidName, Client, Key, DataType, ReadFilter) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qround_request, Client, Key, DataType, ReadFilter, read, _RetriggerAfter = 1})
+
+    ReqMsg  = {qround_request, Client, '_', Key, DataType,
+                ReadFilter, read, _RetriggerAfter = 1},
+    start_request(Pid, ReqMsg),
     %% the process will reply to the client directly
-    .
+    ok.
 
 %% quorum write protocol for consensus sequence
 %%
@@ -220,21 +224,23 @@ qwrite_fast(CSeqPidName, Client, Key, DataType, CC, Value, Round, OldVal) ->
 qwrite(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
     Pid = pid_groups:find_a(CSeqPidName),
-    comm:send_local(Pid, {qwrite, Client, Key,
-                          DataType, {ReadFilter, ContentCheck, WriteFilter},
-                          Value, _RetriggerAfter = 20}),
+
+    ReqMsg = {qwrite, Client, '_', Key,
+                   DataType, {ReadFilter, ContentCheck, WriteFilter},
+                   Value, _RetriggerAfter = 20},
+    start_request(Pid, ReqMsg),
     %% the process will reply to the client directly
     ok.
 
 -spec qwrite_fast(pid_groups:pidname(),
-             comm:erl_local_pid(),
-             ?RT:key(),
-             module(),
-             fun ((any()) -> any()), %% read filter
-             fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
-             fun ((any(), any(), any()) -> any()), %% write filter
-             client_value(), pr:pr(), client_value() | prbr_bottom)
-            -> ok.
+                  comm:erl_local_pid(),
+                  ?RT:key(),
+                  module(),
+                  fun ((any()) -> any()), %% read filter
+                      fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
+                          fun ((any(), any(), any()) -> any()), %% write filter
+                              client_value(), pr:pr(), client_value() | prbr_bottom)
+-> ok.
 qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
@@ -246,12 +252,20 @@ qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
     %% write is the used write round inrecemented by one.
     OldWriteRound = pr:new(pr:get_r(Round)-1, pr:get_id(Round)),
 
-    comm:send_local(Pid, {qwrite_fast, Client, Key,
+    ReqMsg =  {qwrite_fast, Client, '_', Key,
                           DataType, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 20, Round, OldWriteRound,
-                          OldValue}),
+                          OldValue},
+    start_request(Pid, ReqMsg),
     %% the process will reply to the client directly
     ok.
+
+%% start the request with message to on({request_init... before starting
+%% the first step of the protocol
+-spec start_request(pid_groups:pidname(), any()) -> ok.
+start_request(CseqPid, Msg) ->
+    InitMsg = comm:reply_as(CseqPid, 3, Msg),
+    comm:send_local(CseqPid, {request_init, _ClientPosInMsg=2, InitMsg}).
 
 %% @doc spawns a rbrcseq, called by the scalaris supervisor process
 -spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
@@ -280,8 +294,38 @@ init(DBSelector) ->
 %% state()) -> state().
 
 
+on({request_init, ClientPosInMsg, InitMsg}, State) ->
+    %% will be used to track open entries belonging to this request
+    EntryReg = create_open_entry_register(tablename(State)),
+    %% fill placeholder in msg with EntryReg
+    {Target, UnpackedMsg} = comm:unpack_cookie(InitMsg, EntryReg),
+
+    %% once the request is done, the result is sent to Client. However, cleanup
+    %% is requires to close eventual open entries (happens if proposer receives
+    %% a quorum of success replies from a write through caused by its incomplete
+    %% write). Replaces the client in the message, so that it is sent to the
+    %% proposer's request_cleanup on-handler which in turn will forward the message
+    %% to the client after it is done with its cleanup.
+    Client = element(ClientPosInMsg, UnpackedMsg),
+    InjectedCleanupClient = comm:reply_as(Target, 4,
+                                          {request_cleanup, Client, EntryReg, '_'}),
+    NewMsg = setelement(ClientPosInMsg, UnpackedMsg, InjectedCleanupClient),
+    comm:send_local(Target, NewMsg),
+    State;
+
+on({request_cleanup, Client, EntryReg, Result}, State) ->
+    case delete_all_entries(EntryReg, tablename(State),_DeleteOpenEntryReqToo=true) of
+        ok ->
+            comm:send_local(Client, Result);
+        error ->
+            %% Open request register does not exist anymore. This means
+            %% cleanup was already called and the client has received a reply.
+            ok
+    end,
+    State;
+
 %% qread step 1: request the current read/write rounds of + values from replicas.
-on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, State) ->
+on({qround_request, Client, EntryReg, Key, DataType, ReadFilter, OpType, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:read step 1: round_request, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
@@ -302,26 +346,27 @@ on({qround_request, Client, Key, DataType, ReadFilter, OpType, RetriggerAfter}, 
     MyId = {my_id(), ReqId},
     Dest = pid_groups:find_a(routing_table),
     DB = db_selector(State),
-    _ = [ begin
-              %% let fill in whether lookup was consistent
-              LookupEnvelope =
-                  dht_node_lookup:envelope(
-                    4,
-                    {prbr, round_request, DB, '_', This, X, DataType, MyId, ReadFilter, OpType}),
-              comm:send_local(Dest,
-                              {?lookup_aux, X, 0,
-                               LookupEnvelope})
-          end
-          || X <- ?REDUNDANCY:get_keys(Key) ],
 
+    %% create local state for the request
+    Entry = entry_new_round_request(qround_request, ReqId, EntryReg, Key, DataType, Client,
+                                    period(State), ReadFilter, RetriggerAfter, OpType),
+    _ = case save_entry(Entry, tablename(State)) of
+            ok ->
+                [ begin
+                    %% let fill in whether lookup was consistent
+                    LookupEnvelope = dht_node_lookup:envelope(4,
+                            {prbr, round_request, DB, '_', This, X,
+                             DataType, MyId, ReadFilter, OpType}),
+                    comm:send_local(Dest,{?lookup_aux, X, 0, LookupEnvelope})
+                  end
+                || X <- ?REDUNDANCY:get_keys(Key) ];
+            error ->
+                %% cliend has already received an reply.
+                ok
+        end,
     %% retriggering of the request is done via the periodic dictionary scan
     %% {next_period, ...}
 
-    %% create local state for the request id
-    Entry = entry_new_round_request(qround_request, ReqId, Key, DataType, Client,
-                                    period(State), ReadFilter, RetriggerAfter, OpType),
-    %% store local state of the request
-    set_entry(Entry, tablename(State)),
     State;
 
 %% qread step 2: collect round_request replies (step 1) from replicas.
@@ -348,7 +393,7 @@ on({qround_request_collect,
             case Result of
                 false ->
                     %% no majority replied yet
-                    set_entry(NewEntry, tablename(State)),
+                    update_entry(NewEntry, tablename(State)),
                     State;
                 consistent ->
                     WriteState = NewReplies#rr_replies.write_state,
@@ -361,14 +406,15 @@ on({qround_request_collect,
                     inform_client(qread_done, NewEntry,
                                   WriteState#write_state.highest_write_round,
                                   WriteState#write_state.value),
-                    ?PDB:delete(ReqId, tablename(State)),
+                    delete_entry(NewEntry, tablename(State)),
                     State;
                 inconsistent ->
                     %% majority replied, but we do not have a consistent quorum ->
                     %% do a qread with highest received read round + 1
-                    ?PDB:delete(ReqId, tablename(State)),
+                    delete_entry(NewEntry, tablename(State)),
                     gen_component:post_op({qread,
                                            entry_client(NewEntry),
+                                           entry_openreqentry(NewEntry),
                                            entry_key(NewEntry),
                                            entry_datatype(NewEntry),
                                            entry_filters(NewEntry),
@@ -383,14 +429,14 @@ on({qround_request_collect,
                     RReplies = #r_replies{ack_count = 0, deny_count = 0, % doesn't matter..
                                           write_state = NewReplies#rr_replies.write_state},
                     NewEntry2 = entry_set_replies(NewEntry, RReplies),
-                    ?PDB:delete(ReqId, tablename(State)),
+                    delete_entry(NewEntry2, tablename(State)),
                     gen_component:post_op({qread_initiate_write_through, NewEntry2},
                                            State)
             end
     end;
 
 %% qread step 3 with explicit read round number
-on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound, OpType}, State) ->
+on({qread, Client, OpenReqEntry, Key, DataType, ReadFilter, RetriggerAfter, ReadRound, OpType}, State) ->
     ?TRACE("rbrcseq:on qread ReqId ~p~n", [ReqId]),
     %% if the caller process may handle more than one request at a
     %% time for the same key, the pids id has to be unique for each
@@ -409,27 +455,27 @@ on({qread, Client, Key, DataType, ReadFilter, RetriggerAfter, ReadRound, OpType}
     MyId = {my_id(), ReqId},
     Dest = pid_groups:find_a(routing_table),
     DB = db_selector(State),
-    _ = [ begin
-              %% let fill in whether lookup was consistent
-              LookupEnvelope =
-                  dht_node_lookup:envelope(
-                    4,
+    %% create local state for the request
+    Entry = entry_new_read(qread, ReqId, OpenReqEntry, Key, DataType, Client, period(State),
+                           ReadFilter, RetriggerAfter, OpType),
+    _ = case save_entry(Entry, tablename(State)) of
+        ok ->
+            [ begin
+                %% let fill in whether lookup was consistent
+                LookupEnvelope = dht_node_lookup:envelope(4,
                     {prbr, read, DB, '_', This, X, DataType, MyId, ReadFilter,
                      pr:new(ReadRound, MyId)}),
-              comm:send_local(Dest,
-                              {?lookup_aux, X, 0,
-                               LookupEnvelope})
-          end
-          || X <- ?REDUNDANCY:get_keys(Key) ],
+                comm:send_local(Dest, {?lookup_aux, X, 0, LookupEnvelope})
+              end
+            || X <- ?REDUNDANCY:get_keys(Key) ];
+        error ->
+            %% client has already received a reply
+            ok
+    end,
 
     %% retriggering of the request is done via the periodic dictionary scan
     %% {next_period, ...}
 
-    %% create local state for the request id
-    Entry = entry_new_read(qread, ReqId, Key, DataType, Client, period(State),
-                           ReadFilter, RetriggerAfter, OpType),
-    %% store local state of the request
-    set_entry(Entry, tablename(State)),
     State;
 
 %% qread step 4: a replica replied to read from step 3
@@ -459,7 +505,7 @@ on({qread_collect,
             WriteState = NewReplies#r_replies.write_state,
             case Result of
                 false ->
-                    set_entry(NewEntry, tablename(State)),
+                    update_entry(NewEntry, tablename(State)),
                     State;
                 true ->
                     trace_mpath:log_info(self(),
@@ -468,7 +514,7 @@ on({qread_collect,
                                           WriteState#write_state.value}),
                     inform_client(qread_done, NewEntry, WriteState#write_state.highest_write_round,
                                    WriteState#write_state.value),
-                    ?PDB:delete(ReqId, tablename(State)),
+                    delete_entry(NewEntry, tablename(State)),
                     State;
                 write_through ->
                     %% in case a consensus was started, but not yet finished,
@@ -478,7 +524,7 @@ on({qread_collect,
                         1 ->
                             %% delete entry, so outdated answers from minority
                             %% are not considered
-                            ?PDB:delete(ReqId, tablename(State)),
+                            delete_entry(NewEntry, tablename(State)),
                             gen_component:post_op({qread_initiate_write_through,
                                                    NewEntry}, State);
                         3 ->
@@ -486,18 +532,19 @@ on({qread_collect,
                             _ = comm:send_local_after(
                                   15 + randoms:rand_uniform(1,10), self(),
                                   {qread_initiate_write_through, NewEntry}),
-                            ?PDB:delete(ReqId, tablename(State)),
+                            delete_entry(NewEntry, tablename(State)),
                             State;
                         2 ->
-                            ?PDB:delete(ReqId, tablename(State)),
+                            delete_entry(NewEntry, tablename(State)),
                             comm:send_local(self(), {qread_initiate_write_through,
                                                    NewEntry}),
                             State;
                         4 ->
-                            ?PDB:delete(ReqId, tablename(State)),
+                            delete_entry(NewEntry, tablename(State)),
                             %% retry read
                             gen_component:post_op({qread,
                                                    entry_client(NewEntry),
+                                                   entry_openreqentry(NewEntry),
                                                    entry_key(NewEntry),
                                                    entry_datatype(NewEntry),
                                                    entry_filters(NewEntry),
@@ -505,11 +552,12 @@ on({qread_collect,
                                                    1+pr:get_r(entry_my_round(NewEntry)),
                                                    entry_optype(NewEntry)}, State);
                         5 ->
-                            ?PDB:delete(ReqId, tablename(State)),
+                            delete_entry(NewEntry, tablename(State)),
                             %% retry read
                             comm:send_local_after(15 + randoms:rand_uniform(1,10), self(),
                                                   {qread,
                                                    entry_client(NewEntry),
+                                                   entry_openreqentry(NewEntry),
                                                    entry_key(NewEntry),
                                                    entry_datatype(NewEntry),
                                                    entry_filters(NewEntry),
@@ -535,20 +583,21 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
             NewEntry = entry_set_replies(TEntry, NewReplies),
             case Result of
                 false ->
-                    set_entry(NewEntry, tablename(State)),
+                    update_entry(NewEntry, tablename(State)),
                     State;
                 retry ->
                     % we can no longer achieve a quorum accept because of a
                     % concurrent request
                     NextMsg = {qread,
                                entry_client(NewEntry),
+                               entry_openreqentry(NewEntry),
                                entry_key(NewEntry),
                                entry_datatype(NewEntry),
                                entry_filters(NewEntry),
                                entry_retrigger(NewEntry),
                                1 + pr:get_r(entry_my_round(NewEntry)),
                                entry_optype(NewEntry)},
-                    ?PDB:delete(ReqId, tablename(State)),
+                    delete_entry(NewEntry, tablename(State)),
 
                     case randoms:rand_uniform(1, 2) of
                         1 ->
@@ -609,7 +658,9 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                        fun(_,_,_) -> {true, WTUI} end,
                        WTWF},
 
-            Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
+            Entry = entry_new_write(write_through, ReqId,
+                                    entry_openreqentry(ReadEntry),
+                                    entry_key(ReadEntry),
                                     entry_datatype(ReadEntry),
                                     This,
                                     period(State),
@@ -625,25 +676,24 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             DB = db_selector(State),
             Keys = ?REDUNDANCY:get_keys(entry_key(Entry)),
             WTVals = ?REDUNDANCY:write_values_for_keys(Keys,  WTVal),
-            _ = [ begin
-                      %% let fill in whether lookup was consistent
-                      LookupEnvelope =
-                          dht_node_lookup:envelope(
-                            4,
-                            {prbr, write, DB, '_', Collector, K,
-                             entry_datatype(ReadEntry),
-                             MyId,
-                             WriteRound,
-                             pr:new(0,0), %% has no effect because write_through
-                             V,
-                             WTUI,
-                             WTWF, _IsWriteThrough = true}),
-                      comm:send_local(Dest,
-                                      {?lookup_aux, K, 0,
-                                       LookupEnvelope})
-                  end
-                  || {K, V} <- lists:zip(Keys, WTVals) ],
-            set_entry(Entry, tablename(State)),
+            _ = case save_entry(Entry, tablename(State)) of
+                    ok ->
+                        [ begin
+                            %% let fill in whether lookup was consistent
+                            LookupEnvelope =
+                                dht_node_lookup:envelope(
+                                    4,
+                                    {prbr, write, DB, '_', Collector, K,
+                                     entry_datatype(ReadEntry), MyId, WriteRound,
+                                     pr:new(0,0), %% has no effect because write_through
+                                     V, WTUI, WTWF, _IsWriteThrough = true}),
+                            comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope})
+                          end
+                        || {K, V} <- lists:zip(Keys, WTVals) ];
+                    error ->
+                        %% client already received a reply
+                        ok
+                end,
             State;
         false ->
             %% apply the read-filter after the write_through: just
@@ -655,8 +705,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op({qround_request, This, entry_key(ReadEntry), entry_datatype(ReadEntry),
-               fun prbr:noop_read_filter/1, write,
+            gen_component:post_op({qround_request, This, entry_openreqentry(ReadEntry),
+               entry_key(ReadEntry), entry_datatype(ReadEntry), fun prbr:noop_read_filter/1, write,
                entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
               State)
     end;
@@ -677,12 +727,12 @@ on({qread_write_through_collect, ReqId,
             {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
             case Done of
-                false -> set_entry(NewEntry, tablename(State));
+                false -> update_entry(NewEntry, tablename(State));
                 true ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
-                    ?PDB:delete(ReqId, tablename(State))
+                    delete_entry(Entry, tablename(State))
             end
     end,
     State;
@@ -705,11 +755,11 @@ on({qread_write_through_collect, ReqId,
 
             case Done of
                 false ->
-                    set_entry(NewEntry, tablename(State)),
+                    update_entry(NewEntry, tablename(State)),
                     State;
                 true ->
                     %% retry original read
-                    ?PDB:delete(ReqId, TableName),
+                    delete_entry(Entry, TableName),
 
                     %% we want to retry with the read, the original
                     %% request is packed in the client field of the
@@ -740,16 +790,15 @@ on({qread_write_through_collect, ReqId,
                                 %% we also have to delete this request
                                 %% as no one will answer it.
                                 UnpackedEntry2 = element(2, Msg2),
-                                ?PDB:delete(entry_reqid(UnpackedEntry2),
-                                            TableName),
+                                delete_entry(UnpackedEntry2, TableName),
                                 {entry_client(UnpackedEntry2),
                                  entry_filters(UnpackedEntry2)};
                             _ ->
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op({qround_request, Client, Key, entry_datatype(Entry),
-                      Filter, write, entry_retrigger(Entry) - entry_period(Entry)},
+                    gen_component:post_op({qround_request, Client, entry_openreqentry(Entry),
+                      Key, entry_datatype(Entry), Filter, write, entry_retrigger(Entry) - entry_period(Entry)},
                       State)
             end
     end;
@@ -774,13 +823,14 @@ on({qread_write_through_done, ReadEntry, _Filtering,
 %%    inform_client(qread_done, ReplyEntry),
 
     Client = entry_client(ReadEntry),
+    OpenReqEntry = entry_openreqentry(ReadEntry),
     Key = entry_key(ReadEntry),
     DataType = entry_datatype(ReadEntry),
     ReadFilter = entry_filters(ReadEntry),
     RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
 
     gen_component:post_op(
-      {qround_request, Client, Key, DataType, ReadFilter, write, RetriggerAfter},
+      {qround_request, Client, OpenReqEntry, Key, DataType, ReadFilter, write, RetriggerAfter},
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
@@ -804,20 +854,25 @@ on({qread_write_through_done, ReadEntry, Filtering,
     State;
 
 %% normal qwrite step 1: preparation and starting read-phase
-on({qwrite, Client, Key, DataType, Filters, WriteValue, RetriggerAfter}, State) ->
+on({qwrite, Client, OpenReqEntry, Key, DataType, Filters, WriteValue, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qwrite~n", []),
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, OpenReqEntry, Key, DataType, Client, period(State),
                             Filters, WriteValue, RetriggerAfter),
 
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
-    set_entry(Entry, tablename(State)),
-    gen_component:post_op({qround_request, This, Key, DataType,
-                           element(1, Filters), write, 1}, State);
+    case save_entry(Entry, tablename(State)) of
+        ok ->
+            gen_component:post_op({qround_request, This, OpenReqEntry, Key, DataType,
+                                 element(1, Filters), write, 1}, State);
+        error ->
+            %% client has already received reply
+            State
+    end;
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
@@ -826,7 +881,7 @@ on({qwrite_read_done, ReqId,
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
     gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound, ReadValue}, State);
 
-on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
+on({qwrite_fast, Client, OpenReqEntry, Key, DataType, Filters = {_RF, _CC, _WF},
     WriteValue, RetriggerAfter, Round, OldWriteRound, ReadFilterResultValue}, State) ->
 
     %% create state and ReqId, store it and trigger 'do_qwrite_fast'
@@ -836,12 +891,17 @@ on({qwrite_fast, Client, Key, DataType, Filters = {_RF, _CC, _WF},
     ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(qwrite, ReqId, Key, DataType, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, OpenReqEntry, Key, DataType, Client, period(State),
                             Filters, WriteValue, RetriggerAfter),
 
-    set_entry(Entry, tablename(State)),
-    gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound,
+    case save_entry(Entry, tablename(State)) of
+        ok ->
+            gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound,
                                   ReadFilterResultValue}, State);
+        error ->
+            %% client hjas already received reply
+            State
+    end;
 
 on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
     %% What if ReqId does no longer exist? Can that happen? How?
@@ -856,7 +916,7 @@ on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
           %% any time, so we have to be prepared for that.
           State;
         _ ->
-          NewEntry = setelement(2, Entry, do_qwrite_fast),
+          NewEntry = entry_set_debug(Entry, do_qwrite_fast),
           ContentCheck = element(2, entry_filters(NewEntry)),
           WriteFilter = element(3, entry_filters(NewEntry)),
           WriteValue = entry_write_val(NewEntry),
@@ -887,7 +947,7 @@ on({do_qwrite_fast, ReqId, Round, OldWriteRound, OldRFResultValue}, State) ->
                   comm:send_local(entry_client(NewEntry),
                             {qwrite_deny, ReqId, Round, OldRFResultValue,
                             {content_check_failed, Reason}}),
-                  ?PDB:delete(ReqId, tablename(State))
+                  delete_entry(NewEntry, tablename(State))
                 end,
             State
         end;
@@ -909,14 +969,21 @@ on({qwrite_collect, ReqId,
             {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
             case Done of
-                false -> set_entry(NewEntry, tablename(State));
+                false -> update_entry(NewEntry, tablename(State));
                 true ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     trace_mpath:log_info(self(),
                                          {qwrite_done,
                                           value, entry_write_val(ReplyEntry)}),
                     inform_client(qwrite_done, ReplyEntry, WriteRet),
-                    ?PDB:delete(ReqId, tablename(State))
+
+                    %% a successfull write is always the end of the protocol.
+                    %% immediately clear all open requests associated
+                    %% with the client request, and do not wait unitl this
+                    %% process received the cleanup msg. This must be done
+                    %% to prevent a second write beeing submitted by this proposer
+                    delete_all_entries(entry_openreqentry(NewEntry),
+                                       tablename(State), _DeleteReqEntryToo=false)
             end
     end,
     State;
@@ -938,10 +1005,11 @@ on({qwrite_collect, ReqId,
             Replies = entry_replies(Entry),
             {Done, NewReplies} = add_write_deny(Replies, RoundTried, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
-            %NewEntry = entry_set_my_round(NewEntr, NewerRound),
-            case Done of
-                false -> set_entry(NewEntry, TableName),
-                                     State;
+            update_entry(NewEntry, TableName),
+            %% If this request was already denied, do not deny again
+            %% (see true case why this might happen)
+            case Done andalso entry_optype(NewEntry) =/= denied_write of
+                false -> State;
                 true ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),
@@ -953,34 +1021,45 @@ on({qwrite_collect, ReqId,
                     %% request to ourselves or we retry the request
                     %% directly via a post_op.
 
-%% As this happens only when concurrency is detected (not the critical
-%% failure- and concurrency-free path), we have the time to choose a
-%% random number. This is still faster than using msg_delay or
-%% comm:local_send_after() with a random delay.
-%% TODO: random is not allowed for proto_sched reproducability...
+                    %% As this happens only when concurrency is detected (not the critical
+                    %% failure- and concurrency-free path), we have the time to choose a
+                    %% random number. This is still faster than using msg_delay or
+                    %% comm:local_send_after() with a random delay.
+                    %% TODO: random is not allowed for proto_sched reproducability...
                     %% log:log("Concurrency retry"),
                     UpperLimit = case proto_sched:infected() of
-                                     true -> 3;
-                                     false -> 4
+                                     true -> 2;
+                                     false -> 3
                                  end,
+
+                    %% The request is retriggered. However, the current entry
+                    %% representing *this* request should NOT be deleted. This
+                    %% write attempt may have written some (albeit the minority of)
+                    %% replicas. A concurrent proposer might see an inconsistent write state,
+                    %% thus triggering a write through. If acceptors vote for this
+                    %% WT-proposal, the original proposer (i.e. this process) is notified.
+                    %% These messages are aggregated using the current req-id. Thus
+                    %% we need to keep it around for now until some write suceeded.
+                    %%
+                    %% To prevent a deny msg that lags behind from triggering
+                    %% this branch again, mark this request as denied
+                    %% Also we need to prevent a retrigger of this request
+                    %% since it has already spawned a successor request
+                    NewEntry2 = entry_set_optype(NewEntry, denied_write),
+                    NewEntry3 = entry_disable_retrigger(NewEntry2),
+                    update_entry(NewEntry3, TableName),
                     case randoms:rand_uniform(1, UpperLimit) of
                         1 ->
-                            retrigger(NewEntry, TableName, noincdelay),
-                            %% delete of entry is done in retrigger!
-                            State;
-                        2 ->
-                            NewReq = req_for_retrigger(NewEntry, noincdelay),
-                            ?PDB:delete(element(1, NewEntry), TableName),
+                            NewReq = req_for_retrigger(NewEntry3, noincdelay),
                             gen_component:post_op(NewReq, State);
-                        3 ->
-                            NewReq = req_for_retrigger(NewEntry, noincdelay),
+                        2 ->
+                            NewReq = req_for_retrigger(NewEntry3, noincdelay),
                             %% TODO: maybe record number of retries
                             %% and make timespan chosen from
                             %% dynamically wider
                             _ = comm:send_local_after(
                                   10 + randoms:rand_uniform(1,90), self(),
                                   NewReq),
-                            ?PDB:delete(element(1, NewEntry), TableName),
                             State
                     end
             end
@@ -1022,8 +1101,8 @@ on({next_period, NewPeriod}, State) ->
     %% retriggering for them
     Table = tablename(State),
     _ = [ retrigger(X, Table, incdelay)
-          || X <- ?PDB:tab2list(Table), is_tuple(X),
-             12 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
+          || X <- ?PDB:tab2list(Table), is_tuple(X), 13 =:= erlang:tuple_size(X),
+             0 =/= entry_retrigger(X), NewPeriod > entry_retrigger(X)],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -1032,6 +1111,7 @@ on({next_period, NewPeriod}, State) ->
 -spec req_for_retrigger(entry(), incdelay|noincdelay) ->
                                {qround_request,
                                 Client :: comm:erl_local_pid(),
+                                OpenReqEntry :: any(),
                                 Key :: ?RT:key(),
                                 DataType :: module(),
                                 Filters :: any(),
@@ -1039,6 +1119,7 @@ on({next_period, NewPeriod}, State) ->
                                 Delay :: non_neg_integer()}
                                | {qwrite,
                                 Client :: comm:erl_local_pid(),
+                                OPenReqEntry :: any(),
                                 Key :: ?RT:key(),
                                 DataType :: module(),
                                 Filters :: any(),
@@ -1049,16 +1130,16 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    ?ASSERT(erlang:tuple_size(Entry) =:= 12),
+    ?ASSERT(erlang:tuple_size(Entry) =:= 13),
     Filters = entry_filters(Entry),
     if is_tuple(Filters) -> %% write request
-           {qwrite, entry_client(Entry),
+           {qwrite, entry_client(Entry), entry_openreqentry(Entry),
             entry_key(Entry), entry_datatype(Entry),
             entry_filters(Entry), entry_write_val(Entry),
             RetriggerDelay};
        true -> %% read request
-           {qround_request, entry_client(Entry), entry_key(Entry),
-            entry_datatype(Entry), entry_filters(Entry),
+           {qround_request, entry_client(Entry), entry_openreqentry(Entry),
+            entry_key(Entry), entry_datatype(Entry), entry_filters(Entry),
             entry_optype(Entry), RetriggerDelay}
     end.
 
@@ -1067,38 +1148,93 @@ retrigger(Entry, TableName, IncDelay) ->
     Request = req_for_retrigger(Entry, IncDelay),
     ?TRACE("Retrigger caused by timeout or concurrency for ~.0p~n", [Request]),
     comm:send_local(self(), Request),
-    ?PDB:delete(entry_reqid(Entry), TableName).
+    delete_entry(Entry, TableName),
+    ok.
 
--spec get_entry(any(), ?PDB:tableid()) -> entry() | undefined.
+-spec get_entry(any(), ?PDB:tableid()) -> entry() | {any(), [any()]} | undefined.
 get_entry(ReqId, TableName) ->
     ?PDB:get(ReqId, TableName).
 
--spec set_entry(entry(), ?PDB:tableid()) -> ok.
-set_entry(NewEntry, TableName) ->
+%% Refreshs the content of an existing entry. ATTENTION: No check if this entry
+%% already exists will be performed.
+-spec update_entry(entry(), ?PDB:tableid()) -> ok.
+update_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
+%% Stores a new entry in ?PDB as long as the open-request-entry
+%% still exists. Does nothing otherwise. If such entry does not exist,
+%% this means that the client has already reveiced a reply and no further
+%% work should be done for this request (Otherwise a write might be
+%% applied twice.)
+-spec save_entry(entry(), ?PDB:tableid()) -> ok | error.
+save_entry(NewEntry, TableName) ->
+    ReqId = entry_reqid(NewEntry),
+    OpenReqEntry = entry_openreqentry(NewEntry),
+    case get_entry(OpenReqEntry, TableName) of
+        {OpenReqEntry, OpenReqList} ->
+            ?PDB:set({OpenReqEntry, [ReqId | OpenReqList]}, TableName),
+            ?PDB:set(NewEntry, TableName),
+            ok;
+        _ -> error
+    end.
+
+%% Deletes an request entry, as well as its entry in the open-request-entry.
+-spec delete_entry(entry(), ?PDB:tableid()) -> ok.
+delete_entry(Entry, TableName) ->
+    ReqId = entry_reqid(Entry),
+    OpenReqEntry = entry_openreqentry(Entry),
+    {OpenReqEntry, OpenReqList} = get_entry(OpenReqEntry, TableName),
+    ?PDB:set({OpenReqEntry, lists:delete(ReqId, OpenReqList)}, TableName),
+    ?PDB:delete(ReqId, TableName).
+
+%% Deletes all entries included in the open-request-entry. No more can be done.
+%% Return an error if entry is malformed or does not exist
+-spec delete_all_entries(any(), ?PDB:tableid(), boolean()) -> ok | error.
+delete_all_entries(OpenReqEntryId, TableName, DeleteOpenReqEntryToo) ->
+    case get_entry(OpenReqEntryId, TableName) of
+        {OpenReqEntryId, EntryList} ->
+            lists:foreach(fun(E) -> ?PDB:delete(E, TableName) end, EntryList),
+            case DeleteOpenReqEntryToo of
+                true ->
+                    ?PDB:delete(OpenReqEntryId, TableName);
+                false ->
+                    ?PDB:set({OpenReqEntryId, []}, TableName),
+                    ok
+            end;
+        _ -> error
+    end.
+
+%% Creates entry which will be used to keep track of open requests and returns
+%% its keys by which it can be retrieved.
+-spec create_open_entry_register(?PDB:tableid()) -> any().
+create_open_entry_register(TableName) ->
+    RegId = uid:get_pids_uid(),
+    InitVal = [],
+    ?PDB:set({RegId, InitVal}, TableName),
+    RegId.
+
 %% abstract data type to collect quorum read/write replies
--spec entry_new_round_request(any(), any(), ?RT:key(), module(),
+-spec entry_new_round_request(any(), any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer(), read | write)
                     -> entry().
-entry_new_round_request(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
+entry_new_round_request(Debug, ReqId, EntryReg, Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
+    {ReqId, EntryReg, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
      Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), new_rr_replies()}.
 
--spec entry_new_read(any(), any(), ?RT:key(), module(),
+-spec entry_new_read(any(), any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer(), read | write)
                     -> entry().
-entry_new_read(Debug, ReqId, Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
+entry_new_read(Debug, ReqId, EntryReg,  Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
+    {ReqId, EntryReg, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
      Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), new_read_replies()}.
 
--spec entry_new_write(any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
+-spec entry_new_write(any(), any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
-entry_new_write(Debug, ReqId, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
+entry_new_write(Debug, ReqId, EntryReg, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
+    {ReqId, EntryReg, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
      Filters, _ValueToWrite = Value, write, _MyRound = pr:new(0,0), new_write_replies()}.
 
 -spec new_rr_replies() -> #rr_replies{}.
@@ -1122,30 +1258,38 @@ new_write_replies() ->
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
+-spec entry_openreqentry(entry()) -> any().
+entry_openreqentry(Entry)         -> element(2, Entry).
+-spec entry_set_debug(entry(), any()) -> entry().
+entry_set_debug(Entry,Debug)      -> setelement(3, Entry, Debug).
 -spec entry_period(entry())       -> non_neg_integer().
-entry_period(Entry)               -> element(3, Entry).
+entry_period(Entry)               -> element(4, Entry).
 -spec entry_retrigger(entry())    -> non_neg_integer().
-entry_retrigger(Entry)            -> element(4, Entry).
+entry_retrigger(Entry)            -> element(5, Entry).
+-spec entry_disable_retrigger(entry()) -> entry().
+entry_disable_retrigger(Entry) -> setelement(5, Entry, 0).
 -spec entry_key(entry())          -> any().
-entry_key(Entry)                  -> element(5, Entry).
+entry_key(Entry)                  -> element(6, Entry).
 -spec entry_datatype(entry())     -> module().
-entry_datatype(Entry)             -> element(6, Entry).
+entry_datatype(Entry)             -> element(7, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
-entry_client(Entry)               -> element(7, Entry).
+entry_client(Entry)               -> element(8, Entry).
 -spec entry_filters(entry())      -> any().
-entry_filters(Entry)              -> element(8, Entry).
+entry_filters(Entry)              -> element(9, Entry).
 -spec entry_write_val(entry())    -> is_read | any().
-entry_write_val(Entry)            -> element(9, Entry).
--spec entry_optype(entry())       -> read | write.
-entry_optype(Entry)               -> element(10, Entry).
+entry_write_val(Entry)            -> element(10, Entry).
+-spec entry_optype(entry())       -> read | write | denied_write.
+entry_optype(Entry)               -> element(11, Entry).
+-spec entry_set_optype(entry(), read | write | denied_write) -> entry().
+entry_set_optype(Entry, OpType)   -> setelement(11, Entry, OpType).
 -spec entry_my_round(entry())     -> pr:pr().
-entry_my_round(Entry)             -> element(11, Entry).
+entry_my_round(Entry)             -> element(12, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(11, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(12, Entry, Round).
 -spec entry_replies(entry())      -> replies().
-entry_replies(Entry)              -> element(12, Entry).
+entry_replies(Entry)              -> element(13, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
-entry_set_replies(Entry, Replies) -> setelement(12, Entry, Replies).
+entry_set_replies(Entry, Replies) -> setelement(13, Entry, Replies).
 
 -spec add_rr_reply(#rr_replies{}, dht_node_state:db_selector(),
                    pr:pr(), pr:pr(), client_value(), atom(), prbr:write_filter(),
@@ -1467,4 +1611,5 @@ set_period(State, Val) -> setelement(3, State, Val).
 -spec get_db_for_id(atom(), ?RT:key()) -> {atom(), pos_integer()}.
 get_db_for_id(DBName, Key) ->
     {DBName, ?RT:get_key_segment(Key)}.
+
 

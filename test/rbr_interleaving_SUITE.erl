@@ -95,7 +95,7 @@ test_interleaving(_Config) ->
     %% (4 nodes with R=4, the nodes are called 1,2,3,4)
     %%
     %% Three requests are made from three different clients.
-    %% 1. Client A Starts a write operation, but has only written replica 
+    %% 1. Client A Starts a write operation, but has only written replica
     %%      on node 1 so far (has read all replicas in its read phase)
     %% 2. Client B Executes a read which only has read replicas 2,3,4 yet
     %%      (read has returned since majority replied)
@@ -253,8 +253,10 @@ filter_list_append() ->
 %% @doc Sends a read requests via node number ViaKvNr (lexicographically order by pid).
 %% Blocks until read is done.
 read_via_node(ViaKvNr, Key, ReadFilter) ->
-    comm:send_local(nth(ViaKvNr, kv_db),
-                    {qround_request, self(), ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1}),
+    Pid = nth(ViaKvNr, kv_db),
+    Req = {qround_request, self(), '_', ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1},
+    Msg = comm:reply_as(Pid, 3, Req),
+    comm:send_local(Pid, {request_init, _ClinetPosInMsg=2, Msg}),
     receive
         ?SCALARIS_RECV({qread_done, _, _, _, Value}, {ok, Value})
     end.
@@ -262,8 +264,10 @@ read_via_node(ViaKvNr, Key, ReadFilter) ->
 %% @doc Sends a write requests via node number ViaKvNr (lexicographically order by pid).
 %% Blocks until write is done.
 write_via_node(ViaKvNr, Key, Filter, Value) ->
-    comm:send_local(nth(ViaKvNr, kv_db),
-                    {qwrite, self(), ?RT:hash_key(Key), ?MODULE, Filter, Value, 20}),
+    Pid = nth(ViaKvNr, kv_db),
+    Req = {qwrite, self(), '_', ?RT:hash_key(Key), ?MODULE, Filter, Value, 20},
+    Msg = comm:reply_as(Pid, 3, Req),
+    comm:send_local(Pid, {request_init, _ClinetPosInMsg=2, Msg}),
     receive
         ?SCALARIS_RECV({qwrite_done, _, _, _, RetValue}, {ok, RetValue});
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason}, Reason)

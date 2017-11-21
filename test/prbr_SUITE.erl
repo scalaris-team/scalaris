@@ -352,8 +352,13 @@ tester_type_check_rbr(_Config) ->
              {qwrite_fast, 10}  %% needs funs as input
            ],
            [ {inform_client, 3}, %% cannot create valid envelopes
+             {start_request, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid ets:tid()
-             {set_entry, 2},     %% needs valid ets:tid()
+             {save_entry, 2},     %% needs valid ets:tid()
+             {update_entry, 2},     %% needs valid ets:tid()
+             {delete_entry, 2},     %% needs valid ets:tid()
+             {delete_all_entries, 3}, %% needs existing ets entry
+             {retrigger, 3},     %% needs valid ets:tid()
              {add_rr_reply, 10},  %% needs client_value matching db_type
              {add_read_reply, 11},%% needs client_value matching db_type
              {update_write_state, 5}, %% needs client_value matching db_type
