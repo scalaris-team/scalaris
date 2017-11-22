@@ -1044,16 +1044,17 @@ on({qwrite_collect, ReqId,
                     %% To prevent a deny msg that lags behind from triggering
                     %% this branch again, mark this request as denied
                     %% Also we need to prevent a retrigger of this request
-                    %% since it has already spawned a successor request
+                    %% since it already spawns a successor request.
+                    %% Do NOT pass these updates to req_for_retrigger below!
                     NewEntry2 = entry_set_optype(NewEntry, denied_write),
                     NewEntry3 = entry_disable_retrigger(NewEntry2),
                     update_entry(NewEntry3, TableName),
                     case randoms:rand_uniform(1, UpperLimit) of
                         1 ->
-                            NewReq = req_for_retrigger(NewEntry3, noincdelay),
+                            NewReq = req_for_retrigger(NewEntry, noincdelay),
                             gen_component:post_op(NewReq, State);
                         2 ->
-                            NewReq = req_for_retrigger(NewEntry3, noincdelay),
+                            NewReq = req_for_retrigger(NewEntry, noincdelay),
                             %% TODO: maybe record number of retries
                             %% and make timespan chosen from
                             %% dynamically wider
