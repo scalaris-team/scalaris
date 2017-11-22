@@ -723,7 +723,7 @@ on({qread_write_through_collect, ReqId,
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
 
             Replies = entry_replies(Entry),
-            {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
+            {Done, NewReplies, _HigherRound} = add_write_reply(Replies, Round, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
             case Done of
                 false -> update_entry(NewEntry, tablename(State));
@@ -965,8 +965,25 @@ on({qwrite_collect, ReqId,
             State;
         _ ->
             Replies = entry_replies(Entry),
-            {Done, NewReplies} = add_write_reply(Replies, Round, Cons),
-            NewEntry = entry_set_replies(Entry, NewReplies),
+            {Done, NewReplies, IsHigherRound} = add_write_reply(Replies, Round, Cons),
+            NewEntry = case IsHigherRound andalso entry_optype(Entry) =:= denied_write of
+                            true ->
+                                %% If we entered this branch that means we received
+                                %% the first success reply from a writethrough
+                                %% that tries to establish our previous failed
+                                %% write attempt. It is possible that this proposer
+                                %% already retried its write in a new request
+                                %% (howerver, it cannot have started the write phase yet)
+                                %% To prevent that the write is applied twice, delete
+                                %% the newer request. In case that this WT fails
+                                %% this proposer will be notified of it
+                                %% and will then start a new try.
+                                TEntry = entry_set_optype(Entry, write),
+                                delete_newer_entries(TEntry, tablename(State)),
+                                entry_set_replies(TEntry, NewReplies);
+                            false ->
+                                entry_set_replies(Entry, NewReplies)
+                       end,
             case Done of
                 false -> update_entry(NewEntry, tablename(State));
                 true ->
@@ -1187,6 +1204,16 @@ delete_entry(Entry, TableName) ->
     {OpenReqEntry, OpenReqList} = get_entry(OpenReqEntry, TableName),
     ?PDB:set({OpenReqEntry, lists:delete(ReqId, OpenReqList)}, TableName),
     ?PDB:delete(ReqId, TableName).
+
+%% Deletes all entries that where added to the open request list after
+%% the given entry.
+-spec delete_newer_entries(entry(), ?PDB:tableid()) -> ok.
+delete_newer_entries(Entry, TableName) ->
+    {OpenReqEntryId, OpenReqList} = get_entry(entry_openreqentry(Entry), TableName),
+    EntryReqId = entry_reqid(Entry),
+    {ToDelete, ToKeep} = lists:splitwith(fun(E) -> E =/= EntryReqId end, OpenReqList),
+    lists:foreach(fun(E) -> ?PDB:delete(E, TableName) end, ToDelete),
+    ?PDB:set({OpenReqEntryId, ToKeep}, TableName).
 
 %% Deletes all entries included in the open-request-entry. No more can be done.
 %% Return an error if entry is malformed or does not exist
@@ -1483,23 +1510,22 @@ add_read_deny(Replies, _DBSelector, CurrentRound, ReceivedRound, _Cons) ->
     {Result, R1, NewRound}.
 
 -spec add_write_reply(#w_replies{}, pr:pr(), Consistency::boolean())
-                     -> {Done::boolean(), #w_replies{}}.
+                     -> {Done::boolean(), #w_replies{}, IsHigherRound::boolean()}.
 add_write_reply(Replies, Round, _Cons) ->
     RepliesMaxWriteR = Replies#w_replies.highest_write_round,
     RepliesRoundCmp = {pr:get_r(RepliesMaxWriteR), pr:get_id(RepliesMaxWriteR)},
     RoundCmp = {pr:get_r(Round), pr:get_id(Round)},
-    R1 =
+    {R1, IsHigherRound} =
         case RoundCmp > RepliesRoundCmp of
-            false -> Replies;
+            false -> {Replies, false};
             true ->
                 %% Running into this case can mean two things:
                 %% 1. This is the first reply received
                 %% 2. This is a reply of a write through which tries to repair the
                 %% partially written value of this request
                 %% If this is case 2, all previous received replies are obsolete.
-                Replies#w_replies{highest_write_round=Round,
-                                  ack_count=0,
-                                  deny_count=0}
+                {Replies#w_replies{highest_write_round=Round,
+                                   ack_count=0, deny_count=0}, true}
         end,
     R2 =
         case RoundCmp >= RepliesRoundCmp of
@@ -1511,7 +1537,7 @@ add_write_reply(Replies, Round, _Cons) ->
                 R1#w_replies{ack_count=NewAckCount}
         end,
     Done = ?REDUNDANCY:quorum_accepted(R2#w_replies.ack_count),
-    {Done, R2}.
+    {Done, R2, IsHigherRound}.
 
 -spec add_write_deny(#w_replies{}, pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), #w_replies{}}.

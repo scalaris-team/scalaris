@@ -392,7 +392,8 @@ tester_type_check_rbr(_Config) ->
              {save_entry, 2},     %% needs valid ets:tid()
              {update_entry, 2},     %% needs valid ets:tid()
              {delete_entry, 2},     %% needs valid ets:tid()
-             {delete_all_entries, 3}, %% needs existing ets entry
+             {delete_newer_entries, 2}, %% needs valid ets:tid()
+             {delete_all_entries, 3}, %% needs valid ets:tid()
              {retrigger, 3},     %% needs valid ets:tid()
              {add_rr_reply, 10},  %% needs client_value matching db_type
              {add_read_reply, 11},%% needs client_value matching db_type
