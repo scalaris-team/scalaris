@@ -264,8 +264,8 @@ qwrite_fast(CSeqPidName, Client, Key, DataType, ReadFilter, ContentCheck,
 %% the first step of the protocol
 -spec start_request(pid_groups:pidname(), any()) -> ok.
 start_request(CseqPid, Msg) ->
-    InitMsg = comm:reply_as(CseqPid, 3, Msg),
-    comm:send_local(CseqPid, {request_init, _ClientPosInMsg=2, InitMsg}).
+    comm:send_local(CseqPid, {request_init, _ClientPosInMsg=2,
+                              _OpenReqEntryPlaceHolder=3, Msg}).
 
 %% @doc spawns a rbrcseq, called by the scalaris supervisor process
 -spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
@@ -294,23 +294,22 @@ init(DBSelector) ->
 %% state()) -> state().
 
 
-on({request_init, ClientPosInMsg, InitMsg}, State) ->
+on({request_init, ClientPosInMsg, OpenReqEntryPos, InitMsg}, State) ->
     %% will be used to track open entries belonging to this request
     EntryReg = create_open_entry_register(tablename(State)),
     %% fill placeholder in msg with EntryReg
-    {Target, UnpackedMsg} = comm:unpack_cookie(InitMsg, EntryReg),
-
+    NewMsg = setelement(OpenReqEntryPos, InitMsg, EntryReg),
     %% once the request is done, the result is sent to Client. However, cleanup
     %% is requires to close eventual open entries (happens if proposer receives
     %% a quorum of success replies from a write through caused by its incomplete
     %% write). Replaces the client in the message, so that it is sent to the
     %% proposer's request_cleanup on-handler which in turn will forward the message
     %% to the client after it is done with its cleanup.
-    Client = element(ClientPosInMsg, UnpackedMsg),
-    InjectedCleanupClient = comm:reply_as(Target, 4,
+    Client = element(ClientPosInMsg, NewMsg),
+    InjectedCleanupClient = comm:reply_as(self(), 4,
                                           {request_cleanup, Client, EntryReg, '_'}),
-    NewMsg = setelement(ClientPosInMsg, UnpackedMsg, InjectedCleanupClient),
-    comm:send_local(Target, NewMsg),
+    NewMsg2 = setelement(ClientPosInMsg, NewMsg, InjectedCleanupClient),
+    comm:send_local(self(), NewMsg2),
     State;
 
 on({request_cleanup, Client, EntryReg, Result}, State) ->
@@ -1005,11 +1004,12 @@ on({qwrite_collect, ReqId,
             Replies = entry_replies(Entry),
             {Done, NewReplies} = add_write_deny(Replies, RoundTried, Cons),
             NewEntry = entry_set_replies(Entry, NewReplies),
-            update_entry(NewEntry, TableName),
             %% If this request was already denied, do not deny again
             %% (see true case why this might happen)
             case Done andalso entry_optype(NewEntry) =/= denied_write of
-                false -> State;
+                false ->
+                    update_entry(NewEntry, TableName),
+                    State;
                 true ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),

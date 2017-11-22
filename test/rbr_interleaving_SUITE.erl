@@ -254,9 +254,8 @@ filter_list_append() ->
 %% Blocks until read is done.
 read_via_node(ViaKvNr, Key, ReadFilter) ->
     Pid = nth(ViaKvNr, kv_db),
-    Req = {qround_request, self(), '_', ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1},
-    Msg = comm:reply_as(Pid, 3, Req),
-    comm:send_local(Pid, {request_init, _ClinetPosInMsg=2, Msg}),
+    Msg = {qround_request, self(), '_', ?RT:hash_key(Key), ?MODULE, ReadFilter, read, 1},
+    comm:send_local(Pid, {request_init, _ClinetPosInMsg=2, _OpenReqPos=3, Msg}),
     receive
         ?SCALARIS_RECV({qread_done, _, _, _, Value}, {ok, Value})
     end.
@@ -265,9 +264,8 @@ read_via_node(ViaKvNr, Key, ReadFilter) ->
 %% Blocks until write is done.
 write_via_node(ViaKvNr, Key, Filter, Value) ->
     Pid = nth(ViaKvNr, kv_db),
-    Req = {qwrite, self(), '_', ?RT:hash_key(Key), ?MODULE, Filter, Value, 20},
-    Msg = comm:reply_as(Pid, 3, Req),
-    comm:send_local(Pid, {request_init, _ClinetPosInMsg=2, Msg}),
+    Msg = {qwrite, self(), '_', ?RT:hash_key(Key), ?MODULE, Filter, Value, 20},
+    comm:send_local(Pid, {request_init, _ClientPos=2, _OpenReqPos=3, Msg}),
     receive
         ?SCALARIS_RECV({qwrite_done, _, _, _, RetValue}, {ok, RetValue});
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason}, Reason)
