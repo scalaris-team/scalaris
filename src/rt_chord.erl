@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Routing Table
 %% @end
-%% @version $Id$
 -module(rt_chord).
 -author('schuett@zib.de').
--vsn('$Id$').
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
@@ -78,7 +76,14 @@ get_random_node_id() ->
         random -> hash_key(randoms:getRandomString());
         random_with_bit_mask ->
             {Mask1, Mask2} = config:read(key_creator_bitmask),
-            (hash_key(randoms:getRandomString()) band Mask2) bor Mask1
+            (hash_key(randoms:getRandomString()) band Mask2) bor Mask1;
+        modr ->
+            %% put random key into first quarter
+            Key = hash_key(randoms:getRandomString()) div config:read(replication_factor),
+            %% select the quarter based on the availability zone id
+            Quarter = config:read(availability_zone_id) rem config:read(replication_factor),
+            %% calculate the final key
+            Key + Quarter * n() div config:read(replication_factor)
     end.
 
 
@@ -373,7 +378,7 @@ check_config() ->
         config:cfg_is_greater_than_equal(chord_base, 2) and
         config:cfg_is_integer(replication_factor) and
         config:cfg_is_greater_than_equal(replication_factor, 2) and
-        config:cfg_is_in(key_creator, [random, random_with_bit_mask]) and
+        config:cfg_is_in(key_creator, [random, random_with_bit_mask, modr]) and
         case config:read(key_creator) of
             random -> true;
             random_with_bit_mask ->
@@ -382,6 +387,8 @@ check_config() ->
                                         erlang:is_integer(Mask1) andalso
                                             erlang:is_integer(Mask2) end,
                                 "{int(), int()}");
+            modr -> config:cfg_is_integer(replication_factor) and
+                        config:cfg_is_integer(availability_zone_id);
             _ -> false
         end.
 
