@@ -103,7 +103,10 @@ init(Options) ->
                            {config, ConfPars} -> ConfPars;
                            _ -> []
                        end,
+    AdditionalKVs = util:app_get_env(config_kvs, []),
+    %% io:format("~p~n", [AdditionalKVs]),
     _ = [write(K, V) || {K, V} <- ConfigParameters],
+    _ = [write(K, V) || {K, V} <- AdditionalKVs],
 
     try check_config() of
         true -> ok;
