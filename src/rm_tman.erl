@@ -1,4 +1,4 @@
-%  @copyright 2009-2015 Zuse Institute Berlin
+%  @copyright 2009-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -48,6 +48,10 @@
 get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
     Neighbors.
 
+-spec get_randview_size(state()) -> pos_integer().
+get_randview_size({_Neighbors, RandViewSize, _Cache, _Churn}) ->
+    RandViewSize.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -91,12 +95,12 @@ handle_custom_message({rm, once, {cy_cache, NewCache}}, State) ->
 
 % got cyclon cache (as part of a repeating call)
 handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
-    NewState = add_cyclon_cache(NewCache, State),
-    NewRandViewSize = element(2, element(2, NewState)),
+    {ChangeReason, NewState} = add_cyclon_cache(NewCache, State),
+    NewRandViewSize = get_randview_size(NewState),
     % trigger new cyclon cache request
     gossip_cyclon:get_subset_rand(NewRandViewSize, comm:reply_as(self(), 2, {rm, '_'}),
                                   config:read(tman_cyclon_interval)),
-    NewState;
+    {ChangeReason, NewState};
 
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
@@ -138,7 +142,7 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
                RequestPredsMinCount, RequestSuccsMinCount))),
     comm:send(node:pidX(OtherNode),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
-    {{node_discovery}, {NewNeighborhood, RandViewSize, CacheUpd, Churn}};
+    {{node_discovery}, new(NewNeighborhood, RandViewSize, CacheUpd, Churn)};
 
 handle_custom_message({rm, buffer_response, OtherNodes},
    {Neighborhood, RandViewSize, Cache, Churn}) ->
@@ -153,7 +157,7 @@ handle_custom_message({rm, buffer_response, OtherNodes},
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {{node_discovery}, {NewNeighborhood, NewRandViewSize, CacheUpd, Churn}};
+    {{node_discovery}, new(NewNeighborhood, NewRandViewSize, CacheUpd, Churn)};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
@@ -196,7 +200,7 @@ handle_custom_message({rm, update_node, Node},
     % now remove all potentially out-dated nodes and try to re-add them with
     % updated information
     NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
-    {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}};
+    {{unknown}, new(NewNeighborhood2, RandViewSize, Cache, Churn)};
 
 handle_custom_message(_, _State) -> unknown_event.
 
@@ -216,7 +220,7 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
             false -> RandViewSize
         end,
     NewNeighborhood = trigger_update(Neighborhood, [], NewCache),
-    {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}}.
+    {{node_discovery}, new(NewNeighborhood, RandViewSizeNew, NewCache, Churn)}.
 
 -spec trigger_action(State::state())
         -> {ChangeReason::rm_loop:reason(), state()}.
@@ -299,7 +303,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
         true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
         _    -> ok
     end,
-    {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}}.
+    {{unknown}, new(NewNeighborhood2, RandViewSize, Cache, Churn)}.
 
 %% @doc Removes all nodes from the given neighborhood which are in the
 %%      interval I but keep TolerateNode.
@@ -347,7 +351,7 @@ fd_notify(State, leave, _DeadPid, OldNode) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     {NewNeighborhood, RandViewSize, Cache, Churn}};
+     new(NewNeighborhood, RandViewSize, Cache, Churn)};
 fd_notify(State, jump, _DeadPid, OldNode) ->
     % remove old node while jumping -> do not add as zombie candidate!
     % the node will be added again (or might already have been added)
@@ -361,7 +365,7 @@ fd_notify(State, jump, _DeadPid, OldNode) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     {NewNeighborhood, RandViewSize, Cache, Churn}};
+     new(NewNeighborhood, RandViewSize, Cache, Churn)};
 fd_notify(State, crash, DeadPid, _Reason) ->
     % crash, i.e. non-graceful leave -> add as zombie candidate
     {Neighborhood, RandViewSize, Cache, Churn} =
@@ -369,7 +373,7 @@ fd_notify(State, crash, DeadPid, _Reason) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{node_crashed, DeadPid},
-     {NewNeighborhood, RandViewSize, Cache, Churn}};
+     new(NewNeighborhood, RandViewSize, Cache, Churn)};
 fd_notify(State, _Event, _DeadPid, _Data) ->
     {{unknown}, State}.
 
@@ -528,3 +532,10 @@ get_pred_list_length() -> config:read(pred_list_length).
 
 -spec get_succ_list_length() -> pos_integer().
 get_succ_list_length() -> config:read(succ_list_length).
+
+-spec new(Neighbors      :: nodelist:neighborhood(),
+          RandomViewSize :: pos_integer(),
+          Cache          :: [node:node_type()], % random cyclon nodes
+          Churn          :: boolean()) -> state().
+new(Neighbors, RandomViewSize, Cache, Churn) ->
+    {Neighbors, RandomViewSize, Cache, Churn}.
