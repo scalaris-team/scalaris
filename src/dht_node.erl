@@ -1,4 +1,4 @@
-%  @copyright 2007-2016 Zuse Institute Berlin
+%  @copyright 2007-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -541,8 +541,11 @@ init(Options) ->
                      {{dht_node, id}, IdX} -> IdX;
                      _ -> ?RT:get_random_node_id()
                  end,
-            if IsFirst -> dht_node_join:join_as_first(Id, 0, Options);
-               true    -> dht_node_join:join_as_other(Id, 0, Options)
+            case {IsFirst, modr:is_enabled()} of
+                {true, _} -> dht_node_join:join_as_first(Id, 0, Options);
+                {false, false} -> dht_node_join:join_as_other(Id, 0, Options);
+                {false, true} -> %% disable passive lb during join operation
+                    dht_node_join:join_as_other(Id, 0, [{skip_psv_lb} | Options])
             end
     end.
 %% userdevguide-end dht_node:start
