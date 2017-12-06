@@ -26,10 +26,7 @@
 
 -behaviour(rm_beh).
 
--opaque state() :: {Neighbors      :: nodelist:neighborhood(),
-                    RandomViewSize :: pos_integer(),
-                    Cache          :: [node:node_type()], % random cyclon nodes
-                    Churn          :: boolean()}.
+-opaque state() :: rm_tman_state:state().
 
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
@@ -44,14 +41,6 @@
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
 
--spec get_neighbors(state()) -> nodelist:neighborhood().
-get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
-    Neighbors.
-
--spec get_randview_size(state()) -> pos_integer().
-get_randview_size({_Neighbors, RandViewSize, _Cache, _Churn}) ->
-    RandViewSize.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -65,26 +54,26 @@ init_first() ->
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
-           Succ::node:node_type()) -> state().
+           Succ::node:node_type()) -> rm_tman_state:state().
 init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
     gossip_cyclon:get_subset_rand(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     % start by using all available nodes reported by cyclon
     RandViewSize = config:read(gossip_cyclon_cache_size),
-    {Neighborhood, RandViewSize, [], true}.
+    rm_tman_state:init(Neighborhood, RandViewSize, [], true).
 
--spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
+-spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> rm_tman_state:state().
 unittest_create_state(Neighbors) ->
-    {Neighbors, 1, [], true}.
+    rm_tman_state:init(Neighbors, 1, [], true).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop (custom messages not already handled by rm_loop:on/2)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
--spec handle_custom_message(custom_message(), state())
-        -> {ChangeReason::{unknown} | {node_discovery}, state()} | unknown_event.
+-spec handle_custom_message(custom_message(), rm_tman_state:state())
+        -> {ChangeReason::{unknown} | {node_discovery}, rm_tman_state:state()} | unknown_event.
 % got empty cyclon cache
 handle_custom_message({rm, once, {cy_cache, [] = NewCache}}, State) ->
     % loop with msg_delay until a non-empty cache is received
@@ -96,7 +85,7 @@ handle_custom_message({rm, once, {cy_cache, NewCache}}, State) ->
 % got cyclon cache (as part of a repeating call)
 handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
     {ChangeReason, NewState} = add_cyclon_cache(NewCache, State),
-    NewRandViewSize = get_randview_size(NewState),
+    NewRandViewSize = rm_tman_state:get_randview_size(NewState),
     % trigger new cyclon cache request
     gossip_cyclon:get_subset_rand(NewRandViewSize, comm:reply_as(self(), 2, {rm, '_'}),
                                   config:read(tman_cyclon_interval)),
@@ -104,7 +93,10 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
 
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
-   {Neighborhood, RandViewSize, Cache, Churn}) ->
+                      State) ->
+    Cache = rm_tman_state:get_cache(State),
+    RandViewSize = rm_tman_state:get_randview_size(State),
+    Neighborhood = rm_tman_state:get_neighbors(State),
     OtherNodes = nodelist:to_list(OtherNeighbors),
     CacheUpd = element(1, nodelist:lupdate_ids(Cache, OtherNodes)),
     % use only a subset of the cyclon cache in order not to fill the send buffer
@@ -142,11 +134,15 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
                RequestPredsMinCount, RequestSuccsMinCount))),
     comm:send(node:pidX(OtherNode),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
-    {{node_discovery}, new(NewNeighborhood, RandViewSize, CacheUpd, Churn)};
+    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+                       rm_tman_state:set_cache(CacheUpd, State))};
 
 handle_custom_message({rm, buffer_response, OtherNodes},
-   {Neighborhood, RandViewSize, Cache, Churn}) ->
+                      State) ->
     % similar to "{rm, buffer,...}" handling above:
+    Cache = rm_tman_state:get_cache(State),
+    RandViewSize = rm_tman_state:get_randview_size(State),
+    Neighborhood = rm_tman_state:get_neighbors(State),
     CacheUpd = element(1, nodelist:lupdate_ids(Cache, OtherNodes)),
     MyRndView = get_RndView(RandViewSize, CacheUpd),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNodes),
@@ -157,7 +153,9 @@ handle_custom_message({rm, buffer_response, OtherNodes},
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {{node_discovery}, new(NewNeighborhood, NewRandViewSize, CacheUpd, Churn)};
+    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+                       rm_tman_state:set_randview_size(NewRandViewSize,
+                       rm_tman_state:set_cache(CacheUpd, State)))};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
@@ -171,8 +169,8 @@ handle_custom_message({rm, node_info_response, NodeDetails}, State) ->
             {{unknown}, State}
     end;
 
-handle_custom_message({rm, update_node, Node},
-                      {Neighborhood, RandViewSize, Cache, Churn}) ->
+handle_custom_message({rm, update_node, Node}, State) ->
+    Neighborhood = rm_tman_state:get_neighbors(State),
     NewNeighborhood1 = nodelist:update_ids(Neighborhood, [Node]),
     % message from pred or succ
     % -> update any out-dated nodes between old and new ID of the given node to
@@ -200,36 +198,43 @@ handle_custom_message({rm, update_node, Node},
     % now remove all potentially out-dated nodes and try to re-add them with
     % updated information
     NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
-    {{unknown}, new(NewNeighborhood2, RandViewSize, Cache, Churn)};
+    {{unknown}, rm_tman_state:set_neighbors(NewNeighborhood2, State)};
 
 handle_custom_message(_, _State) -> unknown_event.
 
 %% @doc Integrates a non-empty cyclon cache into the own random view and
 %%      neighborhood structures and updates the random view size accordingly.
 %%      Ignores empty cyclon caches.
--spec add_cyclon_cache(Cache::[node:node_type()], state())
-        -> {ChangeReason::{unknown} | {node_discovery}, state()}.
+-spec add_cyclon_cache(Cache::[node:node_type()], rm_tman_state:state())
+        -> {ChangeReason::{unknown} | {node_discovery}, rm_tman_state:state()}.
 add_cyclon_cache([], State) ->
     % ignore empty cache from cyclon
     {{unknown}, State};
-add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
+add_cyclon_cache(NewCache, State) ->
     % increase RandViewSize (no error detected):
+    RandViewSize = rm_tman_state:get_randview_size(State),
+    Neighborhood = rm_tman_state:get_neighbors(State),
     RandViewSizeNew =
         case (RandViewSize < config:read(gossip_cyclon_cache_size)) of
             true  -> RandViewSize + 1;
             false -> RandViewSize
         end,
     NewNeighborhood = trigger_update(Neighborhood, [], NewCache),
-    {{node_discovery}, new(NewNeighborhood, RandViewSizeNew, NewCache, Churn)}.
+    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+                       rm_tman_state:set_randview_size(RandViewSizeNew,
+                       rm_tman_state:set_cache(NewCache, State)))}.
 
--spec trigger_action(State::state())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-trigger_action({Neighborhood, RandViewSize, Cache, _Churn} = State) ->
+-spec trigger_action(State::rm_tman_state:state())
+        -> {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
+trigger_action(State) ->
     % Trigger an update of the Random view
     % use only a subset of the cyclon cache in order not to fill the send buffer
     % with potentially non-existing nodes (in contrast, the nodes from our
     % neighbourhood are more likely to still exist!)
     % Test for being alone:
+    Neighborhood = rm_tman_state:get_neighbors(State),
+    RandViewSize = rm_tman_state:get_randview_size(State),
+    Cache = rm_tman_state:get_cache(State),
     Me = nodelist:node(Neighborhood),
     RndView = get_RndView(RandViewSize, Cache),
     {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
@@ -261,23 +266,26 @@ trigger_action({Neighborhood, RandViewSize, Cache, _Churn} = State) ->
     end,
     {{unknown}, State}.
 
--spec new_pred(State::state(), NewPred::node:node_type()) ->
-          {ChangeReason::rm_loop:reason(), state()}.
+-spec new_pred(State::rm_tman_state:state(), NewPred::node:node_type()) ->
+          {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
 new_pred(State, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
 %%     trigger_update(OldNeighborhood, [], [NewPred]),
     % we trust NewPred to be alive -> integrate node:
     {{node_discovery}, update_nodes(State, [NewPred], [], null)}.
 
--spec new_succ(State::state(), NewSucc::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
+-spec new_succ(State::rm_tman_state:state(), NewSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
 new_succ(State, NewSucc) ->
     % similar to new_pred/2
     {{node_discovery}, update_nodes(State, [NewSucc], [], null)}.
 
--spec update_node(State::state(), NewMe::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
-update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
+-spec update_node(State::rm_tman_state:state(), NewMe::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
+update_node(State, NewMe) ->
+    Cache = rm_tman_state:get_cache(State),
+    Neighborhood = rm_tman_state:get_neighbors(State),
+    RandViewSize = rm_tman_state:get_randview_size(State),
     NewNeighborhood1 = nodelist:update_node(Neighborhood, NewMe),
     % -> update any out-dated nodes between old and new ID to prevent wrong
     %    pred/succ changed:
@@ -303,7 +311,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
         true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
         _    -> ok
     end,
-    {{unknown}, new(NewNeighborhood2, RandViewSize, Cache, Churn)}.
+    {{unknown}, rm_tman_state:set_neighbors(NewNeighborhood2, State)}.
 
 %% @doc Removes all nodes from the given neighborhood which are in the
 %%      interval I but keep TolerateNode.
@@ -341,17 +349,19 @@ contact_new_nodes([]) ->
     ok.
 
 %% @doc Failure detector reported dead/changed node.
--spec fd_notify(State::state(), Event::fd:event(), DeadPid::comm:mypid(),
+-spec fd_notify(State::rm_tman_state:state(), Event::fd:event(), DeadPid::comm:mypid(),
                 Data::term())
-        -> {ChangeReason::rm_loop:reason(), state()}.
+        -> {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
 fd_notify(State, leave, _DeadPid, OldNode) ->
     % graceful leave -> do not add as zombie candidate!
-    {Neighborhood, RandViewSize, Cache, Churn} =
+    State2 =
         update_nodes(State, [], [OldNode], null),
+    Cache = rm_tman_state:get_cache(State2),
+    Neighborhood = rm_tman_state:get_neighbors(State2),
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     new(NewNeighborhood, RandViewSize, Cache, Churn)};
+     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
 fd_notify(State, jump, _DeadPid, OldNode) ->
     % remove old node while jumping -> do not add as zombie candidate!
     % the node will be added again (or might already have been added)
@@ -360,31 +370,35 @@ fd_notify(State, jump, _DeadPid, OldNode) ->
                         ?implies(node:same_process(N, OldNode),
                                  node:is_newer(N, OldNode))
                 end,
-    {Neighborhood, RandViewSize, Cache, Churn} =
+    State2 =
         update_nodes2(State, [], true, FilterFun, null),
+    Cache = rm_tman_state:get_cache(State2),
+    Neighborhood = rm_tman_state:get_neighbors(State2),
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     new(NewNeighborhood, RandViewSize, Cache, Churn)};
+     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
 fd_notify(State, crash, DeadPid, _Reason) ->
     % crash, i.e. non-graceful leave -> add as zombie candidate
-    {Neighborhood, RandViewSize, Cache, Churn} =
+    State2 =
         update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1),
+    Cache = rm_tman_state:get_cache(State2),
+    Neighborhood = rm_tman_state:get_neighbors(State2),
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{node_crashed, DeadPid},
-     new(NewNeighborhood, RandViewSize, Cache, Churn)};
+     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
 fd_notify(State, _Event, _DeadPid, _Data) ->
     {{unknown}, State}.
 
 % dead-node-cache reported dead node to be alive again
--spec zombie_node(State::state(), Node::node:node_type())
-        -> {ChangeReason::rm_loop:reason(), state()}.
+-spec zombie_node(State::rm_tman_state:state(), Node::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), rm_tman_state:state()}.
 zombie_node(State, Node) ->
     % this node could potentially be useful as it has been in our state before
     {{node_discovery}, update_nodes(State, [Node], [], null)}.
 
--spec get_web_debug_info(State::state()) -> [{string(), string()}].
+-spec get_web_debug_info(State::rm_tman_state:state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
@@ -468,11 +482,11 @@ trigger_update(OldNeighborhood, MyRndView, OtherNodes) ->
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
 %%      the new neighborhood is different to the old one. If the successor or
 %%      predecessor changes, the trigger action will be called immediately.
--spec update_nodes(State::state(),
+-spec update_nodes(State::rm_tman_state:state(),
                    NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
-        -> NewState::state().
+        -> NewState::rm_tman_state:state().
 update_nodes(State, NodesToAdd, [], RemoveNodeEvalFun) ->
     update_nodes2(State, NodesToAdd, false, fun(_N) -> true end, RemoveNodeEvalFun);
 update_nodes(State, NodesToAdd, [Node], RemoveNodeEvalFun) ->
@@ -487,17 +501,20 @@ update_nodes(State, NodesToAdd, [_,_|_] = NodesToRemove, RemoveNodeEvalFun) ->
 
 %% @doc Helper for update_nodes/4 with a more generic interface.
 %% @see update_nodes/4
--spec update_nodes2(State::state(),
+-spec update_nodes2(State::rm_tman_state:state(),
                     NodesToAdd::[node:node_type()], MayRemove::boolean(),
                     NodesFilterFun::fun((node:node_type()) -> boolean()),
                     RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
-        -> NewState::state().
+        -> NewState::rm_tman_state:state().
 update_nodes2(State, [], false, _FilterFun, _RemoveNodeEvalFun) ->
     State;
-update_nodes2({OldNeighborhood, RandViewSize, OldCache, _Churn},
+update_nodes2(OldState,
              NodesToAdd, MayRemove, FilterFun, RemoveNodeEvalFun) ->
     % keep all nodes that are not in NodesToRemove
     % note: NodesToRemove should have 0 or 1 element in most cases
+    OldNeighborhood = rm_tman_state:get_neighbors(OldState),
+    OldCache = rm_tman_state:get_cache(OldState),
+    RandViewSize = rm_tman_state:get_randview_size(OldState),
     OldPredPid = node:pidX(nodelist:pred(OldNeighborhood)),
     OldSuccPid = node:pidX(nodelist:succ(OldNeighborhood)),
     Nbh1 = if is_function(RemoveNodeEvalFun) ->
@@ -518,7 +535,10 @@ update_nodes2({OldNeighborhood, RandViewSize, OldCache, _Churn},
                       end,
     NewPredPid = node:pidX(nodelist:pred(NewNeighborhood)),
     NewSuccPid = node:pidX(nodelist:succ(NewNeighborhood)),
-    NewState = {NewNeighborhood, NewRandViewSize, NewCache, NewChurn},
+    NewState = rm_tman_state:set_neighbors(NewNeighborhood,
+               rm_tman_state:set_randview_size(NewRandViewSize,
+               rm_tman_state:set_cache(NewCache,
+               rm_tman_state:set_churn(NewChurn, OldState)))),
     if OldPredPid =/= NewPredPid orelse OldSuccPid =/= NewSuccPid ->
            element(2, trigger_action(NewState));
        true -> NewState
@@ -533,9 +553,6 @@ get_pred_list_length() -> config:read(pred_list_length).
 -spec get_succ_list_length() -> pos_integer().
 get_succ_list_length() -> config:read(succ_list_length).
 
--spec new(Neighbors      :: nodelist:neighborhood(),
-          RandomViewSize :: pos_integer(),
-          Cache          :: [node:node_type()], % random cyclon nodes
-          Churn          :: boolean()) -> state().
-new(Neighbors, RandomViewSize, Cache, Churn) ->
-    {Neighbors, RandomViewSize, Cache, Churn}.
+-spec get_neighbors(rm_tman_state:state()) -> nodelist:neighborhood().
+get_neighbors(State) ->
+    rm_tman_state:get_neighbors(State).
