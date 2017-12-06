@@ -28,6 +28,9 @@
 
 -opaque state() :: rm_tman_state:state().
 
+-define(FIXMODRN(NEIGHBORS), case modr:is_enabled() of true -> modr:fix_neighborhood(NEIGHBORS); false -> NEIGHBORS end).
+-define(FIXMODRS(STATE), case modr:is_enabled() of true -> modr:fix_state(STATE); false -> STATE end).
+
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
     {rm, once, {cy_cache, Cache::[node:node_type()]}} |
@@ -134,7 +137,7 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
                RequestPredsMinCount, RequestSuccsMinCount))),
     comm:send(node:pidX(OtherNode),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
-    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+    {{node_discovery}, rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood),
                        rm_tman_state:set_cache(CacheUpd, State))};
 
 handle_custom_message({rm, buffer_response, OtherNodes},
@@ -153,7 +156,7 @@ handle_custom_message({rm, buffer_response, OtherNodes},
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+    {{node_discovery}, rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood),
                        rm_tman_state:set_randview_size(NewRandViewSize,
                        rm_tman_state:set_cache(CacheUpd, State)))};
 
@@ -166,7 +169,7 @@ handle_custom_message({rm, node_info_response, NodeDetails}, State) ->
             NewState = update_nodes(State, [Node], [], null),
             {{node_discovery}, NewState};
         true ->
-            {{unknown}, State}
+            {{unknown}, ?FIXMODRS(State)}
     end;
 
 handle_custom_message({rm, update_node, Node}, State) ->
@@ -198,7 +201,7 @@ handle_custom_message({rm, update_node, Node}, State) ->
     % now remove all potentially out-dated nodes and try to re-add them with
     % updated information
     NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
-    {{unknown}, rm_tman_state:set_neighbors(NewNeighborhood2, State)};
+    {{unknown}, rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood2), State)};
 
 handle_custom_message(_, _State) -> unknown_event.
 
@@ -220,7 +223,7 @@ add_cyclon_cache(NewCache, State) ->
             false -> RandViewSize
         end,
     NewNeighborhood = trigger_update(Neighborhood, [], NewCache),
-    {{node_discovery}, rm_tman_state:set_neighbors(NewNeighborhood,
+    {{node_discovery}, rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood),
                        rm_tman_state:set_randview_size(RandViewSizeNew,
                        rm_tman_state:set_cache(NewCache, State)))}.
 
@@ -311,6 +314,7 @@ update_node(State, NewMe) ->
         true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
         _    -> ok
     end,
+    %% ignore for modr-mode, it is triggered by slide_chord.erl
     {{unknown}, rm_tman_state:set_neighbors(NewNeighborhood2, State)}.
 
 %% @doc Removes all nodes from the given neighborhood which are in the
@@ -361,7 +365,7 @@ fd_notify(State, leave, _DeadPid, OldNode) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
+     rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood), State2)};
 fd_notify(State, jump, _DeadPid, OldNode) ->
     % remove old node while jumping -> do not add as zombie candidate!
     % the node will be added again (or might already have been added)
@@ -377,7 +381,7 @@ fd_notify(State, jump, _DeadPid, OldNode) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{graceful_leave, OldNode},
-     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
+     rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood), State2)};
 fd_notify(State, crash, DeadPid, _Reason) ->
     % crash, i.e. non-graceful leave -> add as zombie candidate
     State2 =
@@ -387,7 +391,7 @@ fd_notify(State, crash, DeadPid, _Reason) ->
     % try to find a replacement in the cache:
     NewNeighborhood = trigger_update(Neighborhood, [], Cache),
     {{node_crashed, DeadPid},
-     rm_tman_state:set_neighbors(NewNeighborhood, State2)};
+     rm_tman_state:set_neighbors(?FIXMODRN(NewNeighborhood), State2)};
 fd_notify(State, _Event, _DeadPid, _Data) ->
     {{unknown}, State}.
 

@@ -20,8 +20,30 @@
 
 -include("scalaris.hrl").
 
--export([is_enabled/0]).
+-export([is_enabled/0, fix_neighborhood/1, fix_state/1]).
 
 -spec is_enabled() -> boolean().
 is_enabled() ->
     config:read(key_creator) =:= modr.
+
+-spec fix_neighborhood(Neighbors::nodelist:neighborhood()) ->
+                              nodelist:neighborhood().
+fix_neighborhood(Neighbors) ->
+    Neighbors.
+
+-spec fix_state(State::rm_tman_state:state()) ->
+                              rm_tman_state:state().
+fix_state(State) ->
+    State.
+
+%% notes on rm_tman.erl
+
+%% update_node:
+%%    nodelist:update_node changes basenode, triggered by slide_chord.erl
+%% trigger_update: changes node ids
+%%    nodelist:update_ids
+%% update_nodes:
+%%    nodelist:add_nodes
+%%    nodelist:filter
+%% remove_neighbors_in_interval: changes NodeInterval
+%%    nodelist:filter
