@@ -57,7 +57,9 @@ if test "x$ENABLE_CPP" != xno ; then
     AX_BOOST_PROGRAM_OPTIONS
     AX_BOOST_UNIT_TEST_FRAMEWORK
 
-    if test "x$have_boost_147" = "xyes" -a "x$ax_cv_boost_system" = "xyes" -a "x$ax_cv_boost_regex" = "xyes"  -a "x$ax_cv_boost_program_options" = "xyes"  -a "x$ax_cv_boost_unit_test_framework" = "xyes" ; then
+    AX_CHECK_OPENSSL([ENABLE_SSL=yes])
+
+    if test "x$have_boost_147" = "xyes" -a "x$ax_cv_boost_system" = "xyes" -a "x$ax_cv_boost_regex" = "xyes"  -a "x$ax_cv_boost_program_options" = "xyes"  -a "x$ax_cv_boost_unit_test_framework" = "xyes" -a "x$ENABLE_SSL" = "xyes" ; then
       enabled_cxx=1
     fi
   fi
@@ -76,6 +78,10 @@ fi
 
 AC_PATH_PROG(CLANGFORMAT, clang-format, $ac_cv_path_TRUE)
 AC_PATH_PROG(CLANGTIDY, clang-tidy, $ac_cv_path_TRUE)
+
+AC_SUBST(OPENSSL_INCLUDES)
+AC_SUBST(OPENSSL_LDFLAGS)
+AC_SUBST(OPENSSL_LIBS)
 
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
