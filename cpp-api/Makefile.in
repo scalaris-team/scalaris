@@ -40,7 +40,7 @@ libscalaris.a: $(OBJS)
 
 scalaris: libscalaris.a src/cli.o
 	$(NVC)echo -e "\e[0;31mCreating scalaris\033[39m"
-	$(VC)$(CXX) -o $@ src/cli.o libscalaris.a @LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_PROGRAM_OPTIONS_LIB@ -lpthread
+	$(VC)$(CXX) -o $@ src/cli.o libscalaris.a $(LDFLAGS)$  @BOOST_PROGRAM_OPTIONS_LIB@
 
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
@@ -53,7 +53,7 @@ clean:
 .PHONY: all cpp-test clean tests beautify tidy
 
 beautify:
-	@CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
+	$(VC)@CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp
 
 tidy:
-	@CLANGTIDY@ src/cli.cpp $(filter-out src/jsoncpp.cpp, $(SRC_CPP)) $(TEST_SRC_CPP) -- $(CXXFLAGS)
+	$(VC)@CLANGTIDY@ src/cli.cpp $(filter-out src/jsoncpp.cpp, $(SRC_CPP)) $(TEST_SRC_CPP) -- $(CXXFLAGS)
