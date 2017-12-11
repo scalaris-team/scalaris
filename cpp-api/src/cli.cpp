@@ -3,7 +3,7 @@
 
 #include <boost/program_options.hpp>
 
-#include "connection.hpp"
+#include "tcp-connection.hpp"
 #include "transaction_single_op.hpp"
 
 using namespace std;
@@ -26,11 +26,11 @@ namespace std {
     }
     return in;
   }
-}
+} // namespace std
 
 template <typename F> void exec_call(F& f) {
   try {
-    Connection c{"localhost"};
+    TCPConnection c{"localhost"};
     TransactionSingleOp op = {c};
     f(op);
   } catch (std::runtime_error& e) {

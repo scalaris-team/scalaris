@@ -16,12 +16,12 @@ else
 endif
 
 SRC_CPP=$(filter-out src/cli.cpp, $(wildcard src/*.cpp))
-TEST_SRC_CPP=$(wildcard test/*.cpp)
 
 OBJS=$(SRC_CPP:.cpp=.o)
-OBJS_TEST=$(TEST_SRC_CPP:.cpp=.o)
+OBJS_TEST=test/connection.o test/keep_alive.o test/routing_table.o test/transaction_single_op.o
+OBJS_SSLTEST=test/ssl-connection.o test/ssl-routing_table.o test/ssl-transaction_single_op.o
 
-all: libscalaris.a scalaris tests
+all: libscalaris.a scalaris tests ssl-tests
 
 cpp-test : tests
 	$(VC)./tests --report_level=detailed
@@ -29,6 +29,10 @@ cpp-test : tests
 tests: $(OBJS_TEST) $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating tests\033[39m"
 	$(VC)$(CXX) -o $@ $(OBJS_TEST) libscalaris.a $(LDFLAGS)
+
+ssl-tests: $(OBJS_SSLTEST) $(OBJS)
+	$(NVC)echo -e "\e[0;33mCreating ssl-tests\033[39m"
+	$(VC)$(CXX) -o $@ $(OBJS_SSLTEST) libscalaris.a $(LDFLAGS)
 
 libscalaris.a: $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating archive" $@ "\033[39m"
@@ -45,12 +49,12 @@ scalaris: libscalaris.a src/cli.o
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
 	@-rm -rf $(shell find . -type f -name '*.d')
-	@-rm -f ./tests ./scalaris
+	@-rm -f ./tests ./ssl-tests ./scalaris
 
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST:.o=.d)
 
-.PHONY: all cpp-test clean tests beautify tidy
+.PHONY: all cpp-test clean beautify tidy
 
 beautify:
 	$(VC)@CLANGFORMAT@ -style=file -i src/*.[hc]pp test/*.[hc]pp

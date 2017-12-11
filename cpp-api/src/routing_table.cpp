@@ -1,4 +1,4 @@
-// Copyright 2015, 2016 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,23 +18,23 @@ namespace scalaris {
 
   RoutingTable::RoutingTable(Connection& _c) : c(_c) {}
 
-  int RoutingTable::get_replication_factor() throw (std::runtime_error, Json::LogicError,
-                                                    Json::RuntimeError) {
+  int RoutingTable::get_replication_factor() {
     Json::Value result = c.rpc("get_replication_factor");
 
-    if(!result.isObject()) {
+    if (!result.isObject()) {
       std::stringstream error;
       error << result.toStyledString() << " is no object";
       throw std::runtime_error(error.str());
     }
     Json::Value result_status = result["status"];
-    if(!result_status.isString() or (result_status.asString().compare("ok") != 0)) {
+    if (!result_status.isString() or
+        (result_status.asString().compare("ok") != 0)) {
       std::stringstream error;
       error << result.toStyledString() << ": status != ok";
       throw std::runtime_error(error.str());
     }
     Json::Value result_value = result["value"];
-    if(!result_value.isIntegral()) {
+    if (!result_value.isIntegral()) {
       std::stringstream error;
       error << result.toStyledString() << " has numerical value field";
       throw std::runtime_error(error.str());
@@ -42,4 +42,4 @@ namespace scalaris {
     return result_value.asInt();
   }
 
-}
+} // namespace scalaris

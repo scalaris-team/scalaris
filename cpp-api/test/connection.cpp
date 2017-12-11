@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "connection.hpp"
+#include "tcp-connection.hpp"
 #include "routing_table.hpp"
 
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
 
+#include <boost/filesystem/fstream.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/test/unit_test_log.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 #include <iostream>
 
@@ -30,16 +30,14 @@ using namespace scalaris;
 
 BOOST_AUTO_TEST_SUITE(MasterSuite)
 
-BOOST_AUTO_TEST_CASE( create_connection )
-{
-  Connection c = { "localhost" };
+BOOST_AUTO_TEST_CASE(create_connection) {
+  TCPConnection c = {"localhost"};
 
   BOOST_CHECK(c.isOpen());
 }
 
-BOOST_AUTO_TEST_CASE( close_connection )
-{
-  Connection c = { "localhost" };
+BOOST_AUTO_TEST_CASE(close_connection) {
+  TCPConnection c = {"localhost"};
   BOOST_CHECK(c.isOpen());
   c.close();
   BOOST_CHECK(!c.isOpen());

@@ -32,8 +32,7 @@ namespace scalaris {
      RoutingTable(Connection& _c);
 
     /// retrieves the replication factor of the Scalaris instance
-    int get_replication_factor() throw (std::runtime_error, Json::LogicError,
-                                        Json::RuntimeError);
+    int get_replication_factor();
   };
 }
 

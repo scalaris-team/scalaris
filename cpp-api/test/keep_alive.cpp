@@ -1,4 +1,4 @@
-// Copyright 2015 Zuse Institute Berlin
+// Copyright 2015-2017 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -12,16 +12,16 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "connection.hpp"
+#include "tcp-connection.hpp"
 #include "routing_table.hpp"
 #include "json/json.h"
 
 #define BOOST_TEST_DYN_LINK
 
+#include <boost/filesystem/fstream.hpp>
+#include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/test/unit_test_log.hpp>
-#include <boost/test/test_tools.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 #include <iostream>
 
@@ -31,12 +31,11 @@ using namespace scalaris;
 
 BOOST_AUTO_TEST_SUITE(ConnectionKeepAliveSuite)
 
-BOOST_AUTO_TEST_CASE( keep_alive )
-{
-  Connection c = { "localhost" };
-  RoutingTable rt = { c };
+BOOST_AUTO_TEST_CASE(keep_alive) {
+  TCPConnection c = {"localhost"};
+  RoutingTable rt = {c};
 
-  for(int i = 0; i<10; i++) {
+  for (int i = 0; i < 10; i++) {
     int r = rt.get_replication_factor();
     BOOST_CHECK(r > 0);
   }

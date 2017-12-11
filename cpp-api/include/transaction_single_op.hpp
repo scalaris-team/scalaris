@@ -24,6 +24,8 @@
 #include "json/json.h"
 #include "req_list.hpp"
 
+#include "connection.hpp"
+
 namespace scalaris {
   /// \brief Executes a single read or write.
   ///

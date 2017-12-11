@@ -20,48 +20,45 @@
 #include <stdexcept>
 
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
 
+#include "connection.hpp"
+
 namespace scalaris {
 
-  /// represents a connection to Scalaris to execute JSON-RPC requests
-  class Connection {
-  protected:
-    bool closed=false;
-    std::string hostname;
-    std::string link;
-  protected:
+  /// represents a SSL connection to Scalaris to execute JSON-RPC requests
+  class SSLConnection : public Connection {
+    boost::asio::io_service ioservice;
+    boost::asio::ssl::context ctx;
+    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket;
+  public:
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
      * @param _link the URL for JSON-RPC
      * @param port the TCP port of the Scalaris instance
      */
-    Connection(std::string _hostname,
-               std::string _link  = "jsonrpc.yaws"
-               );
+    SSLConnection(std::string _hostname,
+                  std::string _link  = "jsonrpc.yaws");
 
-    ~Connection() = default;
+    ~SSLConnection();
 
-  public:
-    /**
-     * performs a JSON-RPC request
-     * @param methodname the name of the function to call
-     * @param args the list of arguments of the function call
-     */
-    template<typename... Args>
-    Json::Value rpc(const std::string& methodname, Args... args) {
-      std::array<Json::Value, sizeof...(args)> arg_list = {{Converter<Args>::to_value(args)... }};
+    /// checks whether the TCP connection is alive
+    bool isOpen() const;
 
-      Json::Value params = Json::arrayValue;
-      for(size_t i = 0; i< sizeof...(args); i++)
-        params.append(arg_list[i]);
-      return exec_call(methodname, params);
-    }
+    /// closes the TCP connection
+    void close();
 
-  protected:
-    virtual Json::Value exec_call(const std::string& methodname, Json::Value params) = 0;
+    /// returns the server port of the TCP connection
+    virtual unsigned get_port();
+
+  private:
+    virtual Json::Value exec_call(const std::string& methodname, Json::Value params);
+    Json::Value process_result(const Json::Value& value);
+
+    bool verify_callback(bool preverified, boost::asio::ssl::verify_context& ctx);
   };
 }

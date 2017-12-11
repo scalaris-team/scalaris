@@ -12,7 +12,7 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "tcp-connection.hpp"
+#include "ssl-connection.hpp"
 #include "routing_table.hpp"
 #include "connection.hpp"
 #include "json/json.h"
@@ -33,7 +33,8 @@ using namespace scalaris;
 BOOST_AUTO_TEST_SUITE(RoutingTableSuite)
 
 BOOST_AUTO_TEST_CASE(get_replication_factor) {
-  TCPConnection c = {"localhost"};
+  printf("get_replication_factor\n");
+  SSLConnection c = {"localhost"};
   RoutingTable rt = {c};
   int r = rt.get_replication_factor();
   BOOST_CHECK(r > 0);
