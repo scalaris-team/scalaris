@@ -1,4 +1,4 @@
-%% @copyright 2011, 2012 Zuse Institute Berlin
+%% @copyright 2011-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,10 +13,8 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @version $Id$
 -module(sup_yaws).
 -author('kruber@zib.de').
--vsn('$Id$').
 
 -behaviour(supervisor).
 
@@ -47,7 +45,7 @@ start_link() ->
                  {include_dir, [Docroot ++ "/api"]},
                  {id, Id}
                 ],
-    SconfList = [{docroot, Docroot},
+    SconfList2 = [{docroot, Docroot},
                  {port, config:read(yaws_port)},
                  {listen, {0,0,0,0}},
                  {allowed_scripts, [yaws]},
@@ -55,6 +53,18 @@ start_link() ->
                  {authdirs, AuthDirs},
                  {flags, [{access_log, false}]} % {deflate, true}
                 ],
+    SconfList = case config:read(yaws_ssl) of
+                    true ->
+                        application:ensure_all_started(ssl), %% >= R16B02
+                        [{ssl, [{verify, verify_none},
+                                   {keyfile, config:read(yaws_keyfile)},
+                                   {certfile, config:read(yaws_certfile)},
+                                   {cacertfile, config:read(yaws_cacertfile)},
+                                   {password, config:read(yaws_sslpassword)}
+                                   ]}
+                             | SconfList2];
+                    _ -> SconfList2
+                end,
 
     % load yaws application (required by yaws_api:embedded_start_conf)
     _ = application:load(

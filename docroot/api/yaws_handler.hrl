@@ -1,4 +1,4 @@
-%  @copyright 2012 Zuse Institute Berlin
+%  @copyright 2012-2017 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@
 
 out(A) ->
     Peer = if is_tuple(A#arg.clisock) andalso
-              element(1, A#arg.clisock) =:= sslsocket ->
-                   ssl:peername(A#arg.clisock);
+              element(1, A#arg.clisock) =:= ssl ->
+                   {ssl, SSLSocket} = A#arg.clisock,
+                   ssl:peername(SSLSocket);
               true ->
                    inet:peername(A#arg.clisock)
            end,
