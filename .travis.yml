@@ -33,7 +33,8 @@ install:
 script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - env | grep TRAVIS
-  - CXX=clang++ ./configure --with-openssl=/usr/local/opt/openssl
+  - 'if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then CXX=clang++ ./configure --with-openssl=/usr/local/opt/openssl; fi'
+  - 'if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then CXX=clang++ ./configure; fi'
   - touch TAGS.root
   - make
   - make cpp
