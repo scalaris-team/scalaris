@@ -35,8 +35,9 @@ script:
   - env | grep TRAVIS
   - CXX=clang++ ./configure
   - ls /usr/local/Cellar
-  - ls //usr/local/Cellar/openssl
+  - ls /usr/local/Cellar/openssl
   - ls -l $HOME
+  - ls -l /usr/local/etc/openssl
   - touch TAGS.root
   - make
   - make cpp
