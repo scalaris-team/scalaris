@@ -28,7 +28,8 @@ install:
          for pkg in $OSX_PACKAGES; do
            [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
          done
-         CFLAGS="-I/usr/local/opt/openssl/include $CFLAGS"
+         export CXXFLAGS="-I/usr/local/opt/openssl/include $CXXFLAGS"
+         export LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
      fi
 
 script:
