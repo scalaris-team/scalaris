@@ -39,6 +39,8 @@ script:
   - ls -l $HOME
   - ls -l /usr/local/etc/openssl
   - ls -l /usr/local/opt/openssl
+  - ls -l /usr/local/Cellar/openssl/1.0.2n
+  - find /usr/local/Cellar/openssl/1.0.2n
   - touch TAGS.root
   - make
   - make cpp
