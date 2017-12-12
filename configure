@@ -6065,6 +6065,7 @@ fi
             if test x"$PKG_CONFIG" != x""; then
                 OPENSSL_LDFLAGS=`$PKG_CONFIG openssl --libs-only-L 2>/dev/null`
                 if test $? = 0; then
+                    echo "used pkgconfig"
                     OPENSSL_LIBS=`$PKG_CONFIG openssl --libs-only-l 2>/dev/null`
                     OPENSSL_INCLUDES=`$PKG_CONFIG openssl --cflags-only-I 2>/dev/null`
                     found=true
@@ -6080,6 +6081,10 @@ fi
 fi
 
 
+    echo $found
+    echo $ssldirs
+    echo $OPENSSL_INCLUDES
+    echo $OPENSSL_LIBS
 
     # note that we #include <openssl/foo.h>, so the OpenSSL headers have to be in
     # an 'openssl' subdirectory
@@ -6087,6 +6092,7 @@ fi
     if ! $found; then
         OPENSSL_INCLUDES=
         for ssldir in $ssldirs; do
+            echo $ssldir
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl/ssl.h in $ssldir" >&5
 $as_echo_n "checking for openssl/ssl.h in $ssldir... " >&6; }
             if test -f "$ssldir/include/openssl/ssl.h"; then
@@ -6106,6 +6112,8 @@ $as_echo "no" >&6; }
         # if the file wasn't found, well, go ahead and try the link anyway -- maybe
         # it will just work!
     fi
+
+    echo $found
 
     # try the preprocessor and linker with our new flags,
     # being careful not to pollute the global LIBS, LDFLAGS, and CPPFLAGS
