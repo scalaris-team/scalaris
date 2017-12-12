@@ -36,7 +36,7 @@ script:
   - CXX=clang++ ./configure
   - ls /usr/local/Cellar
   - ls //usr/local/Cellar/openssl
-  - ls
+  - ls -l $HOME
   - touch TAGS.root
   - make
   - make cpp
