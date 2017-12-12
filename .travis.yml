@@ -28,14 +28,12 @@ install:
          for pkg in $OSX_PACKAGES; do
            [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
          done
-         export CXXFLAGS="-I/usr/local/opt/openssl/include $CXXFLAGS"
-         export LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
      fi
 
 script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - env | grep TRAVIS
-  - CXX=clang++ ./configure
+  - CXX=clang++ ./configure --with-openssl=/usr/local/opt/openssl
   - ls /usr/local/Cellar
   - ls /usr/local/Cellar/openssl
   - ls -l $HOME
