@@ -34,6 +34,9 @@ script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - env | grep TRAVIS
   - CXX=clang++ ./configure
+  - ls /usr/local/Cellar
+  - ls //usr/local/Cellar/openssl
+  - ls
   - touch TAGS.root
   - make
   - make cpp
