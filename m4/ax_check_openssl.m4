@@ -55,6 +55,7 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
             if test x"$PKG_CONFIG" != x""; then
                 OPENSSL_LDFLAGS=`$PKG_CONFIG openssl --libs-only-L 2>/dev/null`
                 if test $? = 0; then
+                    echo "used pkgconfig"
                     OPENSSL_LIBS=`$PKG_CONFIG openssl --libs-only-l 2>/dev/null`
                     OPENSSL_INCLUDES=`$PKG_CONFIG openssl --cflags-only-I 2>/dev/null`
                     found=true
@@ -68,6 +69,10 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
         ]
         )
 
+    echo $found
+    echo $ssldirs
+    echo $OPENSSL_INCLUDES
+    echo $OPENSSL_LIBS
 
     # note that we #include <openssl/foo.h>, so the OpenSSL headers have to be in
     # an 'openssl' subdirectory
@@ -75,6 +80,7 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
     if ! $found; then
         OPENSSL_INCLUDES=
         for ssldir in $ssldirs; do
+            echo $ssldir
             AC_MSG_CHECKING([for openssl/ssl.h in $ssldir])
             if test -f "$ssldir/include/openssl/ssl.h"; then
                 OPENSSL_INCLUDES="-I$ssldir/include"
@@ -91,6 +97,8 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
         # if the file wasn't found, well, go ahead and try the link anyway -- maybe
         # it will just work!
     fi
+
+    echo $found
 
     # try the preprocessor and linker with our new flags,
     # being careful not to pollute the global LIBS, LDFLAGS, and CPPFLAGS
