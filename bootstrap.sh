@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2016 Zuse Institute Berlin
+# Copyright 2007-2016, 2018 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -66,7 +66,8 @@ sed -e "s/pkgver=.*/pkgver=${VERSION}/g" \
 
 echo "Creating configure script"
 autoreconf --verbose --force --install # -Wall
+echo "            ^ automake is supposed to fail, this is ok"
 echo ""
-echo "            ^ automake is supposed to fail"
-echo ""
-echo "done"
+echo "A ./configure file should be created."
+echo "Please proceed with calling './configure'"
+
