@@ -16,8 +16,7 @@
 
 namespace scalaris {
 
-  Connection::Connection(std::string _hostname,
-                         std::string _link
-                         ) : hostname(_hostname), link(_link) {}
+  Connection::Connection(std::string _hostname, std::string _link)
+      : hostname(_hostname), link(_link) {}
 
-}
+} // namespace scalaris

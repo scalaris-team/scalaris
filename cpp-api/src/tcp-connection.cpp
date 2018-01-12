@@ -16,9 +16,8 @@
 
 namespace scalaris {
 
-  TCPConnection::TCPConnection(std::string _hostname,
-                               std::string _link)
-    : socket(ioservice), Connection(_hostname, _link) {
+  TCPConnection::TCPConnection(std::string _hostname, std::string _link)
+      : socket(ioservice), Connection(_hostname, _link) {
     using boost::asio::ip::tcp;
 
     // Determine the location of the server.

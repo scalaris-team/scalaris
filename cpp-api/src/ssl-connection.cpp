@@ -17,7 +17,7 @@
 namespace scalaris {
 
   SSLConnection::SSLConnection(std::string hostname, std::string link)
-    : Connection(hostname, link),
+      : Connection(hostname, link),
         ctx(boost::asio::ssl::context_base::method::sslv23),
         socket(ioservice, ctx) {
     using boost::asio::ip::tcp;
@@ -28,7 +28,7 @@ namespace scalaris {
           return this->verify_callback(preverified, ctx);
         });
 
-    //ctx.load_verify_file("ca.pem");
+    // ctx.load_verify_file("ca.pem");
 
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
@@ -39,13 +39,15 @@ namespace scalaris {
     boost::system::error_code ec;
     boost::asio::connect(socket.lowest_layer(), endpoint_iterator, ec);
     if (ec) {
-      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
+                << std::endl;
       throw ConnectionError(ec.message());
     }
 
     socket.handshake(boost::asio::ssl::stream_base::client, ec);
     if (ec) {
-      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
+                << std::endl;
       throw ConnectionError(ec.message());
     }
   }
@@ -56,7 +58,9 @@ namespace scalaris {
     }
   }
 
-  bool SSLConnection::isOpen() const { return socket.lowest_layer().is_open(); };
+  bool SSLConnection::isOpen() const {
+    return socket.lowest_layer().is_open();
+  };
 
   void SSLConnection::close() {
     socket.lowest_layer().close();
@@ -71,7 +75,8 @@ namespace scalaris {
       return atoi(port);
   }
 
-  bool SSLConnection::verify_callback(bool preverified, boost::asio::ssl::verify_context& ctx) {
+  bool SSLConnection::verify_callback(bool preverified,
+                                      boost::asio::ssl::verify_context& ctx) {
     // @todo
     return true;
   }
@@ -102,7 +107,8 @@ namespace scalaris {
     boost::system::error_code ec;
     boost::asio::write(socket, request, ec);
     if (ec) {
-      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+      std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
+                << std::endl;
       throw ConnectionError(ec.message());
     }
 

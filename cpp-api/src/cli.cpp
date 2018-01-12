@@ -99,14 +99,14 @@ int main(int argc, char** argv) {
   // Declare the supported options.
   po::options_description desc("Allowed options");
   desc.add_options()
-    // clang-format off
+      // clang-format off
     ("help", "produce help message")
     ("read", po::value<std::string>(), "read key")
     ("write", po::value<pair<string, string>>(),"write key,value")
     ("rbr-read", po::value<std::string>(), "rbr-read key")
     ("rbr-write", po::value<pair<string, string>>(),"rbr-write key,value")
     ("bench", "bench");
-    // clang-format on
+  // clang-format on
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -165,9 +165,7 @@ int main(int argc, char** argv) {
         pair<string, string> kv = vm["rbr-write"].as<pair<string, string>>();
         string key = get<0>(kv);
         string value = get<1>(kv);
-        auto p = [key, value](Rbr& r) {
-          r.write(key, value);
-        };
+        auto p = [key, value](Rbr& r) { r.write(key, value); };
         exec_call2(p);
       } catch (const boost::exception_detail::clone_impl<
                boost::exception_detail::error_info_injector<
