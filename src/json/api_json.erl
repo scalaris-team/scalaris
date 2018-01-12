@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -50,6 +50,9 @@ handler(get_service_info, [])            -> api_json_monitor:get_service_info();
 handler(get_service_performance, [])     -> api_json_monitor:get_service_performance();
 
 handler(get_replication_factor, [])      -> api_json_rt:get_replication_factor();
+
+handler(rbr_read, [Key])                 -> api_json_rbr:read(Key);
+handler(rbr_write, [Key, Value])         -> api_json_rbr:write(Key, Value);
 
 
 handler(AnyOp, AnyParams) ->
