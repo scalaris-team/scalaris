@@ -1,4 +1,4 @@
-// Copyright 2017 Zuse Institute Berlin
+// Copyright 2017-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 #include <stdexcept>
 
 #include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
