@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Zuse Institute Berlin
+// Copyright 2015-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,6 +32,9 @@ namespace scalaris {
       std::cout << ec.message() << std::endl;
       throw ConnectionError(ec.message());
     }
+
+    boost::asio::socket_base::keep_alive option(true);
+    socket.set_option(option);
   }
 
   TCPConnection::~TCPConnection() {
@@ -58,6 +61,8 @@ namespace scalaris {
 
   Json::Value TCPConnection::exec_call(const std::string& methodname,
                                        Json::Value params) {
+
+    // FIXME: reconnect when the connection is closed
     Json::Value call;
     call["method"] = methodname;
     call["params"] = params;
