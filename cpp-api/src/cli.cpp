@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
       try {
         string key = vm["rbr-read"].as<string>();
         auto p = [key](Rbr& r) {
-          std::string value = r.read(key);
+          std::string value = r.read(key).toStyledString();
           cout << value << endl;
         };
         exec_call2(p);

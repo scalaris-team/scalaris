@@ -1,4 +1,4 @@
-// Copyright 2016-2017 Zuse Institute Berlin
+// Copyright 2016-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -93,6 +93,18 @@ namespace scalaris {
       return result;
     }
   };
+
+  /// converts Json::Values to JSON values
+  template<>
+  class Converter<Json::Value> {
+  public:
+    /**
+     * converts a request list to a JSON value
+     * @param arg the request list value
+     */
+    static Json::Value to_value(Json::Value arg) { return arg; }
+  };
+
 }
 
 #endif

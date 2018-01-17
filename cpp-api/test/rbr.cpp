@@ -35,14 +35,14 @@ BOOST_AUTO_TEST_CASE(read_unknown_key) {
   TCPConnection c = {"localhost"};
   Rbr r = {c};
 
-  BOOST_CHECK_THROW(std::string val = r.read("_no_such_key"), ReadFailedError);
+  BOOST_CHECK_THROW(std::string val = r.read("_no_such_key").toStyledString(), ReadFailedError);
 }
 
 BOOST_AUTO_TEST_CASE(write) {
   TCPConnection c = {"localhost"};
   Rbr r = {c};
 
-  r.write("bar", "foo");
+  r.write("bar", Json::Value("foo"));
 }
 
 BOOST_AUTO_TEST_CASE(write_read) {
@@ -50,14 +50,14 @@ BOOST_AUTO_TEST_CASE(write_read) {
     TCPConnection c = {"localhost"};
     Rbr r = {c};
 
-    r.write("write_read", "foo");
+    r.write("write_read", Json::Value("foo"));
   }
   {
     TCPConnection c = {"localhost"};
     Rbr r = {c};
 
-    std::string res = r.read("write_read");
-    BOOST_CHECK(res.compare("foo") == 0);
+    Json::Value res = r.read("write_read");
+    BOOST_CHECK(res.compare(Json::Value("foo")) == 0);
   }
 }
 

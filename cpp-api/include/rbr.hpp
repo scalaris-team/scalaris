@@ -49,7 +49,7 @@ namespace scalaris {
      * Reads a key-value pair
      * @param key the key to lookup in Scalaris
      */
-    std::string read(const std::string key) {
+    Json::Value read(const std::string key) {
       Json::Value val = c.rpc("rbr_read", key);
 
       //std::cout << "read: " << Json::StyledWriter().write(val) << std::endl;
@@ -88,7 +88,7 @@ namespace scalaris {
      * @param key the key to update in Scalaris
      * @param value the value to store under <code>key</code>
      */
-    void write(const std::string key, const std::string value) {
+    void write(const std::string key, const Json::Value& value) {
       Json::Value val = c.rpc("rbr_write", key, value);
 
       //std::cout << "write: " << Json::StyledWriter().write(val) << std::endl;
