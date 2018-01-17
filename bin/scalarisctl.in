@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2017 Zuse Institute Berlin
+# Copyright 2007-2018 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ ERLANG_ADDITIONAL_FLAGS="@ERLANG_ERLANGJS_FLAGS@ @ERLANG_BITCASK_FLAGS@ @ERLANG_
 ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS-""}
 
 # default values (commandline options change these parameters)
-NODE_NAME=checkinstallation
+NODE_NAME=""
 ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
 daemonize=0
 first=0
@@ -72,7 +72,7 @@ usage(){
     echo "    -d          - daemonize"
     echo "    --screen    - if daemonized, put an interactive session into screen"
     echo "    -e <params> - pass additional parameters to erl"
-    echo "    -n <name>   - Erlang process name (default 'node')"
+    echo "    -n <name>   - Erlang process name (starts distributed Erlang required for Java API)"
     echo "    -c <cookie> - Erlang cookie to use (for distributed Erlang)"
     echo "                  (default '`get_cookie`')"
     echo "    -p <port>   - TCP port for the Scalaris node"
@@ -164,8 +164,11 @@ get_sys_hostname() {
 
 fix_node_name() {
     # if the given node name includes an '@', leave untouched
-    if ! echo $NODE_NAME | grep "@" >/dev/null ; then
-        NODE_NAME="$NODE_NAME@`get_hostname`"
+    if [ "" != "$NODE_NAME" ]; then
+        echo here i am
+        if ! echo $NODE_NAME | grep "@" >/dev/null ; then
+            NODE_NAME="$NODE_NAME@`get_hostname`"
+        fi
     fi
 }
 
@@ -671,7 +674,15 @@ checkinstallation() {
 }
 
 scalarisstart(){
-    $ERL -noinput -name $NODE_NAME -eval 'halt(0).' 2>/dev/null > /dev/null
+    echo $NODE_NAME
+    if [ "" = "$NODE_NAME" ]; then
+        DISTRERL=""
+        echo "Starting without distributed Erlang. Java-API will not work."
+        echo
+    else
+        DISTRERL="-name $NODE_NAME"
+    fi
+    $ERL -noinput $DISTRERL -eval 'halt(0).' 2>/dev/null > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo ""
@@ -679,7 +690,7 @@ scalarisstart(){
         echo "Are you already running a Scalaris server with this name?"
         echo "You can change the name by the -n option (see -h)."
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
-        echo "We were trying to run: erl -noinput -name $NODE_NAME -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput $DISTRERL -eval 'halt(0).'"
         list_erlang_processes
         exit 1
     fi
@@ -735,7 +746,7 @@ scalarisstart(){
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
  -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
  -scalaris local_config \"\\\"$ETCDIR/$SCALARIS_LOCAL_CFG\\\"\"\
- -connect_all false -hidden -name $NODE_NAME\
+ -connect_all false -hidden $DISTRERL\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
