@@ -77,10 +77,10 @@ namespace scalaris {
         throw ReadFailedError("unsupported value type");
 
       Json::Value value_value = value["value"];
-      if(!value_value.isString())
+      if(!value_value.isObject())
         throw MalFormedJsonError();
 
-      return value_value.asString();
+      return value_value;
     }
 
     /**
