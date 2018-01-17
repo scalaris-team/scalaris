@@ -52,7 +52,7 @@ namespace scalaris {
     Json::Value read(const std::string key) {
       Json::Value val = c.rpc("rbr_read", key);
 
-      //std::cout << "read: " << Json::StyledWriter().write(val) << std::endl;
+      // std::cout << "read: " << Json::StyledWriter().write(val) << std::endl;
 
       if(!val.isObject())
         throw MalFormedJsonError();
@@ -77,8 +77,6 @@ namespace scalaris {
         throw ReadFailedError("unsupported value type");
 
       Json::Value value_value = value["value"];
-      if(!value_value.isObject())
-        throw MalFormedJsonError();
 
       return value_value;
     }
