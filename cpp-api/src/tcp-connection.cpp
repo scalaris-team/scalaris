@@ -121,6 +121,7 @@ namespace scalaris {
     header_stream << "\n";
 
     std::stringstream json_result;
+    boost::asio::read_until(socket, response, "\n");
     // Write whatever content we already have to output.
     if (response.size() > 0)
       json_result << &response;
@@ -130,9 +131,8 @@ namespace scalaris {
     Json::Value value;
     std::string errs;
     bool ok = Json::parseFromStream(reader_builder, json_result, &value, &errs);
-    if (!ok) {
+    if (!ok)
       throw ConnectionError(errs);
-    }
 
     return process_result(value);
   }
