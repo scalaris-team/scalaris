@@ -205,6 +205,7 @@ check_config() ->
                          fun db_prbr:check_config/0,
                          fun l_on_cseq:check_config/0,
                          fun prbr:check_config/0,
+                         fun rbrcseq:check_config/0,
                          fun db_bitcask_merge_extension:check_config/0
                        ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
