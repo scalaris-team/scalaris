@@ -19,6 +19,6 @@
 
 % thanks to Vincent de Phily for this macro to specify required fields in
 % record where no hard-coded value makes sense at the time of the type
-% definition: 
+% definition:
 -define(required(Record, Field),
         throw({record_field_required, Record, Field, ?MODULE})).
