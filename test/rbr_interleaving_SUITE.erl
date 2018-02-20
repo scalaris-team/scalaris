@@ -1,4 +1,4 @@
-%% @copyright 2013-2017 Zuse Institute Berlin
+%% @copyright 2013-2018 Zuse Institute Berlin
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -183,6 +183,10 @@ test_write_through_notifies_original_proposer(_Config) ->
     ?equals_w_note(Value, ["WriteB", "WriteA"], "Values must match exactly due to interleaving").
 
 test_read_write_commuting(_Config) ->
+    %% Write tuple {A,B} on every replica. Update second element to C for
+    %% 3 out of 4 replicas. Read first element and make sure the outdated replica
+    %% is included. Since operations commute, no write-through should have been
+    %% triggered.
     Key = "123",
 
     % write baseline
@@ -199,11 +203,12 @@ test_read_write_commuting(_Config) ->
                                 fun ?MODULE:cc_noop/3,
                                 fun ?MODULE:wf_second/3}, "C"),
 
-    PrbrDataBeforeRead = prbr_data(),
+    PrbrValuesBeforeRead = prbr_values(),
     _ = slow_link(4, kv_db, 1, dht_node),
     {ok, "A"} = read_via_node(4, Key, fun ?MODULE:rf_first/1),
-    PrbrDataAfterRead = prbr_data(),
-    ?equals_w_note(PrbrDataBeforeRead, PrbrDataAfterRead,
+    PrbrValuesAfterRead = prbr_values(),
+
+    ?equals_w_note(PrbrValuesBeforeRead, PrbrValuesAfterRead,
                    "Read was independent from write and thus should not have caused a "
                    "write through"),
     ok.
