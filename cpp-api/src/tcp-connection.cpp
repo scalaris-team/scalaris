@@ -14,16 +14,25 @@
 
 #include "tcp-connection.hpp"
 
+#include <boost/algorithm/string.hpp>
+
 namespace scalaris {
 
   TCPConnection::TCPConnection(std::string _hostname, std::string _link)
       : socket(ioservice), Connection(_hostname, _link) {
+    connect();
+  }
+
+  void TCPConnection::connect() {
     using boost::asio::ip::tcp;
 
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
     tcp::resolver::query query(hostname, std::to_string(get_port()));
     tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+
+    // create a new socket in case of reconnect
+    socket = boost::asio::ip::tcp::socket(ioservice);
 
     // Try each endpoint until we successfully establish a connection.
     boost::system::error_code ec;
@@ -33,8 +42,8 @@ namespace scalaris {
       throw ConnectionError(ec.message());
     }
 
-    boost::asio::socket_base::keep_alive option(true);
-    socket.set_option(option);
+    // boost::asio::socket_base::keep_alive option(true);
+    // socket.set_option(option);
   }
 
   TCPConnection::~TCPConnection() {
@@ -67,11 +76,10 @@ namespace scalaris {
     call["method"] = methodname;
     call["params"] = params;
     call["id"] = 0;
-    std::stringstream json_call;
-    Json::StreamWriterBuilder builder;
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    writer->write(call, &json_call);
-    std::string json_call_str = json_call.str();
+
+    Json::FastWriter w;
+    std::string json_call_str = w.write(call);
+    boost::trim_right(json_call_str);
 
     boost::asio::streambuf request;
     std::ostream request_stream(&request);
@@ -90,51 +98,56 @@ namespace scalaris {
       throw ConnectionError(ec.message());
     }
 
-    boost::asio::streambuf response;
-    boost::asio::read_until(socket, response, "\r\n");
-    // Check that response is OK.
-    std::istream response_stream(&response);
-    std::string http_version;
-    response_stream >> http_version;
-    unsigned int status_code;
-    response_stream >> status_code;
-    std::string status_message;
-    std::getline(response_stream, status_message);
-    if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
-      std::cout << "Invalid response\n";
-      throw ConnectionError("Invalid response");
+    try {
+      boost::asio::streambuf response;
+      boost::asio::read_until(socket, response, "\r\n");
+      // Check that response is OK.
+      std::istream response_stream(&response);
+      std::string http_version;
+      response_stream >> http_version;
+      unsigned int status_code;
+      response_stream >> status_code;
+      std::string status_message;
+      std::getline(response_stream, status_message);
+      if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
+        std::cout << "Invalid response\n";
+        throw ConnectionError("Invalid response");
+      }
+      if (status_code != 200) {
+        std::cout << "Response returned with status code " << status_code
+                  << "\n";
+        std::stringstream error;
+        error << "Response returned with status code " << status_code;
+        throw ConnectionError(error.str());
+      }
+
+      // Read the response headers, which are terminated by a blank line.
+      boost::asio::read_until(socket, response, "\r\n\r\n");
+      // Process the response headers.
+      std::string header;
+      std::stringstream header_stream;
+      while (std::getline(response_stream, header) && header != "\r")
+        header_stream << header << "\n";
+      header_stream << "\n";
+
+      std::stringstream json_result;
+      boost::asio::read_until(socket, response, "\n");
+      // Write whatever content we already have to output.
+      if (response.size() > 0)
+        json_result << &response;
+
+      Json::CharReaderBuilder reader_builder;
+      reader_builder["collectComments"] = false;
+      Json::Value value;
+      std::string errs;
+      bool ok =
+          Json::parseFromStream(reader_builder, json_result, &value, &errs);
+      if (!ok)
+        throw ConnectionError(errs);
+      return process_result(value);
+    } catch (const std::exception& e) {
+      throw ConnectionError(e.what());
     }
-    if (status_code != 200) {
-      std::cout << "Response returned with status code " << status_code << "\n";
-      std::stringstream error;
-      error << "Response returned with status code " << status_code;
-      throw ConnectionError(error.str());
-    }
-
-    // Read the response headers, which are terminated by a blank line.
-    boost::asio::read_until(socket, response, "\r\n\r\n");
-    // Process the response headers.
-    std::string header;
-    std::stringstream header_stream;
-    while (std::getline(response_stream, header) && header != "\r")
-      header_stream << header << "\n";
-    header_stream << "\n";
-
-    std::stringstream json_result;
-    boost::asio::read_until(socket, response, "\n");
-    // Write whatever content we already have to output.
-    if (response.size() > 0)
-      json_result << &response;
-
-    Json::CharReaderBuilder reader_builder;
-    reader_builder["collectComments"] = false;
-    Json::Value value;
-    std::string errs;
-    bool ok = Json::parseFromStream(reader_builder, json_result, &value, &errs);
-    if (!ok)
-      throw ConnectionError(errs);
-
-    return process_result(value);
   }
 
   Json::Value TCPConnection::process_result(const Json::Value& value) {

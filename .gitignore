@@ -38,6 +38,7 @@ Session.vim
 contrib/slurm/slurm-*.out
 /java-api/target
 /cpp-api/scalaris
+/cpp-api/ssl-tests
 /.maven
 /priv/*.so
 /priv/*.so.dSYM/

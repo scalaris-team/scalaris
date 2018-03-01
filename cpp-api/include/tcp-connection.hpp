@@ -32,9 +32,6 @@ namespace scalaris {
   class TCPConnection : public Connection {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
-    //std::string hostname;
-    //std::string link;
-    //bool closed=false;
   public:
     /**
      * creates a connection instance
@@ -55,6 +52,11 @@ namespace scalaris {
 
     /// returns the server port of the TCP connection
     virtual unsigned get_port();
+
+
+    /// connects to the specified server
+    /// it can also be used, if the connection failed
+    void connect();
 
   private:
     virtual Json::Value exec_call(const std::string& methodname, Json::Value params);
