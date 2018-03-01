@@ -33,14 +33,20 @@ BOOST_AUTO_TEST_SUITE(MasterSuite)
 BOOST_AUTO_TEST_CASE(create_connection) {
   SSLConnection c = {"localhost"};
 
+  c.set_verify_file("../ca-chain.cert.pem");
+  c.set_certificate_file("../host2.cert.pem");
+  c.set_private_key("../host2.key.pem");
+  //c.set_rsa_private_key(const std::string& file);
+  c.set_password("secretpassword");
+
   BOOST_CHECK(c.isOpen());
 }
 
-BOOST_AUTO_TEST_CASE(close_connection) {
-  SSLConnection c = {"localhost"};
-  BOOST_CHECK(c.isOpen());
-  c.close();
-  BOOST_CHECK(!c.isOpen());
-}
+//BOOST_AUTO_TEST_CASE(close_connection) {
+//  SSLConnection c = {"localhost"};
+//  BOOST_CHECK(c.isOpen());
+//  c.close();
+//  BOOST_CHECK(!c.isOpen());
+//}
 
 BOOST_AUTO_TEST_SUITE_END()

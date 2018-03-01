@@ -12,9 +12,9 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "tcp-connection.hpp"
 #include "routing_table.hpp"
 #include "connection.hpp"
+#include "tcp-connection.hpp"
 #include "json/json.h"
 
 #define BOOST_TEST_DYN_LINK

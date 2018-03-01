@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Zuse Institute Berlin
+// Copyright 2015-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,6 +29,11 @@ namespace scalaris {
         });
 
     // ctx.load_verify_file("ca.pem");
+    ctx.set_password_callback(
+        [this](std::size_t max_length,
+               boost::asio::ssl::context::password_purpose purpose) {
+          return this->password_callback(max_length, purpose);
+        });
 
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
@@ -58,6 +63,27 @@ namespace scalaris {
     }
   }
 
+  void SSLConnection::set_verify_file(const std::string& file) {
+    // Load a certification authority file for performing verification.
+    ctx.load_verify_file(file); //"ca.pem"
+  }
+
+  void SSLConnection::set_certificate_file(const std::string& file) {
+    //  Use a certificate from a file.
+    ctx.use_certificate_file(file, boost::asio::ssl::context_base::file_format::pem);
+  }
+  void SSLConnection::set_private_key(const std::string& file) {
+    // Use a private key from a file.
+    ctx.use_private_key_file(file, boost::asio::ssl::context_base::file_format::pem);
+  }
+
+  void SSLConnection::set_rsa_private_key(const std::string& file) {
+    // Use an RSA private key from a file.
+    ctx.use_rsa_private_key_file(file, boost::asio::ssl::context_base::file_format::pem);
+  }
+
+  void SSLConnection::set_password(const std::string& pw) { password = pw; }
+
   bool SSLConnection::isOpen() const {
     return socket.lowest_layer().is_open();
   };
@@ -79,6 +105,14 @@ namespace scalaris {
                                       boost::asio::ssl::verify_context& ctx) {
     // @todo
     return true;
+  }
+
+  std::string SSLConnection::password_callback(
+      std::size_t max_length,
+      boost::asio::ssl::context::password_purpose purpose) {
+    // @todo
+    // for_reading or for_writing
+    return password;
   }
 
   Json::Value SSLConnection::exec_call(const std::string& methodname,

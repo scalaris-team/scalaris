@@ -12,8 +12,8 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "tcp-connection.hpp"
 #include "routing_table.hpp"
+#include "tcp-connection.hpp"
 
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
