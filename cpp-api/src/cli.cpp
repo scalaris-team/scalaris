@@ -180,7 +180,6 @@ int main(int argc, char** argv) {
         string value = "bench-value";
         vector<double> latencies;
         latencies.resize(N);
-        auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < N; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           {
