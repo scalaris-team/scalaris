@@ -30,6 +30,7 @@ install:
          which python3
          brew ls --versions python
          brew ls --versions python3
+         brew install python3
          for pkg in $OSX_PACKAGES; do
            [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
          done
