@@ -14,6 +14,8 @@
 
 #include "ssl-connection.hpp"
 
+#include <boost/algorithm/string.hpp>
+
 namespace scalaris {
 
   SSLConnection::SSLConnection(std::string hostname, std::string link)
@@ -116,17 +118,16 @@ namespace scalaris {
   }
 
   Json::Value SSLConnection::exec_call(const std::string& methodname,
-                                       Json::Value params) {
-    // @todo
+                                       Json::Value params, bool reconnect) {
+    // FIXME add reconnect
     Json::Value call;
     call["method"] = methodname;
     call["params"] = params;
     call["id"] = 0;
-    std::stringstream json_call;
-    Json::StreamWriterBuilder builder;
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    writer->write(call, &json_call);
-    std::string json_call_str = json_call.str();
+
+    Json::FastWriter w;
+    std::string json_call_str = w.write(call);
+    boost::trim_right(json_call_str);
 
     boost::asio::streambuf request;
     std::ostream request_stream(&request);

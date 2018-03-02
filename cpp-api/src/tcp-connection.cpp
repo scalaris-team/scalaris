@@ -19,7 +19,7 @@
 namespace scalaris {
 
   TCPConnection::TCPConnection(std::string _hostname, std::string _link)
-      : socket(ioservice), Connection(_hostname, _link) {
+    : Connection(_hostname, _link), socket(ioservice) {
     connect();
   }
 
@@ -69,7 +69,7 @@ namespace scalaris {
   }
 
   Json::Value TCPConnection::exec_call(const std::string& methodname,
-                                       Json::Value params) {
+                                       Json::Value params, bool reconnect) {
 
     // FIXME: reconnect when the connection is closed
     Json::Value call;
@@ -146,7 +146,11 @@ namespace scalaris {
         throw ConnectionError(errs);
       return process_result(value);
     } catch (const std::exception& e) {
-      throw ConnectionError(e.what());
+      if (reconnect) {
+        connect();
+        return exec_call(methodname, params, false);
+      } else
+        throw ConnectionError(e.what());
     }
   }
 

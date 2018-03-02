@@ -59,7 +59,8 @@ namespace scalaris {
     void connect();
 
   private:
-    virtual Json::Value exec_call(const std::string& methodname, Json::Value params);
+    virtual Json::Value exec_call(const std::string& methodname,
+                                  Json::Value params, bool reconnect = true) override;
     Json::Value process_result(const Json::Value& value);
   };
 }

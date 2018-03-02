@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Zuse Institute Berlin
+// Copyright 2015-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -62,7 +62,8 @@ namespace scalaris {
     void set_rsa_private_key(const std::string& file);
     void set_password(const std::string& file);
   private:
-    virtual Json::Value exec_call(const std::string& methodname, Json::Value params);
+    virtual Json::Value exec_call(const std::string& methodname,
+                                  Json::Value params, bool reconnect = true);
     Json::Value process_result(const Json::Value& value);
 
     bool verify_callback(bool preverified, boost::asio::ssl::verify_context& ctx);

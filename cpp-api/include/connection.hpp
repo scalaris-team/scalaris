@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Zuse Institute Berlin
+// Copyright 2015-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -62,6 +62,8 @@ namespace scalaris {
     }
 
   protected:
-    virtual Json::Value exec_call(const std::string& methodname, Json::Value params) = 0;
+    virtual Json::Value exec_call(const std::string& methodname,
+                                  Json::Value params,
+                                  bool reconnect = true) = 0;
   };
-}
+} // namespace scalaris
