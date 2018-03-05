@@ -44,8 +44,8 @@ namespace scalaris {
       throw ConnectionError(ec.message());
     }
 
-    // boost::asio::socket_base::keep_alive option(true);
-    // socket.set_option(option);
+    boost::asio::socket_base::keep_alive option(true);
+    socket.set_option(option);
   }
 
   TCPConnection::~TCPConnection() {
