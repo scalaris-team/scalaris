@@ -32,7 +32,12 @@ namespace scalaris {
   class TCPConnection : public Connection {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
+
+    bool triedToConnect = false;
   public:
+
+    TCPConnection() = default;
+
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
@@ -58,6 +63,7 @@ namespace scalaris {
     /// it can also be used, if the connection failed
     void connect();
 
+    bool hasTriedToConnect() const { return triedToConnect; }
   private:
     virtual Json::Value exec_call(const std::string& methodname,
                                   Json::Value params, bool reconnect = true) override;

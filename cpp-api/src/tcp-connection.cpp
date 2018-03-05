@@ -26,6 +26,8 @@ namespace scalaris {
   void TCPConnection::connect() {
     using boost::asio::ip::tcp;
 
+    triedToConnect = true;
+
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
     tcp::resolver::query query(hostname, std::to_string(get_port()));
