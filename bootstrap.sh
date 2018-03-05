@@ -64,10 +64,24 @@ fi
 
 ##########
 
+# pretend to use automake
+touch Makefile.am NEWS READ COPYING README INSTALL
+
+if [ ! -d python3-api ]
+then
+    mkdir python3-api
+    touch python3-api/scalaris.in
+fi
+
+cp Makefile.in Makefile.in.bak
+
 echo "Creating configure script"
 autoreconf --verbose --force --install # -Wall
-echo "            ^ automake is supposed to fail, this is ok, no need to worry"
 echo ""
 echo "A ./configure file should be created."
 echo "Please proceed with calling './configure'"
+
+# undo automake
+rm Makefile.am NEWS READ COPYING README INSTALL
+mv Makefile.in.bak Makefile.in
 
