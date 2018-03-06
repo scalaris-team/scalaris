@@ -61,6 +61,9 @@ namespace scalaris {
       return exec_call(methodname, params);
     }
 
+    virtual bool needsConnect() const = 0;
+    virtual void connect() = 0;
+
   protected:
     virtual Json::Value exec_call(const std::string& methodname,
                                   Json::Value params,

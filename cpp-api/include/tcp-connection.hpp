@@ -33,7 +33,7 @@ namespace scalaris {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
 
-    bool triedToConnect = false;
+    bool hasToConnect = true;
   public:
 
     TCPConnection() = default;
@@ -49,6 +49,8 @@ namespace scalaris {
 
     ~TCPConnection();
 
+    bool needsConnect() const override { return hasToConnect; };
+
     /// checks whether the TCP connection is alive
     bool isOpen() const;
 
@@ -58,12 +60,10 @@ namespace scalaris {
     /// returns the server port of the TCP connection
     virtual unsigned get_port();
 
-
     /// connects to the specified server
     /// it can also be used, if the connection failed
-    void connect();
+    void connect() override;
 
-    bool hasTriedToConnect() const { return triedToConnect; }
   private:
     virtual Json::Value exec_call(const std::string& methodname,
                                   Json::Value params, bool reconnect = true) override;
