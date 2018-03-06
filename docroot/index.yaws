@@ -227,6 +227,89 @@ out(A) ->
 </erl>
 </p>
 
+<h3>KVonCseq Storage </h3>
+<h4>Add Key Value</h4>
+
+<form method="post" action="/index.yaws">
+
+<table width="400">
+<tr>
+<td>Key</td><td><input name="key" size="42" /></td>
+</tr>
+<tr>
+<td>Value</td><td><input name="value" size="42" /></td>
+</tr>
+</table>
+
+<input type=hidden name="type" value="addkey">
+<p><input type="submit" value="Add"/> | <a href="/index.yaws">Reset</a></p>
+</form>
+
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+               {ok, Type} = postvar(A,"type"),
+               if 
+                 Type =:= "addkey" -> 
+                    case {postvar(A, "key"),postvar(A, "value")} of
+		      {{ok, Key},{ok, Value}} ->
+                         {Result} = webhelpers:set_key_kvoncseq(Key, Value),
+		    	 {ehtml, {pre, [], io_lib:format('~p', [Result])}};
+                      _ -> 
+                         {ehtml, {pre, [], "<div style='color: red;'>Missing required input: Need a Key and Value</div>"}}
+                    end;
+                 true ->
+                    {ehtml,{pre, [], ""}}
+               end;
+ 	true ->
+      		{ehtml,{pre, [], ""}}
+    end.
+</erl>
+</p>
+
+
+<h4>Search</h4>
+
+<form method="post" action="/index.yaws">
+
+<p>Key <input name="key" size="42" /></p>
+
+<input type=hidden name="type" value="querykey">
+
+<p><input type="submit" value="Lookup"/> | <a href="/index.yaws">Reset</a></p>
+</form>
+
+
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+              {ok, Type} = postvar(A,"type"),
+              if 
+                Type =:= "querykey" ->
+                  case postvar(A, "key") of
+                   {ok, Key} ->
+                      Result = webhelpers:lookup_kvoncseq(Key),
+		      {ehtml, {pre, [], io_lib:format('~p', [Result])}};
+                    _ ->
+                      {ehtml, {pre, [], ""}}
+		  end;
+                true -> 
+                      {ehtml, {pre, [], ""}}
+              end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+</p>
+
 <h3>Args</h3>
 <p>
 <erl>

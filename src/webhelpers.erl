@@ -1,4 +1,4 @@
-% @copyright 2007-2016 Zuse Institute Berlin,
+% @copyright 2007-2018 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@
          getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1,
          safe_html_string/1, safe_html_string/2, html_pre/2,
-         format_nodes/1, format_centroids/1
+         format_nodes/1, format_centroids/1,
+         lookup_kvoncseq/1, set_key_kvoncseq/2
      ]).
 
 -type attribute_type() :: {atom(), string()}.
@@ -70,6 +71,14 @@ set_key(Key, Value) ->
                     {fail, timeout, pos_integer(), list()}}.
 delete_key(Key, Timeout) ->
     util:tc(api_rdht, delete, [Key, Timeout]).
+
+%%%-----------------------------Lookup/Put/delete (kvoncseq)----------
+
+lookup_kvoncseq(Key) ->
+    kv_on_cseq:read(Key).
+
+set_key_kvoncseq(Key, Value) ->
+    kv_on_cseq:write(Key, Value).
 
 %%%--------------------------Vivaldi-Map------------------------------
 -spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, gossip_vivaldi:network_coordinate()}].
