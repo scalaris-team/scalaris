@@ -22,6 +22,11 @@ namespace scalaris {
       : Connection(hostname, link),
         ctx(boost::asio::ssl::context_base::method::sslv23),
         socket(ioservice, ctx) {
+    try {connect();}
+    catch(scalaris::ConnectionError) {}
+  }
+
+  void SSLConnection::connect() {
     using boost::asio::ip::tcp;
 
     socket.set_verify_mode(boost::asio::ssl::verify_peer);
@@ -45,9 +50,11 @@ namespace scalaris {
     // Try each endpoint until we successfully establish a connection.
     boost::system::error_code ec;
     boost::asio::connect(socket.lowest_layer(), endpoint_iterator, ec);
+    hasToConnect = false;
     if (ec) {
       std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
                 << std::endl;
+      hasToConnect = true;
       throw ConnectionError(ec.message());
     }
 
@@ -55,6 +62,7 @@ namespace scalaris {
     if (ec) {
       std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
                 << std::endl;
+      hasToConnect = true;
       throw ConnectionError(ec.message());
     }
   }
@@ -144,6 +152,7 @@ namespace scalaris {
     if (ec) {
       std::cout << __FILE__ << ":" << __LINE__ << " " << ec.message()
                 << std::endl;
+      hasToConnect = true;
       throw ConnectionError(ec.message());
     }
 
@@ -159,12 +168,14 @@ namespace scalaris {
     std::getline(response_stream, status_message);
     if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
       std::cout << "Invalid response\n";
+      hasToConnect = true;
       throw ConnectionError("Invalid response");
     }
     if (status_code != 200) {
       std::cout << "Response returned with status code " << status_code << "\n";
       std::stringstream error;
       error << "Response returned with status code " << status_code;
+      hasToConnect = true;
       throw ConnectionError(error.str());
     }
 
@@ -188,6 +199,7 @@ namespace scalaris {
     std::string errs;
     bool ok = Json::parseFromStream(reader_builder, json_result, &value, &errs);
     if (!ok) {
+      hasToConnect = true;
       throw ConnectionError(errs);
     }
 
@@ -201,24 +213,28 @@ namespace scalaris {
       if (!id.isIntegral() or id.asInt() != 0) {
         std::stringstream error;
         error << value.toStyledString() << " is no id=0";
+        hasToConnect = true;
         throw ConnectionError(error.str());
       }
       Json::Value jsonrpc = value["jsonrpc"];
       if (!jsonrpc.isString()) {
         std::stringstream error;
         error << value.toStyledString() << " has no string member: jsonrpc";
+        hasToConnect = true;
         throw ConnectionError(error.str());
       }
       Json::Value result = value["result"];
       if (!result.isObject()) {
         std::stringstream error;
         error << value.toStyledString() << " has no object member: result";
+        hasToConnect = true;
         throw ConnectionError(error.str());
       }
       return result;
     } else {
       std::stringstream error;
       error << value.toStyledString() << " is no json object";
+      hasToConnect = true;
       throw ConnectionError(error.str());
     }
   }
