@@ -64,6 +64,20 @@ fi
 
 ##########
 
+if [ -z `which automake` ]
+then
+    echo "automake is missing."
+    echo "Please install automake."
+    exit
+fi
+
+if [ -z `which aclocal` ]
+then
+    echo "aclocal is missing."
+    echo "Please install automake."
+    exit
+fi
+
 # pretend to use automake
 touch Makefile.am NEWS READ COPYING README INSTALL
 
