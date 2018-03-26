@@ -14,17 +14,17 @@
 
 #pragma once
 
-#include <array>
-#include <iostream>
-#include <string>
-#include <stdexcept>
-
-#include <boost/asio.hpp>
+#include "connection.hpp"
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
 
-#include "connection.hpp"
+#include <boost/asio.hpp>
+
+#include <array>
+#include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace scalaris {
 
@@ -34,18 +34,19 @@ namespace scalaris {
     boost::asio::ip::tcp::socket socket;
 
     bool hasToConnect = true;
-  public:
 
+  public:
     TCPConnection() = default;
 
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
      * @param _link the URL for JSON-RPC
-     * @param port the TCP port of the Scalaris instance
+     * @param _port the TCP port of the Scalaris instance
      */
-    TCPConnection(std::string _hostname,
-                  std::string _link  = "jsonrpc.yaws");
+    TCPConnection(const std::string& _hostname,
+                  const std::string& _link = "jsonrpc.yaws",
+                  unsigned _port = 8000);
 
     ~TCPConnection();
 
@@ -58,7 +59,7 @@ namespace scalaris {
     void close();
 
     /// returns the server port of the TCP connection
-    virtual unsigned get_port();
+    virtual unsigned getPort();
 
     /// connects to the specified server
     /// it can also be used, if the connection failed
@@ -66,7 +67,8 @@ namespace scalaris {
 
   private:
     virtual Json::Value exec_call(const std::string& methodname,
-                                  Json::Value params, bool reconnect = true) override;
+                                  Json::Value params,
+                                  bool reconnect = true) override;
     Json::Value process_result(const Json::Value& value);
   };
-}
+} // namespace scalaris

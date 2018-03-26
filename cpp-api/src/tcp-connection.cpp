@@ -18,11 +18,14 @@
 
 namespace scalaris {
 
-  TCPConnection::TCPConnection(std::string _hostname, std::string _link)
-    : Connection(_hostname, _link), socket(ioservice) {
+  TCPConnection::TCPConnection(const std::string& _hostname,
+                               const std::string& _link, unsigned _port)
+      : Connection(_hostname, _link, _port), socket(ioservice) {
 
-    try {connect();}
-    catch(scalaris::ConnectionError) {}
+    try {
+      connect();
+    } catch (scalaris::ConnectionError) {
+    }
   }
 
   void TCPConnection::connect() {
@@ -30,7 +33,7 @@ namespace scalaris {
 
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
-    tcp::resolver::query query(hostname, std::to_string(get_port()));
+    tcp::resolver::query query(hostname, std::to_string(getPort()));
     tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
 
     // create a new socket in case of reconnect
@@ -64,12 +67,12 @@ namespace scalaris {
     closed = true;
   };
 
-  unsigned TCPConnection::get_port() {
-    char* port = getenv("SCALARIS_UNITTEST_YAWS_PORT");
-    if (port == NULL)
-      return 8000;
+  unsigned TCPConnection::getPort() {
+    char* EnvPort = getenv("SCALARIS_UNITTEST_YAWS_PORT");
+    if (EnvPort == NULL)
+      return port;
     else
-      return atoi(port);
+      return atoi(EnvPort);
   }
 
   Json::Value TCPConnection::exec_call(const std::string& methodname,

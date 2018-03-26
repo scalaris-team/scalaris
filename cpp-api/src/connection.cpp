@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Zuse Institute Berlin
+// Copyright 2015-2018 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@
 
 namespace scalaris {
 
-  Connection::Connection(std::string _hostname, std::string _link)
-      : hostname(_hostname), link(_link) {}
+  Connection::Connection(const std::string& _hostname, const std::string& _link,
+                         unsigned _port)
+      : hostname(_hostname), link(_link), port(_port) {}
 
 } // namespace scalaris

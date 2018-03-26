@@ -14,34 +14,37 @@
 
 #pragma once
 
-#include <array>
-#include <iostream>
-#include <string>
-#include <stdexcept>
-
-#include <boost/asio.hpp>
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
+
+#include <boost/asio.hpp>
+
+#include <array>
+#include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace scalaris {
 
   /// represents a connection to Scalaris to execute JSON-RPC requests
   class Connection {
   protected:
-    bool closed=false;
+    bool closed = false;
     std::string hostname;
     std::string link;
+    unsigned port;
+
   protected:
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
      * @param _link the URL for JSON-RPC
-     * @param port the TCP port of the Scalaris instance
+     * @param _port the TCP port of the Scalaris instance
      */
-    Connection(std::string _hostname,
-               std::string _link  = "jsonrpc.yaws"
-               );
+    Connection(const std::string& _hostname,
+               const std::string& _link = "jsonrpc.yaws",
+               unsigned _port = 8000);
 
     ~Connection() = default;
 
@@ -51,12 +54,13 @@ namespace scalaris {
      * @param methodname the name of the function to call
      * @param args the list of arguments of the function call
      */
-    template<typename... Args>
+    template <typename... Args>
     Json::Value rpc(const std::string& methodname, Args... args) {
-      std::array<Json::Value, sizeof...(args)> arg_list = {{Converter<Args>::to_value(args)... }};
+      std::array<Json::Value, sizeof...(args)> arg_list = {
+          {Converter<Args>::to_value(args)...}};
 
       Json::Value params = Json::arrayValue;
-      for(size_t i = 0; i< sizeof...(args); i++)
+      for (size_t i = 0; i < sizeof...(args); i++)
         params.append(arg_list[i]);
       return exec_call(methodname, params);
     }
