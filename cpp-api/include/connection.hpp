@@ -46,8 +46,6 @@ namespace scalaris {
                const std::string& _link = "jsonrpc.yaws",
                unsigned _port = 8000);
 
-    ~Connection() = default;
-
   public:
     /**
      * performs a JSON-RPC request
