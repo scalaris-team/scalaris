@@ -58,7 +58,7 @@
 
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
 
--type db_selector() :: kv_db | {tx_id, pos_integer()} | {lease_db, pos_integer()}.
+-type db_selector() :: kv_db | crdt_db | {tx_id, pos_integer()} | {lease_db, pos_integer()}.
 
 -type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
               | succ_pid | predlist | pred | pred_id | pred_pid | node
@@ -90,6 +90,7 @@
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 kv_db = ?required(state, kv_db) :: prbr:state(),
+                crdt_db = ?required(state, crdt_db) :: crdt_acceptor:state(),
                 txid_dbs = ?required(state, txid_dbs) :: tuple(),
                 lease_dbs = ?required(state, lease_dbs) :: tuple(),
                 lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
@@ -112,6 +113,7 @@ new(RT, RMState, DB) ->
            db = DB,
            tx_tp_db = tx_tp:init(),
            kv_db = prbr:init(kv_db),
+           crdt_db = crdt_acceptor:init(crdt_db),
            txid_dbs = erlang:make_tuple(config:read(replication_factor), ok, TxidDBs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, LeaseDBs),
            lease_list = lease_list:empty(),
@@ -138,6 +140,7 @@ new_on_recover(RT, RMState,
            db = db_dht:new(db_dht),
            tx_tp_db = tx_tp:init(),
            kv_db = KV_DB,
+           crdt_db = crdt_acceptor:init(crdt_db), %% TODO??
            txid_dbs  = erlang:make_tuple(config:read(replication_factor), ok, IndexedTXIDs),
            lease_dbs = erlang:make_tuple(config:read(replication_factor), ok, IndexedLeases),
            lease_list = LeaseList,
@@ -223,13 +226,14 @@ delete_for_rejoin(
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
          (state(), kv_db) -> prbr:state();
+         (state(), crdt_db) -> crdt_acceptor:state();
          (state(), {tx_id, pos_integer()}) -> prbr:state();
          (state(), {lease_db, pos_integer()}) -> prbr:state();
          (state(), lease_list) -> lease_list:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, kv_db=PRBRState,
+           db_range=DBRange, kv_db=PRBRState, crdt_db=CRDTState,
            lease_list=LeaseList, txid_dbs = TXID_DBs, lease_dbs = LeaseDBs,
            snapshot_state=SnapState} = State, Key) ->
     case Key of
@@ -278,6 +282,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load2        -> lb_stats:get_load_metric();
         load3        -> lb_stats:get_request_metric();
         kv_db        -> PRBRState;
+        crdt_db      -> CRDTState;
         {tx_id, I}   -> element(I, TXID_DBs);
         {lease_db, I}-> element(I, LeaseDBs);
         lease_list   -> LeaseList
@@ -288,6 +293,7 @@ set_prbr_state(State = #state{txid_dbs=TXID_DBs, lease_dbs = LeaseDBs},
                WhichDB, Value) ->
     case WhichDB of
         kv_db -> State#state{kv_db = Value};
+        crdt_db -> State#state{crdt_db = Value};
         {tx_id, I} -> State#state{txid_dbs = setelement(I, TXID_DBs, Value)};
         {lease_db, I} -> State#state{lease_dbs = setelement(I, LeaseDBs, Value)}
     end.

@@ -86,6 +86,13 @@ childs([DHTNodeGroup, Options]) ->
                     _DBSelectorL1 = {tx_id, Id}])
                    || Id <- lists:seq(1, config:read(replication_factor))],
 
+    %% crdt process  working on the kv DB
+    Crdt_KVcseq = sup:worker_desc(crdt_db, crdt_proposer,
+                                start_link,
+                                [DHTNodeGroup,
+                                 _PidGroupsNameCrdt = crdt_db,
+                                 _DBSelectorCrdt = crdt_db]),
+
     DHTNodeMonitor = sup:worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
                        [DHTNodeGroup, Options]),
@@ -97,6 +104,7 @@ childs([DHTNodeGroup, Options]) ->
      KV_RBRcseq,
      Lease_RBRcseqs,
      Tx_RBRcseqs,
+     Crdt_KVcseq,
      DHTNodeMonitor,
      DHTNode,
      TX
