@@ -15,10 +15,8 @@
 %% @author Jan Skrzypczak
 %% @doc    Paxos register for CRDT's. Implements the role of acceptor
 %% @end
-%% @version $Id$
 -module(crdt_acceptor).
 -author('skrzypczak@zib.de').
--vsn('$Id:$ ').
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -71,19 +69,19 @@ msg_merge_reply(Client, ReqId) ->
 msg_query_reply(Client, ReqId, QueryResult) ->
     comm:send(Client, {query_reply, ReqId, QueryResult}).
 
--spec msg_prepare_reply(comm:myypid(), any(), pr:pr(), pr:pr(), crdt:crdt()) -> ok.
+-spec msg_prepare_reply(comm:mypid(), any(), pr:pr(), pr:pr(), crdt:crdt()) -> ok.
 msg_prepare_reply(Client, ReqId, ReadRound, WriteRound, CVal) ->
     comm:send(Client, {prepare_reply, ReqId, ReadRound, WriteRound, CVal}).
 
--spec msg_prepare_deny(comm:myypid(), any(), pr:pr(), pr:pr()) -> ok.
+-spec msg_prepare_deny(comm:mypid(), any(), pr:pr(), pr:pr()) -> ok.
 msg_prepare_deny(Client, ReqId, TriedReadRound, RequiredReadRound) ->
     comm:send(Client, {read_deny, ReqId, TriedReadRound, RequiredReadRound}).
 
--spec msg_vote_reply(comm:myypid(), any()) -> ok.
+-spec msg_vote_reply(comm:mypid(), any()) -> ok.
 msg_vote_reply(Client, ReqId) ->
     comm:send(Client, {vote_reply, ReqId, done}).
 
--spec msg_vote_deny(comm:myypid(), any(), pr:pr(), pr:pr()) -> ok.
+-spec msg_vote_deny(comm:mypid(), any(), pr:pr(), pr:pr()) -> ok.
 msg_vote_deny(Client, ReqId, TriedWriteRound, RequiredReadRound) ->
     comm:send(Client, {read_deny, ReqId, TriedWriteRound, RequiredReadRound}).
 

@@ -15,10 +15,8 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc State-based CRDT behaviour
 %% @end
-%% @version $Id$
 
 -author('skrzypczak@zib.de').
--vsn('Id$').
 
 -export_type([crdt/0]).
 

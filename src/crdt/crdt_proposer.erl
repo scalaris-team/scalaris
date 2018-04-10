@@ -17,10 +17,8 @@
 %% @doc     @TODO:
 %%              gossiping?
 %% @end
-%% @version $Id$
 -module(crdt_proposer).
 -author('skrzypczak.de').
--vsn('$Id:$ ').
 
 -define(PDB, pdb).
 
@@ -64,7 +62,7 @@
 -include("gen_component.hrl").
 
 
--spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_seleector())
+-spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
                 -> {ok, pid()}.
 start_link(DHTNodeGroup, Name, DBSelector) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
@@ -453,7 +451,7 @@ entry_set_replies(Entry, Replies) -> setelement(6, Entry, Replies).
 get_entry(ReqId, TableName) ->
     ?PDB:get(ReqId, TableName).
 
--spec save_entry(entry(), ?PDB:tableeid()) -> ok.
+-spec save_entry(entry(), ?PDB:tableid()) -> ok.
 save_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
@@ -477,7 +475,7 @@ round_inc(Round, ID) ->
 send_to_which_replica(Key) ->
     send_to_which_replica(Key, self()).
 
--spec send_to_which_replica(?RT:key(), comm:erl_localpid()) -> {non_neg_integer(), ?RT:key()}.
+-spec send_to_which_replica(?RT:key(), comm:erl_local_pid()) -> {non_neg_integer(), ?RT:key()}.
 send_to_which_replica(Key, Client) ->
     %% TODO really ugly hack, only ensures that the same process gets the same
     %% replica key every time, but does not care about locality
