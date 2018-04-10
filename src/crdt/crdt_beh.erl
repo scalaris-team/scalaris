@@ -15,17 +15,37 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc State-based CRDT behaviour
 %% @end
-%% @version $Id$
 %%
 -module(crdt_beh).
 -author('skrzypczak@zib.de').
--vsn('Id$').
 
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
+
 -type crdt() :: term().
 
 -callback new() -> crdt().
+
+-callback update(crdt(), crdt:update_fun()) -> crdt().
+-callback query(crdt(), crdt:update_fun()) -> crdt().
+-callback merge(crdt(), crdt()) -> crdt().
+
+-callback eq(crdt(), crdt()) -> boolean().
+-callback lt(crdt(), crdt()) -> boolean().
+-callback lteq(crdt(), crdt()) -> boolean().
+
+-else.
+
+-export([behaviour_info/1]).
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
+behaviour_info(callbacks) ->
+    [
+        {new, 0},
+        {update, 2}, {query, 2}, {merge, 2},
+        {eq, 2}, {lt, 2}, {lteq, 2}
+    ];
+behaviour_info(_Other) ->
+    undefined.
 
 -endif.
 
