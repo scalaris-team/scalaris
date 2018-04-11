@@ -37,7 +37,7 @@
 
 
 -spec new() -> crdt().
-new() -> [0 || _ <- lists:seq(1, ?R)].
+new() -> [0 || _ <- lists:seq(1, ?R)].
 
 -spec merge(crdt(), crdt()) -> crdt().
 merge(CRDT1, CRDT2) -> lists:zipwith(fun(A, B) -> max(A,  B) end, CRDT1, CRDT2).
