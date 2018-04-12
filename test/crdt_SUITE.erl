@@ -33,14 +33,15 @@ all()   -> [
             {group, pncounter_group}
            ].
 
-groups() ->
-    [
+groups() -> [
         {gcounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
           crdt_gcounter_inc,
           crdt_gcounter_read_your_write,
           crdt_gcounter_read_monotonic,
-          crdt_gcounter_concurrent_read_monotonic
+          crdt_gcounter_read_monotonic2,
+          crdt_gcounter_concurrent_read_monotonic,
+          crdt_gcounter_ordered_concurrent_read
          ]},
         {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
@@ -192,6 +193,58 @@ crdt_gcounter_read_monotonic(_Config) ->
 
     ok.
 
+crdt_gcounter_read_monotonic2(_Config) ->
+    %% starts random number of (strong and eventual) writers
+    %% start multiple reader, which submit reads sequentially
+    %% values read should increase monotonic
+    Key = randoms:getRandomString(),
+    UnitTestPid = self(),
+
+    ReaderCount = randoms:rand_uniform(2, 50),
+    ct:pal("Start ~p readers", [ReaderCount]),
+    Reader = [spawn(fun() ->
+                        Loop =
+                            fun(F) ->
+                                receive
+                                    {read, Pids, Prev} ->
+                                        {ok, Result} = gcounter_on_cseq:read_state(Key),
+                                        case gcounter:lteq(Prev, Result) of
+                                            true -> ok;
+                                            false ->
+                                                ct:pal("~n~w ~nis not smaller or equals than ~n~w", [Prev, Result]),
+                                                UnitTestPid ! {compare_failed, Prev, Result}
+                                        end,
+                                        NextReader = lists:nth(randoms:rand_uniform(1, length(Pids)+1), Pids),
+                                        NextReader ! {read, Pids, Result}
+                                end,
+                                F(F)
+                            end,
+                        Loop(Loop)
+                    end)
+              || _ <- lists:seq(1, ReaderCount)],
+    {ok, Init} = gcounter_on_cseq:read_state(Key),
+    hd(Reader) ! {read, Reader, Init},
+
+    %% do all the writes
+    Parallel = randoms:rand_uniform(1, 50),
+    Count = 10000 div Parallel,
+    WriteFun = fun
+                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
+                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+               end,
+    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    wait_writers_completion(Parallel),
+
+    %% kill reader
+    [exit(R, kill) || R <- Reader],
+    receive {compare_failed, A, B} ->
+        ?ct_fail("~n~w ~nis not smaller or equals than ~n~w", [A, B])
+    after 100 ->
+        ok
+    end,
+    ok.
+
+
 
 crdt_gcounter_concurrent_read_monotonic(_Config) ->
     %% starts random number of (strong and eventual) writers
@@ -202,6 +255,7 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
 
     %% read for infinity
     ReaderCount = randoms:rand_uniform(2, 10),
+    ct:pal("Start ~p readers", [ReaderCount]),
     ReadFun = fun() -> {ok, Val} = gcounter_on_cseq:read_state(Key), Val end,
     CmpFun = fun gcounter:lteq/2,
     Readers = [spawn_monotonic_reader(UnitTestPid, ReadFun, CmpFun) || _ <- lists:seq(1, ReaderCount)],
@@ -221,6 +275,66 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
     check_monotonic_reader_failure(),
 
     ok.
+
+crdt_gcounter_ordered_concurrent_read(_Config) ->
+    %% Starts random number of writer and two readers
+    %% For two concurrent reads returning r1 and r2, it must alsways hold that
+    %% r1 <= r2 or r2 <= r1. (of course, the same must hold for non-concurrent reads)
+    Key = randoms:getRandomString(),
+    UnitTestPid = self(),
+
+    %% start two readers which will report their read results back to main process
+    ReaderCount = 2,
+    ct:pal("Start ~p readers", [ReaderCount]),
+    ReaderPids =
+        [spawn(
+           fun() ->
+                   Loop = fun(F) ->
+                            {ok, Result} = gcounter_on_cseq:read_state(Key),
+                            UnitTestPid ! {testreturn, Id, Result},
+                            F(F)
+                          end,
+                   Loop(Loop)
+           end)
+        || Id <- lists:seq(1, ReaderCount)],
+
+    %% Start writers
+    WriterCount = randoms:rand_uniform(1, 20),
+    Count = 5000 div WriterCount,
+    WriteFun = fun
+                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
+                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+               end,
+    spawn_writers(UnitTestPid, WriterCount, Count, WriteFun),
+    wait_writers_completion(WriterCount),
+
+    %% kill readers and verify result
+    [exit(R, kill) || R <- ReaderPids],
+    ReadResults = [
+                    begin
+                        Loop = fun(F, Collected) ->
+                                    receive {testreturn, Id, Result} ->
+                                        F(F, [Result | Collected])
+                                    after 0 ->
+                                        Collected
+                                    end
+                               end,
+                        lists:reverse(Loop(Loop, []))
+                    end
+                  || Id <- lists:seq(1, ReaderCount)],
+    %% check each pair of returns... it should be enough to only check a subset
+    %% of pairs but this is good enough for now
+    [
+        begin
+            {L1, L2} = {lists:nth(L1Idx, ReadResults), lists:nth(L2Idx, ReadResults)},
+            [
+             ?equals(gcounter:lteq(E1, E2) orelse gcounter:lteq(E2, E1), true)
+            || E1 <- L1, E2 <- L2]
+        end
+    || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
+
+    ok.
+
 
 tester_type_check_crdt(_Config) ->
     Count = 10,
