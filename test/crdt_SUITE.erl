@@ -15,10 +15,8 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Unit tests for crdt-paxos.
 %% @end
-%% @version $Id$
 -module(crdt_SUITE).
 -author('skrzypczak.de').
--vsn('$Id$').
 
 -compile(export_all).
 
@@ -60,7 +58,7 @@ end_per_suite(_Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Size = randoms:rand_uniform(1, 10),
+    Size = randoms:rand_uniform(1, 25),
     R = randoms:rand_uniform(3, 16),
     unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}, {replication_factor, R}]}]),
 
@@ -183,7 +181,7 @@ crdt_gcounter_read_monotonic(_Config) ->
     Count = 10000 div Parallel,
     WriteFun = fun
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc(Key)
+                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
                end,
     spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
