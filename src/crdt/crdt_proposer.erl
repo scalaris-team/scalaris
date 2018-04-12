@@ -163,12 +163,14 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                                                 Type,
                                                 entry_fun(NewEntry),
                                                 Type:new()),
-                        NextStepEntry = entry_set_replies(TEntry, Replies#r_replies{reply_count=0}),
+                        %% keep the merged value we have collected in this phase, which will
+                        %% be the value returned if phase 2 succeeds
+                        NextStepEntry = entry_set_replies(TEntry, NewReplies#r_replies{reply_count=0}),
                         save_entry(NextStepEntry, tablename(State)),
 
                         This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
                         Msg = {crdt_acceptor, vote, '_', This, NewReqId, key,
-                               entry_datatype(NewEntry), UsedReadRound, Replies#r_replies.value},
+                               entry_datatype(NewEntry), UsedReadRound, NewReplies#r_replies.value},
                         send_to_all_replicas(entry_key(NewEntry), Msg),
                         State
                 end
