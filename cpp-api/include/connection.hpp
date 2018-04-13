@@ -32,7 +32,7 @@ namespace scalaris {
   protected:
     bool closed = false;
     std::string hostname;
-    std::string link;
+    std::string link; // the path/link of the URL for JSON-RPC
     unsigned port;
 
   protected:
@@ -63,8 +63,14 @@ namespace scalaris {
       return exec_call(methodname, params);
     }
 
+    std::string getHostname() { return hostname; }
+    std::string getLink() { return link; }
+    unsigned getPort() { return port; }
+
     virtual bool needsConnect() const = 0;
     virtual void connect() = 0;
+
+    virtual std::string toString() const = 0;
 
   protected:
     virtual Json::Value exec_call(const std::string& methodname,

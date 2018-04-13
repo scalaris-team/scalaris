@@ -41,7 +41,7 @@ namespace scalaris {
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
-     * @param _link the URL for JSON-RPC
+     * @param _location the path location for JSON-RPC
      * @param port the TCP port of the Scalaris instance
      */
     SSLConnection(std::string _hostname,
@@ -69,6 +69,13 @@ namespace scalaris {
     void set_private_key(const std::string& file);
     void set_rsa_private_key(const std::string& file);
     void set_password(const std::string& file);
+
+    std::string toString() const override {
+      std::stringstream s;
+      s << "https://" << hostname << ":" << port << "/" << link;
+      return s.str();
+    };
+
   private:
     virtual Json::Value exec_call(const std::string& methodname,
                                   Json::Value params, bool reconnect = true) override;

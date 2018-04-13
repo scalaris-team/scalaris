@@ -41,7 +41,7 @@ namespace scalaris {
     /**
      * creates a connection instance
      * @param _hostname the host name of the Scalaris instance
-     * @param _link the URL for JSON-RPC
+     * @param _link the pathURL for JSON-RPC
      * @param _port the TCP port of the Scalaris instance
      */
     TCPConnection(const std::string& _hostname,
@@ -64,6 +64,12 @@ namespace scalaris {
     /// connects to the specified server
     /// it can also be used, if the connection failed
     void connect() override;
+
+    std::string toString() const override {
+      std::stringstream s;
+      s << "http://" << hostname << ":" << port << "/" << link;
+      return s.str();
+    };
 
   private:
     virtual Json::Value exec_call(const std::string& methodname,

@@ -44,7 +44,6 @@ namespace scalaris {
     boost::asio::connect(socket, endpoint_iterator, ec);
     hasToConnect = false;
     if (ec) {
-      std::cout << ec.message() << std::endl;
       hasToConnect = true;
       throw ConnectionError(ec.message());
     }
@@ -101,7 +100,6 @@ namespace scalaris {
     boost::system::error_code ec;
     boost::asio::write(socket, request, ec);
     if (ec) {
-      std::cout << ec.message() << std::endl;
       hasToConnect = true;
       throw ConnectionError(ec.message());
     }
