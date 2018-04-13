@@ -33,8 +33,6 @@
 -export([entry_val/2]).
 -export([entry_set_val/2]).
 
--export([tester_create_update_fun/1]).
-
 %% let fetch the number of DB entries
 -export([get_load/1]).
 
@@ -105,8 +103,12 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, Ta
     ?TRACE("crdt_acceptor:update: ~p ~p ", [Key, Proposer]),
     Entry = get_entry(Key, TableName),
 
+    Keys = lists:sort(replication:get_keys(Key)),
+    Tmp = lists:dropwhile(fun(E) -> E =/= Key end, Keys),
+    ThisReplicaId = length(Keys) - length(Tmp) + 1,
+
     CVal = entry_val(Entry, DataType),
-    NewCVal = DataType:update(CVal, UpdateFun),
+    NewCVal = DataType:update(UpdateFun, ThisReplicaId, CVal),
     ?ASSERT(DataType:lteq(CVal, NewCVal)),
 
     NewEntry = entry_set_val(Entry, NewCVal),
@@ -135,7 +137,7 @@ on({crdt_acceptor, query, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, Tabl
     Entry = get_entry(Key, TableName),
 
     CVal = entry_val(Entry, DataType),
-    QueryResult = QueryFun(CVal),
+    QueryResult = DataType:query(QueryFun, CVal),
 
     msg_query_reply(Proposer, ReqId, QueryResult),
     TableName;
@@ -275,7 +277,4 @@ entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() -> true.
-
--spec tester_create_update_fun(0) -> crdt:update_fun().
-tester_create_update_fun(0) -> fun crdt:update_noop/1.
 

@@ -16,10 +16,8 @@
 %% @doc    API to increment a replicated counter using a
 %%         state-based G-Counter CRDT .
 %% @end
-%% @version $Id$
 -module(gcounter_on_cseq).
 -author('skrzypczak@zib.de').
--vsn('$Id:$ ').
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -67,15 +65,13 @@ read_helper(Key, APIFun, QueryFun) ->
 %% Increments counter with strong consistency semantics
 -spec inc(client_key()) -> ok.
 inc(Key) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = gcounter:update_add_fun(ReplicaId, 1),
+    UpdateFun = fun(ReplicaId, CRDT) -> gcounter:update_add(ReplicaId, 1, CRDT) end,
     write_helper(Key, fun crdt_proposer:write/5, UpdateFun).
 
 %% Increments counter with evenutally strong consistency semantics
 -spec inc_eventual(client_key()) -> ok.
 inc_eventual(Key) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = gcounter:update_add_fun(ReplicaId, 1),
+    UpdateFun = fun(ReplicaId, CRDT) -> gcounter:update_add(ReplicaId, 1, CRDT) end,
     write_helper(Key, fun crdt_proposer:write_eventual/5, UpdateFun).
 
 -spec write_helper(client_key(), fun((_,_,_,_,_) -> ok), crdt:update_fun()) -> ok.
@@ -96,3 +92,4 @@ write_helper(Key, APIFun, UpdateFun) ->
                             end)
         end
     end.
+

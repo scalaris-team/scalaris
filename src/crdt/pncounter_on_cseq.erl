@@ -16,10 +16,8 @@
 %% @doc    API to increase/decrease a replicated counter using a
 %%         state-based PN-Counter CRDT .
 %% @end
-%% @version $Id$
 -module(pncounter_on_cseq).
 -author('skrzypczak@zib.de').
--vsn('$Id:$ ').
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -69,29 +67,25 @@ read_helper(Key, APIFun, QueryFun) ->
 %% Increase counter with strong consistency semantics
 -spec add(client_key(), non_neg_integer()) -> ok.
 add(Key, ToAdd) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = pncounter:update_add_fun(ReplicaId, ToAdd),
+    UpdateFun = fun(ReplicaId, CRDT) -> pncounter:update_add(ReplicaId, ToAdd, CRDT) end,
     write_helper(Key, fun crdt_proposer:write/5, UpdateFun).
 
 %% Increase counter with evenutally strong consistency semantics
 -spec add_eventual(client_key(), non_neg_integer()) -> ok.
 add_eventual(Key, ToAdd) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = pncounter:update_add_fun(ReplicaId, ToAdd),
+    UpdateFun = fun(ReplicaId, CRDT) -> pncounter:update_add(ReplicaId, ToAdd, CRDT) end,
     write_helper(Key, fun crdt_proposer:write_eventual/5, UpdateFun).
 
 %% Decrease counter with strong consistency semantics
 -spec subtract(client_key(), non_neg_integer()) -> ok.
 subtract(Key, ToSubtract) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = pncounter:update_subtract_fun(ReplicaId, ToSubtract),
+    UpdateFun = fun(ReplicaId, CRDT) -> pncounter:update_subtract(ReplicaId, ToSubtract, CRDT) end,
     write_helper(Key, fun crdt_proposer:write/5, UpdateFun).
 
 %% Decrease counter with evenutally strong consistency semantics
 -spec subtract_eventual(client_key(), non_neg_integer()) -> ok.
 subtract_eventual(Key, ToSubtract) ->
-    {ReplicaId, _} = crdt_proposer:send_to_which_replica(?RT:hash_key(Key)),
-    UpdateFun = pncounter:update_add_fun(ReplicaId, ToSubtract),
+    UpdateFun = fun(ReplicaId, CRDT) -> pncounter:update_subtract(ReplicaId, ToSubtract, CRDT) end,
     write_helper(Key, fun crdt_proposer:write_eventual/5, UpdateFun).
 
 -spec write_helper(client_key(), fun((_,_,_,_,_) -> ok), crdt:update_fun()) -> ok.

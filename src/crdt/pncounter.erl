@@ -15,18 +15,15 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc Implementation of a PN-Counter (Positive-Negative Counter) state-based CRDT.
 %% @end
-%% @version $Id$
-
 -module(pncounter).
 -author('skrzypczak@zib.de').
--vsn('Id$').
 
 -include("scalaris.hrl").
 -define(R, config:read(replication_factor)).
 
--export([update_add_fun/2]).
--export([update_subtract_fun/2]).
--export([query_counter/1, query_counter_fun/0]).
+-export([update_add/3]).
+-export([update_subtract/3]).
+-export([query_counter/1]).
 
 -behaviour(crdt_beh).
 
@@ -51,21 +48,15 @@ lt({P1, N1}, {P2, N2}) ->
 
 %%%%%%%%%%%%%%% Available update and query functions
 
--spec update_add_fun(non_neg_integer(), non_neg_integer()) -> crdt:update_fun().
-update_add_fun(ReplicaNr, ToAdd) ->
-    fun(_CRDT={P, N}) ->
-        {gcounter:update_nth(P, ReplicaNr, ToAdd), N}
-    end.
+-spec update_add(non_neg_integer(), non_neg_integer(), crdt()) -> crdt().
+update_add(ReplicaId, ToAdd, _CRDT={P, N}) ->
+        {gcounter:update_nth(P, ReplicaId, ToAdd), N}.
 
--spec update_subtract_fun(non_neg_integer(), non_neg_integer()) -> crdt:update_fun().
-update_subtract_fun(ReplicaNr, ToSubtract) ->
-    fun(_CRDT={P, N}) ->
-        {P, gcounter:update_nth(N, ReplicaNr, ToSubtract)}
-    end.
+-spec update_subtract(non_neg_integer(), non_neg_integer(), crdt()) -> crdt().
+update_subtract(ReplicaId, ToSubtract, _CRDT={P, N}) ->
+        {P, gcounter:update_nth(N, ReplicaId, ToSubtract)}.
 
 -spec query_counter(crdt()) -> non_neg_integer().
 query_counter(_CRDT={P, N}) -> gcounter:query_counter(P) - gcounter:query_counter(N).
 
--spec query_counter_fun() -> crdt:query_fun().
-query_counter_fun() -> fun ?MODULE:query_counter/1.
 

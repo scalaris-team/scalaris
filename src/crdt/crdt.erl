@@ -15,22 +15,25 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc Some common type defs and functions for CRDTs.
 %% @end
-%% @version $Id$
 -module(crdt).
+-author('skrzypczak@zib.de').
 
 -export_type([crdt/0, update_fun/0, query_fun/0]).
 
--export([update_noop/1, query_noop/1]).
+-export([update_noop/1, update_noop/2, query_noop/1]).
 
 % for tester
 -export([tester_create_update_fun/1, tester_create_query_fun/1]).
 
 -type crdt()        :: term().
--type update_fun()  :: fun((crdt()) -> crdt()).
+-type update_fun()  :: fun((crdt()) -> crdt()) | fun((non_neg_integer(), crdt()) -> crdt()).
 -type query_fun()   :: fun((crdt()) -> term()).
 
 -spec update_noop(crdt()) -> crdt().
 update_noop(CRDT) -> CRDT.
+
+-spec update_noop(non_neg_integer(), crdt()) -> crdt().
+update_noop(_ReplicaId, CRDT) -> CRDT.
 
 -spec query_noop(crdt()) -> term().
 query_noop(CRDT) -> CRDT.

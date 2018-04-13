@@ -24,8 +24,8 @@
 -include("scalaris.hrl").
 -define(R, config:read(replication_factor)).
 
--export([update_add_fun/2]).
--export([query_counter/1, query_counter_fun/0]).
+-export([update_add/3]).
+-export([query_counter/1]).
 
 -export([update_nth/3]). %% internal for usage in pncounter
 
@@ -54,20 +54,16 @@ lt(CRDT1, CRDT2) ->
 
 %%%%%%%%%%%%%%% Available update and query functions
 
--spec update_add_fun(non_neg_integer(), non_neg_integer()) -> crdt:update_fun().
-update_add_fun(ReplicaNr, ToAdd) ->
-    fun(CRDT) ->
-        update_nth(CRDT, ReplicaNr, ToAdd)
-    end.
+-spec update_add(non_neg_integer(), non_neg_integer(), crdt()) -> crdt().
+update_add(ReplicaId, ToAdd, CRDT) -> update_nth(CRDT, ReplicaId, ToAdd).
 
 -spec query_counter(crdt()) -> non_neg_integer().
 query_counter(CRDT) -> lists:foldl(fun(E, Acc) -> E + Acc end, 0, CRDT).
 
--spec query_counter_fun() -> crdt:query_fun().
-query_counter_fun() -> fun ?MODULE:query_counter/1.
-
 %%%%%%%%%%%%%%% Internal
 -spec update_nth(crdt(), non_neg_integer(), non_neg_integer()) -> crdt().
+update_nth(CRDT, 0, _ToAdd) -> CRDT;
+update_nth(CRDT, Idx, _ToAdd) when length(CRDT) < Idx -> CRDT;
 update_nth(CRDT, Idx, ToAdd) -> update_nth(CRDT, Idx, ToAdd, 1).
 
 -spec update_nth(crdt(), non_neg_integer(), non_neg_integer(), non_neg_integer()) -> crdt().

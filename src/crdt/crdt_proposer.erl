@@ -29,8 +29,6 @@
 -export([write/5, write_eventual/5]).
 -export([read/5, read_eventual/5]).
 
--export([send_to_which_replica/1]).
-
 -export([start_link/3]).
 -export([init/1, on/2]).
 
@@ -138,7 +136,8 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                     cons_read ->
                         %% value is already established in a quorum, skip 2. phase
                         QueryFun = entry_fun(NewEntry),
-                        ReturnVal = QueryFun(NewReplies#r_replies.value),
+                        Type = entry_datatype(NewEntry),
+                        ReturnVal = Type:query(QueryFun, NewReplies#r_replies.value),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State)),
                         State;
@@ -189,7 +188,8 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
                     false -> save_entry(NewEntry, tablename(State));
                     true ->
                         QueryFun = entry_fun(NewEntry),
-                        ReturnVal = QueryFun(NewReplies#r_replies.value),
+                        DataType = entry_datatype(NewEntry),
+                        ReturnVal = DataType:query(QueryFun, NewReplies#r_replies.value),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State))
                 end
@@ -326,16 +326,19 @@ on({write, eventual, {update_reply, ReqId, _CVal}}, State) ->
 
 -spec send_to_local_replica(?RT:key(), comm:erl_local_pid(), tuple()) -> ok.
 send_to_local_replica(Key, Client, Message) ->
-    %% TODO: currently sends to a random replica, instead of local (what if
-    %% this node doesn't have a replica?)
+    %% TODO really ugly hack, only ensures that the same client gets the same
+    %% replica key every time, but does not care about locality
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
     Dest = pid_groups:find_a(routing_table),
 
-    {_Idx, K} = send_to_which_replica(Key, Client),
+    Hash = ?RT:hash_key(term_to_binary(Client)),
+    Keys = replication:get_keys(Key),
+    Idx = (Hash rem length(Keys)) + 1,
+    K = lists:nth(Idx, Keys),
+
     LookupEnvelope = dht_node_lookup:envelope(3, setelement(6, Message, K)),
     comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope}),
-
     ok.
 
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
@@ -402,8 +405,7 @@ add_read_reply(Replies, UsedReadRound, _WriteRound, Value, DataType) ->
     %% (retry_read) We received inconsistent value and inconsistent reads rounds:
     %% ->   Might happen for concurrent phase 1 read executions since we are doing
     %%      an incremental round negotiaton mechanism. We have to retry the first phase
-    %%      with an explicit round, otherwise an replica failure might result in an
-    %%      undecidable state... TODO: is this still necessary????
+    %%      with an explicit round, otherwise reads might return conflicting values
     Done = case replication:quorum_accepted(NewReplyCount) of
                false -> false;
                true ->
@@ -472,39 +474,3 @@ round_inc(Round) ->
 -spec round_inc(pr:pr(), any()) -> pr:pr().
 round_inc(Round, ID) ->
     pr:new(pr:get_r(Round)+1, ID).
-
--spec send_to_which_replica(?RT:key()) -> {non_neg_integer(), ?RT:key()}.
-send_to_which_replica(Key) ->
-    send_to_which_replica(Key, self()).
-
--spec send_to_which_replica(?RT:key(), comm:erl_local_pid()) -> {non_neg_integer(), ?RT:key()}.
-send_to_which_replica(Key, Client) ->
-    %% TODO really ugly hack, only ensures that the same process gets the same
-    %% replica key every time, but does not care about locality
-    Hash = ?RT:hash_key(term_to_binary(Client)),
-    Pids = lists:map(fun(E) ->
-                        abs(?RT:hash_key(term_to_binary(E)) - Hash)
-                     end, pid_groups:find_all(dht_node)),
-
-    Keys = replication:get_keys(Key),
-    Idx = (lists:min(Pids) rem length(Keys)) + 1,
-    {Idx, lists:nth(Idx, Keys)}.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

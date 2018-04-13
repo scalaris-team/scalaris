@@ -20,13 +20,17 @@
 
 -export_type([crdt/0]).
 
--export([new/0, update/2, query/2, merge/2, eq/2, lt/2, lteq/2]).
+-export([new/0, update/3, query/2, merge/2, eq/2, lt/2, lteq/2]).
 
--spec update(crdt(), crdt:update_fun()) -> crdt().
-update(CRDT, U) -> U(CRDT).
+-spec update(crdt:update_fun(), non_neg_integer(), crdt()) -> crdt().
+update(U, ReplicaId, CRDT) ->
+    case erlang:fun_info(U, arity) of
+        {arity, 1} -> U(CRDT);
+        {arity, 2} -> U(ReplicaId, CRDT)
+    end.
 
--spec query(crdt(), crdt:query_fun()) -> crdt().
-query(CRDT, Q) -> Q(CRDT).
+-spec query(crdt:query_fun(), crdt()) -> crdt().
+query(Q, CRDT) -> Q(CRDT).
 
 -spec lteq(crdt(), crdt())  -> boolean().
 lteq(CRDT1, CRDT2) -> lt(CRDT1, CRDT2) orelse eq(CRDT1, CRDT2).

@@ -372,7 +372,6 @@ tester_type_check_crdt(_Config) ->
             {start_request, 2},         % sends messages
             {inform_client, 3},         % cannot create valid envelopes
             {inform_client, 2},         % cannot create valid envelopes
-            {send_to_which_replica, 2},
             {get_entry, 2},             % needs valid ets:tid(),
             {save_entry, 2},            % needs valid ets:tid(),
             {delete_entry, 2}           % needs valid ets:tid(),
