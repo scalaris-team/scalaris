@@ -38,6 +38,17 @@ namespace scalaris {
     static Json::Value to_value(int arg) { return Json::Value(arg); }
   };
 
+  /// \brief converts unsigned integers to JSON integers
+  template<>
+  class Converter<unsigned int> {
+  public:
+    /**
+     * converts an integer to a JSON value
+     * @param arg the integer value
+     */
+    static Json::Value to_value(unsigned int arg) { return Json::Value(arg); }
+  };
+
   /// converts std::string to JSON strings
   template<>
   class Converter<std::string> {
