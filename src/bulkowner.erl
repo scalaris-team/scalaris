@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -349,6 +349,8 @@ handle_delivery({do_snapshot, _SnapNo, _Leader} = Msg, _MyRange, _Id, _Parents, 
     gen_component:post_op(Msg, State);
 handle_delivery(MrMsg , MyRange, _Id, _Parents, State) when mr =:= element(1, MrMsg) ->
     gen_component:post_op(erlang:append_element(MrMsg, MyRange), State);
+handle_delivery({deliver_ping, Pid, Msg}, _MyRange, _Id, _Parents, State) ->
+    gen_component:post_op({ping, Pid, {pong, _MyRange, _Id, Msg}}, State);
 handle_delivery(Msg, _MyRange, _Id, _Parents, State) ->
     log:log(warn, "[ ~p ] cannot deliver message ~p (don't know how to handle)",
             [pid_groups:pid_to_name(self()), Msg]),

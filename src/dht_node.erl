@@ -1,4 +1,4 @@
-%  @copyright 2007-2017 Zuse Institute Berlin
+%  @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -492,6 +492,10 @@ on({do_snapshot, SnapNumber, Leader}, State) ->
 
 on({local_snapshot_is_done}, State) ->
     snapshot:on_local_snapshot_is_done(State);
+
+on({ping, Pid, Msg}, State) ->
+    comm:send(Pid, Msg),
+    State;
 
 on({rejoin, Id, Options, {get_move_state_response, MoveState}}, State) ->
     % clean up RM, e.g. fd subscriptions:

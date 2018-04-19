@@ -14,10 +14,8 @@
 
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc JSON API for transactional, consistent access to replicated DHT items
-%% @version $Id$
 -module(api_json).
 -author('schintke@zib.de').
--vsn('$Id$').
 
 -export([handler/2]).
 
@@ -31,28 +29,31 @@
 -spec handler(atom(), list()) -> any().
 handler(nop, [_Value]) -> "ok";
 
-handler(range_read, [From, To])          -> api_json_dht_raw:range_read(From, To);
-handler(delete, [Key])                   -> api_json_rdht:delete(Key);
-handler(delete, [Key, Timeout])          -> api_json_rdht:delete(Key, Timeout);
-handler(req_list, [Param])               -> api_json_tx:req_list(Param);
-handler(req_list, [TLog, ReqList])       -> api_json_tx:req_list(TLog, ReqList);
-handler(read, [Key])                     -> api_json_tx:read(Key);
-handler(write, [Key, Value])             -> api_json_tx:write(Key, Value);
+handler(range_read, [From, To])              -> api_json_dht_raw:range_read(From, To);
+handler(delete, [Key])                       -> api_json_rdht:delete(Key);
+handler(delete, [Key, Timeout])              -> api_json_rdht:delete(Key, Timeout);
+handler(req_list, [Param])                   -> api_json_tx:req_list(Param);
+handler(req_list, [TLog, ReqList])           -> api_json_tx:req_list(TLog, ReqList);
+handler(read, [Key])                         -> api_json_tx:read(Key);
+handler(write, [Key, Value])                 -> api_json_tx:write(Key, Value);
 handler(add_del_on_list, [Key, ToAdd, ToRemove])
-                                         -> api_json_tx:add_del_on_list(Key, ToAdd, ToRemove);
-handler(add_on_nr, [Key, ToAdd])         -> api_json_tx:add_on_nr(Key, ToAdd);
-handler(test_and_set, [Key, OldV, NewV]) -> api_json_tx:test_and_set(Key, OldV, NewV);
-handler(req_list_commit_each, [Param])   -> api_json_tx:req_list_commit_each(Param);
+                                             -> api_json_tx:add_del_on_list(Key, ToAdd, ToRemove);
+handler(add_on_nr, [Key, ToAdd])             -> api_json_tx:add_on_nr(Key, ToAdd);
+handler(test_and_set, [Key, OldV, NewV])     -> api_json_tx:test_and_set(Key, OldV, NewV);
+handler(req_list_commit_each, [Param])       -> api_json_tx:req_list_commit_each(Param);
 
-handler(get_node_info, [])               -> api_json_monitor:get_node_info();
-handler(get_node_performance, [])        -> api_json_monitor:get_node_performance();
-handler(get_service_info, [])            -> api_json_monitor:get_service_info();
-handler(get_service_performance, [])     -> api_json_monitor:get_service_performance();
+handler(get_node_info, [])                   -> api_json_monitor:get_node_info();
+handler(get_node_performance, [])            -> api_json_monitor:get_node_performance();
+handler(get_service_info, [])                -> api_json_monitor:get_service_info();
+handler(get_service_performance, [])         -> api_json_monitor:get_service_performance();
 
-handler(get_replication_factor, [])      -> api_json_rt:get_replication_factor();
+handler(get_replication_factor, [])          -> api_json_rt:get_replication_factor();
 
-handler(rbr_read, [Key])                 -> api_json_rbr:read(Key);
-handler(rbr_write, [Key, Value])         -> api_json_rbr:write(Key, Value);
+handler(rbr_read, [Key])                     -> api_json_rbr:read(Key);
+handler(rbr_write, [Key, Value])             -> api_json_rbr:write(Key, Value);
+
+handler(get_ring_size, [TimeOut])            -> api_json_ring:get_ring_size(TimeOut);
+handler(wait_for_ring_size, [Size, TimeOut]) -> api_json_ring:wait_for_ring_size(Size, TimeOut);
 
 
 handler(AnyOp, AnyParams) ->
