@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--spec get_ring_size(TimeOut::integer()) -> integer() | failed.
+-spec get_ring_size(TimeOut::integer()) -> integer() | failed.
 get_ring_size(TimeOut) ->
     api_ring:get_ring_size(TimeOut).
 
