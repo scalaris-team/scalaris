@@ -88,6 +88,7 @@ msg_vote_deny(Client, ReqId, TriedWriteRound, RequiredReadRound) ->
 -spec init(atom() | tuple()) -> state().
 init(DBName) -> ?PDB:new(DBName).
 
+
 %% @doc Closes the given DB (it may be recoverable using open/1 depending on
 %%      the DB back-end).
 -spec close(state()) -> true.
@@ -143,31 +144,32 @@ on({crdt_acceptor, query, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, Tabl
     TableName;
 
 %% SC-read phase 1
-on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round}, TableName) ->
+on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round, CValToMerge}, TableName) ->
     ?TRACE("crdt:prepare: ~p in round ~p~n", [Key, ProposalRound]),
     Entry = get_entry(Key, TableName),
+    CVal = entry_val(Entry, DataType),
+    NewCVal = DataType:merge(CValToMerge, CVal),
+    NewEntry = entry_set_val(Entry, NewCVal),
 
     ProposalRound =
         case Round of
             {inc, Id} ->
-                OldRound =  entry_r_read(Entry),
+                OldRound =  entry_r_read(NewEntry),
                 pr:new(pr:get_r(OldRound) + 1, Id);
             _ ->
                 Round
         end,
 
-    _ = case pr:get_r(ProposalRound) > pr:get_r(entry_r_read(Entry)) of
+    _ = case pr:get_r(ProposalRound) > pr:get_r(entry_r_read(NewEntry)) of
          true ->
-            CurrentWriteRound = entry_r_write(Entry),
-            CurrentCVal = entry_val(Entry, DataType),
-
-            NewEntry = entry_set_r_read(Entry, ProposalRound),
-            _ = set_entry(NewEntry, TableName),
-
+            CurrentWriteRound = entry_r_write(NewEntry),
+            NewEntry2 = entry_set_r_read(Entry, ProposalRound),
+            _ = set_entry(NewEntry2, TableName),
             msg_prepare_reply(Proposer, ReqId, ProposalRound, CurrentWriteRound,
-                              CurrentCVal);
+                              NewCVal);
          _ ->
-            msg_prepare_deny(Proposer, ReqId, ProposalRound, entry_r_read(Entry))
+            _ = set_entry(NewEntry, TableName),
+            msg_prepare_deny(Proposer, ReqId, ProposalRound, entry_r_read(NewEntry))
     end,
     TableName;
 
@@ -176,18 +178,16 @@ on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, C
     ?TRACE("prbr:vote for key: ~p in round ~p~n", [Key, ProposalRound]),
     Entry = get_entry(Key, TableName),
     CurrentReadRound = entry_r_read(Entry),
+    CVal = entry_val(Entry, DataType),
+    NewCVal = DataType:merge(CVal, CValToMerge),
+    ?ASSERT(DataType:lteq(CVal, NewCVal)),
+    NewEntry = entry_set_val(Entry, NewCVal),
 
     _ = case ProposalRound =:= CurrentReadRound orelse
-              pr:get_r(ProposalRound) > pr:get_r(CurrentReadRound) of
+             pr:get_r(ProposalRound) > pr:get_r(CurrentReadRound) of
             true ->
-                CVal = entry_val(Entry, DataType),
-                %% can you always merge even if round is too low?
-                NewCVal = DataType:merge(CVal, CValToMerge),
-                ?ASSERT(DataType:lteq(CVal, NewCVal)),
-
-                NewEntry = entry_set_r_read(Entry, ProposalRound),
-                NewEntry2 = entry_set_r_write(NewEntry, ProposalRound),
-                NewEntry3 = entry_set_val(NewEntry2, NewCVal),
+                NewEntry2 = entry_set_r_read(NewEntry, ProposalRound),
+                NewEntry3 = entry_set_r_write(NewEntry2, ProposalRound),
                 _ = set_entry(NewEntry3, TableName),
                 msg_vote_reply(Proposer, ReqId);
             false ->

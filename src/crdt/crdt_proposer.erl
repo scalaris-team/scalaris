@@ -112,7 +112,7 @@ on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound}}, 
             end,
 
     This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
-    Msg = {crdt_acceptor, prepare, '_', This, ReqId, key, DataType, Round},
+    Msg = {crdt_acceptor, prepare, '_', This, ReqId, key, DataType, Round, DataType:new()},
     send_to_all_replicas(Key, Msg),
 
     State;
@@ -196,13 +196,12 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
         end,
     State;
 
-on({read, strong, {read_deny, ReqId, _TriedRound, RequiredRound}}, State) ->
+on({read, strong, {read_deny, ReqId, _TriedRound, _RequiredRound}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests
                 ok;
             Entry ->
-                NextRound = round_inc(RequiredRound),
                 %set_last_used_round(NextRound, tablename(State)),
                 delete_entry(Entry, tablename(State)),
 
@@ -215,7 +214,7 @@ on({read, strong, {read_deny, ReqId, _TriedRound, RequiredRound}}, State) ->
                                         entry_key(Entry),
                                         entry_datatype(Entry),
                                         entry_fun(Entry),
-                                        NextRound}})
+                                        none}})
         end,
     State;
 
