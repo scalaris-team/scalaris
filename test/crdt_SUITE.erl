@@ -80,7 +80,7 @@ crdt_gcounter_inc(_Config) ->
     Parallel = randoms:rand_uniform(1, 50),
     Count = 10000 div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     {ok, Result} = gcounter_on_cseq:read(Key),
@@ -115,7 +115,7 @@ crdt_pncounter_banking(_Config) ->
                     ok = pncounter_on_cseq:subtract(From, TransactAmount),
                     ok = pncounter_on_cseq:add(To, TransactAmount)
                 end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     %% check if nothing is lost or gained
@@ -160,7 +160,7 @@ crdt_gcounter_read_your_write(_Config) ->
                     end,
                     ?equals(true, O < N)
                end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     ok.
@@ -184,7 +184,7 @@ crdt_gcounter_read_monotonic(_Config) ->
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
                end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     %% kill reader
@@ -212,10 +212,12 @@ crdt_gcounter_read_monotonic2(_Config) ->
                                             true -> ok;
                                             false ->
                                                 ct:pal("~n~w ~nis not smaller or equals than ~n~w", [Prev, Result]),
-                                                UnitTestPid ! {compare_failed, Prev, Result}
+                                                UnitTestPid ! {compare_failed, Prev, Result},
+                                                ok
                                         end,
                                         NextReader = lists:nth(randoms:rand_uniform(1, length(Pids)+1), Pids),
-                                        NextReader ! {read, Pids, Result}
+                                        NextReader ! {read, Pids, Result},
+                                        ok
                                 end,
                                 F(F)
                             end,
@@ -232,7 +234,7 @@ crdt_gcounter_read_monotonic2(_Config) ->
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
                end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     %% kill reader
@@ -267,7 +269,7 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
                end,
-    spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
     %% kill readers
@@ -305,7 +307,7 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
                end,
-    spawn_writers(UnitTestPid, WriterCount, Count, WriteFun),
+    _ = spawn_writers(UnitTestPid, WriterCount, Count, WriteFun),
     wait_writers_completion(WriterCount),
 
     %% kill readers and verify result
@@ -325,14 +327,13 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
     %% check each pair of returns... it should be enough to only check a subset
     %% of pairs but this is good enough for now
     ct:pal("Check if all ~p reads preformend can be ordered...", [length(lists:flatten(ReadResults))]),
-    [
-        begin
+    _ = [begin
             {L1, L2} = {lists:nth(L1Idx, ReadResults), lists:nth(L2Idx, ReadResults)},
             [
              ?equals(gcounter:lteq(E1, E2) orelse gcounter:lteq(E2, E1), true)
             || E1 <- L1, E2 <- L2]
-        end
-    || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
+         end
+        || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
 
     ok.
 
@@ -450,7 +451,8 @@ wait_writers_completion(NumberOfWriter) ->
     [receive {done} ->
         ct:pal("Finished ~p/~p.~n", [Nth, NumberOfWriter]),
         ok
-    end || Nth <- lists:seq(1, NumberOfWriter)].
+    end || Nth <- lists:seq(1, NumberOfWriter)],
+    ok.
 
 -spec spawn_monotonic_reader(pid(), fun(() -> crdt:crdt()), fun((term(), term()) -> boolean())) -> pid().
 spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun) ->
