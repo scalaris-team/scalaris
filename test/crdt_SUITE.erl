@@ -284,7 +284,7 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
     UnitTestPid = self(),
 
     %% start two readers which will report their read results back to main process
-    ReaderCount = 2,
+    ReaderCount = randoms:rand_uniform(2, 5),
     ct:pal("Start ~p readers", [ReaderCount]),
     ReaderPids =
         [spawn(
@@ -324,6 +324,7 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
                   || Id <- lists:seq(1, ReaderCount)],
     %% check each pair of returns... it should be enough to only check a subset
     %% of pairs but this is good enough for now
+    ct:pal("Check if all ~p reads preformend can be ordered...", [length(lists:flatten(ReadResults))]),
     [
         begin
             {L1, L2} = {lists:nth(L1Idx, ReadResults), lists:nth(L2Idx, ReadResults)},
