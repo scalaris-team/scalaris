@@ -14,7 +14,7 @@
 
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Paxos register for CRDT's. Implements the role of proposer
-%% @doc     @TODO:
+%%         @TODO:
 %%              gossiping?
 %% @end
 -module(crdt_proposer).
