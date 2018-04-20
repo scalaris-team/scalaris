@@ -137,7 +137,7 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         %% value is already established in a quorum, skip 2. phase
                         QueryFun = entry_fun(NewEntry),
                         Type = entry_datatype(NewEntry),
-                        ReturnVal = Type:query(QueryFun, NewReplies#r_replies.value),
+                        ReturnVal = Type:apply_query(QueryFun, NewReplies#r_replies.value),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State)),
                         State;
@@ -189,7 +189,7 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
                     true ->
                         QueryFun = entry_fun(NewEntry),
                         DataType = entry_datatype(NewEntry),
-                        ReturnVal = DataType:query(QueryFun, NewReplies#r_replies.value),
+                        ReturnVal = DataType:apply_query(QueryFun, NewReplies#r_replies.value),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State))
                 end
@@ -227,7 +227,7 @@ on({req_start, {read, eventual, Client, Key, DataType, QueryFun}}, State) ->
     save_entry(Entry, tablename(State)),
 
     This = comm:reply_as(comm:this(), 3, {read, eventual, '_'}),
-    Msg = {crdt_acceptor, query, '_', This, ReqId, key, DataType, QueryFun},
+    Msg = {crdt_acceptor, query_req, '_', This, ReqId, key, DataType, QueryFun},
     send_to_local_replica(Key, Client, Msg),
 
     State;

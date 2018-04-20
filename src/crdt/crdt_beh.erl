@@ -26,8 +26,8 @@
 
 -callback new() -> crdt().
 
--callback update(crdt:update_fun(), non_neg_integer(), crdt()) -> crdt().
--callback query(crdt:update_fun(), crdt()) -> crdt().
+-callback apply_update(crdt:update_fun(), non_neg_integer(), crdt()) -> crdt().
+-callback apply_query(crdt:update_fun(), crdt()) -> crdt().
 -callback merge(crdt(), crdt()) -> crdt().
 
 -callback eq(crdt(), crdt()) -> boolean().
@@ -41,7 +41,8 @@
 behaviour_info(callbacks) ->
     [
         {new, 0},
-        {update, 3}, {query, 2}, {merge, 2},
+        {apply_update, 3}, {apply_query, 2},
+        {merge, 2},
         {eq, 2}, {lt, 2}, {lteq, 2}
     ];
 behaviour_info(_Other) ->

@@ -109,7 +109,7 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, Ta
     ThisReplicaId = length(Keys) - length(Tmp) + 1,
 
     CVal = entry_val(Entry, DataType),
-    NewCVal = DataType:update(UpdateFun, ThisReplicaId, CVal),
+    NewCVal = DataType:apply_update(UpdateFun, ThisReplicaId, CVal),
     ?ASSERT(DataType:lteq(CVal, NewCVal)),
 
     NewEntry = entry_set_val(Entry, NewCVal),
@@ -133,12 +133,12 @@ on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, T
     TableName;
 
 %% eventual consistent read
-on({crdt_acceptor, query, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, TableName) ->
-    ?TRACE("crdt:query: ~p", [Key]),
+on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, TableName) ->
+    ?TRACE("crdt:query_req: ~p", [Key]),
     Entry = get_entry(Key, TableName),
 
     CVal = entry_val(Entry, DataType),
-    QueryResult = DataType:query(QueryFun, CVal),
+    QueryResult = DataType:apply_query(QueryFun, CVal),
 
     msg_query_reply(Proposer, ReqId, QueryResult),
     TableName;
