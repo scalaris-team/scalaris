@@ -368,7 +368,8 @@ add_write_reply(Replies) ->
     Done = replication:quorum_accepted(ReplyCount),
     {Done, NewReplies}.
 
--spec add_read_reply(#r_replies{}, pr:pr(), pr:pr(), crdt:crdt(), module()) -> {boolean(), #r_replies{}}.
+-spec add_read_reply(#r_replies{}, pr:pr(), pr:pr(), crdt:crdt(), module()) ->
+    {boolean() | cons_read | retry_read, #r_replies{}}.
 add_read_reply(Replies, UsedReadRound, _WriteRound, Value, DataType) ->
     NewReplyCount = Replies#r_replies.reply_count + 1,
     NewMaxRound = max(Replies#r_replies.highest_seen_round, UsedReadRound),
