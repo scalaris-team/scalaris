@@ -16,23 +16,25 @@ else
 endif
 
 SRC_CPP=$(filter-out src/cli.cpp, $(wildcard src/*.cpp))
+SRC_TEST_SSL=$(shell ls test/ssl-*.cpp)
+SRC_TEST_NOSSL=$(shell ls test/*.cpp | grep -v ssl)
 
 OBJS=$(SRC_CPP:.cpp=.o)
-OBJS_TEST=test/connection.o test/keep_alive.o test/routing_table.o test/transaction_single_op.o test/rbr.o
-OBJS_SSLTEST=test/ssl-connection.o test/ssl-routing_table.o test/ssl-transaction_single_op.o
+OBJS_TEST_SSL=$(SRC_TEST_SSL:.cpp=.o)
+OBJS_TEST_NOSSL=$(SRC_TEST_NOSSL:.cpp=.o)
 
 all: libscalaris.a scalaris tests ssl-tests
 
 cpp-test : tests
 	$(VC)./tests --report_level=detailed
 
-tests: $(OBJS_TEST) $(OBJS)
+tests: $(OBJS_TEST_NOSSL) $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating tests\033[39m"
-	$(VC)$(CXX) -o $@ $(OBJS_TEST) libscalaris.a $(LDFLAGS)
+	$(VC)$(CXX) -o $@ $(OBJS_TEST_NOSSL) libscalaris.a $(LDFLAGS)
 
-ssl-tests: $(OBJS_SSLTEST) $(OBJS)
+ssl-tests: $(OBJS_TEST_SSL) $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating ssl-tests\033[39m"
-	$(VC)$(CXX) -o $@ $(OBJS_SSLTEST) libscalaris.a $(LDFLAGS)
+	$(VC)$(CXX) -o $@ $(OBJS_TEST_SSL) libscalaris.a $(LDFLAGS)
 
 libscalaris.a: $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating archive" $@ "\033[39m"
@@ -52,7 +54,8 @@ clean:
 	@-rm -f ./tests ./ssl-tests ./scalaris
 
 -include $(OBJS:.o=.d)
--include $(OBJS_TEST:.o=.d)
+-include $(OBJS_TEST_NOSSL:.o=.d)
+-include $(OBJS_TEST_SSL:.o=.d)
 -include src/cli.d
 
 .PHONY: all cpp-test clean beautify tidy
