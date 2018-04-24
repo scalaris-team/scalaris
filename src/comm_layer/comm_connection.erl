@@ -70,12 +70,14 @@
 -type time_last_msg() :: erlang_timestamp().
 -type msg_or_tag() :: comm:message() | comm:msg_tag().
 
+-type socket() :: inet:socket() | ssl:sslsocket().
+
 -type state() ::
     {DestIP                  :: inet:ip_address(),
      DestPort                :: comm_server:tcp_port(),
      LocalListenPort         :: comm_server:tcp_port(),
      Channel                 :: comm:channel(),
-     Socket                  :: inet:socket() | notconnected,
+     Socket                  :: socket() | notconnected,
      StartTime               :: erlang_timestamp(),
      SentMsgCount            :: non_neg_integer(),
      ReceivedMsgCount        :: non_neg_integer(),
@@ -94,15 +96,15 @@
     }.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
-    {tcp, Socket::inet:socket(), Data::binary()} |
-    {tcp_closed, Socket::inet:socket()} |
+    {tcp, Socket::socket(), Data::binary()} |
+    {tcp_closed, Socket::socket()} |
     {report_stats} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% be startable via supervisor, use gen_component
 
 -spec start_link(pid_groups:groupname(), DestIP::inet:ip_address(),
-                 comm_server:tcp_port(), inet:socket() | notconnected,
+                 comm_server:tcp_port(), socket() | notconnected,
                  Channel::comm:channel(), Dir::'rcv' | 'send' | 'both') -> {ok, pid()}.
 start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Channel, Dir) ->
     {_, LocalListenPort} = comm_server:get_local_address_port(),
@@ -123,7 +125,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
 %% @doc initialize: return initial state.
 -spec init({DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
             LocalListenPort::comm_server:tcp_port(), Channel::comm:channel(),
-            Socket::inet:socket() | notconnected}) -> state().
+            Socket::socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
     msg_delay:send_trigger(10, {report_stats}),
     msg_delay:send_trigger(10, {check_idle}),
@@ -496,14 +498,14 @@ send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
                      comm_server:tcp_port(), Channel::comm:channel() | unknown)
-        -> inet:socket() | notconnected.
+        -> socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel) ->
     new_connection(Address, Port, MyPort, Channel, 0).
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
                      comm_server:tcp_port(), Channel::comm:channel() | unknown,
                      non_neg_integer())
-        -> inet:socket() | notconnected.
+        -> socket() | notconnected.
 new_connection(Address, Port, MyPort, Channel, Retries) ->
     StrictOpts =
         case config:read(ssl_mode) of
@@ -552,7 +554,7 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
             end
     end.
 
--spec reconnect(state()) -> inet:socket() | notconnected.
+-spec reconnect(state()) -> socket() | notconnected.
 reconnect(State) ->
     Address = dest_ip(State),
     Port = dest_port(State),
@@ -560,7 +562,7 @@ reconnect(State) ->
     Channel = channel(State),
     new_connection(Address, Port, MyPort, Channel, 0).
 
--spec close_connection(Socket::inet:socket(), State::state()) -> state().
+-spec close_connection(Socket::socket(), State::state()) -> state().
 close_connection(Socket, State) ->
     ?COMM:close(Socket),
     case socket(State) of
@@ -619,7 +621,7 @@ send_msg_bundle(State, MQueue, OQueue, QL) ->
 
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
                 LocalListenPort::comm_server:tcp_port(), Channel::comm:channel(),
-                Socket::inet:socket() | notconnected) -> state().
+                Socket::socket() | notconnected) -> state().
 state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
     {DestIP, DestPort, LocalListenPort, Channel, Socket,
      _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
@@ -645,10 +647,10 @@ local_listen_port(State)       -> element(3, State).
 -spec channel(state()) -> comm:channel().
 channel(State)                 -> element(4, State).
 
--spec socket(state()) -> inet:socket() | notconnected.
+-spec socket(state()) -> socket() | notconnected.
 socket(State)                  -> element(5, State).
 
--spec set_socket(state(), inet:socket() | notconnected) -> state().
+-spec set_socket(state(), socket() | notconnected) -> state().
 set_socket(State, Val)         -> setelement(5, State, Val).
 
 -spec started(state()) -> erlang_timestamp().
@@ -811,7 +813,7 @@ sockname(Socket) ->
             inet:sockname(Socket)
     end.
 
--spec peername(Socket::inet:socket()|ssl:sslsocket()) -> term().
+-spec peername(Socket::socket()) -> term().
 peername(Socket) ->
     case ?COMM of
         ssl ->
@@ -828,7 +830,7 @@ getstat(Socket, Options) ->
             inet:getstat(Socket, Options)
     end.
 
--spec setopts(Socket::inet:socket()|ssl:sslsocket(), list()) -> term().
+-spec setopts(Socket::socket(), list()) -> term().
 setopts(Socket, Options) ->
     case ?COMM of
         ssl ->
