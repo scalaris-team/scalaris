@@ -71,14 +71,8 @@ result_to_json(Result) ->
          {ok}                       -> [{status, "ok"}];
          {ok, Val}                  -> [{status, "ok"},
                                         value_to_json(Val)];
-         {fail, {key_changed, Val}} -> [{status, "fail"},
-                                        {reason, "key_changed"},
-                                        value_to_json(Val)];
          {fail, Reason}             -> [{status, "fail"},
-                                        {reason, atom_to_list(Reason)}];
-         {fail, abort, Keys}        -> [{status, "fail"},
-                                        {reason, "abort"},
-                                        {keys,   {array, Keys}}]
+                                        {reason, atom_to_list(Reason)}]
      end
     }.
 
