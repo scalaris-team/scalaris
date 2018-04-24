@@ -103,8 +103,7 @@ nearestCentroid(U, [X|Centroids]) ->
                              false -> Current
                          end
                 end
-        end, First, Centroids)
-    .
+        end, First, Centroids).
 
 %% @doc Find indices of closest centroids.
 -spec closestPoints(dc_centroids:centroids())
@@ -126,8 +125,7 @@ closestPoints([First, Second|_] = Centroids) ->
                             false -> Acc
                         end
                 end
-    end, {FirstDist, First, Second}, Centroids)
-.
+    end, {FirstDist, First, Second}, Centroids).
 
 -spec zeros_feeder(0..10000) -> {0..10000}.
 zeros_feeder(N) -> {N}.
