@@ -413,7 +413,7 @@ cancel(Trigger) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Get alarm by name.
 -spec get_alarm(Name :: atom(), Alarms :: alarms()) -> {ok, alarm()} |
-                                                       {false, unknown_alarm}.
+                                                       {error, unknown_alarm}.
 get_alarm(Name, Alarms) ->
     case Alarm = lists:keyfind(Name, 2, Alarms) of
         false  -> {error, unknown_alarm};
