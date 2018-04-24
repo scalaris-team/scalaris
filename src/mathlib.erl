@@ -108,7 +108,7 @@ nearestCentroid(U, [X|Centroids]) ->
 
 %% @doc Find indices of closest centroids.
 -spec closestPoints(dc_centroids:centroids())
-    -> {dc_centroids:centroid(), dc_centroids:centroid()} | none.
+    -> {float(), dc_centroids:centroid(), dc_centroids:centroid()} | none.
 closestPoints([]) -> none;
 closestPoints([_]) -> none;
 closestPoints([First, Second|_] = Centroids) ->
