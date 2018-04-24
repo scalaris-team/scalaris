@@ -55,7 +55,7 @@ start_link() ->
                 ],
     SconfList = case config:read(yaws_ssl) of
                     true ->
-                        application:ensure_all_started(ssl), %% >= R16B02
+                        _ = application:ensure_all_started(ssl), %% >= R16B02
                         SSL= {ssl, [
 %% https://jamielinux.com/docs/openssl-certificate-authority/
                                     {keyfile, config:read(yaws_keyfile)},
