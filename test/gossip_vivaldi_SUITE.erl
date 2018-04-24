@@ -100,7 +100,7 @@ test_select_reply_data(_Config) ->
     config:write(gossip_vivaldi_measurements_delay, 0),
 
     Data = {comm:this(), [0.0, 0.0], 0.77},
-    Ret = gossip_vivaldi:select_reply_data(Data, 0, 0, {[1.0, 1.0], 1.0}),
+    Ret = gossip_vivaldi:select_reply_data(Data, 1, 0, {[1.0, 1.0], 1.0}),
     ?equals(Ret, {ok, {[1.0, 1.0], 1.0}}),
 
     receive
