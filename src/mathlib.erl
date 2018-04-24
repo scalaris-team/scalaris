@@ -162,7 +162,9 @@ aggloClusteringHelper(Centroids, Radius, Min, I, J) when Min =< Radius ->
         none -> NewCentroids;
         {Min1, I1, J1} ->
             aggloClusteringHelper(NewCentroids, Radius, Min1, I1, J1)
-    end.
+    end;
+aggloClusteringHelper(Centroids, _Radius, _Min, _I, _J) ->
+    Centroids.
 
 % @doc Calculates the binomial coefficient of n over k for n >= k.
 %      see http://rosettacode.org/wiki/Evaluate_binomial_coefficients#Erlang
