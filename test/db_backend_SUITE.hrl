@@ -245,10 +245,10 @@ is_in({'[', L, R, ']'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso ((Key < R
 eq_lenient(L1, L2) -> eq_lenient(L1, [], L2).
 
 eq_lenient([], [], []) -> true;
-eq_lenient([H1|L1], [], [H2|L2]) when H1 ?EQ H2 -> 
+eq_lenient([H1|L1], [], [H2|L2]) when H1 ?EQ H2 ->
     eq_lenient(L1, [], L2);
-eq_lenient([H1|L1], Pref, [H2|L2]) when H1 ?EQ H2 -> 
+eq_lenient([H1|L1], Pref, [H2|L2]) when H1 ?EQ H2 ->
     eq_lenient(L1, [], lists:append(Pref, L2));
-eq_lenient([H1|L1], Pref, [H2|L2]) when element(1, H1) == element(1, H2) -> 
+eq_lenient([H1|L1], Pref, [H2|L2]) when element(1, H1) == element(1, H2) ->
     eq_lenient([H1|L1], [H2|Pref], L2);
 eq_lenient(_L1, _Pref, _L2) -> false.
