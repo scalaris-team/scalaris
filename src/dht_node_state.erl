@@ -371,7 +371,7 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 
 -spec get_mr_state(State::state(), mr_state:jobid()) ->
-    {value, mr_state:state()} | error.
+    {ok, mr_state:state()} | error.
 get_mr_state(#state{mr_state = MRStates}, JobId) ->
     orddict:find(JobId, MRStates).
 
