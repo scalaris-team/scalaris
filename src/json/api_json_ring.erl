@@ -27,7 +27,7 @@
 get_ring_size(TimeOut) ->
     api_ring:get_ring_size(TimeOut).
 
--spec wait_for_ring_size(Size::integer(), TimeOut::integer()) -> ok.
+-spec wait_for_ring_size(Size::integer(), TimeOut::integer()) -> [char(),...].
 wait_for_ring_size(Size, TimeOut) ->
     api_ring:wait_for_ring_size(Size, TimeOut),
     "ok".
