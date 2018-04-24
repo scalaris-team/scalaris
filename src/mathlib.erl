@@ -143,17 +143,16 @@ aggloClustering(Centroids, Radius) when Radius >= 0 ->
     case closestPoints(Centroids) of
         none -> Centroids;
         {Min, I, J} -> aggloClusteringHelper(Centroids, Radius, Min, I, J)
-    end
-    .
+    end.
 
 -spec aggloClusteringHelper
         (Centroids::[dc_centroids:centroid(),...], Radius::number(),
-         Min::number(), I::dc_centroids:centroid(), J::dc_centroids:centroid()) ->
+         Min::float(), I::dc_centroids:centroid(), J::dc_centroids:centroid()) ->
          dc_centroids:centroids().
 % Note: closestPoints/1 creates Min, I, J and only returns {-1, -1, -1} if
 % Centroids contains less than two elements. This is not the case in the first
 % pattern and we can thus assume these values are pos_integer().
-aggloClusteringHelper(Centroids, _Radius, 0, _, _) -> Centroids;
+aggloClusteringHelper(Centroids, _Radius, 0.0, _, _) -> Centroids;
 aggloClusteringHelper(Centroids, Radius, Min, I, J) when Min =< Radius ->
     {C1, S1} = dc_centroids:get_coordinate_and_relative_size(I),
     {C2, S2} = dc_centroids:get_coordinate_and_relative_size(J),
@@ -165,10 +164,7 @@ aggloClusteringHelper(Centroids, Radius, Min, I, J) when Min =< Radius ->
         none -> NewCentroids;
         {Min1, I1, J1} ->
             aggloClusteringHelper(NewCentroids, Radius, Min1, I1, J1)
-    end
-    ;
-aggloClusteringHelper(Centroids, _Radius, _Min, _I, _J) ->
-    Centroids.
+    end.
 
 % @doc Calculates the binomial coefficient of n over k for n >= k.
 %      see http://rosettacode.org/wiki/Evaluate_binomial_coefficients#Erlang
