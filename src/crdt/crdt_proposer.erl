@@ -387,7 +387,8 @@ add_read_reply(Replies, UsedReadRound, _WriteRound, Value, DataType) ->
             true ->
                 {Value, true andalso Replies#r_replies.cons_value};
             false ->
-                {DataType:merge(Replies#r_replies.value, Value), false}
+                {DataType:merge(Replies#r_replies.value, Value),
+                NewReplyCount =:= 1} % not inconsistent if this is our first reply
         end,
     NewReplies = Replies#r_replies{
                    reply_count=NewReplyCount,
