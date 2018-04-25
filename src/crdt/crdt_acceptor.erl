@@ -191,6 +191,7 @@ on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, C
                 _ = set_entry(NewEntry3, TableName),
                 msg_vote_reply(Proposer, ReqId);
             false ->
+                _ = set_entry(NewEntry, TableName),
                 msg_vote_deny(Proposer, ReqId, ProposalRound, CurrentReadRound)
         end,
     TableName;
