@@ -145,10 +145,9 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         %% we received inconsistent read rounds... thus we have
                         %% concurrency and must retry to get consistent rounds accepts
                         %% entry will be deleted in post_op call to on handler
-                        gen_component:post_op({read, strong, {read_deny,
-                                                             ReqId,
-                                                             UsedReadRound,
-                                                             round_inc(NewReplies#r_replies.highest_seen_round)}},
+                        gen_component:post_op({read, strong,
+                                               {read_deny, ReqId, fixed, UsedReadRound,
+                                                round_inc(NewReplies#r_replies.highest_seen_round)}},
                                              State);
                     true ->
                         delete_entry(NewEntry, tablename(State)),
@@ -196,7 +195,7 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
         end,
     State;
 
-on({read, strong, {read_deny, ReqId, _TriedRound, _RequiredRound}}, State) ->
+on({read, strong, {read_deny, ReqId, RetryMode, _TriedRound, RequiredRound}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests
@@ -204,6 +203,11 @@ on({read, strong, {read_deny, ReqId, _TriedRound, _RequiredRound}}, State) ->
             Entry ->
                 %set_last_used_round(NextRound, tablename(State)),
                 delete_entry(Entry, tablename(State)),
+
+                NextRound = case RetryMode of
+                                inc -> none;
+                                fixed -> round_inc(RequiredRound)
+                            end,
 
                 %% retry the read in a higher round...
                 %% TODO more intelligent retry mechanism?
@@ -214,7 +218,7 @@ on({read, strong, {read_deny, ReqId, _TriedRound, _RequiredRound}}, State) ->
                                         entry_key(Entry),
                                         entry_datatype(Entry),
                                         entry_fun(Entry),
-                                        none}})
+                                        NextRound}})
         end,
     State;
 
