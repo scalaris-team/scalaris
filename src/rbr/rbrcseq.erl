@@ -280,10 +280,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
-    _ = case code:is_loaded(?REDUNDANCY) of
-        false -> code:load_file(?REDUNDANCY);
-        _ -> ok
-    end,
+    _ = code:ensure_loaded(?REDUNDANCY),
     case erlang:function_exported(?REDUNDANCY, init, 0) of
         true ->
             ?REDUNDANCY:init();
