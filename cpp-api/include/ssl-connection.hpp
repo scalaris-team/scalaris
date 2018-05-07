@@ -30,7 +30,7 @@
 namespace scalaris {
 
   /// represents a SSL connection to Scalaris to execute JSON-RPC requests
-  class SSLConnection : public Connection {
+  class SSLConnection final : public Connection {
     boost::asio::io_service ioservice;
     boost::asio::ssl::context ctx;
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket;
@@ -58,7 +58,7 @@ namespace scalaris {
     void close();
 
     /// returns the server port of the TCP connection
-    virtual unsigned get_port();
+    unsigned getPort() const override;
 
     /// connects to the specified server
     /// it can also be used, if the connection failed

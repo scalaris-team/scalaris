@@ -29,7 +29,7 @@
 namespace scalaris {
 
   /// represents a TCP connection to Scalaris to execute JSON-RPC requests
-  class TCPConnection : public Connection {
+  class TCPConnection final : public Connection {
     boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
 
@@ -59,7 +59,7 @@ namespace scalaris {
     void close();
 
     /// returns the server port of the TCP connection
-    virtual unsigned getPort();
+    unsigned getPort() const override;
 
     /// connects to the specified server
     /// it can also be used, if the connection failed

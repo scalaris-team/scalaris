@@ -1,4 +1,4 @@
-#   Copyright 2007-2017 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2018 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -47,8 +47,8 @@ AC_ARG_ENABLE([cpp],
 enabled_cxx=0
 if test "x$ENABLE_CPP" != xno ; then
   # C++ and boost checks
-  AX_CXX_COMPILE_STDCXX_11([noext],[optional])
-  if test "x$HAVE_CXX11" = "x1" ; then
+  AX_CXX_COMPILE_STDCXX_14([noext],[optional])
+  if test "x$HAVE_CXX14" = "x1" ; then
     have_boost_147=
     AX_BOOST_BASE([1.47], [have_boost_147=yes], [have_boost_147=no])
     AX_BOOST_SYSTEM
@@ -69,6 +69,13 @@ if test "x$enabled_cxx" = "x0" ; then
   AC_MSG_NOTICE([c++ bindings disabled ('make cpp' will fail)])
 fi
 
+AX_CHECK_COMPILE_FLAG(-MJ foo)
+
+JSONFLAGS=""
+if test "x$ax_cv_check_cflags___MJ_foo" = "xyes"; then
+JSONFLAGS='-MJ $@.json'
+fi
+
 CXXSHELL=$SHELL
 if test -f /usr/local/bin/bash; then
   CXXSHELL=/usr/local/bin/bash
@@ -86,6 +93,7 @@ AC_SUBST(OPENSSL_LIBS)
 AC_SUBST(CXX)
 AC_SUBST(CXXFLAGS)
 AC_SUBST(CXXSHELL)
+AC_SUBST(JSONFLAGS)
 AC_SUBST(CLANGFORMAT)
 AC_SUBST(CLANGTIDY)
 

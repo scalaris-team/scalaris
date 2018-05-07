@@ -4,7 +4,7 @@ AR=ar
 ARFLAGS=rv
 RANLIB=echo
 CXX=@CXX@
-CXXFLAGS=@CXXFLAGS@ @BOOST_CPPFLAGS@ @OPENSSL_INCLUDES@ -Iinclude
+CXXFLAGS=@CXXFLAGS@ -Wall @BOOST_CPPFLAGS@ @OPENSSL_INCLUDES@ -Iinclude
 LDFLAGS=@LDFLAGS@ @BOOST_LDFLAGS@ @BOOST_SYSTEM_LIB@ @BOOST_REGEX_LIB@ @BOOST_ASIO_LIB@ @BOOST_UNIT_TEST_FRAMEWORK_LIB@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ -lpthread
 
 ifeq ($(VERBOSE),1)
@@ -42,7 +42,7 @@ libscalaris.a: $(OBJS)
 
 .cpp.o: Makefile
 	$(NVC)echo -e "\e[0;32mCompiling" $< "\033[39m"
-	$(VC)$(CXX) -MD $(CXXFLAGS)  -c $< -o $@
+	$(VC)$(CXX) -MD $(CXXFLAGS) @JSONFLAGS@ -c $< -o $@
 
 scalaris: libscalaris.a src/cli.o
 	$(NVC)echo -e "\e[0;31mCreating scalaris\033[39m"
@@ -52,6 +52,11 @@ clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
 	@-rm -rf $(shell find . -type f -name '*.d')
 	@-rm -f ./tests ./ssl-tests ./scalaris
+
+# note, double $ because of escaping in Makefiles
+compile_commands.json: $(SRC_CPP) $(SRC_TEST_CPP) Makefile
+	$(NVC)echo -e "\e[0;32mCreating Compilation Database" $< "\033[39m"
+	$(VC)sed -e '1s/^/[\n/' -e '$$ s/,$$/\n]/' $(SRC_CPP:.cpp=.o.json) $(SRC_TEST_CPP:.cpp=.o.json) > compile_commands.json
 
 -include $(OBJS:.o=.d)
 -include $(OBJS_TEST_NOSSL:.o=.d)

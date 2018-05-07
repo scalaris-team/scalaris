@@ -66,7 +66,7 @@ namespace scalaris {
     closed = true;
   };
 
-  unsigned TCPConnection::getPort() {
+  unsigned TCPConnection::getPort() const {
     char* EnvPort = getenv("SCALARIS_UNITTEST_YAWS_PORT");
     if (EnvPort == NULL)
       return port;

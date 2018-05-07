@@ -47,6 +47,9 @@ namespace scalaris {
                unsigned _port = 8000);
 
   public:
+
+    virtual ~Connection() = default;
+
     /**
      * performs a JSON-RPC request
      * @param methodname the name of the function to call
@@ -63,9 +66,9 @@ namespace scalaris {
       return exec_call(methodname, params);
     }
 
-    std::string getHostname() { return hostname; }
-    std::string getLink() { return link; }
-    unsigned getPort() { return port; }
+    std::string getHostname() const { return hostname; }
+    std::string getLink() const { return link; }
+    virtual unsigned getPort() const { return port; }
 
     virtual bool needsConnect() const = 0;
     virtual void connect() = 0;

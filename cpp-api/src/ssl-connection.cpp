@@ -44,7 +44,7 @@ namespace scalaris {
 
     // Determine the location of the server.
     tcp::resolver resolver(ioservice);
-    tcp::resolver::query query(hostname, std::to_string(get_port()));
+    tcp::resolver::query query(hostname, std::to_string(getPort()));
     tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
 
     // Try each endpoint until we successfully establish a connection.
@@ -103,7 +103,7 @@ namespace scalaris {
     closed = true;
   };
 
-  unsigned SSLConnection::get_port() {
+  unsigned SSLConnection::getPort() const {
     char* port = getenv("SCALARIS_UNITTEST_YAWS_PORT");
     if (port == NULL)
       return 8000;

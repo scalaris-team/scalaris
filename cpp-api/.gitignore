@@ -3,3 +3,4 @@ Makefile
 *.d
 *.o
 tests
+*.o.json
