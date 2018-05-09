@@ -99,3 +99,20 @@ echo "Please proceed with calling './configure'"
 rm Makefile.am NEWS READ COPYING README INSTALL
 mv Makefile.in.bak Makefile.in
 
+ACLOCAL=`which aclocal`
+ACLOCAL_BIN_DIRECTORY=`dirname $ACLOCAL`
+ACLOCAL_BASE_DIRECTORY=`dirname $ACLOCAL_BIN_DIRECTORY`
+ACLOCAL_SHARE_DIRECTORY="$ACLOCAL_BASE_DIRECTORY/share/aclocal"
+#echo $ACLOCAL_BIN_DIRECTORY
+#echo $ACLOCAL_BASE_DIRECTORY
+#echo $ACLOCAL_SHARE_DIRECTORY
+
+if [ -e "$ACLOCAL_SHARE_DIRECTORY/intlmacosx.m4" ]; then
+    #echo "found aclocal directory"
+    if [ ! -e "$ACLOCAL_SHARE_DIRECTORY/ax_boost_system.m4" ]; then
+        echo ""
+        echo "for the save creation of the configure file, it is helpful to have the autoconf-archive package installed"
+        echo "autoconf-archive seems to be missing on your system"
+        echo "$ACLOCAL_SHARE_DIRECTORY/ax_boost_system.m4 does not exist"
+    fi
+fi
