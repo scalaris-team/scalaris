@@ -113,6 +113,6 @@ if [ -e "$ACLOCAL_SHARE_DIRECTORY/intlmacosx.m4" ]; then
         echo ""
         echo "for the save creation of the configure file, it is helpful to have the autoconf-archive package installed"
         echo "autoconf-archive seems to be missing on your system"
-        echo "$ACLOCAL_SHARE_DIRECTORY/ax_boost_system.m4 does not exist"
+        echo "we checked for $ACLOCAL_SHARE_DIRECTORY/ax_boost_system.m4, but it does not exist"
     fi
 fi
