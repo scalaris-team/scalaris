@@ -21,6 +21,12 @@
 -author('skrzypczak.de').
 
 -define(PDB, pdb).
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+
+-define(READ_BATCHING, false).
+-define(READ_BATCHING_INTERVAL, 10).
+-define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
 
 -include("scalaris.hrl").
 
@@ -55,6 +61,11 @@
                   replies()     %% aggregates replies
                  }.
 
+-type batch_entry() :: {read_batch_entry,
+                        non_neg_integer(),
+                        dict:dict(?RT:key(), [{comm:erl_local_pid(), module(), crdt:query_fun()}])
+                       }.
+
 -type replies() :: #w_replies{} | #r_replies{}.
 
 -include("gen_component.hrl").
@@ -63,8 +74,14 @@
 -spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
                 -> {ok, pid()}.
 start_link(DHTNodeGroup, Name, DBSelector) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
-                             [{pid_groups_join_as, DHTNodeGroup, Name}]).
+    {ok, Pid} = gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
+                             [{pid_groups_join_as, DHTNodeGroup, Name}]),
+    case ?READ_BATCHING of
+        false -> ok;
+        true ->
+            comm:send_local_after(next_read_batching_interval(), Pid, {read_batch_trigger})
+    end,
+    {ok, Pid}.
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
@@ -75,7 +92,12 @@ init(DBSelector) ->
 
 -spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun()) -> ok.
 read(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none}}).
+    case ?READ_BATCHING of
+        true ->
+            start_request(CSeqPidName, {add_to_read_batch, Client, Key, DataType, QueryFun});
+        false ->
+            start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none}})
+    end.
 
 -spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun()) -> ok.
 read_eventual(CSeqPidName, Client, Key, DataType, QueryFun) ->
@@ -96,6 +118,51 @@ start_request(CSeqPidName, Msg) ->
 
 
 -spec on(comm:message(), state()) -> state().
+
+%%%%% batching loops
+on({add_to_read_batch, Client, Key, DataType, QueryFun}, State) ->
+    {Id, Count, Reqs} =
+    case get_entry(read_batch_entry, tablename(State)) of
+        undefined ->
+            {read_batch_entry, 0, dict:new()};
+        Batch -> Batch
+    end,
+    ?TRACE("Add to batch ~p",  [{Key, DataType, QueryFun, Count}]),
+    NewReqs = dict:append(Key, {Client, DataType, QueryFun}, Reqs),
+    _ = save_entry({Id, Count+1, NewReqs}, tablename(State)),
+    State;
+
+on({read_batch_trigger}, State) ->
+    {Id, Count, Reqs} =
+    case get_entry(read_batch_entry, tablename(State)) of
+        undefined ->
+            {read_batch_entry, 0, dict:new()};
+        Batch -> Batch
+    end,
+
+    case Count of
+        0 -> ok; % no reqs queued
+        Count ->
+            ?TRACE("Processing batch ... ~p", [{Id, Count, Reqs}]),
+            _ = dict:map(
+                fun(K, ReqsForThisKey=[{_, DataType, _}|_]) ->
+                    This = comm:reply_as(comm:this(), 3, {read_batch_reply, ReqsForThisKey, '_'}),
+                    comm:send_local(self(),
+                        {req_start, {read, strong, This, K, DataType, fun crdt:query_noop/1, none}})
+                end, Reqs),
+            _ = save_entry({Id, 0, dict:new()}, tablename(State))
+    end,
+
+    comm:send_local_after(next_read_batching_interval(), self(), {read_batch_trigger}),
+    State;
+
+on({read_batch_reply, Reqs, {read_done, CRDTState}}, State) ->
+    ?TRACE("Batch reply ... ~p", [{Reqs, CRDTState}]),
+    _ = [begin
+            ReturnVal = DataType:apply_query(QueryFun, CRDTState),
+            comm:send_local(Client, {read_done, ReturnVal})
+         end || {Client, DataType, QueryFun} <- Reqs],
+    State;
 
 %%%%% strong consistent read
 
@@ -363,7 +430,14 @@ inform_client(write_done, Entry) ->
 
 -spec inform_client(read_done, entry(), any()) -> ok.
 inform_client(read_done, Entry, QueryResult) ->
-    comm:send_local(entry_client(Entry), {read_done, QueryResult}).
+    Client = entry_client(Entry),
+    case is_tuple(Client) of
+        true ->
+            % must unpack envelope
+            comm:send(entry_client(Entry), {read_done, QueryResult});
+        false ->
+            comm:send_local(entry_client(Entry), {read_done, QueryResult})
+    end.
 
 -spec add_write_reply(#w_replies{}) -> {boolean(), #w_replies{}}.
 add_write_reply(Replies) ->
@@ -479,3 +553,8 @@ round_inc(Round) ->
 -spec round_inc(pr:pr(), any()) -> pr:pr().
 round_inc(Round, ID) ->
     pr:new(pr:get_r(Round)+1, ID).
+
+-spec next_read_batching_interval() -> non_neg_integer().
+next_read_batching_interval() ->
+    Div = randoms:rand_uniform(0, ?READ_BATCHING_INTERVAL_DIVERGENCE*2 + 1),
+    ?READ_BATCHING_INTERVAL - ?READ_BATCHING_INTERVAL_DIVERGENCE + Div.
