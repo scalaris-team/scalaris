@@ -392,26 +392,40 @@ on({write, eventual, {update_reply, ReqId, _CVal}}, State) ->
                 inform_client(write_done, Entry),
                 delete_entry(Entry, tablename(State))
         end,
+    State;
+
+on({local_range_req, Key, Client, Message, {get_state_response, LocalRange}}, State) ->
+    Keys = replication:get_keys(Key),
+
+    LocalKeys = lists:filter(fun(K) -> intervals:in(K, LocalRange) end, Keys),
+
+    K = case LocalKeys of
+        [] ->
+            ?TRACE("cannot send locally ~p ~p ", [Keys, LocalRange]),
+            %% the local dht node is not responsible for any replca... route to
+            %% random replica
+            Hash = ?RT:hash_key(term_to_binary(Client)),
+            Idx = (Hash rem length(Keys)) + 1,
+            lists:nth(Idx, Keys);
+        [H|_] ->
+            %% use replica managed by local dht node
+            H
+        end,
+
+    Dest = pid_groups:find_a(routing_table),
+    LookupEnvelope = dht_node_lookup:envelope(3, setelement(6, Message, K)),
+    comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope}),
     State.
 
 %%%%%% internal helper
 
 -spec send_to_local_replica(?RT:key(), comm:erl_local_pid(), tuple()) -> ok.
 send_to_local_replica(Key, Client, Message) ->
-    %% TODO really ugly hack, only ensures that the same client gets the same
-    %% replica key every time, but does not care about locality
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
-    Dest = pid_groups:find_a(routing_table),
-
-    Hash = ?RT:hash_key(term_to_binary(Client)),
-    Keys = replication:get_keys(Key),
-    Idx = (Hash rem length(Keys)) + 1,
-    K = lists:nth(Idx, Keys),
-
-    LookupEnvelope = dht_node_lookup:envelope(3, setelement(6, Message, K)),
-    comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope}),
-    ok.
+    LocalDhtNode = pid_groups:get_my(dht_node),
+    This = comm:reply_as(comm:this(), 5, {local_range_req, Key, Client, Message, '_'}),
+    comm:send_local(LocalDhtNode, {get_state, This, my_range}).
 
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
 send_to_all_replicas(Key, Message) ->
