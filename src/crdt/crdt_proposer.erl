@@ -531,7 +531,7 @@ entry_replies(Entry)              -> element(6, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
 entry_set_replies(Entry, Replies) -> setelement(6, Entry, Replies).
 
--spec get_entry(any(), ?PDB:tableid()) -> entry() | batch_entry() | undefined.
+-spec get_entry(any(), ?PDB:tableid()) -> entry() | batch_entry() | undefined.
 get_entry(ReqId, TableName) ->
     ?PDB:get(ReqId, TableName).
 
