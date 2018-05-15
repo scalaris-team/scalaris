@@ -24,7 +24,7 @@
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 
--define(READ_BATCHING, false).
+-define(READ_BATCHING, config:read(read_batching)).
 -define(READ_BATCHING_INTERVAL, 10).
 -define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
 
@@ -35,6 +35,7 @@
 -export([write/5, write_eventual/5]).
 -export([read/5, read_eventual/5]).
 
+-export([check_config/0]).
 -export([start_link/3]).
 -export([init/1, on/2]).
 
@@ -76,11 +77,11 @@
 start_link(DHTNodeGroup, Name, DBSelector) ->
     {ok, Pid} = gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
                              [{pid_groups_join_as, DHTNodeGroup, Name}]),
-    case ?READ_BATCHING of
-        false -> ok;
-        true ->
-            comm:send_local_after(next_read_batching_interval(), Pid, {read_batch_trigger})
-    end,
+    _ = case ?READ_BATCHING of
+            false -> ok;
+            true ->
+                comm:send_local_after(next_read_batching_interval(), Pid, {read_batch_trigger})
+        end,
     {ok, Pid}.
 
 -spec init(dht_node_state:db_selector()) -> state().
@@ -122,11 +123,11 @@ start_request(CSeqPidName, Msg) ->
 %%%%% batching loops
 on({add_to_read_batch, Client, Key, DataType, QueryFun}, State) ->
     {Id, Count, Reqs} =
-    case get_entry(read_batch_entry, tablename(State)) of
-        undefined ->
-            {read_batch_entry, 0, dict:new()};
-        Batch -> Batch
-    end,
+        case get_entry(read_batch_entry, tablename(State)) of
+            undefined ->
+                {read_batch_entry, 0, dict:new()};
+            Batch -> Batch
+        end,
     ?TRACE("Add to batch ~p",  [{Key, DataType, QueryFun, Count}]),
     NewReqs = dict:append(Key, {Client, DataType, QueryFun}, Reqs),
     _ = save_entry({Id, Count+1, NewReqs}, tablename(State)),
@@ -134,11 +135,11 @@ on({add_to_read_batch, Client, Key, DataType, QueryFun}, State) ->
 
 on({read_batch_trigger}, State) ->
     {Id, Count, Reqs} =
-    case get_entry(read_batch_entry, tablename(State)) of
-        undefined ->
-            {read_batch_entry, 0, dict:new()};
-        Batch -> Batch
-    end,
+        case get_entry(read_batch_entry, tablename(State)) of
+            undefined ->
+                {read_batch_entry, 0, dict:new()};
+            Batch -> Batch
+        end,
 
     case Count of
         0 -> ok; % no reqs queued
@@ -530,15 +531,15 @@ entry_replies(Entry)              -> element(6, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
 entry_set_replies(Entry, Replies) -> setelement(6, Entry, Replies).
 
--spec get_entry(any(), ?PDB:tableid()) -> entry() | undefined.
+-spec get_entry(any(), ?PDB:tableid()) -> entry() | batch_entry() | undefined.
 get_entry(ReqId, TableName) ->
     ?PDB:get(ReqId, TableName).
 
--spec save_entry(entry(), ?PDB:tableid()) -> ok.
+-spec save_entry(entry() | batch_entry(), ?PDB:tableid()) -> ok.
 save_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
--spec delete_entry(entry(), ?PDB:tableid()) -> ok.
+-spec delete_entry(entry() | batch_entry(), ?PDB:tableid()) -> ok.
 delete_entry(Entry, TableName) ->
     ReqId = entry_reqid(Entry),
     ?PDB:delete(ReqId, TableName).
@@ -558,3 +559,9 @@ round_inc(Round, ID) ->
 next_read_batching_interval() ->
     Div = randoms:rand_uniform(0, ?READ_BATCHING_INTERVAL_DIVERGENCE*2 + 1),
     ?READ_BATCHING_INTERVAL - ?READ_BATCHING_INTERVAL_DIVERGENCE + Div.
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_bool(read_batching).
+
