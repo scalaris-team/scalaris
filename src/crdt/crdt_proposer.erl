@@ -327,8 +327,7 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
     save_entry(Entry, tablename(State)),
 
     This = comm:reply_as(comm:this(), 3, {write, strong, '_'}),
-    Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType,
-           UpdateFun, _ModifyLocalState=false},
+    Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
     send_to_local_replica(Key, Client, Msg),
 
     State;

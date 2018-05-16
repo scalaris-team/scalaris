@@ -101,11 +101,6 @@ close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(tuple(), state()) -> state().
 on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, TableName) ->
-    on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun,
-        _ModifyLocalState=true}, TableName);
-
-on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun,
-        ModifyLocalState}, TableName) ->
     ?TRACE("crdt_acceptor:update: ~p ~p ", [Key, Proposer]),
     Entry = get_entry(Key, TableName),
 
@@ -117,13 +112,8 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun,
     NewCVal = DataType:apply_update(UpdateFun, ThisReplicaId, CVal),
     ?ASSERT(DataType:lteq(CVal, NewCVal)),
 
-    _ = case ModifyLocalState of
-            true ->
-                NewEntry = entry_set_val(Entry, NewCVal),
-                set_entry(NewEntry, TableName);
-            false -> ok
-        end,
-
+    NewEntry = entry_set_val(Entry, NewCVal),
+    _ = set_entry(NewEntry, TableName),
     msg_update_reply(Proposer, ReqId, NewCVal),
     TableName;
 
