@@ -115,6 +115,7 @@ write_eventual(CSeqPidName, Client, Key, DataType, UpdateFun) ->
 -spec start_request(pid_groups:pidname(), comm:message()) -> ok.
 start_request(CSeqPidName, Msg) ->
     Pid = pid_groups:find_a(CSeqPidName),
+    trace_mpath:log_info(self(), {start_request, request, Msg}),
     comm:send_local(Pid, Msg).
 
 
@@ -206,6 +207,9 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         QueryFun = entry_fun(NewEntry),
                         Type = entry_datatype(NewEntry),
                         ReturnVal = Type:apply_query(QueryFun, NewReplies#r_replies.value),
+                        trace_mpath:log_info(self(), {read_strong_cons_done,
+                                                      crdt_value, NewReplies#r_replies.value,
+                                                      return_value, ReturnVal}),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State)),
                         State;
@@ -234,6 +238,9 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         NextStepEntry = entry_set_replies(TEntry, NewReplies#r_replies{reply_count=0}),
                         save_entry(NextStepEntry, tablename(State)),
 
+                        trace_mpath:log_info(self(), {read_strong_phase2_start,
+                                                      round, UsedReadRound,
+                                                      value, NewReplies#r_replies.value}),
                         This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
                         Msg = {crdt_acceptor, vote, '_', This, NewReqId, key,
                                entry_datatype(NewEntry), UsedReadRound, NewReplies#r_replies.value},
@@ -257,13 +264,16 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
                         QueryFun = entry_fun(NewEntry),
                         DataType = entry_datatype(NewEntry),
                         ReturnVal = DataType:apply_query(QueryFun, NewReplies#r_replies.value),
+                        trace_mpath:log_info(self(), {read_strong_done,
+                                                      crdt_value, NewReplies#r_replies.value,
+                                                      return_value, ReturnVal}),
                         inform_client(read_done, Entry, ReturnVal),
                         delete_entry(Entry, tablename(State))
                 end
         end,
     State;
 
-on({read, strong, {read_deny, ReqId, RetryMode, _TriedRound, RequiredRound}}, State) ->
+on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests
@@ -277,6 +287,11 @@ on({read, strong, {read_deny, ReqId, RetryMode, _TriedRound, RequiredRound}}, St
                                 fixed -> round_inc(RequiredRound)
                             end,
 
+                trace_mpath:log_info(self(), {read_strong_deny,
+                                              retry_mode, RetryMode,
+                                              round_tried, TriedRound,
+                                              round_requed, RequiredRound
+                                             }),
                 %% retry the read in a higher round...
                 %% TODO more intelligent retry mechanism?
                 Delay = randoms:rand_uniform(0, 30),
@@ -311,6 +326,7 @@ on({read, eventual, {query_reply, ReqId, QueryResult}}, State) ->
                 %% have processed them)
                 ok;
             Entry ->
+                trace_mpath:log_info(self(), {read_eventual_done}),
                 % eventual consistent writes just write on a single replica
                 % and expect the update to eventual spread through gossiping
                 % or similiar behaviour
@@ -343,6 +359,8 @@ on({write, strong, {update_reply, ReqId, CVal}}, State) ->
             Entry ->
                 Msg = {crdt_acceptor, merge, '_', This, ReqId, key,
                        entry_datatype(Entry), CVal},
+                trace_mpath:log_info(self(), {write_strong_start,
+                                             value, CVal}),
                 send_to_all_replicas(entry_key(Entry), Msg)
         end,
     State;
@@ -359,6 +377,7 @@ on({write, strong, {merge_reply, ReqId, done}}, State) ->
                 case Done of
                     false -> save_entry(NewEntry, tablename(State));
                     true ->
+                        trace_mpath:log_info(self(), {write_strong_done}),
                         inform_client(write_done, Entry),
                         delete_entry(Entry, tablename(State))
                 end
@@ -385,6 +404,7 @@ on({write, eventual, {update_reply, ReqId, _CVal}}, State) ->
                 %% have processed them)
                 ok;
             Entry ->
+                trace_mpath:log_info(self(), {write_eventual_done}),
                 % eventual consistent writes just write on a single replica
                 % and expect the update to eventual spread through gossiping
                 % or similiar behaviour

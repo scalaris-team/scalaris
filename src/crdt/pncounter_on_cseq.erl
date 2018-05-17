@@ -50,6 +50,7 @@ read_eventual(Key) ->
     {ok, client_value()}.
 read_helper(Key, APIFun, QueryFun) ->
     APIFun(crdt_db, self(), ?RT:hash_key(Key), pncounter, QueryFun),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({read_done, CounterValue}, {ok, CounterValue})
     after 1000 ->

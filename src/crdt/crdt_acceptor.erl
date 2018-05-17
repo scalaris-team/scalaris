@@ -115,6 +115,11 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, Ta
     NewEntry = entry_set_val(Entry, NewCVal),
     _ = set_entry(NewEntry, TableName),
     msg_update_reply(Proposer, ReqId, NewCVal),
+
+    trace_mpath:log_info(self(), {acceptor_update,
+                                  key, Key,
+                                  old_value, CVal,
+                                  new_value, NewCVal}),
     TableName;
 
 on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, TableName) ->
@@ -129,6 +134,11 @@ on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, T
     _ = set_entry(NewEntry, TableName),
 
     msg_merge_reply(Proposer, ReqId),
+
+    trace_mpath:log_info(self(), {acceptor_merge,
+                                  key, Key,
+                                  old_value, CVal,
+                                  new_value, NewCVal}),
     TableName;
 
 %% eventual consistent read
@@ -140,6 +150,10 @@ on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, 
     QueryResult = DataType:apply_query(QueryFun, CVal),
 
     msg_query_reply(Proposer, ReqId, QueryResult),
+
+    trace_mpath:log_info(self(), {acceptor_query,
+                                  key, Key,
+                                  value, CVal}),
     TableName;
 
 %% SC-read phase 1
@@ -170,6 +184,11 @@ on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round, CValTo
             _ = set_entry(NewEntry, TableName),
             msg_prepare_deny(Proposer, ReqId, ProposalRound, entry_r_read(NewEntry))
     end,
+
+    trace_mpath:log_info(self(), {acceptor_read_p1,
+                                  key, Key,
+                                  round, Round,
+                                  merge_value, CValToMerge}),
     TableName;
 
 %% SC-read phase 2
@@ -193,6 +212,13 @@ on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, C
                 _ = set_entry(NewEntry, TableName),
                 msg_vote_deny(Proposer, ReqId, ProposalRound, CurrentReadRound)
         end,
+
+    trace_mpath:log_info(self(), {acceptor_read_p2,
+                                  key, Key,
+                                  current_round, CurrentReadRound,
+                                  tried_round, ProposalRound,
+                                  merge_value, CValToMerge,
+                                  full_value, NewCVal}),
     TableName;
 
 on({crdt_acceptor, get_entry, _DB, Client, Key}, TableName) ->
