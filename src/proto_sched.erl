@@ -92,6 +92,7 @@
 
 %%-define(TRACE(X,Y), log:log("proto_sched: " ++ X,Y)).
 -define(TRACE(X,Y), ok).
+-define(ORDERED_LINKS_DEFAULT, config:read(ordered_links)).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -128,6 +129,8 @@
 %% gen_component behaviour
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
+
+-export([check_config/0]).
 
 -type logger()       :: {proto_sched, comm:mypid()}.
 -type anypid()       :: pid() | comm:mypid().
@@ -198,7 +201,7 @@
 thread_num(N) -> thread_num(N, _TraceId=default).
 
 -spec thread_num(pos_integer(), trace_id()) -> ok.
-thread_num(N, TraceId) -> thread_num(N, TraceId, _OrderedLinks = true).
+thread_num(N, TraceId) -> thread_num(N, TraceId, _OrderedLinks = ?ORDERED_LINKS_DEFAULT).
 
 -spec thread_num(pos_integer(), trace_id(), boolean()) -> ok.
 thread_num(N, TraceId, OrderedLinks) ->
@@ -1041,3 +1044,9 @@ start_deliver_when_ready(TraceId, Entry) ->
         false ->
             Entry
     end.
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_bool(ordered_links).
+
