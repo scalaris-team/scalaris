@@ -92,7 +92,8 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+                                            {ordered_links, false}]}]),
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, _Config) ->
