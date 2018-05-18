@@ -61,7 +61,9 @@ init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     Size = randoms:rand_uniform(1, 25),
     R = randoms:rand_uniform(3, 16),
-    unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}, {replication_factor, R}]}]),
+    unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
+                                               {replication_factor, R},
+                                               {read_batching, true}]}]),
 
     ct:pal("Start test with ringsize ~p and replication degree ~p", [Size, R]),
     [{stop_ring, true} | Config].
