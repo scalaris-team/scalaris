@@ -568,18 +568,18 @@ on({qread_collect,
                             %% are not considered
                             delete_entry(NewEntry, tablename(State)),
                             gen_component:post_op({qread_initiate_write_through,
-                                                   NewEntry}, State);
+                                                   MyRwithId, NewEntry}, State);
                         3 ->
                             %% delay a bit
                             _ = comm:send_local_after(
                                   15 + randoms:rand_uniform(1,10), self(),
-                                  {qread_initiate_write_through, NewEntry}),
+                                  {qread_initiate_write_through, MyRwithId, NewEntry}),
                             delete_entry(NewEntry, tablename(State)),
                             State;
                         2 ->
                             delete_entry(NewEntry, tablename(State)),
                             comm:send_local(self(), {qread_initiate_write_through,
-                                                   NewEntry}),
+                                                    MyRwithId, NewEntry}),
                             State;
                         4 ->
                             delete_entry(NewEntry, tablename(State)),
@@ -654,7 +654,7 @@ on({qread_collect, {read_deny, Cons, MyRwithId, LargerRound}}, State) ->
             end
     end;
 
-on({qread_initiate_write_through, ReadEntry}, State) ->
+on({qread_initiate_write_through, RoundTried, ReadEntry}, State) ->
     ?TRACE("rbrcseq:on qread_initiate_write_through ~p~n", [ReadEntry]),
     %% if a read_filter was active, we cannot take over the value for
     %% a write_through.  We then have to retrigger the read without a
@@ -747,9 +747,10 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op({qround_request, This, entry_openreqentry(ReadEntry),
-               entry_key(ReadEntry), entry_datatype(ReadEntry), fun prbr:noop_read_filter/1, write,
-               entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
+            NextRoundNumber = 1 + pr:get_r(RoundTried),
+            gen_component:post_op({qread, This, entry_openreqentry(ReadEntry),
+               entry_key(ReadEntry), entry_datatype(ReadEntry), fun prbr:noop_read_filter/1,
+               entry_retrigger(ReadEntry) - entry_period(ReadEntry), NextRoundNumber, write},
               State)
     end;
 
@@ -839,8 +840,9 @@ on({qread_write_through_collect, ReqId,
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op({qround_request, Client, entry_openreqentry(Entry),
-                      Key, entry_datatype(Entry), Filter, write, entry_retrigger(Entry) - entry_period(Entry)},
+                    NextRound = 1 + pr:get_r(RoundTried),
+                    gen_component:post_op({qread, Client, entry_openreqentry(Entry), Key, entry_datatype(Entry),
+                                           Filter, entry_retrigger(Entry) - entry_period(Entry), NextRound, write},
                       State)
             end
     end;
@@ -870,9 +872,10 @@ on({qread_write_through_done, ReadEntry, _Filtering,
     DataType = entry_datatype(ReadEntry),
     ReadFilter = entry_filters(ReadEntry),
     RetriggerAfter = entry_retrigger(ReadEntry) - entry_period(ReadEntry),
+    TriedRound = entry_my_round(ReadEntry),
 
     gen_component:post_op(
-      {qround_request, Client, OpenReqEntry, Key, DataType, ReadFilter, write, RetriggerAfter},
+      {qread, Client, OpenReqEntry, Key, DataType, ReadFilter, RetriggerAfter, 1 + pr:get_r(TriedRound), write},
       State);
 
 on({qread_write_through_done, ReadEntry, Filtering,
