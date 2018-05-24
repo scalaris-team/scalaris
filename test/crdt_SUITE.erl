@@ -30,7 +30,8 @@
 all()   -> [
             tester_type_check_crdt,
             {group, gcounter_group},
-            {group, pncounter_group}
+            {group, pncounter_group},
+            {group, proto_sched_group}
            ].
 
 groups() -> [
@@ -46,6 +47,13 @@ groups() -> [
         {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
           crdt_pncounter_banking
+         ]},
+        {proto_sched_group, [sequence, {repeat, ?NUM_REPEATS}],
+         [
+          crdt_proto_sched_write,
+          crdt_proto_sched_concurrent_read_monotonic,
+          crdt_proto_sched_concurrent_read_ordered,
+          crdt_proto_sched_read_your_write
         ]}
     ].
 
@@ -57,15 +65,25 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
+init_per_group(Group, Config) ->
+    [{batching, Group =/= proto_sched_group} | Config].
+
+end_per_group(_Group, _Config) ->
+    ok.
+
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    EnableBatching =
+        case lists:keyfind(batching, 1, Config) of
+            false -> false;
+            {batching, Enabled} -> Enabled
+        end,
     Size = randoms:rand_uniform(1, 25),
-    R = randoms:rand_uniform(3, 16),
-    unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
-                                               {replication_factor, R},
-                                               {read_batching, true}]}]),
 
-    ct:pal("Start test with ringsize ~p and replication degree ~p", [Size, R]),
+    unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
+                                               {read_batching, EnableBatching}]}]),
+
+    ct:pal("Start test with ringsize ~p", [Size]),
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, _Config) ->
@@ -335,13 +353,177 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
     _ = [begin
             {L1, L2} = {lists:nth(L1Idx, ReadResults), lists:nth(L2Idx, ReadResults)},
             [
-             ?equals(gcounter:lteq(E1, E2) orelse gcounter:lteq(E2, E1), true)
+             ?equals_w_note(gcounter:lteq(E1, E2) orelse gcounter:lteq(E2, E1), true,
+                            lists:flatten(io_lib:format("(E1: ~p, E2: ~p)", [E1, E2])))
             || E1 <- L1, E2 <- L2]
          end
         || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
 
     ok.
 
+crdt_proto_sched_write(_Config) ->
+    Key = randoms:getRandomString(),
+    TraceId = default,
+    UnitTestPid = self(),
+
+    Parallel = randoms:rand_uniform(1, 10),
+    Count = 500 div Parallel,
+    WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
+
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun, TraceId),
+    proto_sched:thread_num(Parallel, TraceId),
+    ?ASSERT(not proto_sched:infected()),
+    wait_writers_completion(Parallel),
+    proto_sched:wait_for_end(TraceId),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, TraceId),
+    proto_sched:cleanup(TraceId),
+
+    {ok, Result} = gcounter_on_cseq:read(Key),
+    ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
+    ct:pal("Planned ~p increments, done ~p - discrepancy is NOT ok~n", [Count*Parallel, Result]),
+    ?equals(Count*Parallel, Result),
+
+    ok.
+
+crdt_proto_sched_concurrent_read_monotonic(_Config) ->
+    %% starts random number of (strong and eventual) writers
+    %% start one reader
+    %% values read should increase monotonic
+    Key = randoms:getRandomString(),
+    TraceId = default,
+    UnitTestPid = self(),
+
+    %% read for infinity
+    ParallelReader = randoms:rand_uniform(1, 5),
+    ReadFun = fun() -> {ok, Val} = gcounter_on_cseq:read_state(Key), Val end,
+    CmpFun = fun gcounter:lteq/2,
+    Readers = [spawn_monotonic_reader(UnitTestPid, ReadFun, CmpFun, TraceId)
+               || _ <- lists:seq(1, ParallelReader)],
+
+    %% Start writer
+    ParallelWriter = randoms:rand_uniform(1, 10),
+    Count = 100 div ParallelWriter,
+    WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
+    _ = spawn_writers(UnitTestPid, ParallelWriter, Count, WriteFun, TraceId),
+
+    %% run ptoto sched
+    Parallel = ParallelReader + ParallelWriter,
+    proto_sched:thread_num(Parallel, TraceId),
+    ?ASSERT(not proto_sched:infected()),
+    wait_writers_completion(ParallelWriter),
+
+    %% kill reader
+    [exit(Reader, kill) || Reader <- Readers],
+    check_monotonic_reader_failure(),
+
+    proto_sched:wait_for_end(TraceId),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, TraceId),
+    proto_sched:cleanup(TraceId),
+
+    ok.
+
+crdt_proto_sched_concurrent_read_ordered(_Config) ->
+    %% Starts random number of writer and two readers
+    %% For two concurrent reads returning r1 and r2, it must alsways hold that
+    %% r1 <= r2 or r2 <= r1. (of course, the same must hold for non-concurrent reads)
+    Key = randoms:getRandomString(),
+    TraceId = default,
+    UnitTestPid = self(),
+
+    %% start readers which will report their read results back to main process
+    ReaderCount = randoms:rand_uniform(1, 5),
+    ct:pal("Start ~p readers", [ReaderCount]),
+    ReaderPids =
+        [spawn(
+           fun() ->
+                   Loop = fun(F) ->
+                            {ok, Result} = gcounter_on_cseq:read_state(Key),
+                            UnitTestPid ! {testreturn, Id, Result},
+                            F(F)
+                          end,
+                   proto_sched:thread_begin(TraceId),
+                   Loop(Loop),
+                   proto_sched:thread_end(TraceId)
+           end)
+        || Id <- lists:seq(1, ReaderCount)],
+
+    %% Start writers
+    WriterCount = randoms:rand_uniform(1, 20),
+    Count = 100 div WriterCount,
+    WriteFun = fun
+                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
+                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+               end,
+    _ = spawn_writers(UnitTestPid, WriterCount, Count, WriteFun, TraceId),
+
+    %% start proto_sched
+    Parallel = ReaderCount + WriterCount,
+    proto_sched:thread_num(Parallel, TraceId),
+    ?ASSERT(not proto_sched:infected()),
+    wait_writers_completion(WriterCount),
+
+    %% kill readers
+    [exit(R, kill) || R <- ReaderPids],
+
+    %% terminate proto_sched
+    proto_sched:wait_for_end(TraceId),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, TraceId),
+    proto_sched:cleanup(TraceId),
+
+    %% verify result
+    ReadResults = [
+                    begin
+                        Loop = fun(F, Collected) ->
+                                    receive {testreturn, Id, Result} ->
+                                        F(F, [Result | Collected])
+                                    after 0 ->
+                                        Collected
+                                    end
+                               end,
+                        lists:reverse(Loop(Loop, []))
+                    end
+                  || Id <- lists:seq(1, ReaderCount)],
+    %% check each pair of returns... it should be enough to only check a subset
+    %% of pairs but this is good enough for now
+    ct:pal("Check if all ~p reads preformend can be ordered...", [length(lists:flatten(ReadResults))]),
+    _ = [begin
+            {L1, L2} = {lists:nth(L1Idx, ReadResults), lists:nth(L2Idx, ReadResults)},
+            [
+             ?equals_w_note(gcounter:lteq(E1, E2) orelse gcounter:lteq(E2, E1), true,
+                            lists:flatten(io_lib:format("(E1: ~p, E2: ~p)", [E1, E2])))
+            || E1 <- L1, E2 <- L2]
+         end
+        || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
+
+    ok.
+
+crdt_proto_sched_read_your_write(_Config) ->
+    %% starts concurrent worker writing/reading repeateadly
+    %% each update should be visibile immediatly when using the same worker
+    Key = randoms:getRandomString(),
+    TraceId = default,
+    UnitTestPid = self(),
+
+    %% Start clinets
+    Parallel = randoms:rand_uniform(1, 10),
+    Count = 100 div Parallel,
+    WriteFun = fun (_) ->
+                {ok, Old} = gcounter_on_cseq:read(Key),
+                ok = gcounter_on_cseq:inc(Key),
+                {ok, New} = gcounter_on_cseq:read(Key),
+                ?equals(true, Old < New)
+               end,
+    _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun, TraceId),
+
+    proto_sched:thread_num(Parallel, TraceId),
+    ?ASSERT(not proto_sched:infected()),
+    wait_writers_completion(Parallel),
+
+    proto_sched:wait_for_end(TraceId),
+    unittest_helper:print_proto_sched_stats(at_end_if_failed, TraceId),
+    proto_sched:cleanup(TraceId),
+
+    ok.
 
 tester_type_check_crdt(_Config) ->
     Count = 10,
@@ -440,12 +622,24 @@ tester_type_check_crdt(_Config) ->
 
 -spec spawn_writers(pid(), non_neg_integer(), non_neg_integer(), fun((non_neg_integer()) -> ok)) -> [pid()].
 spawn_writers(UnitTestPid, NumberOfWriters, IterationsPerWriter, WriteFun) ->
+    spawn_writers(UnitTestPid, NumberOfWriters, IterationsPerWriter, WriteFun, none).
+
+-spec spawn_writers(pid(), non_neg_integer(), non_neg_integer(), fun((non_neg_integer()) -> ok),
+                    atom() | none) -> [pid()].
+spawn_writers(UnitTestPid, NumberOfWriters, IterationsPerWriter, WriteFun, ProtoSchedTraceId) ->
     ct:pal("Starting concurrent writers: ~p~n"
            "Performing iterations: ~p~n",
            [NumberOfWriters, IterationsPerWriter]),
     [spawn(
         fun() ->
-            _ = [WriteFun(I) || I <- lists:seq(1, IterationsPerWriter)],
+            case ProtoSchedTraceId of
+                none ->
+                    _ = [WriteFun(I) || I <- lists:seq(1, IterationsPerWriter)];
+                TraceId ->
+                    proto_sched:thread_begin(TraceId),
+                    _ = [WriteFun(I) || I <- lists:seq(1, IterationsPerWriter)],
+                    proto_sched:thread_end(TraceId)
+            end,
             UnitTestPid ! {done}
         end)
      || _Nth <- lists:seq(1, NumberOfWriters)].
@@ -461,6 +655,11 @@ wait_writers_completion(NumberOfWriter) ->
 
 -spec spawn_monotonic_reader(pid(), fun(() -> crdt:crdt()), fun((term(), term()) -> boolean())) -> pid().
 spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun) ->
+    spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun, none).
+
+-spec spawn_monotonic_reader(pid(), fun(() -> crdt:crdt()), fun((term(), term()) -> boolean()),
+                             atom() | none ) -> pid().
+spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun, TraceId) ->
     ct:pal("Starting monotonic reader..."),
     spawn(fun() ->
         Init = ReadFun(),
@@ -476,7 +675,13 @@ spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun) ->
                         F(F, V)
                 end
             end,
-        Loop(Loop, Init)
+        case TraceId of
+            none ->  Loop(Loop, Init);
+            TraceId ->
+                proto_sched:thread_begin(TraceId),
+                Loop(Loop, Init),
+                proto_sched:thread_end(TraceId)
+        end
     end).
 
 -spec check_monotonic_reader_failure() -> ok.
