@@ -28,8 +28,9 @@ get_ring_size(TimeOut, IP, Port) ->
     doJsonRPC(IP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut]).
 
 -spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer()) -> string().
-wait_for_ring_size(Size, TimeOut, IP, Port) ->
-    doJsonRPC(IP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut]).
+wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port) ->
+    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut]).
 
 
 -spec doJsonRPC(IP::string(), Port::integer(), Path::string(), Call::string(), Params::list()) -> term().
