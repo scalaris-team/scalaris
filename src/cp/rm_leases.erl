@@ -116,15 +116,15 @@ on({compare_and_fix, OldRange, NewRange,
 on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
+        {qread_done, _ReqId, _Round, _OldWriteRound, prbr_bottom} ->
+            log:log("not so well-formed qread-response"),
+            State;
         {qread_done, _ReqId, _Round, _OldWriteRound, Lease} ->
             LeaseId = l_on_cseq:get_id(Lease),
             Pid = comm:reply_as(self(), 4, {takeover_after_rm_change, LeaseId, Lease, '_'}),
             %% log:log("rm_leases(~p): going to take over ~p~n", [self(), Lease]),
             l_on_cseq:lease_takeover(Lease, Pid),
             add_takeover(State, Lease);
-        {qread_done, _ReqId, _Round, _OldWriteRound, prbr_bottom} ->
-            log:log("not so well-formed qread-response"),
-            State;
         _ ->
             log:log("not so well-formed qread-response"),
             State
