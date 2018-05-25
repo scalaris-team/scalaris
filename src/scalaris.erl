@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ start() ->
     _ = code:ensure_loaded(api_dht_raw),
     _ = code:ensure_loaded(api_monitor),
     _ = code:ensure_loaded(api_rdht),
+    _ = code:ensure_loaded(api_ring),
     _ = code:ensure_loaded(api_tx),
     _ = code:ensure_loaded(api_vm),
     _ = code:ensure_loaded(api_autoscale),
