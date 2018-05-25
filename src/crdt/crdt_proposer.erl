@@ -59,7 +59,8 @@
                   ?RT:key(),    %% key
                   module(),     %% data type
                   crdt:query_fun() | crdt:update_fun(), %% fun used to read/write crdt state
-                  replies()     %% aggregates replies
+                  replies(),     %% aggregates replies
+                  non_neg_integer() %% round trips executed
                  }.
 
 -type batch_entry() :: {read_batch_entry,
@@ -97,7 +98,7 @@ read(CSeqPidName, Client, Key, DataType, QueryFun) ->
         true ->
             start_request(CSeqPidName, {add_to_read_batch, Client, Key, DataType, QueryFun});
         false ->
-            start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none}})
+            start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none, 0}})
     end.
 
 -spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun()) -> ok.
@@ -150,7 +151,7 @@ on({read_batch_trigger}, State) ->
                 fun(K, ReqsForThisKey=[{_, DataType, _}|_]) ->
                     This = comm:reply_as(comm:this(), 3, {read_batch_reply, ReqsForThisKey, '_'}),
                     comm:send_local(self(),
-                        {req_start, {read, strong, This, K, DataType, fun crdt:query_noop/1, none}})
+                        {req_start, {read, strong, This, K, DataType, fun crdt:query_noop/1, none, 0}})
                 end, Reqs),
             _ = save_entry({Id, 0, dict:new()}, tablename(State))
     end,
@@ -168,10 +169,9 @@ on({read_batch_reply, Reqs, {read_done, CRDTState}}, State) ->
 
 %%%%% strong consistent read
 
-on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound}}, State) ->
+on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound, PreviousRoundTrips}}, State) ->
     ReqId = uid:get_pids_uid(),
     Entry = entry_new_read(ReqId, Client, Key, DataType, QueryFun, DataType:new()),
-    save_entry(Entry, tablename(State)),
 
     Round = case PreviousRound of
                 none ->
@@ -182,6 +182,9 @@ on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound}}, 
 
     This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
     Msg = {crdt_acceptor, prepare, '_', This, ReqId, key, DataType, Round, DataType:new()},
+
+    NewEntry = entry_set_round_trips(Entry, PreviousRoundTrips + 1),
+    save_entry(NewEntry, tablename(State)),
     send_to_all_replicas(Key, Msg),
 
     State;
@@ -233,9 +236,10 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                                                 Type,
                                                 entry_fun(NewEntry),
                                                 Type:new()),
+                        T2Entry = entry_set_round_trips(TEntry, entry_round_trips(NewEntry) + 1),
                         %% keep the merged value we have collected in this phase, which will
                         %% be the value returned if phase 2 succeeds
-                        NextStepEntry = entry_set_replies(TEntry, NewReplies#r_replies{reply_count=0}),
+                        NextStepEntry = entry_set_replies(T2Entry, NewReplies#r_replies{reply_count=0}),
                         save_entry(NextStepEntry, tablename(State)),
 
                         trace_mpath:log_info(self(), {read_strong_phase2_start,
@@ -294,14 +298,16 @@ on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, Sta
                                              }),
                 %% retry the read in a higher round...
                 %% TODO more intelligent retry mechanism?
-                Delay = randoms:rand_uniform(0, 30),
+                RoundTrips = entry_round_trips(Entry),
+                Delay = randoms:rand_uniform(0, 10),
                 comm:send_local_after(Delay, self(),
                                         {req_start, {read, strong,
                                         entry_client(Entry),
                                         entry_key(Entry),
                                         entry_datatype(Entry),
                                         entry_fun(Entry),
-                                        NextRound}})
+                                        NextRound,
+                                        RoundTrips}})
         end,
     State;
 
@@ -361,7 +367,9 @@ on({write, strong, {update_reply, ReqId, CVal}}, State) ->
                        entry_datatype(Entry), CVal},
                 trace_mpath:log_info(self(), {write_strong_start,
                                              value, CVal}),
-                send_to_all_replicas(entry_key(Entry), Msg)
+                NewEntry = entry_inc_round_trips(Entry),
+                save_entry(NewEntry, tablename(State)),
+                send_to_all_replicas(entry_key(NewEntry), Msg)
         end,
     State;
 
@@ -544,11 +552,11 @@ add_vote_reply(Replies) ->
 entry_new_read(ReqId, Client, Key, DataType, QueryFun, EmptyVal) ->
     {ReqId, Client, Key, DataType, QueryFun,
      #r_replies{reply_count=0, highest_seen_round=pr:new(0,0), highest_replies=0,
-                value=EmptyVal, cons_value=true}}.
+                value=EmptyVal, cons_value=true}, _RoundTrips=0}.
 
 -spec entry_new_write(any(), comm:erl_local_pid(), ?RT:key(), module(), crdt:update_fun()) -> entry().
 entry_new_write(ReqId, Client, Key, DataType, UpdateFun) ->
-    {ReqId, Client, Key, DataType, UpdateFun, #w_replies{reply_count=0}}.
+    {ReqId, Client, Key, DataType, UpdateFun, #w_replies{reply_count=0}, _RoundTrips=0}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -564,6 +572,12 @@ entry_fun(Entry)                  -> element(5, Entry).
 entry_replies(Entry)              -> element(6, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
 entry_set_replies(Entry, Replies) -> setelement(6, Entry, Replies).
+-spec entry_round_trips(entry())  -> non_neg_integer().
+entry_round_trips(Entry)          -> element(7, Entry).
+-spec entry_inc_round_trips(entry()) -> entry().
+entry_inc_round_trips(Entry) -> setelement(7, Entry, element(7, Entry) + 1).
+-spec entry_set_round_trips(entry(), non_neg_integer()) -> entry().
+entry_set_round_trips(Entry, RoundTrips) -> setelement(7, Entry, RoundTrips).
 
 -spec get_entry(any(), ?PDB:tableid()) -> entry() | batch_entry() | undefined.
 get_entry(ReqId, TableName) ->

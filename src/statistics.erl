@@ -1,4 +1,4 @@
-% @copyright 2007-2014 Zuse Institute Berlin
+% @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,13 +42,22 @@ get_total_load(Which, Ring) ->
 -spec get_average_load(Which::load(), Ring::ring()) -> float().
 get_average_load(Which, Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    get_total_load(Which, FilteredRing) / length(FilteredRing).
+    case length(FilteredRing) of
+        0 -> 0.0;
+        _ ->
+            get_total_load(Which, FilteredRing) / length(FilteredRing)
+    end.
 
 -spec get_memory_usage(Ring::ring()) -> float().
 get_memory_usage(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    lists:foldl(fun (X, Sum) -> X + Sum end, 0,
-                lists:map(fun get_memory/1, FilteredRing)) / length(FilteredRing).
+    case length(FilteredRing) of
+        0 -> 0.0;
+        _ ->
+            lists:foldl(fun (X, Sum) -> X + Sum end, 0,
+                        lists:map(fun get_memory/1, FilteredRing))
+                / length(FilteredRing)
+    end.
 
 -spec get_max_memory_usage(Ring::ring()) -> node_details:memory().
 get_max_memory_usage(Ring) ->
@@ -58,12 +67,20 @@ get_max_memory_usage(Ring) ->
 -spec get_load_std_deviation(Which::load(), Ring::ring()) -> float().
 get_load_std_deviation(Which, Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    Average = get_average_load(Which, FilteredRing),
-    math:sqrt(lists:foldl(fun (Load, Acc) ->
-                                   Acc + (Load - Average) * (Load - Average)
-                          end, 0,
-                          lists:map(fun(Node) -> get_load(Which, Node) end,
-                                    FilteredRing)) / length(FilteredRing)).
+    case length(FilteredRing) of
+        0 -> 0.0;
+        _ ->
+            Average = get_average_load(Which, FilteredRing),
+            math:sqrt(lists:foldl(fun (Load, Acc) ->
+                                          Acc + (Load - Average)
+                                              * (Load - Average)
+                                  end, 0,
+                                  lists:map(fun(Node) ->
+                                                    get_load(Which, Node)
+                                            end,
+                                            FilteredRing))
+                      / length(FilteredRing))
+    end.
 
 -spec get_load(Which::load(), ring_element()) -> node_details:load().
 get_load(Which, {ok, Details}) ->
@@ -217,16 +234,26 @@ get_total_rt_size(Ring) ->
 -spec get_average_rt_size(Ring::ring()) -> float().
 get_average_rt_size(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    get_total_rt_size(FilteredRing) / length(FilteredRing).
+    case length(FilteredRing) of
+        0 -> 0.0;
+        _ ->
+            get_total_rt_size(FilteredRing) / length(FilteredRing)
+    end.
 
 -spec get_rt_size_std_deviation(Ring::ring()) -> float().
 get_rt_size_std_deviation(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    Average = get_average_rt_size(FilteredRing),
-    math:sqrt(lists:foldl(fun (RTSize, Acc) ->
-                                   Acc + (RTSize - Average) * (RTSize - Average)
-                          end, 0,
-                          lists:map(fun get_rt/1, FilteredRing)) / length(FilteredRing)).
+    case length(FilteredRing) of
+        0 -> 0.0;
+        _ ->
+            Average = get_average_rt_size(FilteredRing),
+            math:sqrt(lists:foldl(fun (RTSize, Acc) ->
+                                          Acc + (RTSize - Average)
+                                              * (RTSize - Average)
+                                  end, 0,
+                                  lists:map(fun get_rt/1, FilteredRing))
+                      / length(FilteredRing))
+    end.
 
 -spec get_rt(ring_element()) -> node_details:rt_size().
 get_rt({ok, Details}) ->
