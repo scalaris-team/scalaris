@@ -1,4 +1,4 @@
-% @copyright 2007-2016 Zuse Institute Berlin
+% @copyright 2007-2018 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -122,6 +122,9 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
             %% log:log("rm_leases(~p): going to take over ~p~n", [self(), Lease]),
             l_on_cseq:lease_takeover(Lease, Pid),
             add_takeover(State, Lease);
+        {qread_done, _ReqId, _Round, _OldWriteRound, prbr_bottom} ->
+            log:log("not so well-formed qread-response"),
+            State;
         _ ->
             log:log("not so well-formed qread-response"),
             State
