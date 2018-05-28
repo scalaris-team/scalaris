@@ -210,8 +210,8 @@ crdt_gcounter_read_monotonic(_Config) ->
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
 
-    %% kill reader
-    exit(Reader, kill),
+    %% stop reader
+    stop_readers(Reader),
     check_monotonic_reader_failure(),
 
     ok.
@@ -240,9 +240,10 @@ crdt_gcounter_read_monotonic2(_Config) ->
                                         end,
                                         NextReader = lists:nth(randoms:rand_uniform(1, length(Pids)+1), Pids),
                                         NextReader ! {read, Pids, Result},
-                                        ok
-                                end,
-                                F(F)
+                                        F(F);
+                                    {reader_done} ->
+                                        UnitTestPid ! {reader_terminated}
+                                end
                             end,
                         Loop(Loop)
                     end)
@@ -259,9 +260,8 @@ crdt_gcounter_read_monotonic2(_Config) ->
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
+    stop_readers(Reader),
 
-    %% kill reader
-    [exit(R, kill) || R <- Reader],
     receive {compare_failed, A, B} ->
         ?ct_fail("~n~w ~nis not smaller or equals than ~n~w", [A, B])
     after 100 ->
@@ -294,9 +294,8 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
+    stop_readers(Readers),
 
-    %% kill readers
-    [exit(R, kill) || R <- Readers],
     check_monotonic_reader_failure(),
 
     ok.
@@ -315,9 +314,14 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
         [spawn(
            fun() ->
                    Loop = fun(F) ->
-                            {ok, Result} = gcounter_on_cseq:read_state(Key),
-                            UnitTestPid ! {testreturn, Id, Result},
-                            F(F)
+                            receive
+                                {reader_done} ->
+                                    UnitTestPid ! {reader_terminated}
+                            after 0 ->
+                                {ok, Result} = gcounter_on_cseq:read_state(Key),
+                                UnitTestPid ! {testreturn, Id, Result},
+                                F(F)
+                            end
                           end,
                    Loop(Loop)
            end)
@@ -332,9 +336,8 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
                end,
     _ = spawn_writers(UnitTestPid, WriterCount, Count, WriteFun),
     wait_writers_completion(WriterCount),
+    stop_readers(ReaderPids),
 
-    %% kill readers and verify result
-    [exit(R, kill) || R <- ReaderPids],
     ReadResults = [
                     begin
                         Loop = fun(F, Collected) ->
@@ -411,9 +414,8 @@ crdt_proto_sched_concurrent_read_monotonic(_Config) ->
     proto_sched:thread_num(Parallel, TraceId),
     ?ASSERT(not proto_sched:infected()),
     wait_writers_completion(ParallelWriter),
+    stop_readers(Readers),
 
-    %% kill reader
-    [exit(Reader, kill) || Reader <- Readers],
     check_monotonic_reader_failure(),
 
     proto_sched:wait_for_end(TraceId),
@@ -437,9 +439,14 @@ crdt_proto_sched_concurrent_read_ordered(_Config) ->
         [spawn(
            fun() ->
                    Loop = fun(F) ->
-                            {ok, Result} = gcounter_on_cseq:read_state(Key),
-                            UnitTestPid ! {testreturn, Id, Result},
-                            F(F)
+                            receive
+                                {reader_done} ->
+                                    UnitTestPid ! {reader_terminated}
+                            after 0 ->
+                                {ok, Result} = gcounter_on_cseq:read_state(Key),
+                                UnitTestPid ! {testreturn, Id, Result},
+                                F(F)
+                            end
                           end,
                    proto_sched:thread_begin(TraceId),
                    Loop(Loop),
@@ -461,9 +468,7 @@ crdt_proto_sched_concurrent_read_ordered(_Config) ->
     proto_sched:thread_num(Parallel, TraceId),
     ?ASSERT(not proto_sched:infected()),
     wait_writers_completion(WriterCount),
-
-    %% kill readers
-    [exit(R, kill) || R <- ReaderPids],
+    stop_readers(ReaderPids),
 
     %% terminate proto_sched
     proto_sched:wait_for_end(TraceId),
@@ -653,6 +658,13 @@ wait_writers_completion(NumberOfWriter) ->
     end || Nth <- lists:seq(1, NumberOfWriter)],
     ok.
 
+-spec stop_readers(pid() | [pid()]) -> ok.
+stop_readers(Reader) when is_pid(Reader) ->
+    stop_readers([Reader]);
+stop_readers(Readers) ->
+    [Reader ! {reader_done} || Reader <- Readers],
+    [receive {reader_terminated} -> ok end || _ <- Readers].
+
 -spec spawn_monotonic_reader(pid(), fun(() -> crdt:crdt()), fun((term(), term()) -> boolean())) -> pid().
 spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun) ->
     spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun, none).
@@ -665,14 +677,18 @@ spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun, TraceId) ->
         Init = ReadFun(),
         Loop =
             fun(F, Prev) ->
-                V = ReadFun(),
-                case LTEQCompareFun(Prev, V) of
-                    true ->
-                        F(F, V);
-                    false ->
-                        ct:pal("~n~w ~nis not smaller or equals than ~n~w", [Prev, V]),
-                        UnitTestPid ! {compare_failed, Prev, V},
-                        F(F, V)
+                receive {reader_done} ->
+                    UnitTestPid ! {reader_terminated}
+                after 0 ->
+                    V = ReadFun(),
+                    case LTEQCompareFun(Prev, V) of
+                        true ->
+                            F(F, V);
+                        false ->
+                            ct:pal("~n~w ~nis not smaller or equals than ~n~w", [Prev, V]),
+                            UnitTestPid ! {compare_failed, Prev, V},
+                            F(F, V)
+                    end
                 end
             end,
         case TraceId of
