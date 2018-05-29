@@ -146,9 +146,11 @@ test_interleaving(_Config) ->
     receive {message_received} -> ok end,
 
     ct:pal("PRBR state after inconsistent read: ~n~p", [prbr_data()]),
-    PrbrData2 = prbr_w_rounds_with_values(),
-    ValList2 = lists:usort(lists:flatten(PrbrData2)),
-    ?equals_w_note(length(ValList2), 1, "All replicas should have the same value and write round").
+    PrbrData2 = prbr_values(),
+    ValList2 = lists:usort(PrbrData2),
+    %% do not compare write rounds as the write messages to acceptor 4 might not
+    %% have been received and processed yet.
+    ?equals_w_note(length(ValList2), 1, "All replicas should have the same value").
 
 test_write_through_notifies_original_proposer(_Config) ->
     %% This tests case tests if a write through correctly notifies the original proposer
