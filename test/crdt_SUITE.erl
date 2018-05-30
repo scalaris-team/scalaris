@@ -562,7 +562,7 @@ tester_type_check_crdt(_Config) ->
             {add_write_reply, 1},       % TODO? prevent generating records with undefined fields
             {add_read_reply, 5},        % needs value matching db_type
             {send_to_all_replicas, 2},  % sends messages
-            {send_to_local_replica, 3}, % sends messages
+            {send_to_local_replica, 2}, % sends messages
             {start_request, 2},         % sends messages
             {inform_client, 3},         % cannot create valid envelopes
             {inform_client, 2},         % cannot create valid envelopes

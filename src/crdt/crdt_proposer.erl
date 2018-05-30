@@ -321,7 +321,7 @@ on({req_start, {read, eventual, Client, Key, DataType, QueryFun}}, State) ->
 
     This = comm:reply_as(comm:this(), 3, {read, eventual, '_'}),
     Msg = {crdt_acceptor, query_req, '_', This, ReqId, key, DataType, QueryFun},
-    send_to_local_replica(Key, Client, Msg),
+    send_to_local_replica(Key, Msg),
 
     State;
 
@@ -350,7 +350,7 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
 
     This = comm:reply_as(comm:this(), 3, {write, strong, '_'}),
     Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
-    send_to_local_replica(Key, Client, Msg),
+    send_to_local_replica(Key, Msg),
 
     State;
 
@@ -401,7 +401,7 @@ on({req_start, {write, eventual, Client, Key, DataType, UpdateFun}}, State) ->
 
     This = comm:reply_as(comm:this(), 3, {write, eventual, '_'}),
     Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
-    send_to_local_replica(Key, Client, Msg),
+    send_to_local_replica(Key, Msg),
 
     State;
 
@@ -421,7 +421,7 @@ on({write, eventual, {update_reply, ReqId, _CVal}}, State) ->
         end,
     State;
 
-on({local_range_req, Key, Client, Message, {get_state_response, LocalRange}}, State) ->
+on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
     Keys = replication:get_keys(Key),
 
     LocalKeys = lists:filter(fun(K) -> intervals:in(K, LocalRange) end, Keys),
@@ -431,8 +431,7 @@ on({local_range_req, Key, Client, Message, {get_state_response, LocalRange}}, St
             ?TRACE("cannot send locally ~p ~p ", [Keys, LocalRange]),
             %% the local dht node is not responsible for any replca... route to
             %% random replica
-            Hash = ?RT:hash_key(term_to_binary(Client)),
-            Idx = (Hash rem length(Keys)) + 1,
+            Idx = randoms:rand_uniform(1, length(Keys)+1),
             lists:nth(Idx, Keys);
         [H|_] ->
             %% use replica managed by local dht node
@@ -446,12 +445,12 @@ on({local_range_req, Key, Client, Message, {get_state_response, LocalRange}}, St
 
 %%%%%% internal helper
 
--spec send_to_local_replica(?RT:key(), comm:erl_local_pid(), tuple()) -> ok.
-send_to_local_replica(Key, Client, Message) ->
+-spec send_to_local_replica(?RT:key(), tuple()) -> ok.
+send_to_local_replica(Key, Message) ->
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
     LocalDhtNode = pid_groups:get_my(dht_node),
-    This = comm:reply_as(comm:this(), 5, {local_range_req, Key, Client, Message, '_'}),
+    This = comm:reply_as(comm:this(), 4, {local_range_req, Key, Message, '_'}),
     comm:send_local(LocalDhtNode, {get_state, This, my_range}).
 
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
