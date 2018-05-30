@@ -202,7 +202,8 @@ on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, C
     NewEntry = entry_set_val(Entry, NewCVal),
 
     _ = case ProposalRound =:= CurrentReadRound orelse
-             pr:get_r(ProposalRound) > pr:get_r(CurrentReadRound) of
+             (pr:get_r(ProposalRound) > pr:get_r(CurrentReadRound)
+             andalso DataType:lteq(CVal, CValToMerge)) of
             true ->
                 NewEntry2 = entry_set_r_read(NewEntry, ProposalRound),
                 NewEntry3 = entry_set_r_write(NewEntry2, ProposalRound),
