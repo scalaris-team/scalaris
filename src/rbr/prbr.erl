@@ -28,7 +28,7 @@
 -define(PDB, db_prbr).
 -define(REPAIR, config:read(prbr_repair_on_write)).
 -define(REPAIR_DELAY, 100). % in ms
--define(REDUNDANCY, config:read(redundancy_module)).
+-define(REDUNDANCY, (config:read(redundancy_module))).
 
 %%% the prbr has to be embedded into a gen_component using it.
 %%% The state it operates on has to be passed to the on handler
@@ -257,7 +257,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
     %% so that the original proposer of the write gets notified of
     %% write progress as well.
     {LearnerToNotify, LearnerForWTI} =
-            case IsWriteThrough of
+        case IsWriteThrough andalso ?REDUNDANCY:notify_orig_learner_on_wt() of
                 false ->
                     {[Proposer], Proposer};
                 true ->

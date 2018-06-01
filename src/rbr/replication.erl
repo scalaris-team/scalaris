@@ -31,14 +31,15 @@
 -export([collect_older_read_value/3]).
 -export([get_read_value/2]).
 -export([skip_write_through/1]).
+-export([notify_orig_learner_on_wt/0]).
 
 %% @doc Returns the replicas of the given key.
 -spec get_keys(?RT:key()) -> [?RT:key()].
 get_keys(Key) ->
     ?RT:get_replica_keys(Key).
 
-%% @doc Returns a list of values (based on WriteValue) wich should 
-%% be written to the Keys passed as argument 
+%% @doc Returns a list of values (based on WriteValue) wich should
+%% be written to the Keys passed as argument
 -spec write_values_for_keys([?RT:key()], client_value()) -> [client_value()].
 write_values_for_keys(Keys, WriteValue) ->
     [WriteValue || _K <- Keys].
@@ -117,4 +118,7 @@ get_read_value(ReadValue, _ReadFilter) -> ReadValue.
 %% @doc Decide whether to skip a write through based on the read value
 -spec skip_write_through(client_value()) -> boolean().
 skip_write_through(_ReadValue) -> false.
+
+-spec notify_orig_learner_on_wt() -> boolean().
+notify_orig_learner_on_wt() -> true.
 
