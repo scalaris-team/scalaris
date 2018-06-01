@@ -81,6 +81,7 @@ init_per_testcase(_TestCase, Config) ->
     Size = randoms:rand_uniform(1, 25),
 
     unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
+                                               {ordered_links, false},
                                                {read_batching, EnableBatching}]}]),
 
     ct:pal("Start test with ringsize ~p", [Size]),
