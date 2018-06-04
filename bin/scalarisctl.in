@@ -167,7 +167,6 @@ get_sys_hostname() {
 fix_node_name() {
     # if the given node name includes an '@', leave untouched
     if [ "" != "$NODE_NAME" ]; then
-        echo here i am
         if ! echo $NODE_NAME | grep "@" >/dev/null ; then
             NODE_NAME="$NODE_NAME@`get_hostname`"
         fi
