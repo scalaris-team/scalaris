@@ -1,17 +1,35 @@
+#!/bin/bash
+# Copyright 2018 Zuse Institute Berlin
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
 RINGSIZE=4
 
-SCALARIS_UNITTEST_PORT="14195"
-SCALARIS_UNITTEST_YAWS_PORT="8000"
+SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
+SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
 
-SESSIONKEY=`cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 32 | head -n 1`
+#SESSIONKEY=`cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 32 | head -n 1`
 
 usage(){
     echo "usage: setup-ring [options] <cmd>"
     echo " options:"
-    echo "    --ring-size <number>   - the number of nodes"
+    echo "    --help                  - show this text"
+    echo "    --ring-size <number>    - the number of nodes (default: 4)"
+    echo "    --session-key <number>  - the session's key (mandatory)"
     echo " <cmd>:"
     echo "    start       - start a ring"
     echo "    stop        - stop a ring"
+    echo "    kill        - kill a node"
     exit $1
 }
 
@@ -49,6 +67,12 @@ stop_ring(){
     ps aux | grep beam.smp | grep "verbatim $SESSIONKEY" | awk '{print $2}'  | xargs -n1 kill -9
 }
 
+kill_node(){
+    ps aux | grep beam.smp | grep "verbatim $SESSIONKEY" | grep -v "join_at 0" | awk '{print $2}' | head -n1 | xargs -n1 kill -9
+}
+
+MANDATORY=false
+
 until [ -z "$1" ]; do
     OPTIND=1
     case $1 in
@@ -62,21 +86,34 @@ until [ -z "$1" ]; do
         "--session-key")
             shift
             SESSIONKEY=$1
+            MANDATORY=true
             shift;;
         start | stop)
             cmd="$1"
             shift;;
+        kill)
+            cmd="$1"
+            shift;;
         *)
+            echo "Unknown parameter: $1."
             shift
             usage 1
     esac
 done
+
+if [ "x$MANDATORY" == xfalse ]
+then
+   echo "Mandatory --session-key parameter is missing"
+   usage 1
+fi
 
 case $cmd in
     start)
         start_ring;;
     stop)
         stop_ring;;
+    kill)
+        kill_node;;
     *)
         echo "Unknown command: $cmd."
         usage 1;;
