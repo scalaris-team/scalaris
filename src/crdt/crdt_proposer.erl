@@ -45,14 +45,14 @@
                  }.
 
 -record(r_replies,  {
-                        reply_count :: non_neg_integer(),
-                        highest_replies :: non_neg_integer(),
+                        reply_count = 0 :: non_neg_integer(),
+                        highest_replies = 0 :: non_neg_integer(),
                         highest_seen_round :: pr:pr(),
-                        cons_value :: boolean(),
+                        cons_value = true :: boolean(),
                         value :: crdt:crdt()
                     }).
 
--record(w_replies, {reply_count :: non_neg_integer()}).
+-record(w_replies, {reply_count = 0 :: non_neg_integer()}).
 
 -type entry() :: {any(),        %% request id
                   comm:erl_local_pid(), %% client
