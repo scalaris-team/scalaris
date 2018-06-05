@@ -290,7 +290,7 @@ entry_r_write(Entry) -> element(3, Entry).
 entry_set_r_write(Entry, Round) -> setelement(3, Entry, Round).
 -spec entry_val(entry()) -> crdt:crdt() | crdt_bottom.
 entry_val(Entry) -> element(4, Entry).
--spec entry_val(entry(), module()) -> crdt:crdt().
+-spec entry_val(entry(), crdt:crdt_module()) -> crdt:crdt().
 entry_val(Entry, DataType) ->
     case entry_val(Entry) of
         crdt_bottom ->

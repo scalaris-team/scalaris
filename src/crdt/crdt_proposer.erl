@@ -57,7 +57,7 @@
 -type entry() :: {any(),        %% request id
                   comm:erl_local_pid(), %% client
                   ?RT:key(),    %% key
-                  module(),     %% data type
+                  crdt:crdt_module(),     %% data type
                   crdt:query_fun() | crdt:update_fun(), %% fun used to read/write crdt state
                   replies(),     %% aggregates replies
                   non_neg_integer() %% round trips executed
@@ -65,7 +65,7 @@
 
 -type batch_entry() :: {read_batch_entry,
                         non_neg_integer(),
-                        dict:dict(?RT:key(), [{comm:erl_local_pid(), module(), crdt:query_fun()}])
+                        dict:dict(?RT:key(), [{comm:erl_local_pid(), crdt:crdt_module(), crdt:query_fun()}])
                        }.
 
 -type replies() :: #w_replies{} | #r_replies{}.
@@ -92,7 +92,7 @@ init(DBSelector) ->
 
 %%%% API
 
--spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun()) -> ok.
+-spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
 read(CSeqPidName, Client, Key, DataType, QueryFun) ->
     case ?READ_BATCHING of
         true ->
@@ -101,15 +101,15 @@ read(CSeqPidName, Client, Key, DataType, QueryFun) ->
             start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none, 0}})
     end.
 
--spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun()) -> ok.
+-spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
 read_eventual(CSeqPidName, Client, Key, DataType, QueryFun) ->
     start_request(CSeqPidName, {req_start, {read, eventual, Client, Key, DataType, QueryFun}}).
 
--spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:update_fun()) -> ok.
+-spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
     start_request(CSeqPidName, {req_start, {write, strong, Client, Key, DataType, UpdateFun}}).
 
--spec write_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), module(), crdt:update_fun()) -> ok.
+-spec write_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write_eventual(CSeqPidName, Client, Key, DataType, UpdateFun) ->
     start_request(CSeqPidName, {req_start, {write, eventual, Client, Key, DataType, UpdateFun}}).
 
@@ -488,7 +488,7 @@ add_write_reply(Replies) ->
     Done = replication:quorum_accepted(ReplyCount),
     {Done, NewReplies}.
 
--spec add_read_reply(#r_replies{}, pr:pr(), pr:pr(), crdt:crdt(), module()) ->
+-spec add_read_reply(#r_replies{}, pr:pr(), pr:pr(), crdt:crdt(), crdt:crdt_module()) ->
     {boolean() | cons_read | retry_read, #r_replies{}}.
 add_read_reply(Replies, UsedReadRound, _WriteRound, Value, DataType) ->
     NewReplyCount = Replies#r_replies.reply_count + 1,
@@ -546,14 +546,14 @@ add_vote_reply(Replies) ->
     Done = replication:quorum_accepted(ReplyCount),
     {Done, NewReplies}.
 
--spec entry_new_read(any(), comm:erl_local_pid(), ?RT:key(), module(), crdt:query_fun(),
+-spec entry_new_read(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun(),
                     crdt:crdt()) -> entry().
 entry_new_read(ReqId, Client, Key, DataType, QueryFun, EmptyVal) ->
     {ReqId, Client, Key, DataType, QueryFun,
      #r_replies{reply_count=0, highest_seen_round=pr:new(0,0), highest_replies=0,
                 value=EmptyVal, cons_value=true}, _RoundTrips=0}.
 
--spec entry_new_write(any(), comm:erl_local_pid(), ?RT:key(), module(), crdt:update_fun()) -> entry().
+-spec entry_new_write(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> entry().
 entry_new_write(ReqId, Client, Key, DataType, UpdateFun) ->
     {ReqId, Client, Key, DataType, UpdateFun, #w_replies{reply_count=0}, _RoundTrips=0}.
 
@@ -563,7 +563,7 @@ entry_reqid(Entry)                -> element(1, Entry).
 entry_client(Entry)               -> element(2, Entry).
 -spec entry_key(entry())          -> any().
 entry_key(Entry)                  -> element(3, Entry).
--spec entry_datatype(entry())     -> module().
+-spec entry_datatype(entry())     -> crdt:crdt_module().
 entry_datatype(Entry)             -> element(4, Entry).
 -spec entry_fun(entry())          -> crdt:update_fun() | crdt:query_fun().
 entry_fun(Entry)                  -> element(5, Entry).

@@ -532,7 +532,7 @@ crdt_proto_sched_read_your_write(_Config) ->
     ok.
 
 tester_type_check_crdt(_Config) ->
-    Count = 10,
+    Count = 1000,
     config:write(no_print_ring_data, true),
 
     tester:register_value_creator({typedef, crdt, update_fun, []},
@@ -559,8 +559,6 @@ tester_type_check_crdt(_Config) ->
             {write_eventual, 5}       % needs fun as input
            ],
            [
-            {add_vote_reply, 1},        % TODO? prevent generating records with undefined fields
-            {add_write_reply, 1},       % TODO? prevent generating records with undefined fields
             {add_read_reply, 5},        % needs value matching db_type
             {send_to_all_replicas, 2},  % sends messages
             {send_to_local_replica, 2}, % sends messages
