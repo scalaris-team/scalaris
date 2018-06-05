@@ -88,7 +88,7 @@ usage(){
     echo "                - (single) port distributed erlang listens on"
     echo "    --nodes-per-vm <number>"
     echo "                - number of Scalaris nodes to start inside the VM"
-    echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart|first_nostart"
+    echo "    -t <stype>  - select start type: first|joining|quorum|recover|nostart|first_nostart|client"
     echo "    -m          - start global Scalaris management server"
     echo "    -s <file>   - use the given file name as the scalaris.local.cfg"
     echo " <cmd>:"

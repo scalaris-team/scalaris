@@ -1,4 +1,4 @@
-%  @copyright 2007-2017 Zuse Institute Berlin
+%  @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,10 +19,8 @@
 %%      If one of the supervised processes fails, only the failed
 %%      process will be re-started!
 %% @end
-%% @version $Id$
 -module(sup_scalaris).
 -author('schuett@zib.de').
--vsn('$Id$').
 
 -include("scalaris.hrl").
 
@@ -295,4 +293,4 @@ check_config() ->
     config:cfg_is_integer(nodes_per_vm) and
     config:cfg_is_port(yaws_port) and
     config:cfg_is_string(docroot) and
-    config:cfg_is_in(start_type, [first, joining, quorum, recover, nostart, first_nostart]).
+    config:cfg_is_in(start_type, [first, joining, quorum, recover, nostart, first_nostart, client]).

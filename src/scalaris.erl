@@ -14,10 +14,8 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Starting and stopping the scalaris app.
-%% @version $Id$
 -module(scalaris).
 -author('schuett@zib.de').
--vsn('$Id$').
 
 -include("scalaris.hrl").
 
@@ -84,12 +82,16 @@ start(normal, []) ->
         config:init([]),
         {ok, _PidGroupsPid} = pid_groups:start_link(),
         {ok, _LogPid} = log:start_link(),
-        {ok, _YawsPid} = sup_yaws:start_link(),
-        case sup_scalaris:start_link() of
-            %% ignore -> {error, ignore}; % no longer needed as dialyzer states
-            X = {ok, Pid} when is_pid(Pid) ->
-                comm:send_local(service_per_vm, {scalaris_says_hi}),
-                X
+        case config:read(start_type) of
+            client -> ok;
+            _ ->
+                {ok, _YawsPid} = sup_yaws:start_link(),
+                case sup_scalaris:start_link() of
+                    %% ignore -> {error, ignore}; % no longer needed as dialyzer states
+                    X = {ok, Pid} when is_pid(Pid) ->
+                        comm:send_local(service_per_vm, {scalaris_says_hi}),
+                        X
+                end
         end
     catch
         Error:Reason ->
