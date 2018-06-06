@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin
+% @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc This is a small server for running benchmarks
 %% @end
-%% @version $Id$
 -module(bench).
 -author('schuett@zib.de').
--vsn('$Id$').
 
 %% public interface
 -export([increment/2, increment_o/3,
@@ -26,7 +24,8 @@
          increment/3, increment_o/4,
          quorum_read/2, quorum_read_o/3,
          read_read/2, read_read_o/3,
-         load_start/1, load_stop/0]).
+         load_start/1, load_stop/0,
+         print_results/2]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -43,18 +42,24 @@ increment(ThreadsPerVM, Iterations) ->
 -spec increment_o(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::options()) -> {ok, [{atom(), term()},...]}.
 increment_o(ThreadsPerVM, Iterations, Options) ->
     Msg = {bench, increment, ThreadsPerVM, Iterations, comm:this(), undefined},
-    manage_run(ThreadsPerVM, Iterations, Options, Msg).
+    {ok, Res} = manage_run(ThreadsPerVM, Iterations, Options, Msg),
+    print_results(Res, Options),
+    {ok, Res}.
 
 %% @doc run an increment benchmark (i++) on all nodes
 -spec increment_with_histo(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> {ok, [{atom(), term()},...]}.
 increment_with_histo(ThreadsPerVM, Iterations) ->
-    increment_with_histo_o(ThreadsPerVM, Iterations, [print, verbose]).
+    {ok, Res} = increment_with_histo_o(ThreadsPerVM, Iterations, [print, verbose]),
+    print_results(Res, [print, verbose]),
+    {ok, Res}.
 
 %% @doc run an increment benchmark (i++) on all nodes with custom options
 -spec increment_with_histo_o(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::options()) -> {ok, [{atom(), term()},...]}.
 increment_with_histo_o(ThreadsPerVM, Iterations, Options) ->
     Msg = {bench, increment_with_histo, ThreadsPerVM, Iterations, comm:this(), undefined},
-    manage_run(ThreadsPerVM, Iterations, Options, Msg).
+    {ok, Res} = manage_run(ThreadsPerVM, Iterations, Options, Msg),
+    print_results(Res, Options),
+    {ok, Res}.
 
 %% @doc run an increment benchmark on all nodes (with a user-specified key)
 -spec increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
@@ -71,7 +76,9 @@ increment_o(ThreadsPerVM, Iterations, Key, Options) ->
             {failed, init_per_key};
         _ ->
             Msg = {bench, increment_with_key, ThreadsPerVM, Iterations, comm:this(), Key},
-            manage_run(ThreadsPerVM, Iterations, Options, Msg)
+            {ok, Res} = manage_run(ThreadsPerVM, Iterations, Options, Msg),
+            print_results(Res, Options),
+            {ok, Res}
     end.
 
 %% @doc run an read benchmark on all nodes
@@ -83,7 +90,9 @@ quorum_read(ThreadsPerVM, Iterations) ->
 -spec quorum_read_o(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::options()) -> {ok, [{atom(), term()},...]}.
 quorum_read_o(ThreadsPerVM, Iterations, Options) ->
     Msg = {bench, quorum_read, ThreadsPerVM, Iterations, comm:this(), undefined},
-    manage_run(ThreadsPerVM, Iterations, Options, Msg).
+    {ok, Res} = manage_run(ThreadsPerVM, Iterations, Options, Msg),
+    print_results(Res, Options),
+    {ok, Res}.
 
 %% @doc run an read benchmark on all nodes
 -spec read_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> {ok, [{atom(), term()},...]}.
@@ -94,7 +103,9 @@ read_read(ThreadsPerVM, Iterations) ->
 -spec read_read_o(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::options()) -> {ok, [{atom(), term()},...]}.
 read_read_o(ThreadsPerVM, Iterations, Options) ->
     Msg = {bench, read_read, ThreadsPerVM, Iterations, comm:this(), undefined},
-    manage_run(ThreadsPerVM, Iterations, Options, Msg).
+    {ok, Res} = manage_run(ThreadsPerVM, Iterations, Options, Msg),
+    print_results(Res, Options),
+    {ok, Res}.
 
 -spec load_start(Gap::pos_integer()) -> ok.
 load_start(Gap) ->
@@ -150,7 +161,6 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
                  Options::options(), Message::comm:message())
                          -> {ok, [{atom(), term()},...]}.
 manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
-    Verbose = lists:member(verbose, Options),
     Print = lists:member(print, Options),
     ServerList = util:get_proc_in_vms(bench_server),
     %% io:format("~p~n", [ServerList]),
@@ -184,26 +194,6 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
                                end, 0.0, AvgLatAll) / NrServers,
     AvgExTimeAll = [element(3, Node) / 1000.0 || Node <- Statistics],
     Aborts = [element(6, Node) || Node <- Statistics],
-    case Verbose andalso Print of
-        true ->
-            io:format("servers: ~p threads/vm: ~p iterations: ~p~n",
-                      [NrServers, ThreadsPerVM, Iterations]),
-            io:format("wall clock time        : ~p~n", [WallClockTime]),
-            io:format("wall clock throughput  : ~p~n", [WallClockTP]),
-            io:format("wall clock avg. latency: ~p ms~n", [WallClockLat]),
-            io:format("min. throughput: ~p ~p (1/s)~n", [MinTP, MinTPAll]),
-            io:format("avg. throughput: ~p ~p (1/s)~n", [MeanTP, MeanTPAll]),
-            io:format("max. throughput: ~p ~p (1/s)~n", [MaxTP, MaxTPAll]),
-            io:format("min. latency   : ~p (ms)~n", [MinLatAll]),
-            io:format("avg. latency   : ~p (ms)~n", [AvgLatAll]),
-            io:format("max. latency   : ~p (ms)~n", [MaxLatAll]),
-            io:format("avg. ex. time  : ~p (ms)~n", [AvgExTimeAll]),
-            %io:format("std. dev.(%)   : ~p~n",
-            %          [[math:sqrt(element(5, Node)) / element(3, Node) * 100 || Node <- Statistics]]),
-            io:format("aborts         : ~p~n", [Aborts]);
-            %io:format("Statistics: ~p~n", [ Statistics ]);
-        false -> ok
-    end,
     Result = [{servers, ServerList},
               {threads_per_vm, ThreadsPerVM},
               {iterations, Iterations},
@@ -211,12 +201,12 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
               {wall_clock_time, WallClockTime},
               {wall_clock_throughput, WallClockTP},
               {wall_clock_latency, WallClockLat},
-              {min_troughput_overall, MinTP},
-              {min_troughput_each, MinTPAll},
-              {mean_troughput_overall, MeanTP},
-              {mean_troughput_each, MeanTPAll},
-              {max_troughput_overall, MaxTP},
-              {max_troughput_each, MaxTPAll},
+              {min_throughput_overall, MinTP},
+              {min_throughput_each, MinTPAll},
+              {mean_throughput_overall, MeanTP},
+              {mean_throughput_each, MeanTPAll},
+              {max_throughput_overall, MaxTP},
+              {max_throughput_each, MaxTPAll},
               {min_latency_each, MinLatAll},
               {avg_latency_each, AvgLatAll},
               {max_latency_each, MaxLatAll},
@@ -262,3 +252,49 @@ collect(Length, L, Print) ->
            end)
     end.
 
+
+-spec print_results(Results::[{atom(), term()},...], Options::options()) -> ok.
+print_results(Result, Options) ->
+    Verbose = lists:member(verbose, Options),
+    Print = lists:member(print, Options),
+    [{servers, ServerList},
+     {threads_per_vm, ThreadsPerVM},
+     {iterations, Iterations},
+     {statistics, _Statistics},
+     {wall_clock_time, WallClockTime},
+     {wall_clock_throughput, WallClockTP},
+     {wall_clock_latency, WallClockLat},
+     {min_throughput_overall, MinTP},
+     {min_throughput_each, MinTPAll},
+     {mean_throughput_overall, MeanTP},
+     {mean_throughput_each, MeanTPAll},
+     {max_throughput_overall, MaxTP},
+     {max_throughput_each, MaxTPAll},
+     {min_latency_each, MinLatAll},
+     {avg_latency_each, AvgLatAll},
+     {max_latency_each, MaxLatAll},
+     {avg_latency_overall, _AvgLat},
+     {avg_exec_time, AvgExTimeAll},
+     {aborts, Aborts}
+    ]  = Result,
+    NrServers = length(ServerList),
+    case Verbose andalso Print of
+        true ->
+            io:format("servers: ~p threads/vm: ~p iterations: ~p~n",
+                      [NrServers, ThreadsPerVM, Iterations]),
+            io:format("wall clock time        : ~p~n", [WallClockTime]),
+            io:format("wall clock throughput  : ~p~n", [WallClockTP]),
+            io:format("wall clock avg. latency: ~p ms~n", [WallClockLat]),
+            io:format("min. throughput: ~p ~p (1/s)~n", [MinTP, MinTPAll]),
+            io:format("avg. throughput: ~p ~p (1/s)~n", [MeanTP, MeanTPAll]),
+            io:format("max. throughput: ~p ~p (1/s)~n", [MaxTP, MaxTPAll]),
+            io:format("min. latency   : ~p (ms)~n", [MinLatAll]),
+            io:format("avg. latency   : ~p (ms)~n", [AvgLatAll]),
+            io:format("max. latency   : ~p (ms)~n", [MaxLatAll]),
+            io:format("avg. ex. time  : ~p (ms)~n", [AvgExTimeAll]),
+            %io:format("std. dev.(%)   : ~p~n",
+            %          [[math:sqrt(element(5, Node)) / element(3, Node) * 100 || Node <- Statistics]]),
+            io:format("aborts         : ~p~n", [Aborts]);
+            %io:format("Statistics: ~p~n", [ Statistics ]);
+        false -> ok
+    end.
