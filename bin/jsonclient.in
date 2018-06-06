@@ -1,0 +1,92 @@
+#!/bin/bash
+# Copyright 2007-2018 Zuse Institute Berlin
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+BINDIR=@bindir@
+
+IP="{127,0,0,1}"
+PORT=8000
+
+usage(){
+    echo "usage: jsonclient [options] <cmd>"
+    echo " options:"
+    echo "    -h          - print this help message"
+    echo "    -p <port>   - TCP port for YAWS as Erlang tuple (default {127,0,0,1})"
+    echo "    -i <ip>     - TCP IP for YAWS (default 8000)"
+    echo " <cmd>:"
+    echo "    benchmark   - run benchmarks"
+    echo "    ringsize    - get ring size"
+    echo ""
+    exit $1
+}
+
+fix_paths() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    # is this a source checkout or an (rpm/deb/manual) installation?
+    if [ "$DIRNAME" != "$BINDIR" -a "$DIRNAME" != "/bin" ]; then
+        # scalaris
+        SCALARISDIR=`dirname $DIRNAME`
+        # scalaris/bin
+        BINDIR=$SCALARISDIR/bin
+    fi
+}
+
+jsonbenchmark() {
+    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:run_benchmark($IP, $PORT), halt(0).\"" start
+}
+
+getringsize() {
+    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:get_ring_size(10000, $IP, $PORT), halt(0).\"" start
+}
+
+fix_paths
+
+until [ -z "$1" ]; do
+  OPTIND=1
+  case $1 in
+    "--help")
+      shift
+      usage 0;;
+    benchmark | ringsize)
+      cmd="$1"
+      shift;;
+    *)
+      if getopts "hx:i:p:" optionName; then
+        case "$optionName" in
+            i) IP=$OPTARG;;
+            p) PORT=$OPTARG;;
+            h) usage 0;;
+          [?]) echo "Wrong parameter $1."
+               usage 1;;
+        esac
+        shift $(($OPTIND-1))
+      else
+        shift
+        usage 1
+      fi;;
+  esac
+done
+
+case $cmd in
+    benchmark)
+        jsonbenchmark;;
+    ringsize)
+        getringsize;;
+    *)
+        echo "Unknown command: $cmd."
+        usage 1;;
+esac
