@@ -18,20 +18,33 @@
 -author('schuett@zib.de').
 
 % for api_json:
--export([get_ring_size/3, wait_for_ring_size/4, doJsonRPC/5]).
+-export([get_ring_size/3, wait_for_ring_size/4, run_benchmark/2]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
 -spec get_ring_size(TimeOut::integer(), IP::string(), Port::integer()) -> integer().
-get_ring_size(TimeOut, IP, Port) ->
-    doJsonRPC(IP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut]).
+get_ring_size(TimeOut, _IP = {A,B,C,D}, Port) ->
+    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut]).
 
 -spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer()) -> string().
 wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port) ->
     TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
     doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut]).
 
+-spec run_benchmark(IP::string(), Port::integer()) -> ok.
+run_benchmark(_IP = {A,B,C,D}, Port) ->
+    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    io:format("running bench:increment(10, 500)...~n"),
+    Incr = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_incr", []),
+    ResultIncr = bench_json_helper:json_to_result(Incr),
+    bench:print_results(ResultIncr, [print, verbose]),
+    io:format("running bench:quorum_read(10, 5000)...~n"),
+    Read = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_read", []),
+    ResultRead = bench_json_helper:json_to_result(Read),
+    bench:print_results(ResultRead, [print, verbose]),
+    ok.
 
 -spec doJsonRPC(IP::string(), Port::integer(), Path::string(), Call::string(), Params::list()) -> term().
 doJsonRPC(IP, Port, Path, Call, Params) ->

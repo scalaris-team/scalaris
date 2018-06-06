@@ -55,6 +55,8 @@ handler(rbr_write, [Key, Value])             -> api_json_rbr:write(Key, Value);
 handler(get_ring_size, [TimeOut])            -> api_json_ring:get_ring_size(TimeOut);
 handler(wait_for_ring_size, [Size, TimeOut]) -> api_json_ring:wait_for_ring_size(Size, TimeOut);
 
+handler(run_benchmark_incr, [])                  -> api_jsonclient:run_benchmark_incr();
+handler(run_benchmark_read, [])                  -> api_jsonclient:run_benchmark_read();
 
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~s:~p(~p)~n", [?MODULE, AnyOp, AnyParams]),
