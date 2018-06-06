@@ -82,7 +82,9 @@ start(normal, []) ->
         config:init([]),
         {ok, _LogPid} = log:start_link(),
         case config:read(start_type) of
-            client -> ok;
+            client ->
+                _ = inets:start(), % for jsonrpc
+                ok;
             _ ->
                 {ok, _PidGroupsPid} = pid_groups:start_link(),
                 {ok, _YawsPid} = sup_yaws:start_link(),
