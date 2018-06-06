@@ -90,13 +90,13 @@ statistic_to_json({WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts})
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 jsonbench_to_result({struct, KVL}) ->
-    [json_to_value(KV) || KV <- KVL].
+    [json_to_value(KV) || KV <- KVL].
 
 
 json_to_value({"servers", {array, ServerList}}) ->
-    {servers, [ json_to_server(Server) || Server <- ServerList]};
+    {servers, [ json_to_server(Server) || Server <- ServerList]};
 json_to_value({"statistics", {array, Statistics}}) ->
-    {statistics, [json_to_statistics(Statistic) || Statistic <- Statistics]};
+    {statistics, [json_to_statistics(Statistic) || Statistic <- Statistics]};
 json_to_value({"min_throughput_each", {array, MinTPAll}}) ->
     {min_throughput_each, MinTPAll};
 json_to_value({"mean_throughput_each", {array, MeanTPAll}}) ->
@@ -116,7 +116,7 @@ json_to_value({"aborts", {array, Aborts}}) ->
 json_to_value({Key, Value}) -> %% fallthrough
     {list_to_atom(Key), Value}.
 
-json_to_server({struct, [{"port", Port}, {"server", Server}, {"ip", IP}]}) ->
+json_to_server({struct, [{"port", Port}, {"server", Server}, {"ip", IP}]}) ->
     {IP, Port, list_to_atom(Server)}.
 
 json_to_statistics({struct, [{"wall_clock_time", WallClockTime}, {"min_time", MinTime},
