@@ -1,5 +1,5 @@
 
-# Copyright 2007-2017 Zuse Institute Berlin
+# Copyright 2007-2018 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ PYTHON3_2TO3=@PYTHON3_2TO3@
 VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.6.1
 COMMONS_CLI_VERSION=1.2
+
+SESSIONKEY:=$(shell cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 32 | head -n 1)
 
 .PHONY: all bench bench-ssl bench-ssl-strict bench-ssl-strict-bad compile test test-vts cpp cpp-clean cpp-test java java-test java-bench java-* datanucleus datanucleus-test ycsb coverity python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags tags-clean docs dialyzer dialyzer-col rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean nifs %_SUITE
 
@@ -204,7 +206,7 @@ test-clean:
             result_read_10_10000.txt result_read_1_100000.txt \
             data/ct*@*
 
-bench: compile
+bench2: compile
 	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node start && \
 	echo "running bench:increment(10, 500)..." && \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
@@ -222,6 +224,11 @@ bench: compile
 	else \
 	  true ; \
 	fi
+
+bench: compile
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) start
+	./bin/jsonclient -p $(SCALARIS_UNITTEST_YAWS_PORT) benchmark
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) stop
 
 bench-ssl: compile
 	( ./bin/setup-ring-for-benchmarks.sh --ssl --ring-size 4 --node-prefix ebench_node start && \

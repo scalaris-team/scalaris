@@ -46,3 +46,4 @@ contrib/slurm/slurm-*.out
 /contrib/log4erl/src/log4erl_parser.erl
 /cpp-api/tests.dSYM/
 /cpp-api/compile_commands.json
+/bin/jsonclient
