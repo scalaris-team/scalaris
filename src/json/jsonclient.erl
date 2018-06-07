@@ -17,37 +17,37 @@
 -module(jsonclient).
 -author('schuett@zib.de').
 
-% for api_json:
--export([get_ring_size/3, wait_for_ring_size/4, run_benchmark/2]).
+-export([get_ring_size/4, wait_for_ring_size/5, run_benchmark/3]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--spec get_ring_size(TimeOut::integer(), IP::string(), Port::integer()) -> integer().
-get_ring_size(TimeOut, _IP = {A,B,C,D}, Port) ->
+-spec get_ring_size(TimeOut::integer(), IP::string(), Port::integer(), SSL::boolean()) -> integer().
+get_ring_size(TimeOut, _IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
-    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut]).
+    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut], SSL).
 
--spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer()) -> string().
-wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port) ->
+-spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer(), SSL::boolean()) -> string().
+wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
-    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut]).
+    doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut], SSL).
 
--spec run_benchmark(IP::string(), Port::integer()) -> ok.
-run_benchmark(_IP = {A,B,C,D}, Port) ->
+-spec run_benchmark(IP::string(), Port::integer(), SSL::boolean()) -> ok.
+run_benchmark(_IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     io:format("running bench:increment(10, 500)...~n"),
-    Incr = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_incr", []),
+    Incr = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_incr", [], SSL),
     ResultIncr = bench_json_helper:json_to_result(Incr),
     bench:print_results(ResultIncr, [print, verbose]),
     io:format("running bench:quorum_read(10, 5000)...~n"),
-    Read = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_read", []),
+    Read = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_read", [], SSL),
     ResultRead = bench_json_helper:json_to_result(Read),
     bench:print_results(ResultRead, [print, verbose]),
     ok.
 
--spec doJsonRPC(IP::string(), Port::integer(), Path::string(), Call::string(), Params::list()) -> term().
-doJsonRPC(IP, Port, Path, Call, Params) ->
+-spec doJsonRPC(IP::string(), Port::integer(), Path::string(), Call::string(), Params::list(), SSL::boolean()) -> term().
+doJsonRPC(IP, Port, Path, Call, Params, SSL) ->
+    ok = ssl:start(), %% just in case
     ContentType = "application/json",
     Json = {struct, [{jsonrpc, "2.0"}, {method, Call}, {params, {array, Params}}, {id, 1}]},
     Body = lists:flatten(json2:encode(Json)),
@@ -57,8 +57,9 @@ doJsonRPC(IP, Port, Path, Call, Params) ->
                {"Connection", "Keep-Alive"},
                {"Content-Type", ContentType},
                {"Content-Length", length(Body)}],
-    Request = { "http://" ++ IP ++ ":" ++ integer_to_list(Port) ++ "/" ++ Path, Headers,
+    Request = { get_url_prefix(SSL) ++ IP ++ ":" ++ integer_to_list(Port) ++ "/" ++ Path, Headers,
                 ContentType, Body},
+    io:format("~s~n", [get_url_prefix(SSL) ++ IP ++ ":" ++ integer_to_list(Port) ++ "/" ++ Path]),
     HTTPOptions = [{version, "HTTP/1.1"}],
     Options = [{body_format, string}],
     Result = httpc:request(post, Request, HTTPOptions, Options),
@@ -80,6 +81,11 @@ doJsonRPC(IP, Port, Path, Call, Params) ->
             {error, Reason}
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% util
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 trim_new_lines(S) ->
     trim_new_lines_internal(lists:reverse(S)).
 
@@ -91,3 +97,8 @@ trim_new_lines_internal(S = [First | Rest]) ->
         $\n ->trim_new_lines_internal(Rest);
         _ -> lists:reverse(S)
     end.
+
+get_url_prefix(_SSL = true) ->
+    "https://";
+get_url_prefix(_SSL = false) ->
+    "http://".
