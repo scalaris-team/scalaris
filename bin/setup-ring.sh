@@ -60,7 +60,7 @@ start_ring(){
     let TESTPORT=$SCALARIS_UNITTEST_PORT+$RINGSIZE
     let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$RINGSIZE
 
-    ./bin/scalarisctl -t client -e "-noinput -eval \"jsonclient:wait_for_ring_size($RINGSIZE, 10000, {127,0,0,1}, $SCALARIS_UNITTEST_YAWS_PORT), halt(0).\"" start
+    ./bin/jsonclient -p $SCALARIS_UNITTEST_YAWS_PORT -r $RINGSIZE waitforringsize
 }
 
 stop_ring(){
