@@ -22,17 +22,17 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--spec get_ring_size(TimeOut::integer(), IP::string(), Port::integer(), SSL::boolean()) -> integer().
+-spec get_ring_size(TimeOut::integer(), IP::{non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}, Port::integer(), SSL::boolean()) -> integer().
 get_ring_size(TimeOut, _IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     doJsonRPC(TheIP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut], SSL).
 
--spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer(), SSL::boolean()) -> string().
+-spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::{non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}, Port::integer(), SSL::boolean()) -> string().
 wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut], SSL).
 
--spec run_benchmark(IP::string(), Port::integer(), SSL::boolean()) -> ok.
+-spec run_benchmark(IP::{non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}, Port::integer(), SSL::boolean()) -> ok.
 run_benchmark(_IP = {A,B,C,D}, Port, SSL) ->
     TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     io:format("running bench:increment(10, 500)...~n"),
