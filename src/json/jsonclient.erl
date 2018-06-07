@@ -25,17 +25,17 @@
 
 -spec get_ring_size(TimeOut::integer(), IP::string(), Port::integer()) -> integer().
 get_ring_size(TimeOut, _IP = {A,B,C,D}, Port) ->
-    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     doJsonRPC(TheIP, Port, "jsonrpc.yaws", "get_ring_size", [TimeOut]).
 
 -spec wait_for_ring_size(Size::integer(), TimeOut::integer(), IP::string(), Port::integer()) -> string().
 wait_for_ring_size(Size, TimeOut, _IP = {A,B,C,D}, Port) ->
-    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     doJsonRPC(TheIP, Port, "jsonrpc.yaws", "wait_for_ring_size", [Size, TimeOut]).
 
 -spec run_benchmark(IP::string(), Port::integer()) -> ok.
 run_benchmark(_IP = {A,B,C,D}, Port) ->
-    TheIP = io_lib:format("~w.~w.~w.~w", [A,B,C,D]),
+    TheIP = lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D])),
     io:format("running bench:increment(10, 500)...~n"),
     Incr = doJsonRPC(TheIP, Port, "jsonrpc.yaws", "run_benchmark_incr", []),
     ResultIncr = bench_json_helper:json_to_result(Incr),
@@ -64,7 +64,7 @@ doJsonRPC(IP, Port, Path, Call, Params) ->
     Result = httpc:request(post, Request, HTTPOptions, Options),
     case Result of
         {ok, {_StatusLine, _Headers2, Body2}} ->
-            JsonResponse = json2:decode_string(string:trim(Body2)),
+            JsonResponse = json2:decode_string(trim_new_lines(Body2)), % cheap string:trim()
             case JsonResponse of
                 {ok, {struct, List}} ->
                     case lists:keyfind("result", 1, List) of
@@ -78,4 +78,16 @@ doJsonRPC(IP, Port, Path, Call, Params) ->
             end;
         {error, Reason} ->
             {error, Reason}
+    end.
+
+trim_new_lines(S) ->
+    trim_new_lines_internal(lists:reverse(S)).
+
+trim_new_lines_internal([]) ->
+    [];
+trim_new_lines_internal(S = [First | Rest]) ->
+    case First of
+        [$\r,$\n] -> trim_new_lines_internal(Rest);
+        $\n ->trim_new_lines_internal(Rest);
+        _ -> lists:reverse(S)
     end.
