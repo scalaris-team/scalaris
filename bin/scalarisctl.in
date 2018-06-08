@@ -235,7 +235,7 @@ checkinstallation() {
         exit 1
     fi
 
-    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null 2>&1
+    $ERL -noinput -name "checkinstallation$NODE_NAME" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
@@ -247,7 +247,7 @@ checkinstallation() {
         echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
+    $ERL -noinput -name "checkinstallation$NODE_NAME@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
