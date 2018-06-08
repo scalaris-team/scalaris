@@ -14,6 +14,8 @@
 #    limitations under the License.
 
 RINGSIZE=4
+WITHSSL=""
+SSL=""
 
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
 SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
@@ -53,7 +55,7 @@ start_ring(){
             let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
         fi
 
-        ./bin/scalarisctl -d -k $key -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start
+        ./bin/scalarisctl -d -k $key -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start $WITHSSL
 
     done
 
@@ -61,6 +63,8 @@ start_ring(){
     let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$RINGSIZE
 
     ./bin/jsonclient -p $SCALARIS_UNITTEST_YAWS_PORT -r $RINGSIZE waitforringsize
+
+    # $SSL
 }
 
 stop_ring(){
@@ -87,6 +91,13 @@ until [ -z "$1" ]; do
             shift
             SESSIONKEY=$1
             MANDATORY=true
+            shift;;
+        "--ssl")
+            WITHSSL="-s scalaris.local.ssl.cfg"
+            SSL="-s"
+            shift;;
+        "--ssl-strict")
+            WITHSSL="-s scalaris.local.ssl.good.cfg"
             shift;;
         start | stop)
             cmd="$1"

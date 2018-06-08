@@ -20,6 +20,7 @@ BINDIR=@bindir@
 IP="{127,0,0,1}"
 PORT=8000
 RINGSIZE=4
+SSL=false
 
 usage(){
     echo "usage: jsonclient [options] <cmd>"
@@ -28,6 +29,7 @@ usage(){
     echo "    -i <ip>         - TCP IP for YAWS as Erlang tuple (default {127,0,0,1})"
     echo "    -p <port>       - TCP port for YAWS (default 8000)"
     echo "    -r <size>       - ring size (default 4)"
+    echo "    -s              - enable ssl (default false)"
     echo " <cmd>:"
     echo "    benchmark       - run benchmarks"
     echo "    ringsize        - get ring size"
@@ -49,15 +51,15 @@ fix_paths() {
 }
 
 jsonbenchmark() {
-    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:run_benchmark($IP, $PORT), halt(0).\"" start
+    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:run_benchmark($IP, $PORT, $SSL), halt(0).\"" start
 }
 
 get_ring_size() {
-    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:get_ring_size(10000, $IP, $PORT), halt(0).\"" start
+    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:get_ring_size(10000, $IP, $PORT, $SSL), halt(0).\"" start
 }
 
 wait_for_ring_size() {
-    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:wait_for_ring_size($RINGSIZE, 10000, $IP, $PORT), halt(0).\"" start
+    $BINDIR/scalarisctl -t client -e "-noinput -eval \"jsonclient:wait_for_ring_size($RINGSIZE, 10000, $IP, $PORT, $SSL), halt(0).\"" start
 }
 
 fix_paths
@@ -72,11 +74,12 @@ until [ -z "$1" ]; do
       cmd="$1"
       shift;;
     *)
-      if getopts "hx:i:p:r:" optionName; then
+      if getopts "hsx:i:p:r:" optionName; then
         case "$optionName" in
             i) IP=$OPTARG;;
             p) PORT=$OPTARG;;
             r) RINGSIZE=$OPTARG;;
+            s) SSL=true;;
             h) usage 0;;
           [?]) echo "Wrong parameter $1."
                usage 1;;
