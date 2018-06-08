@@ -47,7 +47,7 @@ run_benchmark(_IP = {A,B,C,D}, Port, SSL) ->
 
 -spec doJsonRPC(IP::string(), Port::integer(), Path::string(), Call::string(), Params::list(), SSL::boolean()) -> term().
 doJsonRPC(IP, Port, Path, Call, Params, SSL) ->
-    ok = ssl:start(), %% just in case
+    _ = ssl:start(), %% just in case.  ok | {error, Reason}
     ContentType = "application/json",
     Json = {struct, [{jsonrpc, "2.0"}, {method, Call}, {params, {array, Params}}, {id, 1}]},
     Body = lists:flatten(json2:encode(Json)),
