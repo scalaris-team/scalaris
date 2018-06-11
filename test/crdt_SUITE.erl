@@ -661,7 +661,7 @@ wait_writers_completion(NumberOfWriter) ->
 stop_readers(Reader) when is_pid(Reader) ->
     stop_readers([Reader]);
 stop_readers(Readers) ->
-    [Reader ! {reader_done} || Reader <- Readers],
+    _ = [Reader ! {reader_done} || Reader <- Readers],
     [receive {reader_terminated} -> ok end || _ <- Readers],
     ok.
 
