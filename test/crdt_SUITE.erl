@@ -636,7 +636,7 @@ spawn_writers(UnitTestPid, NumberOfWriters, IterationsPerWriter, WriteFun, Proto
            [NumberOfWriters, IterationsPerWriter]),
     [spawn(
         fun() ->
-            case ProtoSchedTraceId of
+            _ = case ProtoSchedTraceId of
                 none ->
                     _ = [WriteFun(I) || I <- lists:seq(1, IterationsPerWriter)];
                 TraceId ->
@@ -662,7 +662,8 @@ stop_readers(Reader) when is_pid(Reader) ->
     stop_readers([Reader]);
 stop_readers(Readers) ->
     [Reader ! {reader_done} || Reader <- Readers],
-    [receive {reader_terminated} -> ok end || _ <- Readers].
+    [receive {reader_terminated} -> ok end || _ <- Readers],
+    ok.
 
 -spec spawn_monotonic_reader(pid(), fun(() -> crdt:crdt()), fun((term(), term()) -> boolean())) -> pid().
 spawn_monotonic_reader(UnitTestPid, ReadFun, LTEQCompareFun) ->
