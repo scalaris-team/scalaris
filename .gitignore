@@ -27,6 +27,8 @@
 /*.log
 ebin/
 *.swp
+*.swo
+.DS_Store
 Session.vim
 .vimrc
 /src/user_default.erl
