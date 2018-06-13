@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -198,8 +198,10 @@ mpath(Config) ->
 simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
+    %% use erlang:=< instead of < as progress is not guaranteed for a
+    %% single round
     start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}],
-               1, 0.1, get_rep_upd_config(Method), fun erlang:'<'/2).
+               1, 0.1, get_rep_upd_config(Method), fun erlang:'=<'/2).
 
 multi_round(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -313,8 +315,10 @@ parts(Config) ->
     FType = proplists:get_value(ftype, Config),
     OldConf = get_rep_upd_config(Method),
     Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),
+    %% use erlang:=< instead of < as progress is not guaranteed for a
+    %% few rounds
     start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}],
-               2, 0.2, Conf, fun erlang:'<'/2).
+               2, 0.2, Conf, fun erlang:'=<'/2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
