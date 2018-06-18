@@ -64,9 +64,9 @@ function wait_for_stable_ring {
         NR_OF_FIRSTS=`epmd -names | grep 'name first at port' | wc -l`
     done
     # wait for the first VM to initialize
-    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', api_vm, wait_for_scalaris_to_start, []), io:format('\tserver started: ~p~n', [A]), halt(0)."
+    erl -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', api_vm, wait_for_scalaris_to_start, []), io:format('\tserver started: ~p~n', [A]), halt(0)."
     # wait for the ring to stabilize
-    erl -setcookie "chocolate chip cookie" -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', admin, wait_for_stable_ring, [$NR_OF_NODES]), io:format('\tring stable: ~p~n', [A]), halt(0)."
+    erl -name bench_ -noinput -eval "A = rpc:call('first@`hostname -f`', admin, wait_for_stable_ring, [$NR_OF_NODES]), io:format('\tring stable: ~p~n', [A]), halt(0)."
 }
 
 function kill_old_nodes() {

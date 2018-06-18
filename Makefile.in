@@ -206,67 +206,20 @@ test-clean:
             result_read_10_10000.txt result_read_1_100000.txt \
             data/ct*@*
 
-bench2: compile
-	( ./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node start && \
-	echo "running bench:increment(10, 500)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
-	echo "running bench:quorum_read(10, 5000)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
-	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ring-size 4 --node-prefix ebench_node stop ; \
-	if [ $$FAILED -ne 0 ]; then \
-	  echo "####################" ; \
-	  echo "Erlang messages (last 50 per log file):" ; \
-	  echo "####################" ; \
-	  tail -n 50 log/ebench_*@"`hostname -f`"/* ; \
-	  echo "####################" ; \
-	  false ; \
-	else \
-	  true ; \
-	fi
-
 bench: compile
 	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) start
 	./bin/jsonclient -p $(SCALARIS_UNITTEST_YAWS_PORT) benchmark
 	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) stop
 
 bench-ssl: compile
-	( ./bin/setup-ring-for-benchmarks.sh --ssl --ring-size 4 --node-prefix ebench_node start && \
-	echo "running bench:increment(10, 500)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
-	echo "running bench:quorum_read(10, 5000)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
-	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ssl --ring-size 4 --node-prefix ebench_node stop ; \
-	if [ $$FAILED -ne 0 ]; then \
-	  echo "####################" ; \
-	  echo "Erlang messages (last 50 per log file):" ; \
-	  echo "####################" ; \
-	  tail -n 50 log/ebench_*@"`hostname -f`"/* ; \
-	  echo "####################" ; \
-	  false ; \
-	else \
-	  true ; \
-	fi
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) --ssl start
+	./bin/jsonclient -s -p $(SCALARIS_UNITTEST_YAWS_PORT) benchmark
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) --ssl stop
 
 bench-ssl-strict: compile
-	( ./bin/setup-ring-for-benchmarks.sh --ssl-strict --ring-size 4 --node-prefix ebench_node start && \
-	echo "running bench:increment(10, 500)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, increment, [10, 500]), halt(0)." && \
-	echo "running bench:quorum_read(10, 5000)..." && \
-	$(ERL) -setcookie "chocolate chip cookie" -name bench_ctl -pa ebin/ -noinput -eval "rpc:call('ebench_node1@`hostname -f`', bench, quorum_read, [10, 5000]), halt(0)." ) ; \
-	FAILED=$$? ; \
-	./bin/setup-ring-for-benchmarks.sh --ssl-strict --ring-size 4 --node-prefix ebench_node stop ; \
-	if [ $$FAILED -ne 0 ]; then \
-	  echo "####################" ; \
-	  echo "Erlang messages (last 50 per log file):" ; \
-	  echo "####################" ; \
-	  tail -n 50 log/ebench_*@"`hostname -f`"/* ; \
-	  echo "####################" ; \
-	  false ; \
-	else \
-	  true ; \
-	fi
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) --ssl-strict start
+	./bin/jsonclient -s -p $(SCALARIS_UNITTEST_YAWS_PORT) benchmark
+	./bin/setup-ring.sh --ring-size 4 --session-key $(SESSIONKEY) --ssl-strict stop
 
 bench-ssl-strict-bad: compile
 	( ./bin/setup-ring-for-benchmarks.sh --ssl-strict --bad-nodes 2 --ring-size 4 --node-prefix ebench_node start && \
