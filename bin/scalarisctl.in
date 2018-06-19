@@ -189,14 +189,20 @@ get_cookie() {
 }
 
 cleanup_before_checkinstallation() {
-  for pid in `ps aux | grep beam.smp | grep $NODE_NAME | awk '{print $2}'`;
-  do
-    #echo "Killing $pid..."
-    kill $pid
-  done
+  if [ "" != "$NODE_NAME" ]; then
+    for pid in `ps aux | grep beam.smp | grep $NODE_NAME | awk '{print $2}'`;
+    do
+      #echo "Killing $pid..."
+      kill $pid
+    done
+  fi
 }
 
 checkinstallation() {
+    if [ "" = "$NODE_NAME" ]; then
+        NODE_NAME=`cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 8 | head -n 1`
+        fix_node_name
+    fi
     echo "Running cleanup..."
     cleanup_before_checkinstallation
     echo -n "Running basic tests..."
@@ -234,7 +240,7 @@ checkinstallation() {
         exit 1
     fi
 
-    $ERL -noinput -name "checkinstallation$NODE_NAME" -eval 'halt(0).' > /dev/null 2>&1
+    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
@@ -246,14 +252,14 @@ checkinstallation() {
         echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -name "checkinstallation$NODE_NAME@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
+    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@`get_hostname`'"
         echo "Are you already running another checkinstallation?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
-        echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_hostname`\" -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation$NODE_NAME@`get_hostname`\" -eval 'halt(0).'"
         echo -n "Continuing basic tests..."
     fi
 
@@ -453,7 +459,6 @@ checkinstallation() {
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
         echo "  (result: ${scalaris_nodes_count_actual})."
         echo "  we were trying to run: $0 -t first -m -d start"
-        ps aux | grep beam.smp | grep $NODE_NAME
         # try to stop anyway (it could have been a false alarm):
         $0 -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
@@ -776,7 +781,10 @@ scalarisstart(){
 
 scalarisstop(){
     pushd $BEAMDIR > /dev/null
-    $ERL -setcookie "$SCALARIS_COOKIE" \
+    if [ "$SCALARIS_COOKIE" != "" ]; then
+        cookie="-setcookie $SCALARIS_COOKIE"
+    fi
+    $ERL $cookie \
         -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
@@ -788,7 +796,10 @@ scalarisstop(){
 
 scalariscall(){
     pushd $BEAMDIR > /dev/null
-    $ERL -setcookie "$SCALARIS_COOKIE" \
+    if [ "$SCALARIS_COOKIE" != "" ]; then
+        cookie="-setcookie $SCALARIS_COOKIE"
+    fi
+    $ERL $cookie \
         -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
