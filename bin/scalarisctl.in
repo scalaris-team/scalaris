@@ -428,8 +428,9 @@ checkinstallation() {
     if [ -n "$port" ]; then
         export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]"
     fi
+
     export SCALARIS_JAPI_NODE="$NODE_NAME"
-    $0 -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
+    $0 -e "$erl_flags" -c "chocolate chip cookie" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"

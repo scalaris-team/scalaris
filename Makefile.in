@@ -275,6 +275,7 @@ java-test: compile java
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
+	-c "chocolate chip cookie" \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -buildfile java-api/build.xml test ) ; \
@@ -320,6 +321,7 @@ datanucleus-test: compile datanucleus
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
+	-c "chocolate chip cookie" \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	mvn -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -f contrib/datanucleus/scalaris-datanucleus-store-test/pom.xml test ) ; \
@@ -495,6 +497,7 @@ interop-test: compile java java-scalaris.test.compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
+	-c "chocolate chip cookie" \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
 	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.stderr.log && \
