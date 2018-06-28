@@ -21,7 +21,6 @@
 
 #include <sys/time.h> // clang modules
 
-#include <boost/asio.hpp>
 #include "json/json.h"
 
 namespace scalaris {

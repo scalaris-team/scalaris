@@ -18,8 +18,6 @@
 #include "exceptions.hpp"
 #include "json/json.h"
 
-#include <boost/asio.hpp>
-
 #include <array>
 #include <iostream>
 #include <stdexcept>
