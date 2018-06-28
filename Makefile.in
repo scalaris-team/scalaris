@@ -277,10 +277,10 @@ java-test: compile java
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-c "chocolate chip cookie" \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
-	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
+	( ./bin/scalarisctl -c "chocolate chip cookie" -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -buildfile java-api/build.xml test ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
+	./bin/scalarisctl -c "chocolate chip cookie" -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \

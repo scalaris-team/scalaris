@@ -436,7 +436,7 @@ checkinstallation() {
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
         echo "  we were trying to run: $0 -d -t first -m start"
         # try to stop anyway (it could have been a false alarm):
-        $0 -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        $0 -e "$erl_flags" -c "chocolate chip cookie" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
     fi
 
@@ -461,7 +461,7 @@ checkinstallation() {
         echo "  (result: ${scalaris_nodes_count_actual})."
         echo "  we were trying to run: $0 -t first -m -d start"
         # try to stop anyway (it could have been a false alarm):
-        $0 -e "$erl_flags" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        $0 -e "$erl_flags" -c "chocolate chip cookie" -d -t first -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
       fi
     done
@@ -670,7 +670,7 @@ checkinstallation() {
         echo "$CPP_OUTPUT"
     fi
 
-    $0 -e "$erl_flags" -d -f -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+    $0 -e "$erl_flags" -c "chocolate chip cookie" -d -f -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
 
     if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
          -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 -o "$CPP_FAILED" -ne 0 ]; then
@@ -706,7 +706,9 @@ scalarisstart(){
         BACKGROUND="-detached"
     fi
     local tmp
+    local COOKIE
     tmp=""
+    COOKIE=""
     if [ "$start_type" != "" ]; then
         tmp="$tmp -scalaris start_type $start_type"
     else
@@ -741,7 +743,7 @@ scalarisstart(){
         tmp="$tmp -scalaris nodes_per_vm \"$NODES_PER_VM\""
     fi
     if [ "$SCALARIS_COOKIE" != "" ]; then
-        tmp="$tmp -setcookie $SCALARIS_COOKIE"
+        COOKIE="-setcookie '$SCALARIS_COOKIE'"
     fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
     # if YAWSHOME is not the logdir, make sure to create the directory!
@@ -760,6 +762,7 @@ scalarisstart(){
  -scalaris local_config \"\\\"$ETCDIR/$SCALARIS_LOCAL_CFG\\\"\"\
  -connect_all false -hidden $DISTRERL\
  $SCALARIS_ADDITIONAL_PARAMETERS\
+ $COOKIE\
  -s scalaris `echo $erl_flags`"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
         if [ -n "$SLURM_JOBID" ]; then
@@ -781,31 +784,45 @@ scalarisstart(){
 }
 
 scalarisstop(){
+    FAILED=
     pushd $BEAMDIR > /dev/null
     if [ "$SCALARIS_COOKIE" != "" ]; then
-        cookie="-setcookie $SCALARIS_COOKIE"
-    fi
-    $ERL $cookie \
+      $ERL -setcookie "$SCALARIS_COOKIE"\
         -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
-    FAILED=$?
+      FAILED=$?
+    else
+      $ERL \
+        -name "ctl_$RANDOM@`get_hostname`" \
+        -pa $BEAMDIR \
+        -noinput \
+        -s scalaris cli -extra $NODE_NAME stop
+      FAILED=$?
+    fi
     popd > /dev/null 2>&1 || true
     return $FAILED
 }
 
 scalariscall(){
+    FAILED=
     pushd $BEAMDIR > /dev/null
     if [ "$SCALARIS_COOKIE" != "" ]; then
-        cookie="-setcookie $SCALARIS_COOKIE"
-    fi
-    $ERL $cookie \
+      $ERL -setcookie "$SCALARIS_COOKIE" \
         -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -eval "$1"
-    FAILED=$?
+      FAILED=$?
+    else
+      $ERL \
+        -name "ctl_$RANDOM@`get_hostname`" \
+        -pa $BEAMDIR \
+        -noinput \
+        -eval "$1"
+      FAILED=$?
+    fi
     popd > /dev/null 2>&1 || true
     return $FAILED
 }
@@ -923,6 +940,7 @@ fix_node_name
 
 case $cmd in
     checkinstallation)
+        SCALARIS_COOKIE="chocolate chip cookie" # java hack
         checkinstallation;;
     start)
         scalarisstart;;
@@ -943,6 +961,7 @@ case $cmd in
         if [ -z "$DBG_CHECK_RING_SIZE" -o -z "$DBG_CHECK_RING_TIMEOUT" ] ; then
           usage 1
         else
+          SCALARIS_COOKIE="chocolate chip cookie"
           dbg_check_ring "$DBG_CHECK_RING_SIZE" "$DBG_CHECK_RING_TIMEOUT"
         fi;;
     *)
