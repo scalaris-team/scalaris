@@ -29,7 +29,7 @@ apply_update(U, ReplicaId, CRDT) ->
         {arity, 2} -> U(ReplicaId, CRDT)
     end.
 
--spec apply_query(crdt:query_fun(), crdt()) -> crdt().
+-spec apply_query(crdt:query_fun(), crdt()) -> term().
 apply_query(Q, CRDT) -> Q(CRDT).
 
 -spec lteq(crdt(), crdt())  -> boolean().
