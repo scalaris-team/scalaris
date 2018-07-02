@@ -499,7 +499,7 @@ interop-test: compile java java-scalaris.test.compile python
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-c "chocolate chip cookie" \
 	-n "$(SCALARIS_JTEST_NAME)" -m -t first start ; \
-	( ./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
+	( ./bin/scalarisctl -c "chocolate chip cookie" -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 && \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" $(PYTHON2) python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_write.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_write.stderr.log && \
@@ -513,7 +513,7 @@ interop-test: compile java java-scalaris.test.compile python
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_python.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_python.stderr.log && \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_ruby.log 2> log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_ruby.stderr.log ) ; \
 	FAILED=$$? ; \
-	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
+	./bin/scalarisctl -c "chocolate chip cookie" -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  cat "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"interop.*write*.stderr.log ; \
