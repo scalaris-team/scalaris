@@ -56,9 +56,9 @@ msg_get_val_reply(Client, Key, UpdatedVal) ->
 msg_ack_reply(Client, Key, ProposalNumber, ProposalValue) ->
     comm:send(Client, {ack_reply, Key, ProposalNumber, ProposalValue}).
 
--spec msg_learner_ack_reply(comm:mypid(), ?RT:key(), crdt:crdt_module(), pr:pr(), crdt:crdt(), any()) -> ok.
-msg_learner_ack_reply(Client, Key, DataType, ProposalNumber, ProposalValue, ProposerId) ->
-    comm:send(Client, {learner_ack_reply, Key, DataType, ProposalNumber, ProposalValue, ProposerId}).
+-spec msg_learner_ack_reply(comm:mypid(), ?RT:key(), [comm:mypid()], crdt:crdt_module(), pr:pr(), crdt:crdt(), any()) -> ok.
+msg_learner_ack_reply(Proposer, Key, Clients, DataType, ProposalNumber, ProposalValue, ProposerId) ->
+    comm:send(Proposer, {learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, ProposerId}).
 
 -spec msg_nack_reply(comm:mypid(), ?RT:key(), pr:pr(), crdt:crdt()) -> ok.
 msg_nack_reply(Client, Key, ProposalNumber, ProposalValue) ->
@@ -101,7 +101,7 @@ on({gla_acceptor, get_proposal_value, _Cons, Proposer, Key, DataType, UpdateFun}
     State;
 
 
-on({gla_acceptor, propose, _Cons, Proposer, Key, ProposalNumber, ProposedValue, DataType},
+on({gla_acceptor, propose, _Cons, Proposer, Key, Clients, ProposalNumber, ProposedValue, DataType},
    _State={TableName, ProposerList}) ->
     ?TRACE("crdt_acceptor:propose: ~p ~p ~n ~p ~p", [Key, Proposer, ProposalNumber, ProposedValue]),
     NewProposerList = case lists:member(Proposer, ProposerList) of
@@ -117,7 +117,7 @@ on({gla_acceptor, propose, _Cons, Proposer, Key, ProposalNumber, ProposedValue, 
             NewEntry = entry_set_val(Entry, ProposedValue),
             _ = set_entry(NewEntry, TableName),
 
-            _ = [msg_learner_ack_reply(Learner, Key, DataType, ProposalNumber, ProposedValue, Proposer)
+            _ = [msg_learner_ack_reply(Learner, Key, Clients, DataType, ProposalNumber, ProposedValue, Proposer)
                  || Learner <- NewProposerList], %% each proposer is also a learner
             msg_ack_reply(Proposer, Key, ProposalNumber, ProposedValue);
         false ->
