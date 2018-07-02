@@ -282,6 +282,7 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
 
     NewEntry = learner_add_vote(Entry, ProposerId, ProposalNumber),
     VoteCount = learner_votes(NewEntry, ProposerId, ProposalNumber),
+    %ct:pal("~p", [[VoteCount, NewEntry]]),
     Learnt = learner_learnt(NewEntry),
     NewEntry2 =
         case replication:quorum_accepted(VoteCount) andalso
@@ -420,19 +421,30 @@ learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
 learner_votes(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
     Key = {Proposer, ProposalNumber},
-    element(2, lists:keyfind(Key, 1, Votes)).
+    %ct:pal("~p", [Votes]),
+    case lists:keyfind(Key, 1, Votes) of
+        false -> 0;
+        E -> element(2, E)
+    end.
 
 -spec learner_add_vote(learner_entry(), any(), non_neg_integer()) -> learner_entry().
 learner_add_vote(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
-    Key = {Proposer, ProposalNumber},
-    UpdatedVote = case lists:keysearch(Key, 1, Votes) of
-                      false -> {Key, 1};
-                      {value, {Key, VoteCount}} -> {Key, VoteCount + 1}
-                  end,
-    NewVotes = lists:keystore(Key, 1, Votes, UpdatedVote),
-    setelement(4, Entry, NewVotes).
+    Dummy = {{Proposer, -1}, 0},
 
+    {HighestPropNum, OldCount} = lists:max([{PropNum, OldCount} ||
+                                            {{P, PropNum}, OldCount} <- [Dummy | Votes], P =:= Proposer]),
+    case HighestPropNum > ProposalNumber of
+        true -> Entry;
+        false ->
+            NewVoteCount = case ProposalNumber =:= HighestPropNum of
+                               true -> OldCount + 1;
+                               false -> 1
+                           end,
+            NewList = [E || E={{P,_},_} <- Votes, P =/= Proposer],
+            NewVotes = [{{Proposer, ProposalNumber}, NewVoteCount}| NewList],
+            setelement(4, Entry, NewVotes)
+    end.
 
 %%%%%%%%%%%%%%% creation/retrieval/save of entries
 -spec new_entry(?RT:key(), crdt:crdt_module()) -> entry().
