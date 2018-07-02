@@ -365,8 +365,6 @@ send_to_all_replicas(Key, Message, _Routing=true) ->
     ok.
 
 %%%%%%%%%%%%%%%%%% access of proposer entry
--spec entry_key(entry())            -> any().
-entry_key(Entry)                    -> element(1, Entry).
 -spec entry_datatype(entry())       -> crdt:crdt_module().
 entry_datatype(Entry)               -> element(2, Entry).
 -spec entry_clients(entry())       -> [any()].
@@ -384,8 +382,6 @@ entry_propnum(Entry)                -> element(7, Entry).
 entry_propval(Entry)                -> element(8, Entry).
 -spec entry_bufval(entry())        -> crdt:crdt().
 entry_bufval(Entry)                -> element(9, Entry).
--spec entry_outval(entry())        -> crdt:crdt().
-entry_outval(Entry)                -> element(10, Entry).
 
 entry_add_client(Entry, Client) ->
     Clients = element(3, Entry),
@@ -406,10 +402,6 @@ entry_set_outval(Entry, X)      -> setelement(10, Entry, X).
 
 
 %%%%%%%%%%%%%%%% access of learner entry
--spec learner_key(entry())      -> any().
-learner_key(Entry)              -> element(1, Entry).
--spec learner_datatype(entry()) -> crdt:crdt_module().
-learner_datatype(Entry)         -> element(2, Entry).
 -spec learner_learnt(entry())   -> crdt:crdt().
 learner_learnt(Entry)           -> element(3, Entry).
 
@@ -435,12 +427,12 @@ learner_add_vote(Entry, Proposer, ProposalNumber) ->
 new_entry(Key, DataType) ->
     {lowest_key(Key), DataType, [], passive, 0, 0, 0, DataType:new(), DataType:new(), DataType:new()}.
 
--spec new_learner_entry(?RT:key(), crdt:crdt_module()) -> entry().
+-spec new_learner_entry(?RT:key(), crdt:crdt_module()) -> learner_entry().
 new_learner_entry(Key, DataType) ->
     {{learner, lowest_key(Key)}, DataType, DataType:new(), #{}}.
 
 
--spec get_entry(?RT:key(), ?PDB:tableid()) -> entry() | undefined.
+-spec get_entry(?RT:key() | {learner, ?RT:key()}, ?PDB:tableid()) -> entry() | undefined.
 get_entry({learner, Key}, TableName) ->
     ?PDB:get({learner, lowest_key(Key)}, TableName);
 get_entry(Key, TableName) ->
