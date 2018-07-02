@@ -383,21 +383,29 @@ entry_propval(Entry)                -> element(8, Entry).
 -spec entry_bufval(entry())        -> crdt:crdt().
 entry_bufval(Entry)                -> element(9, Entry).
 
+-spec entry_add_client(entry(), comm:mypid()) -> entry().
 entry_add_client(Entry, Client) ->
     Clients = element(3, Entry),
     setelement(3, Entry, [Client | Clients]).
+-spec entry_remove_clients(entry(), [comm:mypid()]) -> entry().
 entry_remove_clients(Entry, ClientsToRemve) ->
     Clients = element(3, Entry),
     NewClients = lists:filter(fun(C) -> not lists:member(C, ClientsToRemve) end, Clients),
     setelement(3, Entry, NewClients).
 
-%%TODO: specs
+-spec entry_set_status(entry(), passive | active) -> entry().
 entry_set_status(Entry, Status) -> setelement(4, Entry, Status).
+-spec entry_set_ackcount(entry(), non_neg_integer()) -> entry().
 entry_set_ackcount(Entry, X)    -> setelement(5, Entry, X).
+-spec entry_set_nackcount(entry(), non_neg_integer()) -> entry().
 entry_set_nackcount(Entry, X)   -> setelement(6, Entry, X).
+-spec entry_set_propnum(entry(), non_neg_integer()) -> entry().
 entry_set_propnum(Entry, X)     -> setelement(7, Entry, X).
+-spec entry_set_propval(entry(), crdt:crdt()) -> entry().
 entry_set_propval(Entry, X)     -> setelement(8, Entry, X).
+-spec entry_set_bufval(entry(), crdt:crdt()) -> entry().
 entry_set_bufval(Entry, X)      -> setelement(9, Entry, X).
+-spec entry_set_outval(entry(), crdt:crdt()) -> entry().
 entry_set_outval(Entry, X)      -> setelement(10, Entry, X).
 
 
