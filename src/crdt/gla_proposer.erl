@@ -47,7 +47,7 @@
 -type entry() :: {?RT:key(), %% key
                   crdt:crdt_module(), %% data type
                   [any()], %% clients waiting for reply TODO use this or keep close to paper
-                  active | passive,
+                  active | passive,
                   non_neg_integer(), %% ack count
                   non_neg_integer(), %% nack count
                   non_neg_integer(), %% active proposal number
