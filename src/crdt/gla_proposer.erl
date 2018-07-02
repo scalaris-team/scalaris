@@ -190,7 +190,9 @@ on({propose, Key, ForceProposal}, State) ->
     BufVal = entry_bufval(Entry),
     NewPropVal = DataType:merge(PropVal, BufVal),
     case entry_status(Entry) =:= passive
-        andalso (ForceProposal orelse DataType:lt(PropVal, NewPropVal)) of
+        andalso (ForceProposal orelse %% read requests do not change lattice value
+                 entry_clients(Entry) =/= [] orelse %% there might be an open read request
+                 DataType:lt(PropVal, NewPropVal)) of
         true ->
             NewPropNum = entry_propnum(Entry) + 1,
             NewEntry1 = entry_set_ackcount(Entry, 0),
@@ -282,7 +284,6 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
 
     NewEntry = learner_add_vote(Entry, ProposerId, ProposalNumber),
     VoteCount = learner_votes(NewEntry, ProposerId, ProposalNumber),
-    %ct:pal("~p", [[VoteCount, NewEntry]]),
     Learnt = learner_learnt(NewEntry),
     NewEntry2 =
         case replication:quorum_accepted(VoteCount) andalso
@@ -421,7 +422,6 @@ learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
 learner_votes(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
     Key = {Proposer, ProposalNumber},
-    %ct:pal("~p", [Votes]),
     case lists:keyfind(Key, 1, Votes) of
         false -> 0;
         E -> element(2, E)
