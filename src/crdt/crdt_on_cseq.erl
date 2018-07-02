@@ -32,17 +32,19 @@
 -spec read(client_key(), crdt:crdt_module(), crdt:query_fun()) -> {ok, client_value()}.
 read(Key, DataType, QueryFun) ->
     Mod = crdt:proposer_module(),
-    read_helper(Key, fun Mod:read/5, DataType, QueryFun).
+    FunName = read,
+    read_helper(Key, Mod, FunName, DataType, QueryFun).
 
 -spec read_eventual(client_key(), crdt:crdt_module(), crdt:query_fun()) -> {ok, client_value()}.
 read_eventual(Key, DataType, QueryFun) ->
     Mod = crdt:proposer_module(),
-    read_helper(Key, fun Mod:read_eventual/5, DataType, QueryFun).
+    FunName = read_eventual,
+    read_helper(Key, Mod, FunName, DataType, QueryFun).
 
--spec read_helper(client_key(), fun((_,_,_,_,_) -> ok), crdt:crdt_module(), crdt:query_fun()) ->
+-spec read_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:query_fun()) ->
     {ok, client_value()}.
-read_helper(Key, APIFun, DataType, QueryFun) ->
-    APIFun(crdt_db, self(), ?RT:hash_key(Key), DataType, QueryFun),
+read_helper(Key, ApiMod, ApiFun, DataType, QueryFun) ->
+    ApiMod:ApiFun(crdt_db, self(), ?RT:hash_key(Key), DataType, QueryFun),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({read_done, CounterValue}, {ok, CounterValue})
@@ -62,16 +64,18 @@ read_helper(Key, APIFun, DataType, QueryFun) ->
 -spec write(client_key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
-    write_helper(Key, fun Mod:write/5, DataType, UpdateFun).
+    FunName = write,
+    write_helper(Key, Mod, FunName, DataType, UpdateFun).
 
 -spec write_eventual(client_key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write_eventual(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
-    write_helper(Key, fun Mod:write_eventual/5, DataType, UpdateFun).
+    FunName = write_eventual,
+    write_helper(Key, Mod, FunName, DataType, UpdateFun).
 
--spec write_helper(client_key(), fun((_,_,_,_,_) -> ok), crdt:crdt_module(), crdt:update_fun()) -> ok.
-write_helper(Key, APIFun, DataType, UpdateFun) ->
-    APIFun(crdt_db, self(), ?RT:hash_key(Key), DataType, UpdateFun),
+-spec write_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:update_fun()) -> ok.
+write_helper(Key, ApiMod, ApiFun, DataType, UpdateFun) ->
+    ApiMod:ApiFun(crdt_db, self(), ?RT:hash_key(Key), DataType, UpdateFun),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({write_done}, ok)
