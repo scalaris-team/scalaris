@@ -961,7 +961,6 @@ case $cmd in
         if [ -z "$DBG_CHECK_RING_SIZE" -o -z "$DBG_CHECK_RING_TIMEOUT" ] ; then
           usage 1
         else
-          SCALARIS_COOKIE="chocolate chip cookie"
           dbg_check_ring "$DBG_CHECK_RING_SIZE" "$DBG_CHECK_RING_TIMEOUT"
         fi;;
     *)
