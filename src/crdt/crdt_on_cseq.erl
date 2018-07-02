@@ -64,7 +64,7 @@ write(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
     write_helper(Key, fun Mod:write/5, DataType, UpdateFun).
 
--spec write_eventual(client_key(), crdt:crdt_modue(), crdt:update_fun()) -> ok.
+-spec write_eventual(client_key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write_eventual(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
     write_helper(Key, fun Mod:write_eventual/5, DataType, UpdateFun).

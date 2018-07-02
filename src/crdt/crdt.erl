@@ -48,7 +48,7 @@ tester_create_update_fun(0) -> fun update_noop/1.
 -spec tester_create_query_fun(0) -> query_fun().
 tester_create_query_fun(0) -> fun query_noop/1.
 
--spec rsm_implementation() -> [{atom, {module(), module()}}].
+-spec rsm_implementation() -> {module(), module()}.
 rsm_implementation() ->
     Available =
         [{crdt_paxos, {crdt_proposer, crdt_acceptor}},

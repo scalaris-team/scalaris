@@ -410,8 +410,8 @@ entry_set_outval(Entry, X)      -> setelement(10, Entry, X).
 
 
 %%%%%%%%%%%%%%%% access of learner entry
--spec learner_learnt(entry())   -> crdt:crdt().
-learner_learnt(Entry)           -> element(3, Entry).
+-spec learner_learnt(learner_entry()) -> crdt:crdt().
+learner_learnt(Entry) -> element(3, Entry).
 
 -spec learner_set_learnt(learner_entry(), crdt:crdt()) -> learner_entry().
 learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
@@ -420,7 +420,7 @@ learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
 learner_votes(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
     Key = {Proposer, ProposalNumber},
-    lists:keyfind(Key, 1, Votes).
+    element(2, lists:keyfind(Key, 1, Votes)).
 
 -spec learner_add_vote(learner_entry(), any(), non_neg_integer()) -> learner_entry().
 learner_add_vote(Entry, Proposer, ProposalNumber) ->
@@ -444,13 +444,13 @@ new_learner_entry(Key, DataType) ->
     {{learner, lowest_key(Key)}, DataType, DataType:new(), []}.
 
 
--spec get_entry(?RT:key() | {learner, ?RT:key()}, ?PDB:tableid()) -> entry() | undefined.
+-spec get_entry(?RT:key() | {learner, ?RT:key()}, ?PDB:tableid()) -> entry() | learner_entry() | undefined.
 get_entry({learner, Key}, TableName) ->
     ?PDB:get({learner, lowest_key(Key)}, TableName);
 get_entry(Key, TableName) ->
     ?PDB:get(lowest_key(Key), TableName).
 
--spec save_entry(entry(), ?PDB:tableid()) -> ok.
+-spec save_entry(entry() | learner_entry(), ?PDB:tableid()) -> ok.
 save_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
@@ -481,14 +481,11 @@ remove_open_request(State, Req) ->
     setelement(5, State, lists:delete(Req, Reqs)).
 
 %%%%%%%%%%%%%% misc
+-spec inform_client(write_done, comm:mypid()) -> ok.
 inform_client(write_done, Client) ->
-    case is_tuple(Client) of
-        true ->
-            comm:send(Client, {write_done});
-        false ->
-            comm:send_local(Client, {write_done})
-    end.
+    comm:send(Client, {write_done}).
 
+-spec inform_client(read_done, comm:mypid(), any()) -> ok.
 inform_client(read_done, Client, Value) ->
     comm:send_local(Client, {read_done, Value}).
 
