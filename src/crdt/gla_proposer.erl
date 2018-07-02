@@ -420,13 +420,17 @@ learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
 learner_votes(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
     Key = {Proposer, ProposalNumber},
-    maps:get(Key, Votes).
+    lists:keyfind(Key, 1, Votes).
 
 -spec learner_add_vote(learner_entry(), any(), non_neg_integer()) -> learner_entry().
 learner_add_vote(Entry, Proposer, ProposalNumber) ->
     Votes = element(4, Entry),
     Key = {Proposer, ProposalNumber},
-    NewVotes = maps:update_with(Key, fun(E) -> E + 1 end, 1, Votes),
+    UpdatedVote = case lists:keysearch(Key, 1, Votes) of
+                      false -> {Key, 1};
+                      {value, {Key, VoteCount}} -> {Key, VoteCount + 1}
+                  end,
+    NewVotes = lists:keystore(Key, 1, Votes, UpdatedVote),
     setelement(4, Entry, NewVotes).
 
 
@@ -437,7 +441,7 @@ new_entry(Key, DataType) ->
 
 -spec new_learner_entry(?RT:key(), crdt:crdt_module()) -> learner_entry().
 new_learner_entry(Key, DataType) ->
-    {{learner, lowest_key(Key)}, DataType, DataType:new(), #{}}.
+    {{learner, lowest_key(Key)}, DataType, DataType:new(), []}.
 
 
 -spec get_entry(?RT:key() | {learner, ?RT:key()}, ?PDB:tableid()) -> entry() | undefined.
