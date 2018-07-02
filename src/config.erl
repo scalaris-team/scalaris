@@ -207,6 +207,7 @@ check_config() ->
                          fun l_on_cseq:check_config/0,
                          fun prbr:check_config/0,
                          fun rbrcseq:check_config/0,
+                         fun crdt:check_config/0,
                          fun crdt_proposer:check_config/0,
                          fun db_bitcask_merge_extension:check_config/0
                        ]],

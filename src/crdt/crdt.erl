@@ -21,6 +21,7 @@
 -export_type([crdt/0, crdt_module/0, update_fun/0, query_fun/0]).
 
 -export([update_noop/1, update_noop/2, query_noop/1]).
+-export([check_config/0, proposer_module/0, acceptor_module/0]).
 
 % for tester
 -export([tester_create_update_fun/1, tester_create_query_fun/1]).
@@ -46,3 +47,20 @@ tester_create_update_fun(0) -> fun update_noop/1.
 
 -spec tester_create_query_fun(0) -> query_fun().
 tester_create_query_fun(0) -> fun query_noop/1.
+
+-spec rsm_implementation() -> [{atom, {module(), module()}}].
+rsm_implementation() ->
+    Available =
+        [{crdt_paxos, {crdt_proposer, crdt_acceptor}},
+         {lattice, {gla_proposer, gla_acceptor}}],
+    element(2, lists:keyfind(config:read(crdt_rsm), 1, Available)).
+
+-spec proposer_module() -> module().
+proposer_module() -> element(1, rsm_implementation()).
+-spec acceptor_module() -> module().
+acceptor_module() -> element(2, rsm_implementation()).
+
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_atom(crdt_rsm).
+

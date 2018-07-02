@@ -14,8 +14,6 @@
 
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Paxos register for CRDT's. Implements the role of proposer
-%%         @TODO:
-%%              gossiping?
 %% @end
 -module(crdt_proposer).
 -author('skrzypczak.de').
@@ -24,6 +22,7 @@
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 
+-define(ROUTING_DISABLED, false).
 -define(READ_BATCHING, config:read(read_batching)).
 -define(READ_BATCHING_INTERVAL, 10).
 -define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
@@ -449,6 +448,10 @@ on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
 send_to_local_replica(Key, Message) ->
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
+    send_to_local_replica(Key, Message, not ?ROUTING_DISABLED).
+
+-spec send_to_local_replica(?RT:key(), tuple(), boolean()) -> ok.
+send_to_local_replica(Key, Message, _Routing=true) ->
     LocalDhtNode = pid_groups:get_my(dht_node),
     This = comm:reply_as(comm:this(), 4, {local_range_req, Key, Message, '_'}),
     comm:send_local(LocalDhtNode, {get_state, This, my_range}).
@@ -456,6 +459,11 @@ send_to_local_replica(Key, Message) ->
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
 send_to_all_replicas(Key, Message) ->
     %% assert element(3, message) =:= '_'
+    %% assert element(6, message) =:= key
+    send_to_all_replicas(Key, Message, not ?ROUTING_DISABLED).
+
+-spec send_to_all_replicas(?RT:key(), tuple(), boolean()) -> ok.
+send_to_all_replicas(Key, Message, _Routing=true) ->
     Dest = pid_groups:find_a(routing_table),
 
     _ = [begin

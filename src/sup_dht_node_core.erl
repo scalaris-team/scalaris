@@ -87,7 +87,7 @@ childs([DHTNodeGroup, Options]) ->
                    || Id <- lists:seq(1, config:read(replication_factor))],
 
     %% crdt process  working on the kv DB
-    Crdt_KVcseq = sup:worker_desc(crdt_db, crdt_proposer,
+    Crdt_KVcseq = sup:worker_desc(crdt_db, crdt:proposer_module(),
                                 start_link,
                                 [DHTNodeGroup,
                                  _PidGroupsNameCrdt = crdt_db,
