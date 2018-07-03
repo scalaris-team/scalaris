@@ -14,8 +14,7 @@
 
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Proposer + Learner implementation from "Generalized Lattice Agreement"
-%% TODO: instead of sending write done messages, let them poll? only local repla sends msg
-%% @end
+%% TODO: instead of sending write done messages, let them poll? only local repla sends msg %% @end
 -module(gla_proposer).
 -author('skrzypczak.de').
 
@@ -287,12 +286,19 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
     Learnt = learner_learnt(NewEntry),
     NewEntry2 =
         case replication:quorum_accepted(VoteCount) andalso
+             %% a bit of an hack to ensure that clients are only notified with the first
+             %% vote over the threshold
+             not replication:quorum_accepted(VoteCount - 1) andalso
             DataType:lteq(Learnt, ProposalValue) of
             true ->
                 ProposerEntry = get_entry(Key, tablename(State)),
                 NewProposerEntry = entry_remove_clients(ProposerEntry, Clients),
                 _ = save_entry(NewProposerEntry, tablename(State)),
-                [inform_client(write_done, Client) || Client <- Clients],
+
+                %% Only notify clients of this proposer. This is necessary for linearizability as
+                %% a read only looks at the learned value of the local learner after its no-op write succeeded
+                %% all write requests are enveloped (see notify_client in req_start)
+                [inform_client(write_done, Client) || Client <- Clients, element(1, Client) =:= comm:this()],
 
                 learner_set_learnt(NewEntry, ProposalValue);
             false ->
