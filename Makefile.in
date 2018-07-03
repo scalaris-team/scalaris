@@ -194,7 +194,7 @@ $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 %_TESTS: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -spec test/$@.cfg -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	erl -noshell -noinput @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -eval "runner:run_spec(\"test/$@.cfg\"), halt(0)" | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 test-vts: compile

@@ -1,4 +1,4 @@
-% @copyright 2013-2016 Zuse Institute Berlin,
+% @copyright 2013-2018 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -616,8 +616,8 @@ check_config() ->
     All_DBs = [db_ets, db_mnesia, db_toke, db_hanoidb, db_bitcask],
     Current_DB = config:read(db_backend),
 
-    config:cfg_is_module(db_backend) and
-    config:cfg_is_in(db_backend, All_DBs) and
+    config:cfg_is_module(db_backend) andalso
+    config:cfg_is_in(db_backend, All_DBs) andalso
     case Current_DB:is_available() of
         true ->
             true;
@@ -625,7 +625,7 @@ check_config() ->
             error_logger:error_msg("Modules ~p for selected DB backend ~p are missing.~n",
                                    [Missing, Current_DB]),
             false
-    end and
+    end andalso
     case config:read(ensure_recover) of
         true ->
             % ensure_recovery is enabled which means we must check if
