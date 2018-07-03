@@ -121,9 +121,10 @@ on({gla_acceptor, propose, _Cons, Proposer, Key, Clients, ProposalNumber, Propos
                  || Learner <- NewProposerList], %% each proposer is also a learner
             msg_ack_reply(Proposer, Key, ProposalNumber, ProposedValue);
         false ->
-            NewEntry = entry_set_val(Entry, DataType:merge(AcceptedValue, ProposedValue)),
+            MergedValue = DataType:merge(AcceptedValue, ProposedValue),
+            NewEntry = entry_set_val(Entry, MergedValue),
             _ = set_entry(NewEntry, TableName),
-            msg_nack_reply(Proposer, Key, ProposalNumber, AcceptedValue)
+            msg_nack_reply(Proposer, Key, ProposalNumber, MergedValue)
     end,
 
     {TableName, NewProposerList}.
