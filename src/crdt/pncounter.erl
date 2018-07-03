@@ -43,8 +43,7 @@ eq({P1, N1}, {P2, N2}) -> gcounter:eq(P1, P2) andalso gcounter:eq(N1, N2).
 
 -spec lt(crdt(), crdt()) -> boolean().
 lt({P1, N1}, {P2, N2}) ->
-    (gcounter:lt(P1, P2) andalso not gcounter:lt(N2, N1)) orelse
-    (gcounter:lt(N1, N2) andalso not gcounter:lt(P2, P1)).
+    gcounter:lteq(P1, P2) andalso gcounter:lteq(N1, N2).
 
 %%%%%%%%%%%%%%% Available update and query functions
 
