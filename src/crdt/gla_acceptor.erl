@@ -48,9 +48,9 @@
                  }.
 
 %% Messages to expect from this module
--spec msg_get_val_reply(comm:mypid(), ?RT:key(), crdt:crdt()) -> ok.
-msg_get_val_reply(Client, Key, UpdatedVal) ->
-    comm:send(Client, {proposal_val_reply, Key, UpdatedVal}).
+-spec msg_get_val_reply(comm:mypid(), ?RT:key(), crdt:crdt_module(), crdt:crdt()) -> ok.
+msg_get_val_reply(Client, Key, DataType, UpdatedVal) ->
+    comm:send(Client, {proposal_val_reply, Key, DataType, UpdatedVal}).
 
 -spec msg_ack_reply(comm:mypid(), ?RT:key(), pr:pr(), crdt:crdt()) -> ok.
 msg_ack_reply(Client, Key, ProposalNumber, ProposalValue) ->
@@ -93,7 +93,7 @@ on({gla_acceptor, get_proposal_value, _Cons, Proposer, Key, DataType, UpdateFun}
     NewEntry = entry_set_val(Entry, NewCVal),
     _ = set_entry(NewEntry, TableName),
 
-    msg_get_val_reply(Proposer, Key, NewCVal),
+    msg_get_val_reply(Proposer, Key, DataType, NewCVal),
     trace_mpath:log_info(self(), {acceptor_update,
                                   key, Key,
                                   old_value, CVal,

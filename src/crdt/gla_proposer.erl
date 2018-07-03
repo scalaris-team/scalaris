@@ -164,16 +164,16 @@ on({notify_client, Request={_ReqId, Client}, Msg}, State) ->
     end;
 
 %% ReceiveValue
-on({write, Client, {proposal_val_reply, Key, ProposalValue}}, State) ->
+on({write, Client, {proposal_val_reply, Key, DataType, ProposalValue}}, State) ->
     ProposerList = proposers(State),
-    [comm:send(Proposer, {internal_receive, Key, Client, ProposalValue})
+    [comm:send(Proposer, {internal_receive, Key, Client, DataType, ProposalValue})
      || Proposer <- ProposerList],
 
     State;
 
 %% Internal Receive
-on({internal_receive, Key, Client, PropVal}, State) ->
-    Entry = get_entry(Key, tablename(State)),
+on({internal_receive, Key, Client, DataType, PropVal}, State) ->
+    Entry = get_entry(Key, DataType, tablename(State)),
     DataType = entry_datatype(Entry),
     NewBufVal = DataType:merge(entry_bufval(Entry), PropVal),
     NewEntry = entry_set_bufval(Entry, NewBufVal),
@@ -389,7 +389,8 @@ entry_bufval(Entry)                -> element(9, Entry).
 entry_add_client(Entry, Client) ->
     Clients = element(3, Entry),
     setelement(3, Entry, [Client | Clients]).
--spec entry_remove_clients(entry(), [comm:mypid()]) -> entry().
+-spec entry_remove_clients(undefined | entry(), [comm:mypid()]) -> entry().
+entry_remove_clients(undefined, _) -> undefined;
 entry_remove_clients(Entry, ClientsToRemve) ->
     Clients = element(3, Entry),
     NewClients = lists:filter(fun(C) -> not lists:member(C, ClientsToRemve) end, Clients),
@@ -462,7 +463,15 @@ get_entry({learner, Key}, TableName) ->
 get_entry(Key, TableName) ->
     ?PDB:get(lowest_key(Key), TableName).
 
--spec save_entry(entry() | learner_entry(), ?PDB:tableid()) -> ok.
+-spec get_entry(?RT:key(), crdt:crdt_module(), ?PDB:tableid()) -> entry().
+get_entry(Key, DataType, TableName) ->
+    case ?PDB:get(lowest_key(Key), TableName) of
+        undefined -> new_entry(Key, DataType);
+        Entry -> Entry
+    end.
+
+-spec save_entry(undefined | entry() | learner_entry(), ?PDB:tableid()) -> ok.
+save_entry(undefined, _) -> ok;
 save_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
