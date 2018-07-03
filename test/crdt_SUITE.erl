@@ -130,25 +130,24 @@ crdt_pncounter_banking(_Config) ->
     Count = 10000 div Parallel,
     WriteFun =  fun(_I) ->
                     TransactAmount = randoms:rand_uniform(1, StartMoney),
-                    From = lists:nth(randoms:rand_uniform(1, AccountNum), Accounts),
-                    To = lists:nth(randoms:rand_uniform(1, AccountNum), Accounts),
+                    From = lists:nth(randoms:rand_uniform(1, AccountNum+1), Accounts),
+                    To = lists:nth(randoms:rand_uniform(1, AccountNum+1), Accounts),
                     %% allows From =:= To, but shouldn't be a problem
                     ok = pncounter_on_cseq:subtract(From, TransactAmount),
                     ok = pncounter_on_cseq:add(To, TransactAmount)
                 end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
-
     %% check if nothing is lost or gained
     Balances = [begin
                     {ok, Money} = pncounter_on_cseq:read(Account),
                     Money
                 end || Account <- Accounts],
     EndMoney = lists:sum(Balances),
+    ct:pal("The individual account balances are: ~n~p", [Balances]),
     ct:pal("Start balance: ~p~nEnd balance: ~p~ndiscrepancy is NOT ok!~n",
            [TotalMoney, EndMoney]),
     ?equals(TotalMoney, EndMoney),
-    ct:pal("The individual account balances are: ~n~p", [Balances]),
     ok.
 
 crdt_gcounter_read_your_write(_Config) ->
@@ -330,7 +329,7 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
 
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
-    Count = 5000 div WriterCount,
+    Count = 500 div WriterCount,
     WriteFun = fun
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
@@ -561,7 +560,9 @@ tester_type_check_crdt(_Config) ->
            [
             {add_read_reply, 5},        % needs value matching db_type
             {send_to_all_replicas, 2},  % sends messages
+            {send_to_all_replicas, 3},  % sends messages
             {send_to_local_replica, 2}, % sends messages
+            {send_to_local_replica, 3},  % sends messages
             {start_request, 2},         % sends messages
             {inform_client, 3},         % cannot create valid envelopes
             {inform_client, 2},         % cannot create valid envelopes
@@ -600,19 +601,9 @@ tester_type_check_crdt(_Config) ->
             {update_nth, 4}             % requires args in bounds
            ]
           },
-          {gcounter_on_cseq,
-           [],
-           [{read_helper, 3},           % cannot create funs
-            {write_helper, 3}           % cannot create funs
-           ]
-          },
-          {pncounter, [],[] },
-          {gcounter_on_cseq,
-           [],
-           [{read_helper, 3},           % cannot create funs
-            {write_helper, 3}           % cannot create funs
-           ]
-          }
+          {pncounter, [],[] }
+          %% cannot test both pncounter_on_cseq and gcounter_on_cseq at the same time,
+          %% as this would cause a crash if the same key is used for both
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
