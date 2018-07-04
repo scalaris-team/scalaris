@@ -17,18 +17,47 @@
 -module(runner).
 -author('schuett@zib.de').
 
--export([run_spec/1]).
+-export([run_spec/1, run_suite/1, run_suite_group/2, run_suite_case/2]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec run_spec(list()) -> term().
+-spec run_spec(string()) -> term().
 run_spec(Spec) ->
     %% ct:pal("~s~n", [Spec]),
     ct:run_test([
                  {spec, [Spec]},
+                 {ct_hooks, [scalaris_cth]}
+                ]
+               ).
+
+-spec run_suite(string()) -> term().
+run_suite(Suite) ->
+    %% ct:pal("~s~n", [Suite]),
+    ct:run_test([
+                 {suite, [Suite]},
+                 {ct_hooks, [scalaris_cth]}
+                ]
+               ).
+
+-spec run_suite_group(string(), string()) -> term().
+run_suite_group(Suite, Group) ->
+    %% ct:pal("~s:~s~n", [Suite, Group]),
+    ct:run_test([
+                 {suite, [Suite]},
+                 {group, [Group]},
+                 {ct_hooks, [scalaris_cth]}
+                ]
+               ).
+
+-spec run_suite_case(string(), string()) -> term().
+run_suite_case(Suite, Case) ->
+    %% ct:pal("~s:~s~n", [Suite, Case]),
+    ct:run_test([
+                 {suite, [Suite]},
+                 {testcase, [Case]},
                  {ct_hooks, [scalaris_cth]}
                 ]
                ).

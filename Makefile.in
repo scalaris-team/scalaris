@@ -169,7 +169,7 @@ ${SUITES}: compile
 # use non standard ports to run a single SUITE so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -suite $@ -ct_hooks scalaris_cth -noshell | tee ct_$@.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @ERL@ -noshell -noinput @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -eval "runner:run_suite(\"test/$@\"), halt(0)" | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 # define targets for single test cases of the form <test-suite>:<test-case>:
@@ -179,12 +179,12 @@ $(1)\:%_GROUP: compile
 # use non standard ports to run a single SUITE's test case so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_GROUP_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS)  -suite $(1) -group $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*_GROUP.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @ERL@ -noshell -noinput -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -eval "runner:run_suite_group(\"$(1)\", \"$$*\"), halt(0)" | tee ct_$(1).$$*_GROUP.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$(1).$$*_GROUP.log
 
 # single test case
 $(1)\:%: compile
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(1)_$$*_$(SCALARIS_CT_NAME)  -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -suite $(1) -case $$* -ct_hooks scalaris_cth -noshell | tee ct_$(1).$$*.log ; \
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @ERL@ -noshell -noinput -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS)  -eval "runner:run_suite_case(\"$(1)\", \"$$*\"), halt(0)" | tee ct_$(1).$$*.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$(1).$$*.log
 endef
 $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
@@ -194,7 +194,7 @@ $(foreach SUITE,$(SUITES),$(eval $(call TEST_CASE_TARGET,$(SUITE))))
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 %_TESTS: compile
-	erl -noshell -noinput @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -eval "runner:run_spec(\"test/$@.cfg\"), halt(0)" | tee ct_$@.log ; \
+	@ERL@ -noshell -noinput @ERLANG_ERLANGJS_FLAGS@ @ERLANG_HANOIDB_FLAGS@ @ERLANG_TOKE_FLAGS@ @ERLANG_BITCASK_FLAGS@ -pa `pwd`/ebin `pwd`/test $(CONTRIB_EBIN_PATHS) -eval "runner:run_spec(\"test/$@.cfg\"), halt(0)" | tee ct_$@.log ; \
 	! grep -E "TEST COMPLETE, [0-9]+ ok, [1-9]+ failed" ct_$@.log
 
 test-vts: compile
