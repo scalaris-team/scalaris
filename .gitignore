@@ -3,6 +3,7 @@
 /.Emakefile
 /config.status
 /ct_run.*ct*@*
+/ct_run.nonode*
 /all_runs.html
 /index.html
 /.externalToolBuilders
