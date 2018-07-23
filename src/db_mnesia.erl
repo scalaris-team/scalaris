@@ -75,6 +75,10 @@ start() ->
       case mnesia:create_schema([node()]) of
         ok -> ok;
         Msg ->
+              VMName = case config:read(vmname) of
+                           failed -> atom_to_list(novmname);
+                           X -> atom_to_list(X)
+                       end,
               case util:is_unittest() of
                   true ->
                       ct:pal("starting mnesia: ~p~n", [Msg]),
@@ -82,14 +86,14 @@ start() ->
                              "while we still found persisted data of a node with the "
                              "same name. If you want to get rid of the old persisted "
                              "data, delete them using ~p.~n",
-                             ["rm -rf data/" ++ atom_to_list(config:read(vmname)) ++ "/" ++ atom_to_list(node())]);
+                             ["rm -rf data/" ++ VMName ++ "/" ++ atom_to_list(node())]);
                   false ->
                       io:format("starting mnesia: ~p~n", [Msg]),
                       io:format("starting mnesia: maybe you tried to start a new node "
                                 "while we still found persisted data of a node with the "
                                 "same name. If you want to get rid of the old persisted "
                                 "data, delete them using ~p.~n",
-                                ["rm -rf data/" ++ atom_to_list(config:read(vmname)) ++ "/" ++ atom_to_list(node())])
+                                ["rm -rf data/" ++ VMName ++ "/" ++ atom_to_list(node())])
               end,
               erlang:halt()
       end
