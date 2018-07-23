@@ -1,4 +1,4 @@
-%% @copyright 2013 scalaris project http://scalaris.zib.de
+%% @copyright 2013-2018 Scalaris project http://scalaris.zib.de
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@
 -export([close/1, close_and_delete/1]).
 
 %% db info
--export([get_persisted_tables/0, get_name/1, get_load/1, 
+-export([get_persisted_tables/0, get_name/1, get_load/1,
          is_available/0, supports_feature/1]).
 
 %% iteration
@@ -90,10 +90,10 @@ new_db(DBName, HanoiOptions) ->
             {error, eexist} -> ok;
             {error, Error0} -> erlang:exit({?MODULE, 'cannot create dir', BaseDir, Error0})
         end,
-    
+
     % HanoiDB stores not in a file but a dir store
     FullDBDir = lists:flatten([BaseDir, "/", DBName]),
-    case hanoidb:open(FullDBDir, HanoiOptions) of 
+    case hanoidb:open(FullDBDir, HanoiOptions) of
         {ok, Tree} ->    {Tree, DBName};
         ignore ->    log:log(error, "[ Node ~w:db_hanoidb ] ~.0p", [self(), ignore]),
                      erlang:error({hanoidb_failed, ignore});
@@ -113,9 +113,9 @@ close({DB, _FileName}) ->
 close_and_delete({_DB, DBName} = State) ->
     close(State),
     % A disk backend happens in some directory
-    
+
     DirName = [config:read(db_directory), "/", atom_to_list(node()), "/", DBName],
-    
+
     % Delete all DB files
     {ok, Files} = file:list_dir(DirName),
     lists:foreach(fun(FileName) ->
@@ -127,7 +127,7 @@ close_and_delete({_DB, DBName} = State) ->
                                           [self(), ?MODULE, FileName, Reason])
                           end
                   end, Files),
-    
+
     % Delete DB dir
     case file:del_dir(DirName) of
         ok -> ok;
@@ -164,7 +164,7 @@ get_persisted_tables() ->
     [].
 
 
-%% @doc Checks for modules required for this DB backend. Returns true if no 
+%% @doc Checks for modules required for this DB backend. Returns true if no
 %%      modules are missing, or else a list of missing modules
 -spec is_available() -> boolean() | [atom()].
 is_available() ->
@@ -266,9 +266,9 @@ foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
               end,
     %% see HINT in foldl/5
     %% now retrieve actual data
-    lists:foldl(Fun, Acc, CutData). 
+    lists:foldl(Fun, Acc, CutData).
 
-%% @doc Works similar to foldl/3 but uses hanoidb:fold instead of our own implementation. 
+%% @doc Works similar to foldl/3 but uses hanoidb:fold instead of our own implementation.
 %% The order in which will be iterated over is unspecified, but using this fuction
 %% might be faster than foldl/3 if it does not matter.
 -spec foldl_unordered(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
@@ -284,10 +284,10 @@ foldl_unordered({DB, _DBName}, Fun, Acc) ->
 get_all_keys(DB, Interval, MaxNum) ->
     % TODO evaluate converting scalaris:Intervals to hanoidb:ranges
     % in order to leverage hanoidb:fold rather than get_all_keys+lists:fold.
-    
+
     Keys = hanoidb:fold(DB, fun(Key, _Entry, AccIn) -> [?OUT(Key) | AccIn] end, []),
-    
-    {_, In} = lists:foldl(fun 
+
+    {_, In} = lists:foldl(fun
                              (_, {0, _} = AccIn) ->
                                   AccIn;
                              (Key, {Max, KeyAcc} = AccIn) ->

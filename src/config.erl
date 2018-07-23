@@ -1,4 +1,4 @@
-%  @copyright 2007-2017 Zuse Institute Berlin
+%  @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -107,6 +107,15 @@ init(Options) ->
     %% io:format("~p~n", [AdditionalKVs]),
     _ = [write(K, V) || {K, V} <- ConfigParameters],
     _ = [write(K, V) || {K, V} <- AdditionalKVs],
+
+    %% use different subdirectory per vmname to be independent of distr. Erlang
+    DBSubDir = case read(vmname) of
+                   failed -> novmname;
+                   X -> X
+               end,
+    _ = write(db_directory, read(db_directory) ++ "/"
+              ++ atom_to_list(DBSubDir) ++ "/"),
+    filelib:ensure_dir(read(db_directory)),
 
     try check_config() of
         true -> ok;
