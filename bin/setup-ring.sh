@@ -16,6 +16,7 @@
 RINGSIZE=4
 WITHSSL=""
 SSL=""
+VMPREFIX=""
 
 SCALARIS_UNITTEST_PORT=${SCALARIS_UNITTEST_PORT-"14195"}
 SCALARIS_UNITTEST_YAWS_PORT=${SCALARIS_UNITTEST_YAWS_PORT-"8000"}
@@ -28,6 +29,7 @@ usage(){
     echo "    --help                  - show this text"
     echo "    --ring-size <number>    - the number of nodes (default: 4)"
     echo "    --session-key <number>  - the session's key (mandatory)"
+    echo "    --vm-prefix <string>    - the prefix for the vm names"
     echo " <cmd>:"
     echo "    start       - start a ring"
     echo "    stop        - stop a ring"
@@ -38,7 +40,7 @@ usage(){
 start_ring(){
     KEYS=`./bin/scalarisctl -t client -e "-noinput -eval \"io:format('\n%~p', [api_rt:escaped_list_of_keys(api_rt:get_evenly_spaced_keys($RINGSIZE))]), halt(0)\"" start | grep % | cut -c 3- | rev | cut -c 2- | rev`
 
-    export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$SCALARIS_UNITTEST_PORT,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$SCALARIS_UNITTEST_PORT,service_per_vm}] -scalaris verbatim $SESSIONKEY"
+    ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$SCALARIS_UNITTEST_PORT,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$SCALARIS_UNITTEST_PORT,service_per_vm}] -scalaris verbatim $SESSIONKEY"
     idx=0
     for key in $KEYS; do
         let idx+=1
@@ -53,6 +55,13 @@ start_ring(){
             STARTTYPE="joining"
             let TESTPORT=$SCALARIS_UNITTEST_PORT+$idx-1
             let YAWSPORT=$SCALARIS_UNITTEST_YAWS_PORT+$idx-1
+        fi
+
+        if [ -n $VMPREFIX ]
+        then
+            export SCALARIS_ADDITIONAL_PARAMETERS="$ADDITIONAL_PARAMETERS -scalaris vmname $VMPREFIX$idx"
+        else
+            export SCALARIS_ADDITIONAL_PARAMETERS="$ADDITIONAL_PARAMETERS"
         fi
 
         ./bin/scalarisctl -d -k $key -p $TESTPORT -y $YAWSPORT -t $STARTTYPE start $WITHSSL
@@ -86,6 +95,10 @@ until [ -z "$1" ]; do
         "--ring-size")
             shift
             RINGSIZE=$1
+            shift;;
+        "--vm-prefix")
+            shift
+            VMPREFIX=$1
             shift;;
         "--session-key")
             shift
