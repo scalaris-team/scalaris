@@ -900,6 +900,10 @@ on({qread_write_through_done, ReadEntry, Filtering,
 
 %% normal qwrite step 1: preparation and starting read-phase
 on({qwrite, Client, OpenReqEntry, Key, DataType, Filters, WriteValue, RetriggerAfter}, State) ->
+    gen_component:post_op({qwrite, Client, OpenReqEntry, Key, DataType,
+                           Filters, WriteValue, RetriggerAfter, incremental}, State);
+
+on({qwrite, Client, OpenReqEntry, Key, DataType, Filters, WriteValue, RetriggerAfter, RoundToTry}, State) ->
     ?TRACE("rbrcseq:on qwrite~n", []),
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
@@ -912,8 +916,14 @@ on({qwrite, Client, OpenReqEntry, Key, DataType, Filters, WriteValue, RetriggerA
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     case save_entry(Entry, tablename(State)) of
         ok ->
-            gen_component:post_op({qround_request, This, OpenReqEntry, Key, DataType,
-                                 element(1, Filters), write, _RetriggerAfter = 1}, State);
+            case RoundToTry of
+                incremental ->
+                    gen_component:post_op({qround_request, This, OpenReqEntry, Key, DataType,
+                        element(1, Filters), write, _RetriggerAfter = 1}, State);
+                _ ->
+                    gen_component:post_op({qread, This, OpenReqEntry, Key, DataType,
+                        element(1, Filters), _RetriggerAfter = 1, RoundToTry, write}, State)
+            end;
         error ->
             %% client has already received reply
             State
@@ -1113,18 +1123,28 @@ on({qwrite_collect, ReqId,
                     NewEntry2 = entry_set_optype(NewEntry, denied_write),
                     NewEntry3 = entry_disable_retrigger(NewEntry2),
                     update_entry(NewEntry3, TableName),
+
+                    NextMsg = {qwrite,
+                               entry_client(Entry),
+                               entry_openreqentry(Entry),
+                               entry_key(Entry),
+                               entry_datatype(Entry),
+                               entry_filters(Entry),
+                               entry_write_val(Entry),
+                               entry_retrigger(NewEntry),
+                               % round to retry in... + 2 to account for incremented
+                               % read round prepared for fast writes
+                               2 + pr:get_r(Replies#w_replies.highest_write_round)
+                              },
+
                     case randoms:rand_uniform(1, UpperLimit) of
                         1 ->
-                            NewReq = req_for_retrigger(NewEntry, noincdelay),
-                            gen_component:post_op(NewReq, State);
+                            %% retry read immediately
+                            gen_component:post_op(NextMsg, State);
                         2 ->
-                            NewReq = req_for_retrigger(NewEntry, noincdelay),
-                            %% TODO: maybe record number of retries
-                            %% and make timespan chosen from
-                            %% dynamically wider
-                            _ = comm:send_local_after(
-                                  10 + randoms:rand_uniform(1,90), self(),
-                                  NewReq),
+                            %% delay before retry
+                            Delay = 15 + randoms:rand_uniform(1, 10),
+                            comm:send_local_after(Delay, self(), NextMsg),
                             State
                     end
             end
@@ -1605,6 +1625,7 @@ add_write_deny(Replies, RoundTried, _Cons) ->
                 NewDenyCount = R1#w_replies.deny_count + 1,
                 R1#w_replies{deny_count=NewDenyCount}
         end,
+
     Done = ?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
     {Done, R2}.
 
