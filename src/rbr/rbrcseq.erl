@@ -727,7 +727,7 @@ on({qread_initiate_write_through, RoundTried, ReadEntry}, State) ->
                                     4,
                                     {prbr, write, DB, '_', Collector, K,
                                      entry_datatype(ReadEntry), MyId, WriteRound,
-                                     pr:new(0,0), %% has no effect because write_through
+                                     pr:set_wti(RoundTried, PreviousWTI),
                                      V, WTUI, WTWF, _IsWriteThrough = true}),
                             comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope})
                           end
@@ -931,10 +931,29 @@ on({qwrite, Client, OpenReqEntry, Key, DataType, Filters, WriteValue, RetriggerA
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
-    {qread_done, _ReadId, Round, OldWriteRound, ReadValue}},
-   State) ->
+    {qread_done, _ReadId, Round, OldWriteRound, ReadValue}}, State) ->
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
-    gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound, ReadValue}, State);
+
+    NewState = gen_component:post_op({do_qwrite_fast, ReqId, Round, OldWriteRound, ReadValue}, State),
+    %% check if we should send a learned message to ourselves before executing phase 2
+    %% to prevent applying the same update twice
+    case pr:get_wti(OldWriteRound) of
+        {PrevReturn, PrevProposer} ->
+            case element(1, PrevProposer)  =:= comm:this() of
+                true ->
+                    %% the previous update in the sequence was done by the same proposer -> send learned
+                    %% msg to ourselves to be safe
+                    Msg = element(4, PrevProposer),
+                    NewMsg = setelement(3, Msg,
+                                         {learned_reply, OldWriteRound, Round, PrevReturn}),
+                    gen_component:post_op(NewMsg, NewState);
+                false ->
+                    NewState
+            end;
+        _ ->
+            %% first write in this sequence
+            NewState
+    end;
 
 on({qwrite_fast, Client, OpenReqEntry, Key, DataType, Filters = {_RF, _CC, _WF},
     WriteValue, RetriggerAfter, Round, OldWriteRound, ReadFilterResultValue}, State) ->
@@ -1166,6 +1185,27 @@ on({qwrite_collect, ReqId,
     %% drop replies for unknown requests, as they must be outdated
     %% as all initiations run through the same process.
     ;
+
+on({qwrite_collect, ReqId,
+    {learned_reply, Round, NextRound, WriteRet}}, State) ->
+    %% receiving this message means that the request was definitely completed
+    Entry = get_entry(ReqId, tablename(State)),
+    _ = case Entry of
+        undefined ->
+            %% drop replies for unknown requests, as they must be
+            %% outdated as all replies run through the same process.
+            State;
+        _ ->
+            Replies = entry_replies(Entry),
+            {_, NewReplies, _} = add_write_reply(Replies, Round, true),
+            NewEntry = entry_set_replies(Entry, NewReplies),
+            ReplyEntry = entry_set_my_round(NewEntry, NextRound),
+            inform_client(qwrite_done, ReplyEntry, WriteRet),
+
+            delete_all_entries(entry_openreqentry(NewEntry),
+                                tablename(State), _DeleteReqEntryToo=false)
+    end,
+    State;
 
 %% periodically scan the local states for long lasting entries and
 %% retrigger them
@@ -1626,7 +1666,9 @@ add_write_deny(Replies, RoundTried, _Cons) ->
                 R1#w_replies{deny_count=NewDenyCount}
         end,
 
-    Done = ?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
+    % even one deny requires us to retry. otherwise we risk waiting forever
+    % if one acceptor has failed
+    Done = true, %?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
     {Done, R2}.
 
 -spec is_read_commuting(prbr:read_filter(), prbr:write_filter(), module()) -> boolean().

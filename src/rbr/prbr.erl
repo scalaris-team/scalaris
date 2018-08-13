@@ -135,6 +135,10 @@ msg_read_deny(Client, Cons, YourRound, LargerRound) ->
 msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet) ->
     comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite, WriteRet}).
 
+-spec msg_learned_reply(comm:mypid(),  pr:pr(), pr:pr(), any()) -> ok.
+msg_learned_reply(Client, UsedWriteRound, YourNextRoundForWrite, WriteRet) ->
+    comm:send(Client, {learned_reply, UsedWriteRound, YourNextRoundForWrite, WriteRet}).
+
 -spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), pr:pr())
                     -> ok.
 msg_write_deny(Client, Cons, Key, WriteRoundTried) ->
@@ -256,12 +260,19 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
     %% When this is part of a write through keep the old proposer,
     %% so that the original proposer of the write gets notified of
     %% write progress as well.
-    {LearnerToNotify, LearnerForWTI} =
+    LearnerForWTI =
         case IsWriteThrough andalso ?REDUNDANCY:notify_orig_learner_on_wt() of
                 false ->
-                    {[Proposer], Proposer};
+                    case pr:get_wti(OldWriteRound) of
+                        {Return, OrigLearner} ->
+                            msg_learned_reply(OrigLearner, OldWriteRound, InRound, Return);
+                        _ ->
+                            %% first write has no predecessor
+                            ok
+                    end,
+                    Proposer;
                 true ->
-                    {_, OrigLearner} = pr:get_wti(InRound),
+                    {_, OrigLearner} = pr:get_wti(OldWriteRound),
                     %% The follow-up behaviour of a WT does not change if it is
                     %% successful or denied. In both cases the original request
                     %% is retried. Therefore we do need to keep old WT learner around
@@ -269,7 +280,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                     %% a long list of WT-Learner caused by write throughs followed by
                     %% write throughs due to duelling requests (which is likely for a
                     %% high replication factor with a high number of concurrent requests).
-                    {[OrigLearner, Proposer], OrigLearner}
+                    OrigLearner
               end,
     _ = case writable(KeyEntry, InRound, OldWriteRound, WriteFilter) of
             true ->
@@ -301,9 +312,8 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                                               val, Value,
                                               write_filter, WriteFilter,
                                               newval, NewVal}),
-                [msg_write_reply(P, Cons, Key, NewWriteRound,
-                                  NextWriteRound, Ret)
-                 || P <- LearnerToNotify],
+                msg_write_reply(Proposer, Cons, Key, NewWriteRound,
+                                  NextWriteRound, Ret),
 
                 set_entry(entry_set_val(NewEntry, NewVal), TableName);
             {false, Reason} ->
@@ -330,7 +340,7 @@ on({prbr, write, DB, Cons, Proposer, Key, DataType, ProposerUID, InRound, OldWri
                 %% The round the client used to write is send back, because the client
                 %% must distinguish between denies from its own request and possible
                 %% write through attempts based on its partially completed write.
-                [msg_write_deny(P, Cons, Key, RoundTried) || P <- LearnerToNotify]
+                msg_write_deny(Proposer, Cons, Key, RoundTried)
         end,
     TableName;
 

@@ -13,6 +13,8 @@
 
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc    Unit tests for rbrcseq which simulate specific interleaving of messages.
+%%         The purpose of this suite is to reliably replicate rare corner-cases by slowing
+%%         downe specific links during certain times during the tests.
 %%         The tests depend on the gen_component breakpoint mechanism to delay specific messages.
 %%         Each test case assumes a specific replication factor (usually 4).
 %% @end
@@ -24,6 +26,7 @@
 -compile(export_all).
 
 -define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), ct:pal(X, Y)).
 
 -include("scalaris.hrl").
 -include("unittest.hrl").
@@ -33,7 +36,9 @@ all() -> [
           test_link_slowing,
           test_link_slowing2,
           test_interleaving,
-          test_write_through_notifies_original_proposer,
+          test_write_once_1,
+          test_write_once_2,
+          test_write_once_3,
           test_read_write_commuting
          ].
 
@@ -152,7 +157,7 @@ test_interleaving(_Config) ->
     %% have been received and processed yet.
     ?equals_w_note(length(ValList2), 1, "All replicas should have the same value").
 
-test_write_through_notifies_original_proposer(_Config) ->
+test_write_once_1(_Config) ->
     %% This tests case tests if a write through correctly notifies the original proposer
     %% of the write.
     %% Write A is started, but does not finish because two write messages are delayed.
@@ -175,6 +180,7 @@ test_write_through_notifies_original_proposer(_Config) ->
     [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
 
     % write B should now trigger a write through which should finish write A
+    % once write B retries, a notification should be sent to write A
     {ok, _} = write_via_node(2, Key, filter_list_append(), "WriteB"),
 
     receive {write_a_done} -> ok
@@ -183,6 +189,147 @@ test_write_through_notifies_original_proposer(_Config) ->
     end,
     {ok, Value} = read_via_node(3, Key, element(1, filter_list_append())),
     ?equals_w_note(Value, ["WriteB", "WriteA"], "Values must match exactly due to interleaving").
+
+test_write_once_2(_Config) ->
+    %% This tests does the following:
+    %% There is an unsuccessfull write A that writes on replica 4
+    %% Write B is successful by writing on replica 1-3. but the proposer retries
+    %% because it receives the deny message from replica 4 first.
+    %% Write C sees consistent quorum 1-3 and proposes its follow-up value
+    %% which is written on all replicas
+    %% Write B retries but it should be notified before sending write messages.
+    %% --> Write B should only be written once
+
+    TestPid = self(),
+    Key = "123",
+
+    print_prbr_data(),
+
+    %% Write A: phase 1 reaches all replicas, write msg only replica 4
+    get_notified_by_message(self(), 1, kv_db, 4, dht_node, write),
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
+    _SlowLinksA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(1, 3)],
+    spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+
+    print_prbr_data(),
+    ct:pal("write A done"),
+
+    %% Write B: writes replica 1 to 3. gets deny from replica 4 before quorum of acks
+    %% --> it retries its request
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(1,4)],
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+
+    SlowLinksB1 = slow_link(2, kv_db, 4, dht_node, round_request),
+    SlowLinksB3 = slow_link(2, kv_db, 3, dht_node, write),
+    SlowLinksB4 = slow_link(2, kv_db, 2, dht_node, read),
+    spawn(fun() -> _ =
+            write_via_node(2, Key, filter_list_append(), "WriteB"),
+            TestPid ! {write_b_done}
+          end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    print_prbr_data(),
+
+    ct:pal("flush slow link 4"),
+    flush_slow_link(SlowLinksB1),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,3)],
+    print_prbr_data(),
+
+    ct:pal("flush slow link 3"),
+    flush_slow_link(SlowLinksB3),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+    print_prbr_data(),
+
+    %% Write C: observer consistent quorum from repliica 1 to 3
+    %% write any follow-up value to all replicas
+    [get_notified_by_message(self(), 3, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+    SlowLinkC = slow_link(3, kv_db, 4, dht_node, round_request),
+    _ = write_via_node(3, Key, filter_list_append(), "WriteC"),
+    remove_slow_link(SlowLinkC),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,4)],
+    ct:pal("write C done"),
+    print_prbr_data(),
+
+    %% Write B: should not be able to retry as it gets notified earlier
+    ct:pal("remove slowness from write b"),
+    remove_slow_link(SlowLinksB4),
+    remove_slow_link(SlowLinksB3),
+    remove_slow_link(SlowLinksB1),
+
+    receive {write_b_done} -> ok end,
+    print_prbr_data(),
+
+    %% Read and check if WriteB exists only once
+    {ok, Value} = read_via_node(4, Key, element(1, filter_list_append())),
+    ?equals_w_note(Value, ["WriteC", "WriteB"], "Values must match exactly with this interleaving"),
+
+    ok.
+
+test_write_once_3(_Config) ->
+    %% This tests does the following:
+    %% There is an unsuccessfull write A that writes on replica 4
+    %% Write B is successful by writing on replica 1-3. but the proposer retries
+    %% because it receives the deny message from replica 4 first.
+    %% Write B retries but it should be see that it has consistent quorum from
+    %% previous attempt
+    %% --> Write B should only be written once
+
+    TestPid = self(),
+    Key = "123",
+
+    print_prbr_data(),
+
+    %% Write A: phase 1 reaches all replicas, write msg only replica 4
+    get_notified_by_message(self(), 1, kv_db, 4, dht_node, write),
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
+    _SlowLinksA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(1, 3)],
+    spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+
+    print_prbr_data(),
+    ct:pal("write A done"),
+
+    %% Write B: writes replica 1 to 3. gets deny from replica 4 before quorum of acks
+    %% --> it retries its request
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(1,4)],
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+
+    SlowLinksB1 = slow_link(2, kv_db, 4, dht_node, round_request),
+    SlowLinksB3 = slow_link(2, kv_db, 3, dht_node, write),
+    SlowLinksB4 = slow_link(2, kv_db, 2, dht_node, read),
+    spawn(fun() -> _ =
+            write_via_node(2, Key, filter_list_append(), "WriteB"),
+            TestPid ! {write_b_done}
+          end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    print_prbr_data(),
+
+    ct:pal("flush slow link 4"),
+    flush_slow_link(SlowLinksB1),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,3)],
+    print_prbr_data(),
+
+    ct:pal("flush slow link 3"),
+    flush_slow_link(SlowLinksB3),
+    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+    print_prbr_data(),
+
+    %% Write B: should not be able to retry as it gets notified earlier
+    ct:pal("remove slowness from write b"),
+    remove_slow_link(SlowLinksB4),
+    remove_slow_link(SlowLinksB3),
+    remove_slow_link(SlowLinksB1),
+
+    receive {write_b_done} -> ok end,
+    print_prbr_data(),
+
+    %% Read and check if WriteB exists only once
+    {ok, Value} = read_via_node(4, Key, element(1, filter_list_append())),
+    ?equals_w_note(Value, ["WriteB"], "Values must match exactly with this interleaving"),
+
+    ok.
 
 test_read_write_commuting(_Config) ->
     %% Write tuple {A,B} on every replica. Update second element to C for
@@ -303,6 +450,10 @@ notify_fun(PidToNotify, FromPid, ToPid, _ToType=dht_node, MessageType, BpName) -
             _ -> false
         end
     end.
+
+%% @doc Helper for test outputs
+print_prbr_data() ->
+    ct:pal("PRBR state: ~n~p", [prbr_data()]).
 
 %% @doc Gets all information stored in prbr for all nodes.
 prbr_data() ->
