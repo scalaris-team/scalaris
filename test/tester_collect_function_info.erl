@@ -547,6 +547,8 @@ equal_types(Left, Right)  when is_list(Left) andalso is_list(Right) ->
               end, lists:zip(Left, Right));
 equal_types({type,_, Type, LeftList}, {type,_, Type, RightList} ) ->
     equal_types(LeftList, RightList);
+equal_types({user_type,_, Type, LeftList}, {user_type,_, Type, RightList} ) ->
+    equal_types(LeftList, RightList);
 equal_types(_, _) ->
     false.
 
