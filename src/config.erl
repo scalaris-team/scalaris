@@ -124,7 +124,7 @@ init(Options) ->
             receive nothing -> ok end
     catch Err:Reason -> % wait so the error output can be written:
             error_logger:error_msg("check_config/0 crashed with: ~.0p:~.0p~nStacktrace:~p~n",
-                                   [Err, Reason, erlang:get_stacktrace()]),
+                                   [Err, Reason, util:get_stacktrace()]),
             init:stop(1),
             receive nothing -> ok end
     end.

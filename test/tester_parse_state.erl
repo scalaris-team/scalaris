@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@
          reset_unknown_types/1,
 
          is_known_type/4, lookup_type/2, lookup_fun_type/2,
-         
+
          % compact state
          finalize/1]).
 
@@ -80,20 +80,20 @@ find_fun_info(Module, Func, Arity, ParseState) ->
     catch
         throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n",
                                 [Module, Func,
-                                 {exception, {Term2, erlang:get_stacktrace(),
+                                 {exception, {Term2, util:get_stacktrace(),
                                               util:get_linetrace()}}]);
         % special handling for exits that come from a ct:fail() call:
         exit:{test_case_failed, Reason2} ->
             ?ct_fail("error ~p:~p/~p failed with ~p~n",
-                     [Module, Func, Arity, {Reason2, erlang:get_stacktrace(),
+                     [Module, Func, Arity, {Reason2, util:get_stacktrace(),
                                             util:get_linetrace()}]);
         exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n",
                                  [Module, Func,
-                                  {exception, {Reason2, erlang:get_stacktrace(),
+                                  {exception, {Reason2, util:get_stacktrace(),
                                                util:get_linetrace()}}]);
         error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n",
                                   [Module, Func,
-                                   {exception, {Reason2, erlang:get_stacktrace(),
+                                   {exception, {Reason2, util:get_stacktrace(),
                                                 util:get_linetrace()}}])
     end.
 

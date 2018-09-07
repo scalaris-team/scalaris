@@ -1,4 +1,4 @@
-%  @copyright 2007-2015 Zuse Institute Berlin
+%  @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ trycall(Prefix, Module, Func, Args, DefaultReturnValue) ->
             DefaultReturnValue;
           X:Y ->
             io:format("~p:~p failed with ~p:~p ~p~n",
-                      [Module, Func, X, Y, erlang:get_stacktrace()]),
+                      [Module, Func, X, Y, util:get_stacktrace()]),
             DefaultReturnValue
     end.
 

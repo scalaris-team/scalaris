@@ -1,4 +1,4 @@
-%% @copyright 2007-2016 Zuse Institute Berlin
+%% @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -577,7 +577,7 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
             % this PID.
             Level:Reason ->
                 log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
-                        [Level, Reason, Module, erlang:get_stacktrace()]),
+                        [Level, Reason, Module, util:get_stacktrace()]),
                 erlang:Level(Reason)
         after
             case WaitForInit of

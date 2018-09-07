@@ -1,4 +1,4 @@
-%  @copyright 2008-2015 Zuse Institute Berlin
+%  @copyright 2008-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -276,7 +276,7 @@ stop_ring(Pid) ->
         end
     catch
         Level:Reason ->
-            ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, erlang:get_stacktrace()]),
+            ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, util:get_stacktrace()]),
             erlang:Level(Reason)
     after
             catch(unregister(ct_test_ring)),
@@ -594,7 +594,7 @@ get_ring_data(Type) ->
                       Result =
                           case erlang:whereis(ct_test_ring) of
                               undefined -> [];
-                              _         -> {exception, Level, Reason, erlang:get_stacktrace()}
+                              _         -> {exception, Level, Reason, util:get_stacktrace()}
                           end,
                       Self ! {data, Result}
               end

@@ -1,4 +1,4 @@
-% @copyright 2008-2017 Zuse Institute Berlin
+% @copyright 2008-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ init(Supervisor, GroupName) ->
             % this PID.
             Level:Reason ->
                 log:log(error,"Error: exception ~p:~p in ~p:init/2:  ~.0p",
-                        [Level, Reason, ?MODULE, erlang:get_stacktrace()]),
+                        [Level, Reason, ?MODULE, util:get_stacktrace()]),
                 erlang:Level(Reason)
         after
             Supervisor ! {started, self()}
