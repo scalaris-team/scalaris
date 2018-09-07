@@ -106,7 +106,7 @@ crdt_gcounter_inc(_Config) ->
 
     {ok, Result} = gcounter_on_cseq:read(Key),
     ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
-    ct:pal("Planned ~p increments, done ~p - discrepancy is NOT ok~n", [Count*Parallel, Result]),
+    ct:pal("Planned ~p increments, done ~p~n", [Count*Parallel, Result]),
     ?equals(Count*Parallel, Result),
     ok.
 
@@ -145,7 +145,7 @@ crdt_pncounter_banking(_Config) ->
                 end || Account <- Accounts],
     EndMoney = lists:sum(Balances),
     ct:pal("The individual account balances are: ~n~p", [Balances]),
-    ct:pal("Start balance: ~p~nEnd balance: ~p~ndiscrepancy is NOT ok!~n",
+    ct:pal("Start balance: ~p~nEnd balance: ~p~n",
            [TotalMoney, EndMoney]),
     ?equals(TotalMoney, EndMoney),
     ok.
@@ -383,7 +383,7 @@ crdt_proto_sched_write(_Config) ->
 
     {ok, Result} = gcounter_on_cseq:read(Key),
     ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
-    ct:pal("Planned ~p increments, done ~p - discrepancy is NOT ok~n", [Count*Parallel, Result]),
+    ct:pal("Planned ~p increments, done ~p~n", [Count*Parallel, Result]),
     ?equals(Count*Parallel, Result),
 
     ok.
