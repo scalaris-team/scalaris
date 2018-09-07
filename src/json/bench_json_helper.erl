@@ -22,9 +22,11 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
+-spec json_to_result(term()) -> term().
 json_to_result(Result) ->
     jsonbench_to_result(Result).
 
+-spec result_to_json(list()) -> {struct, [{Key::atom(), Value::term()}]}.
 result_to_json(List) ->
     {struct, [value_to_json(KeyX, ValueX) || {KeyX, ValueX} <- List]}.
 
