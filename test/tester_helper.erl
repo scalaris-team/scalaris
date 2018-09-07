@@ -1,4 +1,4 @@
-%  @copyright 2010-2014 Zuse Institute Berlin
+%  @copyright 2010-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ reload_with_options(Module, MyOptions) ->
     %ct:pal("~p", [Options]),
     {ok, CurCWD} = file:get_cwd(),
     ok = fix_cwd_scalaris(),
-    case compile:file(Src, lists:append(MyOptions, Options)) of
+    case compile:file(Src, [{i, "./include"} | lists:append(MyOptions, Options)]) of
         {ok,_ModuleName,Binary} ->
             %% config no longer needs explicit code reload callbacks
             %% case Module of
