@@ -1,4 +1,4 @@
-% @copyright 2007-2015 Zuse Institute Berlin
+% @copyright 2007-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -355,6 +355,17 @@ logged_exec(Cmd) ->
             ok
     end.
 
+-ifdef(have_new_stacktrace).
+-spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]} |
+                           {Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()], Sources::[term()]}].
+get_stacktrace() ->
+    try
+        erlang:exit(a)
+    catch
+        _Class:_ExceptionPattern:Stk ->
+            Stk
+    end.
+-else.
 %% @doc Gets the current stack trace. Use this method in order to get a stack
 %%      trace if no exception was thrown.
 -spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]} |
@@ -373,6 +384,7 @@ get_stacktrace() ->
         ST -> ST % just in case
     end,
     ST.
+-endif.
 
 -spec get_linetrace() -> term() | undefined.
 get_linetrace() ->
