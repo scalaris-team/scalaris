@@ -63,7 +63,7 @@ reload_with_options(Module, MyOptions) ->
     %ct:pal("~p", [Options]),
     {ok, CurCWD} = file:get_cwd(),
     ok = fix_cwd_scalaris(),
-    case compile:file(Src, [{i, "./include"} | lists:append(MyOptions, Options)]) of
+    case compile:file(Src, [{i, "./include"} | lists:append(MyOptions, Options)]) of
         {ok,_ModuleName,Binary} ->
             %% config no longer needs explicit code reload callbacks
             %% case Module of
