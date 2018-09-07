@@ -572,7 +572,7 @@ AS_IF([test "${erlang_timestamp}" = "true"],
 ###########################################################
 ## https://github.com/erlang/otp/commit/84fd2c325c9e38b5ea2307b6133c3d15b33a3241
 SSL_GETSTAT=false
-ssl_getstat=`"${ERL}" -noshell -eval 'io:format("~p~n", [[erlang:function_exported(ssl,getstat,2)]]), erlang:halt().' | tail -1`
+ssl_getstat=`"${ERL}" -noshell -eval 'code:ensure_loaded(ssl),io:format("~p~n", [[erlang:function_exported(ssl,getstat,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${ssl_getstat}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ssl_getstat}"
        EDOCMACROS="${EDOCMACROS}, {have_ssl_getstat, true}"
@@ -580,6 +580,51 @@ AS_IF([test "${ssl_getstat}" = "true"],
        SSL_GETSTAT=true
        AC_MSG_NOTICE([ssl:getstat() is available])],
       [AC_MSG_NOTICE([ssl:getstat() is not available])])
+
+###########################################################
+#
+# check for ssl:handshake/1 for ssl
+#
+###########################################################
+## https://github.com/erlang/otp/commit/8dcfffd4fb8520239b189357e81122d4fdacb42d
+SSL_HANDSHAKE=false
+ssl_handshake=`"${ERL}" -noshell -eval 'code:ensure_loaded(ssl),io:format("~p~n", [[erlang:function_exported(ssl,handshake,1)]]), erlang:halt().' | tail -1`
+AS_IF([test "${ssl_handshake}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ssl_handshake}"
+       EDOCMACROS="${EDOCMACROS}, {have_ssl_handshake, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_ssl_handshake"
+       SSL_HANDSHAKE=true
+       AC_MSG_NOTICE([ssl:handshake() is available])],
+      [AC_MSG_NOTICE([ssl:handshake() is not available])])
+
+###########################################################
+#
+# check for new stacktrace syntax
+#
+###########################################################
+# http://erlang.org/eeps/eep-0047.md
+
+erlang_cv_new_stacktrace=0
+AC_LANG_PUSH([Erlang])[]dnl
+AC_RUN_IFELSE(
+[AC_LANG_PROGRAM([], [dnl
+try
+  5
+catch
+  C:E:Stk ->
+          Stk
+end])],
+[erlang_cv_new_stacktrace=true],
+[erlang_cv_new_stacktrace=false])
+AC_LANG_POP([Erlang])[]dnl
+
+AS_IF([test "${erlang_cv_new_stacktrace}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_new_stacktrace}"
+       EDOCMACROS="${EDOCMACROS}, {have_new_stacktrace, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_new_stacktrace"
+       AC_MSG_NOTICE([new stacktrace syntax is available])],
+      [AC_MSG_NOTICE([new stacktrace syntax is not available])])
+
 
 ###########################################################
 #
@@ -829,7 +874,7 @@ else
   echo "  toke                 : yes"
 fi
 
-if test "x$SSL_GETSTAT_FLAGS" = "xtrue" ; then
+if test "x$SSL_GETSTAT" = "xfalse" ; then
   echo "  ssl                  : no"
 else
   echo "  ssl                  : yes"
