@@ -291,9 +291,12 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
              not replication:quorum_accepted(VoteCount - 1) andalso
             DataType:lteq(Learnt, ProposalValue) of
             true ->
-                ProposerEntry = get_entry(Key, tablename(State)),
-                NewProposerEntry = entry_remove_clients(ProposerEntry, Clients),
-                _ = save_entry(NewProposerEntry, tablename(State)),
+                case get_entry(Key, tablename(State)) of
+                    undefined -> ok;
+                    ProposerEntry ->
+                        NewPropEntry = entry_remove_clients(ProposerEntry, Clients),
+                        save_entry(NewPropEntry, tablename(State))
+                end,
 
                 %% Only notify clients of this proposer. This is necessary for linearizability as
                 %% a read only looks at the learned value of the local learner after its no-op write succeeded
@@ -304,7 +307,6 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
             false ->
                 NewEntry
         end,
-
     _ = save_entry(NewEntry2, tablename(State)),
 
     %% lazily complete lists of active proposers
@@ -395,8 +397,7 @@ entry_bufval(Entry)                -> element(9, Entry).
 entry_add_client(Entry, Client) ->
     Clients = element(3, Entry),
     setelement(3, Entry, [Client | Clients]).
--spec entry_remove_clients(undefined | entry(), [comm:mypid()]) -> entry().
-entry_remove_clients(undefined, _) -> undefined;
+-spec entry_remove_clients(entry(), [comm:mypid()]) -> entry().
 entry_remove_clients(Entry, ClientsToRemve) ->
     Clients = element(3, Entry),
     NewClients = lists:filter(fun(C) -> not lists:member(C, ClientsToRemve) end, Clients),
@@ -476,8 +477,7 @@ get_entry(Key, DataType, TableName) ->
         Entry -> Entry
     end.
 
--spec save_entry(undefined | entry() | learner_entry(), ?PDB:tableid()) -> ok.
-save_entry(undefined, _) -> ok;
+-spec save_entry(entry() | learner_entry(), ?PDB:tableid()) -> ok.
 save_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 

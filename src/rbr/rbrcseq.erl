@@ -20,6 +20,10 @@
 -author('schintke@zib.de').
 -vsn('$Id:$ ').
 
+%% req_for_retrigger can handle incdelay or noincdelay for retriggering
+%% requests. noincdelay is not used right now, but throwing away logic seems premature
+-dialyzer({no_match, req_for_retrigger/2}).
+
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
 -define(REDUNDANCY, (config:read(redundancy_module))).
@@ -793,58 +797,51 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
             Replies = entry_replies(Entry),
-            {Done, NewReplies} = add_write_deny(Replies, RoundTried, Cons),
-            NewEntry = entry_set_replies(Entry, NewReplies),
+            {_Done=true, _NewReplies} = add_write_deny(Replies, RoundTried, Cons),
 
-            case Done of
-                false ->
-                    update_entry(NewEntry, tablename(State)),
-                    State;
-                true ->
-                    %% retry original read
-                    delete_entry(Entry, TableName),
+            %% the first deny we receive requires us to retry the request
+            delete_entry(Entry, TableName),
 
-                    %% we want to retry with the read, the original
-                    %% request is packed in the client field of the
-                    %% entry as we created a reply_as with
-                    %% qread_write_through_done The 2nd field of the
-                    %% reply_as was filled with the original state
-                    %% entry (including the original client and the
-                    %% original read filter.
-                    {_Pid, Msg1} = comm:unpack_cookie(entry_client(Entry), {whatever}),
-                    %% reply_as from qread write through without filtering
-                    qread_write_through_done = comm:get_msg_tag(Msg1),
-                    UnpackedEntry = element(2, Msg1),
-                    UnpackedClient = entry_client(UnpackedEntry),
+            %% we want to retry with the read, the original
+            %% request is packed in the client field of the
+            %% entry as we created a reply_as with
+            %% qread_write_through_done The 2nd field of the
+            %% reply_as was filled with the original state
+            %% entry (including the original client and the
+            %% original read filter.
+            {_Pid, Msg1} = comm:unpack_cookie(entry_client(Entry), {whatever}),
+            %% reply_as from qread write through without filtering
+            qread_write_through_done = comm:get_msg_tag(Msg1),
+            UnpackedEntry = element(2, Msg1),
+            UnpackedClient = entry_client(UnpackedEntry),
 
-                    %% In case of filters enabled, we packed once more
-                    %% to write through without filters and applying
-                    %% the filters afterwards. Let's check this by
-                    %% unpacking and seeing whether the reply msg tag
-                    %% is still a qread_write_through_done. Then we
-                    %% have to use the 2nd unpacking to get the
-                    %% original client entry.
-                    {_Pid2, Msg2} = comm:unpack_cookie(
-                                      UnpackedClient, {whatever2}),
+            %% In case of filters enabled, we packed once more
+            %% to write through without filters and applying
+            %% the filters afterwards. Let's check this by
+            %% unpacking and seeing whether the reply msg tag
+            %% is still a qread_write_through_done. Then we
+            %% have to use the 2nd unpacking to get the
+            %% original client entry.
+            {_Pid2, Msg2} = comm:unpack_cookie(
+                              UnpackedClient, {whatever2}),
 
-                    {Client, Filter} =
-                        case comm:get_msg_tag(Msg2) of
-                            qread_write_through_done ->
-                                %% we also have to delete this request
-                                %% as no one will answer it.
-                                UnpackedEntry2 = element(2, Msg2),
-                                delete_entry(UnpackedEntry2, TableName),
-                                {entry_client(UnpackedEntry2),
-                                 entry_filters(UnpackedEntry2)};
-                            _ ->
-                                {UnpackedClient,
-                                 entry_filters(UnpackedEntry)}
-                        end,
-                    NextRound = 1 + pr:get_r(RoundTried),
-                    gen_component:post_op({qread, Client, entry_openreqentry(Entry), Key, entry_datatype(Entry),
-                                           Filter, entry_retrigger(Entry) - entry_period(Entry), NextRound, write},
-                      State)
-            end
+            {Client, Filter} =
+                case comm:get_msg_tag(Msg2) of
+                    qread_write_through_done ->
+                        %% we also have to delete this request
+                        %% as no one will answer it.
+                        UnpackedEntry2 = element(2, Msg2),
+                        delete_entry(UnpackedEntry2, TableName),
+                        {entry_client(UnpackedEntry2),
+                         entry_filters(UnpackedEntry2)};
+                    _ ->
+                        {UnpackedClient,
+                         entry_filters(UnpackedEntry)}
+                end,
+            NextRound = 1 + pr:get_r(RoundTried),
+            gen_component:post_op({qread, Client, entry_openreqentry(Entry), Key, entry_datatype(Entry),
+                                   Filter, entry_retrigger(Entry) - entry_period(Entry), NextRound, write},
+              State)
     end;
 
 on({qread_write_through_done, ReadEntry, _Filtering,
@@ -1668,7 +1665,7 @@ add_write_deny(Replies, RoundTried, _Cons) ->
 
     % even one deny requires us to retry. otherwise we risk waiting forever
     % if one acceptor has failed
-    Done = true, %?REDUNDANCY:quorum_denied(R2#w_replies.deny_count),
+    Done = true,
     {Done, R2}.
 
 -spec is_read_commuting(prbr:read_filter(), prbr:write_filter(), module()) -> boolean().
