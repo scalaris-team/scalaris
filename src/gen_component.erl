@@ -594,7 +594,7 @@ loop(UState, GCState) ->
 %%            try
                 on(Msg, UState, GCState)
             %% catch Level:Reason ->
-            %%         Stacktrace = erlang:get_stacktrace(),
+            %%         Stacktrace = util:get_stacktrace(),
             %%         log:log(error,
             %%                 "Error: exception ~p:~p in loop of ~.0p~n ",
             %%                 [Level, Reason, {UState, GCState}]),
@@ -684,7 +684,7 @@ on(Msg, UState, GCState) ->
                     end
             catch Level:Reason ->
                     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
-                    Stacktrace = erlang:get_stacktrace(),
+                    Stacktrace = util:get_stacktrace(),
                     case Stacktrace of
                         %% erlang < R15 : {Module, Handler, [Msg, State]}
                         %% erlang >= R15: {Module, Handler, [Msg, State], _}
@@ -756,7 +756,7 @@ on_traced_msg(Msg, UState, GCState) ->
                 true -> loop(NewUState, bp_step_done(Msg, T1GCState))
             end
     catch Level:Reason ->
-              Stacktrace = erlang:get_stacktrace(),
+              Stacktrace = util:get_stacktrace(),
               case Stacktrace of
                   %% erlang < R15 : {Module, Handler, [Msg, State]}
                   %% erlang >= R15: {Module, Handler, [Msg, State], _}
