@@ -115,7 +115,7 @@ init(Options) ->
                end,
     _ = write(db_directory, read(db_directory) ++ "/"
               ++ atom_to_list(DBSubDir) ++ "/"),
-    filelib:ensure_dir(read(db_directory)),
+    ok = filelib:ensure_dir(read(db_directory)),
 
     try check_config() of
         true -> ok;
