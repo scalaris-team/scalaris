@@ -15,24 +15,37 @@
 %% @author Jan Skrzypczak <skrzypczak@zib.de>
 %% @doc State-based CRDT behaviour
 %% @end
-
+%%
+-module(crdt_beh).
 -author('skrzypczak@zib.de').
 
--export_type([crdt/0]).
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
 
--export([new/0, apply_update/3, apply_query/2, merge/2, eq/2, lt/2, lteq/2]).
+-type crdt() :: term().
 
--spec apply_update(crdt:update_fun(), non_neg_integer(), crdt()) -> crdt().
-apply_update(U, ReplicaId, CRDT) ->
-    case erlang:fun_info(U, arity) of
-        {arity, 1} -> U(CRDT);
-        {arity, 2} -> U(ReplicaId, CRDT)
-    end.
+-callback new() -> crdt().
 
--spec apply_query(crdt:query_fun(), crdt()) -> term().
-apply_query(Q, CRDT) -> Q(CRDT).
+-callback apply_update(crdt:update_fun(), non_neg_integer(), crdt()) -> crdt().
+-callback apply_query(crdt:query_fun(), crdt()) -> term().
+-callback merge(crdt(), crdt()) -> crdt().
 
--spec lteq(crdt(), crdt())  -> boolean().
-lteq(CRDT1, CRDT2) -> lt(CRDT1, CRDT2) orelse eq(CRDT1, CRDT2).
+-callback eq(crdt(), crdt()) -> boolean().
+-callback lteq(crdt(), crdt()) -> boolean().
 
+-else.
+
+-export([behaviour_info/1]).
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
+behaviour_info(callbacks) ->
+    [
+        {new, 0},
+        {apply_update, 3}, {apply_query, 2},
+        {merge, 2},
+        {eq, 2}, {lteq, 2}
+    ];
+behaviour_info(_Other) ->
+    undefined.
+
+-endif.
 

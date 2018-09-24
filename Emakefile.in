@@ -1,6 +1,6 @@
 % behaviors first - otherwise there are compile warnings
 {["src/cloud_beh.erl",
-  "src/crdt/crdt_beh.erl",
+  "src/crdt/types/crdt_beh.erl",
   "src/db_backend_beh.erl",
   "src/gen_component.erl",
   "src/gossip_beh.erl",
@@ -31,6 +31,7 @@
   "src/comm_layer/*",
   "src/cp/*",
   "src/crdt/*",
+  "src/crdt/types/*",
   "src/json/*",
   "src/paxos/*",
   "src/rbr/*",

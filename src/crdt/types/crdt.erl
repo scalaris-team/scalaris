@@ -31,7 +31,7 @@
 -type query_fun()   :: fun((crdt()) -> term()).
 
 % existing implemented crdts
--type crdt_module() :: gcounter | pncounter.
+-type crdt_module() :: gcounter | pncounter | gset.
 
 -spec update_noop(crdt()) -> crdt().
 update_noop(CRDT) -> CRDT.

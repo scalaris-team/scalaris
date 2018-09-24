@@ -41,9 +41,8 @@ merge({P1, N1}, {P2, N2}) -> {gcounter:merge(P1, P2), gcounter:merge(N1, N2)}.
 -spec eq(crdt(), crdt()) -> boolean().
 eq({P1, N1}, {P2, N2}) -> gcounter:eq(P1, P2) andalso gcounter:eq(N1, N2).
 
--spec lt(crdt(), crdt()) -> boolean().
-lt({P1, N1}, {P2, N2}) ->
-    gcounter:lteq(P1, P2) andalso gcounter:lteq(N1, N2).
+-spec lteq(crdt(), crdt()) -> boolean().
+lteq({P1, N1}, {P2, N2}) -> gcounter:lteq(P1, P2) andalso gcounter:lteq(N1, N2).
 
 %%%%%%%%%%%%%%% Available update and query functions
 

@@ -45,12 +45,12 @@ merge(CRDT1, CRDT2) -> lists:zipwith(fun(A, B) -> max(A,  B) end, CRDT1, CRDT2).
 -spec eq(crdt(), crdt()) -> boolean().
 eq(CRDT1, CRDT2) -> CRDT1 =:= CRDT2.
 
--spec lt(crdt(), crdt()) -> boolean().
-lt(CRDT1, CRDT2) ->
-    {LT, GT} = lists:foldl(fun({E1, E2}, {AccL, AccG}) ->
-                                {AccL orelse E1 < E2, AccG orelse E1 > E2}
-                           end, {false, false}, lists:zip(CRDT1, CRDT2)),
-    LT andalso not GT.
+-spec lteq(crdt(), crdt()) -> boolean().
+lteq(CRDT1, CRDT2) ->
+    Lteq = lists:foldl(fun({E1, E2}, Acc) ->
+                                Acc andalso E1 =< E2
+                           end, true, lists:zip(CRDT1, CRDT2)),
+    Lteq.
 
 %%%%%%%%%%%%%%% Available update and query functions
 
