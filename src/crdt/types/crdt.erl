@@ -26,12 +26,12 @@
 % for tester
 -export([tester_create_update_fun/1, tester_create_query_fun/1]).
 
--type crdt()        :: term().
+-type crdt()        :: gcounter:crdt() | pncounter:crdt() | gset:crdt().
+-type crdt_module() :: gcounter | pncounter | gset.
+
 -type update_fun()  :: fun((crdt()) -> crdt()) | fun((non_neg_integer(), crdt()) -> crdt()).
 -type query_fun()   :: fun((crdt()) -> term()).
 
-% existing implemented crdts
--type crdt_module() :: gcounter | pncounter | gset.
 
 -spec update_noop(crdt()) -> crdt().
 update_noop(CRDT) -> CRDT.

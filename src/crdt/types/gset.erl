@@ -26,6 +26,10 @@
 -export([update_add/2]).
 -export([query_lookup/2]).
 
+%% GLA utility functions
+-export([lt/2]).
+-export([exists/2]).
+-export([fold/3]).
 
 -behaviour(crdt_beh).
 
@@ -34,7 +38,7 @@
 -include("crdt_beh.hrl").
 
 -spec new() -> crdt().
-new() -> [0 || _ <- ordsets:new()].
+new() -> ordsets:new().
 
 -spec merge(crdt(), crdt()) -> crdt().
 merge(CRDT1, CRDT2) -> ordsets:union(CRDT1, CRDT2).
@@ -53,4 +57,17 @@ update_add(ToAdd, CRDT) -> ordsets:add_element(ToAdd, CRDT).
 -spec query_lookup(any(), crdt()) -> boolean().
 query_lookup(Element, CRDT) -> ordsets:is_element(Element, CRDT).
 
+%%%%%%%%%%%%%%% Utility functions used in GLA implementation
+-spec lt(crdt(), crdt()) -> boolean().
+lt(CRDT1, CRDT2) -> lteq(CRDT1, CRDT2) andalso not eq(CRDT1, CRDT2).
 
+-spec exists(fun((term()) -> boolean()), crdt()) -> boolean().
+exists(PredFun, CRDT) ->
+    ordsets:fold(fun(_, true) -> true;
+                     (E, false) ->
+                         PredFun(E)
+                  end, false, CRDT).
+
+-spec fold(fun((term(), term()) -> term()), term(), crdt()) -> term().
+fold(Fun, Acc0, CRDT) ->
+    ordsets:fold(Fun, Acc0, CRDT).

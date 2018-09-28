@@ -33,7 +33,7 @@
 -export([set_entry/2]).
 -export([get_entry/2]).
 -export([entry_key/1]).
--export([entry_val/2]).
+-export([entry_val/1]).
 -export([entry_set_val/2]).
 
 -export_type([state/0]).
@@ -41,24 +41,19 @@
 
 -type state() :: {?PDB:db(), [comm:mypid()]}.
 
-%% so there are no longer any read denies, all reads succeed.
 -type entry() :: {
-                   any(), %% key
-                   any() %% value
+                   any(),      %% key
+                   gset:crdt() %% value
                  }.
 
 %% Messages to expect from this module
--spec msg_get_val_reply(comm:mypid(), ?RT:key(), crdt:crdt_module(), crdt:crdt()) -> ok.
-msg_get_val_reply(Client, Key, DataType, UpdatedVal) ->
-    comm:send(Client, {proposal_val_reply, Key, DataType, UpdatedVal}).
-
--spec msg_ack_reply(comm:mypid(), ?RT:key(), pr:pr(), crdt:crdt()) -> ok.
+-spec msg_ack_reply(comm:mypid(), ?RT:key(), pr:pr(), gset:crdt()) -> ok.
 msg_ack_reply(Client, Key, ProposalNumber, ProposalValue) ->
     comm:send(Client, {ack_reply, Key, ProposalNumber, ProposalValue}).
 
--spec msg_learner_ack_reply(comm:mypid(), ?RT:key(), [comm:mypid()], crdt:crdt_module(), pr:pr(), crdt:crdt(), any()) -> ok.
-msg_learner_ack_reply(Proposer, Key, Clients, DataType, ProposalNumber, ProposalValue, ProposerId) ->
-    comm:send(Proposer, {learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, ProposerId}).
+-spec msg_learner_ack_reply(comm:mypid(), ?RT:key(), crdt:crdt_module(), pr:pr(), gset:crdt(), any()) -> ok.
+msg_learner_ack_reply(Proposer, Key, DataType, ProposalNumber, ProposalValue, ProposerId) ->
+    comm:send(Proposer, {learner_ack_reply, Key, DataType, ProposalNumber, ProposalValue, ProposerId}).
 
 -spec msg_nack_reply(comm:mypid(), ?RT:key(), pr:pr(), crdt:crdt()) -> ok.
 msg_nack_reply(Client, Key, ProposalNumber, ProposalValue) ->
@@ -79,49 +74,32 @@ close(_State={TableName, _}) -> ?PDB:close(TableName).
 -spec close_and_delete(state()) -> true.
 close_and_delete(_State={TableName, _}) -> ?PDB:close_and_delete(TableName).
 
+%% implements acceptor action Accept and Reject
 -spec on(tuple(), state()) -> state().
-on({gla_acceptor, get_proposal_value, _Cons, Proposer, Key, DataType, UpdateFun}, State={TableName, _ProposerList}) ->
-    ?TRACE("gla_acceptor:update: ~p ~p ", [Key, Proposer]),
-    Entry = get_entry(Key, TableName),
-
-    Keys = lists:sort(replication:get_keys(Key)),
-    Tmp = lists:dropwhile(fun(E) -> E =/= Key end, Keys),
-    ThisReplicaId = length(Keys) - length(Tmp) + 1,
-
-    CVal = entry_val(Entry, DataType),
-    NewCVal = DataType:apply_update(UpdateFun, ThisReplicaId, CVal),
-    NewEntry = entry_set_val(Entry, NewCVal),
-    _ = set_entry(NewEntry, TableName),
-
-    msg_get_val_reply(Proposer, Key, DataType, NewCVal),
-    trace_mpath:log_info(self(), {acceptor_update,
-                                  key, Key,
-                                  old_value, CVal,
-                                  new_value, NewCVal}),
-    State;
-
-
-on({gla_acceptor, propose, _Cons, Proposer, Key, Clients, ProposalNumber, ProposedValue, DataType},
+on({gla_acceptor, propose, _Cons, Proposer, Key, DataType, ProposalNumber, ProposedValue},
    _State={TableName, ProposerList}) ->
     ?TRACE("crdt_acceptor:propose: ~p ~p ~n ~p ~p", [Key, Proposer, ProposalNumber, ProposedValue]),
+    % TODO since no initial discovery is implemented, add unknown proposers to our list
     NewProposerList = case lists:member(Proposer, ProposerList) of
                           true -> ProposerList;
                           false -> [Proposer | ProposerList]
                       end,
 
     Entry = get_entry(Key, TableName),
-    AcceptedValue = entry_val(Entry, DataType),
+    AcceptedValue = entry_val(Entry),
 
-    case DataType:lteq(AcceptedValue, ProposedValue) of
+    case gset:lteq(AcceptedValue, ProposedValue) of
         true ->
+            %% Accept action
             NewEntry = entry_set_val(Entry, ProposedValue),
             _ = set_entry(NewEntry, TableName),
 
-            _ = [msg_learner_ack_reply(Learner, Key, Clients, DataType, ProposalNumber, ProposedValue, Proposer)
+            _ = [msg_learner_ack_reply(Learner, Key, DataType, ProposalNumber, ProposedValue, Proposer)
                  || Learner <- NewProposerList], %% each proposer is also a learner
             msg_ack_reply(Proposer, Key, ProposalNumber, ProposedValue);
         false ->
-            MergedValue = DataType:merge(AcceptedValue, ProposedValue),
+            %% Reject action
+            MergedValue = gset:merge(AcceptedValue, ProposedValue),
             NewEntry = entry_set_val(Entry, MergedValue),
             _ = set_entry(NewEntry, TableName),
             msg_nack_reply(Proposer, Key, ProposalNumber, MergedValue)
@@ -153,11 +131,9 @@ new(Key, Val) ->
 -spec entry_key(entry()) -> any().
 entry_key(Entry) -> element(1, Entry).
 -spec entry_val(entry()) -> crdt:crdt() | gla_bottom.
-entry_val(Entry) -> element(2, Entry).
--spec entry_val(entry(), crdt:crdt_module()) -> crdt:crdt().
-entry_val(Entry, DataType) ->
-    case entry_val(Entry) of
-        gla_bottom -> DataType:new();
+entry_val(Entry) ->
+    case element(2, Entry) of
+        gla_bottom -> gset:new();
         Any -> Any
     end.
 -spec entry_set_val(entry(), any()) -> entry().

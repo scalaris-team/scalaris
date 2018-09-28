@@ -23,6 +23,7 @@
 -define(TRACE(X,Y), ok).
 
 -define(ROUTING_DISABLED, false).
+-define(WRITE_DONE_POLLING_PERIOD, 10). %% time in ms how often to check if writes completed
 
 -include("scalaris.hrl").
 
@@ -40,7 +41,7 @@
                    dht_node_state:db_selector(),
                    non_neg_integer(), %% period this process is in
                    [any()], %% list of known proposers
-                   [any()]  %% list of open requests
+                   [{any(), ?RT:key(), any()}] %% list of writer clients waiting for reply
                  }.
 
 -type entry() :: {?RT:key(), %% key
@@ -50,9 +51,9 @@
                   non_neg_integer(), %% ack count
                   non_neg_integer(), %% nack count
                   non_neg_integer(), %% active proposal number
-                  crdt:crdt(), %% proposed value
-                  crdt:crdt(), %% buffered value
-                  crdt:crdt() %% output value
+                  gset:crdt(), %% proposed value
+                  gset:crdt(), %% buffered value
+                  gset:crdt() %% output value
                  }.
 
 -type learner_entry() :: {{learner, ?RT:key()},
@@ -71,6 +72,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
+    comm:send_local(self(), {learnt_cmd_poller}),
     {?PDB:new(?MODULE, [set]), DBSelector, 0, [], []}.
 
 
@@ -110,21 +112,21 @@ on({req_start, {read, strong, Client, Key, DataType, QueryFun}}, State) ->
 
 on({read_write_done, Client, Key, DataType, QueryFun, _Msg}, State) ->
     This = comm:reply_as(comm:this(), 5, {apply_query, Client, DataType, QueryFun, '_'}),
-    gen_component:post_op({get_learnt_value, Key, This}, State);
+    gen_component:post_op({learnt_value, Key, This}, State);
 
-on({apply_query, Client, DataType, QueryFun, {ok, LearntValue}}, State) ->
-    inform_client(read_done, Client, DataType:apply_query(QueryFun, LearntValue)),
+on({apply_query, Client, DataType, QueryFun, LearntValue}, State) ->
+    CrdtVal = gset:fold(fun({_CmdId, UpdateCmd}, Acc) ->
+                                %% replica ID does not matter (i.e. when using gcounter)
+                                %% as the CRDT value is not distributed, only its update commands.
+                                DataType:apply_update(UpdateCmd, 1, Acc)
+                        end,
+                        DataType:new(), LearntValue),
+    inform_client(read_done, Client, DataType:apply_query(QueryFun, CrdtVal)),
     State;
 
 %%%%% strong consistent write
 
-%% Start request... first retrieve value to propose as a crdt only supplies an update fun
-%% If we implemented state machine replication as described in paper (i.e. set-inclusion
-%% of proposed update commands), the size of the proposed lattice value will grow
-%% linear with the number of commands. As it is not trivial how to prune this set,
-%% this is not really a practical solution... Instead we apply the update
-%% command first on a replica and use the result as value to propose. However, this
-%% makes it harder to known when a particular update command was learned.
+%% procedure ExecuteUpdate
 on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
     NewState =
         case get_entry(Key, tablename(State)) of
@@ -136,74 +138,75 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
         end,
 
     ReqId = uid:get_pids_uid(), %% unique identifier for this request
-    Request = {ReqId, Client},
-    NewState2 = add_open_request(NewState, Request),
-    %% Wrapper called after write completes to ensure that each client gets only
-    %% a single write done message
-    WriteCompleteClient = comm:reply_as(comm:this(), 3, {notify_client, Request, '_'}),
-    %% Wrapper to start the write after the lattice value to be proposed was retrieved
-    WriteBeginClient = comm:reply_as(comm:this(), 3, {write, WriteCompleteClient, '_'}),
+    PropVal = gset:update_add({ReqId, UpdateFun}, gset:new()),
 
-    Msg = {gla_acceptor, get_proposal_value, '_', WriteBeginClient, key, DataType, UpdateFun},
-    send_to_local_replica(Key, Msg),
-    NewState2;
+    NewState2 = add_waiting_client(NewState, {ReqId, Key, Client}),
+    gen_component:post_op({receive_value, Key, DataType, PropVal},  NewState2);
 
-%% write is complete
-on({notify_client, Request={_ReqId, Client}, Msg}, State) ->
-   case lists:member(Request, open_requests(State)) of
-        false ->
-            %% request was already answered -> do nothing
-            State;
-        true ->
-            case is_tuple(Client) of
-                true -> comm:send(Client, Msg); %% clients is also enveloped
-                false -> comm:send_local(Client, Msg)
-            end,
-            remove_open_request(State, Request)
-    end;
+%% check which commands are learnt to notify the client
+on({learnt_cmd_poller}, State) ->
+    NewList =
+       lists:filter(fun({CmdId, Key, Client}) ->
+                        case get_entry({learner, Key}, tablename(State)) of
+                            undefined -> true;
+                            Entry ->
+                                CmdSet = learner_learnt(Entry),
+                                case gset:exists(fun(E) -> element(1, E) =:= CmdId end, CmdSet) of
+                                    true ->
+                                        inform_client(write_done, Client),
+                                        false;
+                                    false ->
+                                        true
+                                end
+                        end
+                    end, waiting_clients(State)),
 
-%% ReceiveValue
-on({write, Client, {proposal_val_reply, Key, DataType, ProposalValue}}, State) ->
+    NewState = set_waiting_clients(State, NewList),
+
+    comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller}),
+    NewState;
+
+
+%% action ReceiveValue
+on({receive_value, Key, DataType, Command}, State) ->
     ProposerList = proposers(State),
-    [comm:send(Proposer, {internal_receive, Key, Client, DataType, ProposalValue})
+    [comm:send(Proposer, {internal_receive, Key, DataType, Command})
      || Proposer <- ProposerList],
 
     State;
 
 %% Internal Receive
-on({internal_receive, Key, Client, DataType, PropVal}, State) ->
+on({internal_receive, Key, DataType, PropVal}, State) ->
     Entry = get_entry(Key, DataType, tablename(State)),
-    DataType = entry_datatype(Entry),
-    NewBufVal = DataType:merge(entry_bufval(Entry), PropVal),
+    NewBufVal = gset:merge(entry_bufval(Entry), PropVal),
     NewEntry = entry_set_bufval(Entry, NewBufVal),
-    NewEntry2 = entry_add_client(NewEntry, Client),
-    _ = save_entry(NewEntry2, tablename(State)),
+    _ = save_entry(NewEntry, tablename(State)),
 
-    gen_component:post_op({propose, Key, _ForeceProposal=true}, State);
+    gen_component:post_op({propose, Key}, State);
 
 %% Propose
-on({propose, Key, ForceProposal}, State) ->
+on({propose, Key}, State) ->
     Entry = get_entry(Key, tablename(State)),
-    DataType = entry_datatype(Entry),
     PropVal = entry_propval(Entry),
     BufVal = entry_bufval(Entry),
-    NewPropVal = DataType:merge(PropVal, BufVal),
+    NewPropVal = gset:merge(PropVal, BufVal),
     case entry_status(Entry) =:= passive
-        andalso (ForceProposal orelse %% read requests do not change lattice value
-                 entry_clients(Entry) =/= [] orelse %% there might be an open read request
-                 DataType:lt(PropVal, NewPropVal)) of
+        andalso gset:lt(PropVal, NewPropVal) of
         true ->
             NewPropNum = entry_propnum(Entry) + 1,
-            NewEntry1 = entry_set_ackcount(Entry, 0),
-            NewEntry2 = entry_set_nackcount(NewEntry1, 0),
-            NewEntry3 = entry_set_propnum(NewEntry2, NewPropNum),
-            NewEntry4 = entry_set_propval(NewEntry3, NewPropVal),
-            NewEntry5 = entry_set_bufval(NewEntry4, DataType:new()),
-            NewEntry6 = entry_set_status(NewEntry5, active),
-            _ = save_entry(NewEntry6, tablename(State)),
-            Clients = entry_clients(Entry),
-            Msg =  {gla_acceptor, propose, '_', comm:this(), key, Clients, NewPropNum, NewPropVal, DataType},
+            NewEntry1 = entry_set_propval(Entry, NewPropVal),
+            NewEntry2 = entry_set_status(NewEntry1, active),
+            NewEntry3 = entry_set_ackcount(NewEntry2, 0),
+            NewEntry4 = entry_set_nackcount(NewEntry3, 0),
+            NewEntry5 = entry_set_propnum(NewEntry4, NewPropNum),
+            _ = save_entry(NewEntry5, tablename(State)),
+
+            DataType = entry_datatype(NewEntry5),
+            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, NewPropVal},
             send_to_all_replicas(Key, Msg),
+
+            NewEntry6 = entry_set_bufval(NewEntry5, gset:new()),
+            _ = save_entry(NewEntry6, tablename(State)),
 
             State;
         false ->
@@ -225,11 +228,10 @@ on({ack_reply, Key, ProposalNumber, _ProposalValue}, State) ->
 %% Proposer Nack
 on({nack_reply, Key, ProposalNumber, ProposalValue}, State) ->
     Entry = get_entry(Key, tablename(State)),
-    DataType = entry_datatype(Entry),
     case entry_propnum(Entry) =:= ProposalNumber of
         true ->
             NewAckCount = entry_nackcount(Entry) + 1,
-            NewProposalValue = DataType:merge(ProposalValue, entry_propval(Entry)),
+            NewProposalValue = gset:merge(ProposalValue, entry_propval(Entry)),
             NewEntry = entry_set_nackcount(Entry, NewAckCount),
             NewEntry2 = entry_set_propval(NewEntry, NewProposalValue),
             _ = save_entry(NewEntry2, tablename(State)),
@@ -245,14 +247,14 @@ on({refine, Key}, State) ->
          replication:quorum_accepted(entry_nackcount(Entry) + entry_ackcount(Entry)) of
         true ->
             NewPropNum = entry_propnum(Entry) + 1,
-            DataType = entry_datatype(Entry),
             PropVal = entry_propval(Entry),
             NewEntry1 = entry_set_ackcount(Entry, 0),
             NewEntry2 = entry_set_nackcount(NewEntry1, 0),
             NewEntry3 = entry_set_propnum(NewEntry2, NewPropNum),
             _ = save_entry(NewEntry3, tablename(State)),
-            Clients = entry_clients(Entry),
-            Msg =  {gla_acceptor, propose, '_', comm:this(), key, Clients, NewPropNum, PropVal, DataType},
+
+            DataType = entry_datatype(Entry),
+            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, PropVal},
             send_to_all_replicas(Key, Msg),
             State;
         false ->
@@ -269,13 +271,13 @@ on({decide, Key}, State) ->
             NewEntry = entry_set_outval(Entry, PropVal),
             NewEntry2 = entry_set_status(NewEntry, passive),
             _ = save_entry(NewEntry2, tablename(State)),
-            gen_component:post_op({propose, Key, _ForceProposal=false}, State);
+            gen_component:post_op({propose, Key}, State);
         false ->
             State
     end;
 
 %% Learner ack
-on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, ProposerId}, State) ->
+on({learner_ack_reply, Key, DataType, ProposalNumber, Value, ProposerId}, State) ->
     Entry = case get_entry({learner, Key}, tablename(State)) of
                 undefined -> new_learner_entry(Key, DataType);
                 E -> E
@@ -286,38 +288,25 @@ on({learner_ack_reply, Key, Clients, DataType, ProposalNumber, ProposalValue, Pr
     Learnt = learner_learnt(NewEntry),
     NewEntry2 =
         case replication:quorum_accepted(VoteCount) andalso
-             %% a bit of an hack to ensure that clients are only notified with the first
-             %% vote over the threshold
-             not replication:quorum_accepted(VoteCount - 1) andalso
-            DataType:lteq(Learnt, ProposalValue) of
+            gset:lt(Learnt, Value) of
             true ->
-                case get_entry(Key, tablename(State)) of
-                    undefined -> ok;
-                    ProposerEntry ->
-                        NewPropEntry = entry_remove_clients(ProposerEntry, Clients),
-                        save_entry(NewPropEntry, tablename(State))
-                end,
-
-                %% Only notify clients of this proposer. This is necessary for linearizability as
-                %% a read only looks at the learned value of the local learner after its no-op write succeeded
-                %% all write requests are enveloped (see notify_client in req_start)
-                [inform_client(write_done, Client) || Client <- Clients, element(1, Client) =:= comm:this()],
-
-                learner_set_learnt(NewEntry, ProposalValue);
+                learner_set_learnt(NewEntry, Value);
             false ->
                 NewEntry
         end,
     _ = save_entry(NewEntry2, tablename(State)),
 
     %% lazily complete lists of active proposers
-    add_proposer(State, ProposerId);
+    add_proposer(State, ProposerId),
+    State;
 
-on({get_learnt_value, Key, Client}, State) ->
-    Ret = case get_entry({learner, Key}, tablename(State)) of
-            undefined -> {fail, not_found};
-            Entry -> {ok, learner_learnt(Entry)}
+%% procedure LearntValue
+on({learnt_value, Key, Client}, State) ->
+    Ret =
+        case get_entry({learner, Key}, tablename(State)) of
+            undefined -> gset:new();
+            Entry -> learner_learnt(Entry)
         end,
-
     comm:send(Client, Ret),
     State;
 
@@ -345,18 +334,6 @@ on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
     State.
 
 %%%%%%%%%%%%%%%% message sending helpers
--spec send_to_local_replica(?RT:key(), tuple()) -> ok.
-send_to_local_replica(Key, Message) ->
-    %% assert element(3, message) =:= '_'
-    %% assert element(5, message) =:= key
-    send_to_local_replica(Key, Message, not ?ROUTING_DISABLED).
-
--spec send_to_local_replica(?RT:key(), tuple(), boolean()) -> ok.
-send_to_local_replica(Key, Message, _Routing=true) ->
-    LocalDhtNode = pid_groups:get_my(dht_node),
-    This = comm:reply_as(comm:this(), 4, {local_range_req, Key, Message, '_'}),
-    comm:send_local(LocalDhtNode, {get_state, This, my_range}).
-
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
 send_to_all_replicas(Key, Message) ->
     %% assert element(3, message) =:= '_'
@@ -377,8 +354,6 @@ send_to_all_replicas(Key, Message, _Routing=true) ->
 %%%%%%%%%%%%%%%%%% access of proposer entry
 -spec entry_datatype(entry())       -> crdt:crdt_module().
 entry_datatype(Entry)               -> element(2, Entry).
--spec entry_clients(entry())       -> [any()].
-entry_clients(Entry)               -> element(3, Entry).
 
 -spec entry_status(entry())         -> passive | active.
 entry_status(Entry)                 -> element(4, Entry).
@@ -392,16 +367,6 @@ entry_propnum(Entry)                -> element(7, Entry).
 entry_propval(Entry)                -> element(8, Entry).
 -spec entry_bufval(entry())        -> crdt:crdt().
 entry_bufval(Entry)                -> element(9, Entry).
-
--spec entry_add_client(entry(), comm:mypid()) -> entry().
-entry_add_client(Entry, Client) ->
-    Clients = element(3, Entry),
-    setelement(3, Entry, [Client | Clients]).
--spec entry_remove_clients(entry(), [comm:mypid()]) -> entry().
-entry_remove_clients(Entry, ClientsToRemve) ->
-    Clients = element(3, Entry),
-    NewClients = lists:filter(fun(C) -> not lists:member(C, ClientsToRemve) end, Clients),
-    setelement(3, Entry, NewClients).
 
 -spec entry_set_status(entry(), passive | active) -> entry().
 entry_set_status(Entry, Status) -> setelement(4, Entry, Status).
@@ -457,11 +422,11 @@ learner_add_vote(Entry, Proposer, ProposalNumber) ->
 %%%%%%%%%%%%%%% creation/retrieval/save of entries
 -spec new_entry(?RT:key(), crdt:crdt_module()) -> entry().
 new_entry(Key, DataType) ->
-    {lowest_key(Key), DataType, [], passive, 0, 0, 0, DataType:new(), DataType:new(), DataType:new()}.
+    {lowest_key(Key), DataType, [], passive, 0, 0, 0, gset:new(), gset:new(), gset:new()}.
 
 -spec new_learner_entry(?RT:key(), crdt:crdt_module()) -> learner_entry().
 new_learner_entry(Key, DataType) ->
-    {{learner, lowest_key(Key)}, DataType, DataType:new(), []}.
+    {{learner, lowest_key(Key)}, DataType, gset:new(), []}.
 
 
 -spec get_entry(?RT:key() | {learner, ?RT:key()}, ?PDB:tableid()) -> entry() | learner_entry() | undefined.
@@ -496,21 +461,25 @@ add_proposer(State, Proposer) ->
         false -> setelement(4, State, [Proposer | Known])
     end.
 
--spec open_requests(state()) -> [{any(), comm:mypid()}].
-open_requests(State) -> element(5, State).
--spec add_open_request(state(), {any(), comm:mypid()}) -> state().
-add_open_request(State, Req) ->
-    Reqs = element(5, State),
-    setelement(5, State, [Req | Reqs]).
--spec remove_open_request(state(), {any(), comm:mypid()}) -> state().
-remove_open_request(State, Req) ->
-    Reqs = element(5, State),
-    setelement(5, State, lists:delete(Req, Reqs)).
+-spec waiting_clients(state()) -> [{any(), ?RT:key(), any()}].
+waiting_clients(State) -> element(5, State).
+-spec set_waiting_clients(state(),[{any(), ?RT:key(), any()}]) -> [{any(), ?RT:key(), any()}].
+set_waiting_clients(State, Clients) -> setelement(5, State, Clients).
+-spec add_waiting_client(state(), {any(), ?RT:key(), any()}) -> state().
+add_waiting_client(State, Client) ->
+    Known =  element(5, State),
+    case lists:member(Client, Known) of
+        true -> State;
+        false -> setelement(5, State, [Client | Known])
+    end.
 
 %%%%%%%%%%%%%% misc
 -spec inform_client(write_done, comm:mypid()) -> ok.
 inform_client(write_done, Client) ->
-    comm:send(Client, {write_done}).
+    case is_tuple(Client) of
+        false -> comm:send_local(Client, {write_done});
+        true -> comm:send(Client, {write_done})
+    end.
 
 -spec inform_client(read_done, comm:mypid(), any()) -> ok.
 inform_client(read_done, Client, Value) ->
