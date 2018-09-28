@@ -33,7 +33,7 @@
 
 -behaviour(crdt_beh).
 
--opaque crdt() :: ordsets:ordset().
+-opaque crdt() :: ordsets:ordset(term()).
 
 -include("crdt_beh.hrl").
 
@@ -51,7 +51,7 @@ lteq(CRDT1, CRDT2) -> ordsets:is_subset(CRDT1, CRDT2).
 
 %%%%%%%%%%%%%%% Available update and query functions
 
--spec update_add(non_neg_integer(), crdt()) -> crdt().
+-spec update_add(term(), crdt()) -> crdt().
 update_add(ToAdd, CRDT) -> ordsets:add_element(ToAdd, CRDT).
 
 -spec query_lookup(any(), crdt()) -> boolean().

@@ -113,7 +113,7 @@ on({read_write_done, Client, Key, DataType, QueryFun, _Msg}, State) ->
     This = comm:reply_as(comm:this(), 5, {apply_query, Client, DataType, QueryFun, '_'}),
     gen_component:post_op({learnt_value, Key, This}, State);
 
-on({apply_query, Client, DataType, QueryFun, LearntValue}, State) ->
+on({apply_query, Client, DataType, QueryFun, {LearntValue}}, State) ->
     CrdtVal = gset:fold(fun({_CmdId, UpdateCmd}, Acc) ->
                                 %% replica ID does not matter (i.e. when using gcounter)
                                 %% as the CRDT value is not distributed, only its update commands.
@@ -142,7 +142,8 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
     case waiting_clients(NewState) of
         [] ->
             %% we do not poll currently as the wait set was empty -> start polling
-            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller});
+            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller}),
+            ok;
         _ ->
             %% we are already polling
             ok
@@ -176,7 +177,8 @@ on({learnt_cmd_poller}, State) ->
             ok;
         _ ->
             %% there are still waiting clients... continue to poll
-            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller})
+            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller}),
+            ok
     end,
 
     NewState = set_waiting_clients(State, NewList),
@@ -313,8 +315,7 @@ on({learner_ack_reply, Key, DataType, ProposalNumber, Value, ProposerId}, State)
     _ = save_entry(NewEntry2, tablename(State)),
 
     %% lazily complete lists of active proposers
-    add_proposer(State, ProposerId),
-    State;
+    add_proposer(State, ProposerId);
 
 %% procedure LearntValue
 on({learnt_value, Key, Client}, State) ->
@@ -323,7 +324,7 @@ on({learnt_value, Key, Client}, State) ->
             undefined -> gset:new();
             Entry -> learner_learnt(Entry)
         end,
-    comm:send(Client, Ret),
+    comm:send(Client, {Ret}),
     State;
 
 %% Internal to get local acceptor process
@@ -479,7 +480,7 @@ add_proposer(State, Proposer) ->
 
 -spec waiting_clients(state()) -> [{any(), ?RT:key(), any()}].
 waiting_clients(State) -> element(5, State).
--spec set_waiting_clients(state(),[{any(), ?RT:key(), any()}]) -> [{any(), ?RT:key(), any()}].
+-spec set_waiting_clients(state(), [{any(), ?RT:key(), any()}]) -> state().
 set_waiting_clients(State, Clients) -> setelement(5, State, Clients).
 -spec add_waiting_client(state(), {any(), ?RT:key(), any()}) -> state().
 add_waiting_client(State, Client) ->
