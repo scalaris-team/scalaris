@@ -23,7 +23,7 @@
 -define(TRACE(X,Y), ok).
 
 -define(ROUTING_DISABLED, false).
--define(WRITE_DONE_POLLING_PERIOD, 100). %% time in ms how often to check if writes completed
+-define(WRITE_DONE_POLLING_PERIOD, 10). %% time in ms how often to check if writes completed
 
 -include("scalaris.hrl").
 
@@ -136,8 +136,8 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
             _ -> State
         end,
 
-    ReqId = uid:get_pids_uid(), %% unique identifier for this request
-    PropVal = gset:update_add({ReqId, UpdateFun}, gset:new()),
+    CmdId = {comm:this(), uid:get_pids_uid()}, %% unique identifier of this command
+    PropVal = gset:update_add({CmdId, UpdateFun}, gset:new()),
 
     case waiting_clients(NewState) of
         [] ->
@@ -148,7 +148,7 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
             %% we are already polling
             ok
     end,
-    NewState2 = add_waiting_client(NewState, {ReqId, Key, Client}),
+    NewState2 = add_waiting_client(NewState, {CmdId, Key, Client}),
     gen_component:post_op({receive_value, Key, DataType, PropVal},  NewState2);
 
 %% check which commands are learnt to notify the client
