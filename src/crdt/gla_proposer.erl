@@ -23,7 +23,7 @@
 -define(TRACE(X,Y), ok).
 
 -define(ROUTING_DISABLED, false).
--define(WRITE_DONE_POLLING_PERIOD, 10). %% time in ms how often to check if writes completed
+-define(WRITE_DONE_POLLING_PERIOD, 100). %% time in ms how often to check if writes completed
 
 -include("scalaris.hrl").
 
@@ -72,7 +72,6 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
-    comm:send_local(self(), {learnt_cmd_poller}),
     {?PDB:new(?MODULE, [set]), DBSelector, 0, [], []}.
 
 
@@ -140,11 +139,21 @@ on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
     ReqId = uid:get_pids_uid(), %% unique identifier for this request
     PropVal = gset:update_add({ReqId, UpdateFun}, gset:new()),
 
+    case waiting_clients(NewState) of
+        [] ->
+            %% we do not poll currently as the wait set was empty -> start polling
+            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller});
+        _ ->
+            %% we are already polling
+            ok
+    end,
     NewState2 = add_waiting_client(NewState, {ReqId, Key, Client}),
     gen_component:post_op({receive_value, Key, DataType, PropVal},  NewState2);
 
 %% check which commands are learnt to notify the client
 on({learnt_cmd_poller}, State) ->
+    %% notfiy all clients whose write was completed and remove the respective requests
+    %% from the wait set
     NewList =
        lists:filter(fun({CmdId, Key, Client}) ->
                         case get_entry({learner, Key}, tablename(State)) of
@@ -161,9 +170,16 @@ on({learnt_cmd_poller}, State) ->
                         end
                     end, waiting_clients(State)),
 
-    NewState = set_waiting_clients(State, NewList),
+    case NewList of
+        [] ->
+            %% no waiting clients... we can stop polling for now
+            ok;
+        _ ->
+            %% there are still waiting clients... continue to poll
+            comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller})
+    end,
 
-    comm:send_local_after(?WRITE_DONE_POLLING_PERIOD, self(), {learnt_cmd_poller}),
+    NewState = set_waiting_clients(State, NewList),
     NewState;
 
 
