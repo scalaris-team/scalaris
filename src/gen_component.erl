@@ -577,7 +577,7 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
             % this PID.
             ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
                 log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
-                        [Level, Reason, Module, Stacktrace()]),
+                        [Level, Reason, Module, Stacktrace]),
                 erlang:Level(Reason)
         after
             case WaitForInit of
