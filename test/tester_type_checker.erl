@@ -213,9 +213,9 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                        {list, {tuple,
                                [{typedef, tester, test_any, []}, {typedef, tester, test_any, []}]}},
                        CheckStack, ParseState);
-        {typedef, ordsets, ordset, [_InnerType]} ->
+        {typedef, ordsets, ordset, [InnerType]} ->
             check_list(Value,
-                       {list, {typedef, tester, test_any, []}},
+                       {list, InnerType},
                        CheckStack, ParseState);
         {typedef, _Module, _TypeName, []} ->
             check_typedef(Value, Type, CheckStack, ParseState);
