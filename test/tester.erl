@@ -146,6 +146,33 @@ get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
                                            {var_fun, [], util:randomelem(FunTypes)}
                                     end.
 
+-ifdef(have_new_stacktrace).
+tryToCreateValue(VarList, ArgType, Size, TypeInfos) ->
+    try
+        {ok, tester_value_creator:create_value({var_type, VarList, ArgType}, Size, TypeInfos)}
+    catch
+        Error:{error, Reason}:Stk ->
+            print_error(Reason),
+                                                %ct:pal("Reason: ~p~n", [Reason]),
+            {fail, {fail, no_result, no_result_type, Error, tester_value_creator,
+                    create_value,
+                    [ArgType, Size, typeInfos], %TypeInfos
+                    Reason, Stk, util:get_linetrace()}}
+    end.
+-else.
+tryToCreateValue(VarList, ArgType, Size, TypeInfos) ->
+    try
+        {ok, tester_value_creator:create_value({var_type, VarList, ArgType}, Size, TypeInfos)}
+    catch
+        Error:{error, Reason} ->
+            print_error(Reason),
+                                                %ct:pal("Reason: ~p~n", [Reason]),
+            {fail, {fail, no_result, no_result_type, Error, tester_value_creator,
+                    create_value,
+                    [ArgType, Size, typeInfos], %TypeInfos
+                    Reason, erlang:get_stacktrace(), util:get_linetrace()}}
+    end.
+-endif.
 
 -spec run_test_ttt(Module::module(), Fun::atom(),
                    Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
@@ -159,18 +186,7 @@ run_test_ttt(Module, Func,
     Fun = get_arg_and_result_type(FunType, FeederFunType, Options),
     {var_fun, VarList, {'fun', ArgType, ResultType}} = Fun,
     Size = 30,
-    GenArgs = try
-               {ok, tester_value_creator:create_value({var_type, VarList, ArgType},
-                                                      Size, TypeInfos)}
-           catch
-               Error:{error, Reason} ->
-                   print_error(Reason),
-                   %ct:pal("Reason: ~p~n", [Reason]),
-                   {fail, {fail, no_result, no_result_type, Error, tester_value_creator,
-                           create_value,
-                           [ArgType, Size, typeInfos], %TypeInfos
-                           Reason, util:get_stacktrace(), util:get_linetrace()}}
-           end,
+    GenArgs = tryToCreateValue(VarList, ArgType, Size, TypeInfos),
     case GenArgs of
         {ok, Args} ->
             case proplists:get_bool(with_feeder, Options) of
@@ -203,6 +219,7 @@ run_test_ttt(Module, Func,
             ErrorDesc
     end.
 
+-ifdef(have_new_stacktrace).
 % @doc called before the actual test to convert the input values. Can
 % be used to implement types which cannot be expressed by type-specs
 apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
@@ -221,12 +238,62 @@ apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
                  util:get_stacktrace(), util:get_linetrace()}
         end
     catch
+        Error:Reason:Stk ->
+            ct:pal("Reason: ~p~n", [Reason]),
+            {fail, no_result, no_result_type, Error, Module,
+             FeederFun,
+             Args,
+             Reason, Stk, util:get_linetrace()}
+    end.
+
+apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
+    %% ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
+    try
+        tester_global_state:set_last_call(Thread, Module, Func, Args),
+        Result = erlang:apply(Module, Func, Args),
+        %% ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
+        case tester_type_checker:check(Result, ResultType, TypeInfos) of
+            true ->
+                ok;
+            {false, ErrorMsg} ->
+                tester_type_checker:log_error(ErrorMsg),
+                {fail, Result, ResultType, type_check_failed_on_fun_result, Module, Func,
+                 Args, consult_output_for_detailed_type_check_report,
+                 no_stacktrace, util:get_linetrace()}
+        end
+    catch
+        exit:{test_case_failed, Reason}:Stk ->
+            {fail, no_result, no_result_type, test_case_failed, Module, Func,
+             Args, Reason, Stk, util:get_linetrace()};
+        Error:Reason:Stk ->
+            {fail, no_result, no_result_type, Error, Module, Func, Args, Reason,
+             Stk, util:get_linetrace()}
+    end.
+-else.
+% @doc called before the actual test to convert the input values. Can
+% be used to implement types which cannot be expressed by type-specs
+apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
+    FeederFun = list_to_atom(atom_to_list(Func) ++ "_feeder"),
+    try
+        Result = apply(Module, FeederFun, Args),
+        case tester_type_checker:check(Result, ResultType, TypeInfos) of
+            true ->
+                {ok, Result};
+            {false, ErrMsg} ->
+                tester_type_checker:log_error(ErrMsg),
+                {fail, no_result, ResultType, type_check_failed_of_feeder_result, Module,
+                 FeederFun,
+                 Args,
+                 consult_output_for_detailed_type_check_report,
+                 erlang:get_stacktrace(), util:get_linetrace()}
+        end
+    catch
         Error:Reason ->
             ct:pal("Reason: ~p~n", [Reason]),
             {fail, no_result, no_result_type, Error, Module,
              FeederFun,
              Args,
-             Reason, util:get_stacktrace(), util:get_linetrace()}
+             Reason, erlang:get_stacktrace(), util:get_linetrace()}
     end.
 
 apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
@@ -247,11 +314,12 @@ apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
     catch
         exit:{test_case_failed, Reason} ->
             {fail, no_result, no_result_type, test_case_failed, Module, Func,
-             Args, Reason, util:get_stacktrace(), util:get_linetrace()};
+             Args, Reason, erlang:get_stacktrace(), util:get_linetrace()};
         Error:Reason ->
             {fail, no_result, no_result_type, Error, Module, Func, Args, Reason,
-             util:get_stacktrace(), util:get_linetrace()}
+             erlang:get_stacktrace(), util:get_linetrace()}
     end.
+-endif.
 
 -spec run_test(module(), atom(), non_neg_integer(), non_neg_integer(),
                tester_parse_state:state(), integer(), test_options()) -> ok.
