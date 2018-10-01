@@ -90,6 +90,15 @@
 -define(DEBUG_REGISTER(PROCESS, PID), ok).
 -endif.
 
+-ifdef(have_new_stacktrace).
+    %% >= erlang 21
+-define(CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace),
+        Level:Reason:Stacktrace -> ok,).
+-else.
+-define(CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace),
+        Level:Reason -> Stacktrace = erlang:get_stacktrace(),).
+-endif.
+
 % disable compression (the overhead is too high, at least for GbE)
 -define(COMM_COMPRESS_MSG(DeliverMsg, State),
         term_to_binary(DeliverMsg, [{minor_version, 1}])

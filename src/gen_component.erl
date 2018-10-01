@@ -394,7 +394,7 @@ bp_about_to_kill(Pid) ->
          end || PidX <- MonitoredBy,
                 % exclude already paused pids:
                 erlang:process_info(PidX, priority) =/= {priority, low}],
-    
+
     ok.
 
 %% @doc Sets an erlang monitor using erlang:monitor/2 in a gen_component
@@ -575,9 +575,9 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
             % If init throws up, send 'started' to the supervisor but exit.
             % The supervisor will try to restart the process as it is watching
             % this PID.
-            Level:Reason ->
+            ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
                 log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
-                        [Level, Reason, Module, util:get_stacktrace()]),
+                        [Level, Reason, Module, Stacktrace()]),
                 erlang:Level(Reason)
         after
             case WaitForInit of
@@ -593,8 +593,7 @@ loop(UState, GCState) ->
     receive Msg ->
 %%            try
                 on(Msg, UState, GCState)
-            %% catch Level:Reason ->
-            %%         Stacktrace = util:get_stacktrace(),
+            %% ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
             %%         log:log(error,
             %%                 "Error: exception ~p:~p in loop of ~.0p~n ",
             %%                 [Level, Reason, {UState, GCState}]),
@@ -682,9 +681,8 @@ on(Msg, UState, GCState) ->
                         false -> loop(NewUState, T1GCState);
                         true -> loop(NewUState, bp_step_done(Msg, T1GCState))
                     end
-            catch Level:Reason ->
+            catch ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
                     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
-                    Stacktrace = util:get_stacktrace(),
                     case Stacktrace of
                         %% erlang < R15 : {Module, Handler, [Msg, State]}
                         %% erlang >= R15: {Module, Handler, [Msg, State], _}
@@ -755,8 +753,7 @@ on_traced_msg(Msg, UState, GCState) ->
                 false -> loop(NewUState, T1GCState);
                 true -> loop(NewUState, bp_step_done(Msg, T1GCState))
             end
-    catch Level:Reason ->
-              Stacktrace = util:get_stacktrace(),
+    catch ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
               case Stacktrace of
                   %% erlang < R15 : {Module, Handler, [Msg, State]}
                   %% erlang >= R15: {Module, Handler, [Msg, State], _}

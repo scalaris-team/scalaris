@@ -275,8 +275,8 @@ stop_ring(Pid) ->
             ok
         end
     catch
-        Level:Reason ->
-            ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, util:get_stacktrace()]),
+        ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
+            ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, Stacktrace]),
             erlang:Level(Reason)
     after
             catch(unregister(ct_test_ring)),
@@ -590,11 +590,11 @@ get_ring_data(Type) ->
                          end || DhtNode <- DHTNodes]),
                   Self ! {data, Data}
               catch
-                  Level:Reason ->
+                  ?CATCH_CLAUSE_WITH_STACKTRACE(Level, Reason, Stacktrace)
                       Result =
                           case erlang:whereis(ct_test_ring) of
                               undefined -> [];
-                              _         -> {exception, Level, Reason, util:get_stacktrace()}
+                              _         -> {exception, Level, Reason, Stacktrace}
                           end,
                       Self ! {data, Result}
               end
@@ -772,7 +772,7 @@ data_contains_all_replicas(Data, Key) ->
     Replicas = [E || E <- Data, lists:member(db_entry:get_key(E), Keys)],
     length(Keys) =:= length(Replicas).
 
-% @doc returns only left-open intervals or intervals:all() 
+% @doc returns only left-open intervals or intervals:all()
 %      rrepair relies on this
 -spec build_interval(intervals:key(), intervals:key()) -> intervals:interval().
 build_interval(?MINUS_INFINITY, ?PLUS_INFINITY) -> intervals:all();
@@ -790,7 +790,7 @@ db_entry_not_null(Entry) ->
 -spec scrub_data(db_dht:db_as_list()) -> db_dht:db_as_list().
 scrub_data(Data) ->
     lists:filter(
-        fun db_entry_not_null/1, 
+        fun db_entry_not_null/1,
         lists:usort(fun(A, B) ->
                  db_entry:get_key(A) =< db_entry:get_key(B)
             end, lists:reverse(Data))).

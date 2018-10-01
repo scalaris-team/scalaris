@@ -24,6 +24,7 @@
 -export([register_thread/1, take_registered_threads/0]).
 
 -include("unittest.hrl").
+-include("scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -78,14 +79,14 @@ delete(Key) ->
                     ets:delete(?MODULE, Key);
                 _ ->
                     %% unregister non registered object
-                    ct:pal("you tried to unregister ~w which is not registered~nStacktrace: ~p", 
+                    ct:pal("you tried to unregister ~w which is not registered~nStacktrace: ~p",
                            [Key, util:get_stacktrace()]),
                     throw({unittest_global_state_delete_unregistered_object, Key})
             end
         end
-    catch error:badarg ->
+    catch ?CATCH_CLAUSE_WITH_STACKTRACE(error, badarg, Stacktrace)
               % probably the table does not exist
-              ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
+              ct:pal("Stacktrace: ~p", [Stacktrace]),
               throw({unittest_global_state_unknown_table, Key})
     end.
 
