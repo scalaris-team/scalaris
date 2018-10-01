@@ -542,6 +542,8 @@ tester_type_check_crdt(_Config) ->
                                   gcounter, new, 0),
     tester:register_value_creator({typedef, pncounter, crdt, []},
                                   pncounter, new, 0),
+    tester:register_value_creator({typedef, gset, crdt, []},
+                                  gset, new, 0),
 
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
@@ -612,6 +614,7 @@ tester_type_check_crdt(_Config) ->
     tester:unregister_value_creator({typedef, crdt, update_fun, []}),
     tester:unregister_value_creator({typedef, gcounter, crdt, []}),
     tester:unregister_value_creator({typedef, pncounter, crdt, []}),
+    tester:unregister_value_creator({typedef, gset, crdt, []}),
 
     true.
 
