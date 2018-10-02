@@ -42,8 +42,8 @@
 -type state() :: {?PDB:db(), [comm:mypid()]}.
 
 -type entry() :: {
-                   any(),      %% key
-                   gset:crdt() %% value
+                   any(), %% key
+                   gset:crdt() | gla_bottom %% value
                  }.
 
 %% Messages to expect from this module
@@ -124,19 +124,19 @@ set_entry(NewEntry, TableName) ->
 new(Key) ->
     new(Key, gla_bottom).
 
--spec new(any(), any()) -> entry().
+-spec new(any(), gset:crdt() | gla_bottom) -> entry().
 new(Key, Val) ->
-    {Key, _Value = Val}.
+    {Key, Val}.
 
 -spec entry_key(entry()) -> any().
 entry_key(Entry) -> element(1, Entry).
--spec entry_val(entry()) -> crdt:crdt() | gla_bottom.
+-spec entry_val(entry()) -> gset:crdt() | gla_bottom.
 entry_val(Entry) ->
     case element(2, Entry) of
         gla_bottom -> gset:new();
         Any -> Any
     end.
--spec entry_set_val(entry(), any()) -> entry().
+-spec entry_set_val(entry(), gset:crdt()) -> entry().
 entry_set_val(Entry, Value) -> setelement(2, Entry, Value).
 
 

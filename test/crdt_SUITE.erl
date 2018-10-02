@@ -595,6 +595,39 @@ tester_type_check_crdt(_Config) ->
             {msg_vote_reply, 2}         % sends messages
            ]
           },
+          {gla_proposer,
+           [
+            {start_link, 3},            % starts processes
+            {start_gen_component, 5},   % unsupported types
+            {on, 2},                    % sends messages
+            {read, 5},                  % needs fun as input
+            {read_eventual, 5},       % needs fun as input
+            {write, 5},                 % needs fun as input
+            {write_eventual, 5}       % needs fun as input
+           ],
+           [
+            {send_to_all_replicas, 2},  % sends messages
+            {send_to_all_replicas, 3},  % sends messages
+            {start_request, 2},         % sends messages
+            {inform_client, 3},         % cannot create valid envelopes
+            {inform_client, 2},         % cannot create valid envelopes
+            {get_entry, 2},             % needs valid ets:tid(),
+            {save_entry, 2}             % needs valid ets:tid(),
+           ]},
+          {gla_acceptor,
+           [
+            {init, 1},                  % needs to be in a pidgroup for db_name
+            {close, 1},                 % needs valid ets:tid()
+            {close_and_delete, 1},      % needs valid ets:tid()
+            {on, 2},                    % sends messages
+            {set_entry, 2},             % needs valid ets:tid()
+            {get_entry, 2}              % needs valid ets:tid()
+           ],
+           [
+            {msg_ack_reply, 4},          % sends messages
+            {msg_learner_ack_reply, 6},  % sends messages
+            {msg_nack_reply, 4}       % sends messages
+           ]},
           {gcounter,
            [
             {update_nth, 3}             % requires args in bounds

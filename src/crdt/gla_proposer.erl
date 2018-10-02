@@ -58,7 +58,7 @@
 
 -type learner_entry() :: {{learner, ?RT:key()},
                            crdt:crdt_module(),
-                           crdt:crdt(),
+                           gset:crdt(),
                            [{any(), non_neg_integer()}]}.
 
 -include("gen_component.hrl").
@@ -380,9 +380,9 @@ entry_ackcount(Entry)               -> element(5, Entry).
 entry_nackcount(Entry)              -> element(6, Entry).
 -spec entry_propnum(entry())        -> non_neg_integer().
 entry_propnum(Entry)                -> element(7, Entry).
--spec entry_propval(entry())        -> crdt:crdt().
+-spec entry_propval(entry())        -> gset:crdt().
 entry_propval(Entry)                -> element(8, Entry).
--spec entry_bufval(entry())        -> crdt:crdt().
+-spec entry_bufval(entry())        -> gset:crdt().
 entry_bufval(Entry)                -> element(9, Entry).
 
 -spec entry_set_status(entry(), passive | active) -> entry().
@@ -393,19 +393,19 @@ entry_set_ackcount(Entry, X)    -> setelement(5, Entry, X).
 entry_set_nackcount(Entry, X)   -> setelement(6, Entry, X).
 -spec entry_set_propnum(entry(), non_neg_integer()) -> entry().
 entry_set_propnum(Entry, X)     -> setelement(7, Entry, X).
--spec entry_set_propval(entry(), crdt:crdt()) -> entry().
+-spec entry_set_propval(entry(), gset:crdt()) -> entry().
 entry_set_propval(Entry, X)     -> setelement(8, Entry, X).
--spec entry_set_bufval(entry(), crdt:crdt()) -> entry().
+-spec entry_set_bufval(entry(), gset:crdt()) -> entry().
 entry_set_bufval(Entry, X)      -> setelement(9, Entry, X).
--spec entry_set_outval(entry(), crdt:crdt()) -> entry().
+-spec entry_set_outval(entry(), gset:crdt()) -> entry().
 entry_set_outval(Entry, X)      -> setelement(10, Entry, X).
 
 
 %%%%%%%%%%%%%%%% access of learner entry
--spec learner_learnt(learner_entry()) -> crdt:crdt().
+-spec learner_learnt(learner_entry()) -> gset:crdt().
 learner_learnt(Entry) -> element(3, Entry).
 
--spec learner_set_learnt(learner_entry(), crdt:crdt()) -> learner_entry().
+-spec learner_set_learnt(learner_entry(), gset:crdt()) -> learner_entry().
 learner_set_learnt(Entry, Value) -> setelement(3, Entry, Value).
 
 -spec learner_votes(learner_entry(), any(), non_neg_integer()) -> non_neg_integer().
