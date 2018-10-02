@@ -378,6 +378,12 @@ parse_type({remote_type, _Line, [{atom, _Line2, sets},
            Module, ParseState) ->
     {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
     {{builtin_type, set_set, Value}, ParseState2};
+% ordsets:ordset(Value)
+parse_type({remote_type, _Line, [{atom, _Line2, ordsets},
+                                 {atom, _Line3, ordset}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, ordsets_ordset, Value}, ParseState2};
 parse_type({remote_type, _Line, [{atom, _Line2, TypeModule},
                                  {atom, _Line3, TypeName}, L]},
            _Module, ParseState) ->

@@ -130,6 +130,10 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, gb_sets_functions_thrown} | CheckStack]}
             end;
+        {builtin_type, ordsets_ordset, ValueType} ->
+            check_list(Value,
+                       {list, ValueType},
+                       CheckStack, ParseState);
         {builtin_type, map} ->
             % there is no is_map/1, so try some functions on the map to check
             try check_map(Value, CheckStack)
@@ -212,10 +216,6 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_list(orddict:to_list(Value), % [Key,Value]
                        {list, {tuple,
                                [{typedef, tester, test_any, []}, {typedef, tester, test_any, []}]}},
-                       CheckStack, ParseState);
-        {typedef, ordsets, ordset, [InnerType]} ->
-            check_list(Value,
-                       {list, InnerType},
                        CheckStack, ParseState);
         {typedef, _Module, _TypeName, []} ->
             check_typedef(Value, Type, CheckStack, ParseState);
