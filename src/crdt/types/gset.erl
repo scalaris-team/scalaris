@@ -54,7 +54,7 @@ lteq(CRDT1, CRDT2) -> ordsets:is_subset(CRDT1, CRDT2).
 -spec update_add(term(), crdt()) -> crdt().
 update_add(ToAdd, CRDT) -> ordsets:add_element(ToAdd, CRDT).
 
--spec query_lookup(any(), crdt()) -> boolean().
+-spec query_lookup(term(), crdt()) -> boolean().
 query_lookup(Element, CRDT) -> ordsets:is_element(Element, CRDT).
 
 %%%%%%%%%%%%%%% Utility functions used in GLA implementation

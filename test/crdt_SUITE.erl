@@ -603,7 +603,13 @@ tester_type_check_crdt(_Config) ->
             {update_nth, 4}             % requires args in bounds
            ]
           },
-          {pncounter, [],[] }
+          {pncounter, [],[] },
+          {gset,
+           [{exists,2},
+            {fold,3}
+           ],
+           []
+          }
           %% cannot test both pncounter_on_cseq and gcounter_on_cseq at the same time,
           %% as this would cause a crash if the same key is used for both
         ],
