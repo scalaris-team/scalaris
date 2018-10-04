@@ -624,9 +624,11 @@ tester_type_check_crdt(_Config) ->
             {get_entry, 2}              % needs valid ets:tid()
            ],
            [
-            {msg_ack_reply, 4},          % sends messages
+            {msg_ack_reply, 3},          % sends messages
             {msg_learner_ack_reply, 6},  % sends messages
-            {msg_nack_reply, 4}       % sends messages
+            {msg_nack_reply, 4},       % sends messages
+            {entry_proposed, 2},
+            {entry_update_proposed, 3}
            ]},
           {gcounter,
            [

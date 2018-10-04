@@ -43,13 +43,14 @@
 
 -type entry() :: {
                    any(), %% key
-                   gset:crdt() | gla_bottom %% value
+                   gset:crdt() | gla_bottom, %% value
+                   any()
                  }.
 
 %% Messages to expect from this module
--spec msg_ack_reply(comm:mypid(), ?RT:key(), pr:pr(), gset:crdt()) -> ok.
-msg_ack_reply(Client, Key, ProposalNumber, ProposalValue) ->
-    comm:send(Client, {ack_reply, Key, ProposalNumber, ProposalValue}).
+-spec msg_ack_reply(comm:mypid(), ?RT:key(), pr:pr()) -> ok.
+msg_ack_reply(Client, Key, ProposalNumber) ->
+    comm:send(Client, {ack_reply, Key, ProposalNumber}).
 
 -spec msg_learner_ack_reply(comm:mypid(), ?RT:key(), crdt:crdt_module(), pr:pr(), gset:crdt(), any()) -> ok.
 msg_learner_ack_reply(Proposer, Key, DataType, ProposalNumber, ProposalValue, ProposerId) ->
@@ -76,16 +77,19 @@ close_and_delete(_State={TableName, _}) -> ?PDB:close_and_delete(TableName).
 
 %% implements acceptor action Accept and Reject
 -spec on(tuple(), state()) -> state().
-on({gla_acceptor, propose, _Cons, Proposer, Key, DataType, ProposalNumber, ProposedValue},
+on({gla_acceptor, propose, _Cons, Proposer, Key, DataType, ProposalNumber, PartialProposedValue},
    _State={TableName, ProposerList}) ->
-    ?TRACE("crdt_acceptor:propose: ~p ~p ~n ~p ~p", [Key, Proposer, ProposalNumber, ProposedValue]),
+    ?TRACE("crdt_acceptor:propose: ~p ~p ~n ~p ~p", [Key, Proposer, ProposalNumber, PartialProposedValue]),
     % TODO since no initial discovery is implemented, add unknown proposers to our list
     NewProposerList = case lists:member(Proposer, ProposerList) of
                           true -> ProposerList;
                           false -> [Proposer | ProposerList]
                       end,
 
-    Entry = get_entry(Key, TableName),
+    TEntry = get_entry(Key, TableName),
+    Entry = entry_update_proposed(TEntry, Proposer, PartialProposedValue),
+    ProposedValue = entry_proposed(Entry, Proposer),
+
     AcceptedValue = entry_val(Entry),
 
     case gset:lteq(AcceptedValue, ProposedValue) of
@@ -96,16 +100,18 @@ on({gla_acceptor, propose, _Cons, Proposer, Key, DataType, ProposalNumber, Propo
 
             _ = [msg_learner_ack_reply(Learner, Key, DataType, ProposalNumber, ProposedValue, Proposer)
                  || Learner <- NewProposerList], %% each proposer is also a learner
-            msg_ack_reply(Proposer, Key, ProposalNumber, ProposedValue);
+            msg_ack_reply(Proposer, Key, ProposalNumber);
         false ->
             %% Reject action
             MergedValue = gset:merge(AcceptedValue, ProposedValue),
             NewEntry = entry_set_val(Entry, MergedValue),
             _ = set_entry(NewEntry, TableName),
-            msg_nack_reply(Proposer, Key, ProposalNumber, MergedValue)
+            MissingValues = gset:subtract(AcceptedValue, ProposedValue),
+            msg_nack_reply(Proposer, Key, ProposalNumber, MissingValues)
     end,
 
     {TableName, NewProposerList}.
+
 
 -spec get_entry(any(), ?PDB:db()) -> entry().
 get_entry(Id, TableName) ->
@@ -126,10 +132,11 @@ new(Key) ->
 
 -spec new(any(), gset:crdt() | gla_bottom) -> entry().
 new(Key, Val) ->
-    {Key, Val}.
+    {Key, Val, dict:new()}.
 
 -spec entry_key(entry()) -> any().
 entry_key(Entry) -> element(1, Entry).
+
 -spec entry_val(entry()) -> gset:crdt() | gla_bottom.
 entry_val(Entry) ->
     case element(2, Entry) of
@@ -139,6 +146,13 @@ entry_val(Entry) ->
 -spec entry_set_val(entry(), gset:crdt()) -> entry().
 entry_set_val(Entry, Value) -> setelement(2, Entry, Value).
 
+-spec entry_proposed(entry(), any()) -> gset:crdt().
+entry_proposed(Entry, Proposer) -> dict:fetch(Proposer, element(3, Entry)).
+-spec entry_update_proposed(entry(), any(), gset:crdt()) -> entry().
+entry_update_proposed(Entry, Proposer, PartialVal) ->
+    Dict = element(3, Entry),
+    Dict2 = dict:update(Proposer, fun(E) -> gset:merge(PartialVal, E) end, PartialVal, Dict),
+    setelement(3, Entry, Dict2).
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().

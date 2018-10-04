@@ -53,7 +53,8 @@
                   non_neg_integer(), %% active proposal number
                   gset:crdt(), %% proposed value
                   gset:crdt(), %% buffered value
-                  gset:crdt() %% output value
+                  gset:crdt(), %% output value
+                  gset:crdt() %% refine value
                  }.
 
 -type learner_entry() :: {{learner, ?RT:key()},
@@ -220,7 +221,7 @@ on({propose, Key}, State) ->
             _ = save_entry(NewEntry5, tablename(State)),
 
             DataType = entry_datatype(NewEntry5),
-            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, NewPropVal},
+            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, BufVal},
             send_to_all_replicas(Key, Msg),
 
             NewEntry6 = entry_set_bufval(NewEntry5, gset:new()),
@@ -232,7 +233,7 @@ on({propose, Key}, State) ->
     end;
 
 %% Proposer Ack
-on({ack_reply, Key, ProposalNumber, _ProposalValue}, State) ->
+on({ack_reply, Key, ProposalNumber}, State) ->
     Entry = get_entry(Key, tablename(State)),
     case entry_propnum(Entry) =:= ProposalNumber of
         true ->
@@ -244,14 +245,14 @@ on({ack_reply, Key, ProposalNumber, _ProposalValue}, State) ->
     end;
 
 %% Proposer Nack
-on({nack_reply, Key, ProposalNumber, ProposalValue}, State) ->
+on({nack_reply, Key, ProposalNumber, MissingValues}, State) ->
     Entry = get_entry(Key, tablename(State)),
     case entry_propnum(Entry) =:= ProposalNumber of
         true ->
             NewAckCount = entry_nackcount(Entry) + 1,
-            NewProposalValue = gset:merge(ProposalValue, entry_propval(Entry)),
+            RefVal = gset:merge(MissingValues, entry_refval(Entry)),
             NewEntry = entry_set_nackcount(Entry, NewAckCount),
-            NewEntry2 = entry_set_propval(NewEntry, NewProposalValue),
+            NewEntry2 = entry_set_refval(NewEntry, RefVal),
             _ = save_entry(NewEntry2, tablename(State)),
             gen_component:post_op({refine, Key}, State);
         false -> State
@@ -265,14 +266,17 @@ on({refine, Key}, State) ->
          replication:quorum_accepted(entry_nackcount(Entry) + entry_ackcount(Entry)) of
         true ->
             NewPropNum = entry_propnum(Entry) + 1,
-            PropVal = entry_propval(Entry),
+            RefVal = entry_refval(Entry),
+            PropVal = gset:merge(entry_propval(Entry), RefVal),
             NewEntry1 = entry_set_ackcount(Entry, 0),
             NewEntry2 = entry_set_nackcount(NewEntry1, 0),
             NewEntry3 = entry_set_propnum(NewEntry2, NewPropNum),
-            _ = save_entry(NewEntry3, tablename(State)),
+            NewEntry4 = entry_set_propval(NewEntry3, PropVal),
+            NewEntry5 = entry_set_refval(NewEntry4, gset:new()),
+            _ = save_entry(NewEntry5, tablename(State)),
 
             DataType = entry_datatype(Entry),
-            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, PropVal},
+            Msg =  {gla_acceptor, propose, '_', comm:this(), key, DataType, NewPropNum, RefVal},
             send_to_all_replicas(Key, Msg),
             State;
         false ->
@@ -351,6 +355,7 @@ on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
     State.
 
 %%%%%%%%%%%%%%%% message sending helpers
+
 -spec send_to_all_replicas(?RT:key(), tuple()) -> ok.
 send_to_all_replicas(Key, Message) ->
     %% assert element(3, message) =:= '_'
@@ -384,6 +389,8 @@ entry_propnum(Entry)                -> element(7, Entry).
 entry_propval(Entry)                -> element(8, Entry).
 -spec entry_bufval(entry())        -> gset:crdt().
 entry_bufval(Entry)                -> element(9, Entry).
+-spec entry_refval(entry())        -> gset:crdt().
+entry_refval(Entry)                -> element(11, Entry).
 
 -spec entry_set_status(entry(), passive | active) -> entry().
 entry_set_status(Entry, Status) -> setelement(4, Entry, Status).
@@ -399,7 +406,8 @@ entry_set_propval(Entry, X)     -> setelement(8, Entry, X).
 entry_set_bufval(Entry, X)      -> setelement(9, Entry, X).
 -spec entry_set_outval(entry(), gset:crdt()) -> entry().
 entry_set_outval(Entry, X)      -> setelement(10, Entry, X).
-
+-spec entry_set_refval(entry(), gset:crdt()) -> entry().
+entry_set_refval(Entry, X)      -> setelement(11, Entry, X).
 
 %%%%%%%%%%%%%%%% access of learner entry
 -spec learner_learnt(learner_entry()) -> gset:crdt().
@@ -439,7 +447,7 @@ learner_add_vote(Entry, Proposer, ProposalNumber) ->
 %%%%%%%%%%%%%%% creation/retrieval/save of entries
 -spec new_entry(?RT:key(), crdt:crdt_module()) -> entry().
 new_entry(Key, DataType) ->
-    {lowest_key(Key), DataType, [], passive, 0, 0, 0, gset:new(), gset:new(), gset:new()}.
+    {lowest_key(Key), DataType, [], passive, 0, 0, 0, gset:new(), gset:new(), gset:new(), gset:new()}.
 
 -spec new_learner_entry(?RT:key(), crdt:crdt_module()) -> learner_entry().
 new_learner_entry(Key, DataType) ->
