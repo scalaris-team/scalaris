@@ -23,8 +23,7 @@
 -define(TRACE(X,Y), ok).
 
 -define(ROUTING_DISABLED, false).
--define(READ_BATCHING, config:read(read_batching)).
--define(READ_BATCHING_INTERVAL, 10).
+-define(READ_BATCHING_INTERVAL, (config:read(read_batching_interval))).
 -define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
 
 -include("scalaris.hrl").
@@ -77,7 +76,7 @@
 start_link(DHTNodeGroup, Name, DBSelector) ->
     {ok, Pid} = gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
                              [{pid_groups_join_as, DHTNodeGroup, Name}]),
-    _ = case ?READ_BATCHING of
+    _ = case read_batching_enabled() of
             false -> ok;
             true ->
                 comm:send_local_after(next_read_batching_interval(), Pid, {read_batch_trigger})
@@ -93,7 +92,7 @@ init(DBSelector) ->
 
 -spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
 read(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    case ?READ_BATCHING of
+    case read_batching_enabled() of
         true ->
             start_request(CSeqPidName, {add_to_read_batch, Client, Key, DataType, QueryFun});
         false ->
@@ -610,13 +609,16 @@ round_inc(Round) ->
 round_inc(Round, ID) ->
     pr:new(pr:get_r(Round)+1, ID).
 
+-spec read_batching_enabled() -> boolean().
+read_batching_enabled() -> ?READ_BATCHING_INTERVAL > 0.
+
 -spec next_read_batching_interval() -> non_neg_integer().
 next_read_batching_interval() ->
     Div = randoms:rand_uniform(0, ?READ_BATCHING_INTERVAL_DIVERGENCE*2 + 1),
-    ?READ_BATCHING_INTERVAL - ?READ_BATCHING_INTERVAL_DIVERGENCE + Div.
+    max(0, ?READ_BATCHING_INTERVAL - ?READ_BATCHING_INTERVAL_DIVERGENCE + Div).
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_bool(read_batching).
+    config:cfg_is_integer(read_batching_interval).
 

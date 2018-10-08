@@ -24,7 +24,7 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--define(NUM_REPEATS, 10).
+-define(NUM_REPEATS, 1).
 -define(RANDOMIZE_RING, true).
 
 all()   -> [
@@ -78,7 +78,7 @@ init_per_testcase(_TestCase, Config) ->
             false -> false;
             {batching, Enabled} -> Enabled
         end,
-    Size = randoms:rand_uniform(1, 25),
+    Size = randoms:rand_uniform(5, 6),
 
     unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
                                                {ordered_links, false},
@@ -98,8 +98,8 @@ crdt_gcounter_inc(_Config) ->
     Key = randoms:getRandomString(),
     UnitTestPid = self(),
 
-    Parallel = randoms:rand_uniform(1, 50),
-    Count = 10000 div Parallel,
+    Parallel = randoms:rand_uniform(5, 10),
+    Count = 10 div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -127,7 +127,7 @@ crdt_pncounter_banking(_Config) ->
 
     %% spawn worker
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 10000 div Parallel,
+    Count = 1000 div Parallel,
     WriteFun =  fun(_I) ->
                     TransactAmount = randoms:rand_uniform(1, StartMoney),
                     From = lists:nth(randoms:rand_uniform(1, AccountNum+1), Accounts),
@@ -157,7 +157,7 @@ crdt_gcounter_read_your_write(_Config) ->
     UnitTestPid = self(),
 
     %% Start writer
-    Parallel = randoms:rand_uniform(1, 50),
+    Parallel = randoms:rand_uniform(20, 21),
     Count = 1000 div Parallel,
     WriteFun = fun (_) ->
                     %% note: by desing, when mixing a strong read with a eventual write
@@ -202,7 +202,7 @@ crdt_gcounter_read_monotonic(_Config) ->
 
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 10000 div Parallel,
+    Count = 1000 div Parallel,
     WriteFun = fun
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
@@ -253,7 +253,7 @@ crdt_gcounter_read_monotonic2(_Config) ->
 
     %% do all the writes
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 10000 div Parallel,
+    Count = 1000 div Parallel,
     WriteFun = fun
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
@@ -287,7 +287,7 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
 
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 10000 div Parallel,
+    Count = 1000 div Parallel,
     WriteFun = fun
                     (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
                     (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
@@ -531,7 +531,7 @@ crdt_proto_sched_read_your_write(_Config) ->
     ok.
 
 tester_type_check_crdt(_Config) ->
-    Count = 1000,
+    Count = 100,
     config:write(no_print_ring_data, true),
 
     tester:register_value_creator({typedef, crdt, update_fun, []},
