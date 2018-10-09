@@ -24,7 +24,7 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--define(NUM_REPEATS, 1).
+-define(NUM_REPEATS, 10).
 -define(RANDOMIZE_RING, true).
 
 all()   -> [

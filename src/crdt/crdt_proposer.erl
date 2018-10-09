@@ -25,6 +25,8 @@
 -define(ROUTING_DISABLED, false).
 -define(READ_BATCHING_INTERVAL, (config:read(read_batching_interval))).
 -define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
+-define(WRITE_BATCHING_INTERVAL, (config:read(write_batching_interval))).
+-define(WRITE_BATCHING_INTERVAL_DIVERGENCE, 2).
 
 -include("scalaris.hrl").
 
@@ -39,7 +41,9 @@
 
 -type state() :: { ?PDB:tableid(),
                    dht_node_state:db_selector(),
-                   non_neg_integer() %% period this process is in
+                   non_neg_integer(), %% period this process is in
+                   boolean(),
+                   boolean()
                  }.
 
 -record(r_replies,  {
@@ -61,9 +65,10 @@
                   non_neg_integer() %% round trips executed
                  }.
 
--type batch_entry() :: {read_batch_entry,
+-type batch_entry() :: {read_batch_entry | write_batch_entry,
                         non_neg_integer(),
-                        dict:dict(?RT:key(), [{comm:erl_local_pid(), crdt:crdt_module(), crdt:query_fun()}])
+                        dict:dict(?RT:key(), [{comm:erl_local_pid(), crdt:crdt_module(),
+                                               crdt:update_fun() | crdt:query_fun()}])
                        }.
 
 -type replies() :: #w_replies{} | #r_replies{}.
@@ -74,18 +79,12 @@
 -spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
                 -> {ok, pid()}.
 start_link(DHTNodeGroup, Name, DBSelector) ->
-    {ok, Pid} = gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
-                             [{pid_groups_join_as, DHTNodeGroup, Name}]),
-    _ = case read_batching_enabled() of
-            false -> ok;
-            true ->
-                comm:send_local_after(next_read_batching_interval(), Pid, {read_batch_trigger})
-        end,
-    {ok, Pid}.
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, DBSelector,
+                             [{pid_groups_join_as, DHTNodeGroup, Name}]).
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
-    {?PDB:new(?MODULE, [set]), DBSelector, 0}.
+    {?PDB:new(?MODULE, [set]), DBSelector, 0, false, false}.
 
 
 %%%% API
@@ -105,7 +104,12 @@ read_eventual(CSeqPidName, Client, Key, DataType, QueryFun) ->
 
 -spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
-    start_request(CSeqPidName, {req_start, {write, strong, Client, Key, DataType, UpdateFun}}).
+    case write_batching_enabled() of
+        true ->
+            start_request(CSeqPidName, {add_to_write_batch, Client, Key, DataType, UpdateFun});
+        false ->
+            start_request(CSeqPidName, {req_start, {write, strong, Client, Key, DataType, UpdateFun}})
+    end.
 
 -spec write_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write_eventual(CSeqPidName, Client, Key, DataType, UpdateFun) ->
@@ -131,7 +135,8 @@ on({add_to_read_batch, Client, Key, DataType, QueryFun}, State) ->
     ?TRACE("Add to batch ~p",  [{Key, DataType, QueryFun, Count}]),
     NewReqs = dict:append(Key, {Client, DataType, QueryFun}, Reqs),
     _ = save_entry({Id, Count+1, NewReqs}, tablename(State)),
-    State;
+
+    set_read_batch_in_progress(State);
 
 on({read_batch_trigger}, State) ->
     {Id, Count, Reqs} =
@@ -154,8 +159,7 @@ on({read_batch_trigger}, State) ->
             _ = save_entry({Id, 0, dict:new()}, tablename(State))
     end,
 
-    comm:send_local_after(next_read_batching_interval(), self(), {read_batch_trigger}),
-    State;
+    set_read_batch_done(State);
 
 on({read_batch_reply, Reqs, {read_done, CRDTState}}, State) ->
     ?TRACE("Batch reply ... ~p", [{Reqs, CRDTState}]),
@@ -164,6 +168,56 @@ on({read_batch_reply, Reqs, {read_done, CRDTState}}, State) ->
             comm:send_local(Client, {read_done, ReturnVal})
          end || {Client, DataType, QueryFun} <- Reqs],
     State;
+
+on({add_to_write_batch, Client, Key, DataType, UpdateFun}, State) ->
+    {Id, Count, Reqs} =
+        case get_entry(write_batch_entry, tablename(State)) of
+            undefined ->
+                {write_batch_entry, 0, dict:new()};
+            Batch -> Batch
+        end,
+    ?TRACE("Add to write batch ~p",  [{Key, DataType, UpdateFun, Count}]),
+    NewReqs = dict:append(Key, {Client, DataType, UpdateFun}, Reqs),
+    _ = save_entry({Id, Count+1, NewReqs}, tablename(State)),
+
+    set_write_batch_in_progress(State);
+
+on({write_batch_trigger}, State) ->
+    {Id, Count, Reqs} =
+        case get_entry(write_batch_entry, tablename(State)) of
+            undefined ->
+                {write_batch_entry, 0, dict:new()};
+            Batch -> Batch
+        end,
+
+    case Count of
+        0 -> ok; % no reqs queued
+        Count ->
+            ?TRACE("Processing batch ... ~p", [{Id, Count, Reqs}]),
+            _ = dict:map(
+                fun(K, ReqsForThisKey=[{_, DataType, _}|_]) ->
+                    This = comm:reply_as(comm:this(), 3, {write_batch_reply, ReqsForThisKey, '_'}),
+                    UpdateFuns = [U || {_Client, _DataType, U} <- ReqsForThisKey],
+                    CompositeFun = fun(RepId, Crdt) ->
+                                        lists:foldl(fun(UF, TCrdt) ->
+                                                        DataType:apply_update(UF, RepId, TCrdt)
+                                                    end, Crdt, UpdateFuns)
+                                   end,
+                    comm:send_local(self(),
+                        {req_start, {write, strong, This, K, DataType, CompositeFun}})
+                end, Reqs),
+            _ = save_entry({Id, 0, dict:new()}, tablename(State))
+    end,
+
+    set_write_batch_done(State);
+
+on({write_batch_reply, Reqs, {write_done}}, State) ->
+    ?TRACE("Batch reply ... ~p", [{Reqs}]),
+    _ = [begin
+            comm:send_local(Client, {write_done})
+         end || {Client, _DataType, _UpdateFun} <- Reqs],
+    State;
+
 
 %%%%% strong consistent read
 
@@ -475,7 +529,14 @@ send_to_all_replicas(Key, Message, _Routing=true) ->
 
 -spec inform_client(write_done, entry()) -> ok.
 inform_client(write_done, Entry) ->
-    comm:send_local(entry_client(Entry), {write_done}).
+    Client = entry_client(Entry),
+    case is_tuple(Client) of
+        true ->
+            % must unpack envelope
+            comm:send(entry_client(Entry), {write_done});
+        false ->
+            comm:send_local(entry_client(Entry), {write_done})
+    end.
 
 -spec inform_client(read_done, entry(), any()) -> ok.
 inform_client(read_done, Entry, QueryResult) ->
@@ -609,16 +670,52 @@ round_inc(Round) ->
 round_inc(Round, ID) ->
     pr:new(pr:get_r(Round)+1, ID).
 
+%%%% batching helpers
+-spec set_read_batch_in_progress(state()) -> state().
+set_read_batch_in_progress(State) ->
+    case element(4, State) =:= false andalso read_batching_enabled() of
+        true ->
+            comm:send_local_after(next_read_batching_interval(), self(), {read_batch_trigger}),
+            setelement(4, State, true);
+        false -> State
+    end.
+
+-spec set_read_batch_done(state()) -> state().
+set_read_batch_done(State) ->
+    setelement(4, State, false).
+
+-spec set_write_batch_in_progress(state()) -> state().
+set_write_batch_in_progress(State) ->
+    case element(5, State) =:= false andalso write_batching_enabled() of
+        true ->
+            comm:send_local_after(next_write_batching_interval(), self(), {write_batch_trigger}),
+            setelement(5, State, true);
+        false -> State
+    end.
+
+-spec set_write_batch_done(state()) -> state().
+set_write_batch_done(State) ->
+    setelement(5, State, false).
+
 -spec read_batching_enabled() -> boolean().
 read_batching_enabled() -> ?READ_BATCHING_INTERVAL > 0.
+
+-spec write_batching_enabled() -> boolean().
+write_batching_enabled() -> ?WRITE_BATCHING_INTERVAL > 0.
 
 -spec next_read_batching_interval() -> non_neg_integer().
 next_read_batching_interval() ->
     Div = randoms:rand_uniform(0, ?READ_BATCHING_INTERVAL_DIVERGENCE*2 + 1),
     max(0, ?READ_BATCHING_INTERVAL - ?READ_BATCHING_INTERVAL_DIVERGENCE + Div).
 
+-spec next_write_batching_interval() -> non_neg_integer().
+next_write_batching_interval() ->
+    Div = randoms:rand_uniform(0, ?WRITE_BATCHING_INTERVAL_DIVERGENCE*2 + 1),
+    max(0, ?WRITE_BATCHING_INTERVAL - ?WRITE_BATCHING_INTERVAL_DIVERGENCE + Div).
+
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(read_batching_interval).
+    config:cfg_is_integer(read_batching_interval) andalso
+    config:cfg_is_integer(write_batching_interval).
 
