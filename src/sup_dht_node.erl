@@ -96,6 +96,13 @@ childs([{DHTNodeGroup, Options}]) ->
     RoutingTable =
         sup:worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
+    DHTNodeCache =
+        case config:read(cache_dht_nodes) of
+            true ->
+                sup:worker_desc(dht_node_cache, dht_node_cache, start_link, [DHTNodeGroup]);
+            false ->
+                []
+        end,
     SupDHTNodeCore_AND =
         sup:supervisor_desc(sup_dht_node_core, sup_dht_node_core,
                                  start_link, [DHTNodeGroup, Options]),
@@ -124,6 +131,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     Reregister,
                     DBValCache,
                     DeadNodeCache,
+                    DHTNodeCache,
                     RoutingTable,
                     DC_Clustering,
                     VivaldiLatency,

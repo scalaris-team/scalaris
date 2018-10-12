@@ -22,7 +22,8 @@
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 
--define(ROUTING_DISABLED, false).
+-define(CACHED_ROUTING, (config:read(cache_dht_nodes))).
+
 -define(READ_BATCHING_INTERVAL, (config:read(read_batching_interval))).
 -define(READ_BATCHING_INTERVAL_DIVERGENCE, 2).
 -define(WRITE_BATCHING_INTERVAL, (config:read(write_batching_interval))).
@@ -501,10 +502,13 @@ on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
 send_to_local_replica(Key, Message) ->
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
-    send_to_local_replica(Key, Message, not ?ROUTING_DISABLED).
+    send_to_local_replica(Key, Message, ?CACHED_ROUTING).
 
 -spec send_to_local_replica(?RT:key(), tuple(), boolean()) -> ok.
-send_to_local_replica(Key, Message, _Routing=true) ->
+send_to_local_replica(Key, Message, _CachedRouting=true) ->
+    dht_node_cache:cached_send_to_local_replica(Key, _KeyPos=6,
+                                                Message, _LookupEnvPos=3);
+send_to_local_replica(Key, Message, _CachedRouting=false) ->
     LocalDhtNode = pid_groups:get_my(dht_node),
     This = comm:reply_as(comm:this(), 4, {local_range_req, Key, Message, '_'}),
     comm:send_local(LocalDhtNode, {get_state, This, my_range}).
@@ -513,18 +517,24 @@ send_to_local_replica(Key, Message, _Routing=true) ->
 send_to_all_replicas(Key, Message) ->
     %% assert element(3, message) =:= '_'
     %% assert element(6, message) =:= key
-    send_to_all_replicas(Key, Message, not ?ROUTING_DISABLED).
+    send_to_all_replicas(Key, Message, ?CACHED_ROUTING).
 
 -spec send_to_all_replicas(?RT:key(), tuple(), boolean()) -> ok.
-send_to_all_replicas(Key, Message, _Routing=true) ->
-    Dest = pid_groups:find_a(routing_table),
+send_to_all_replicas(Key, Message, _CachedRouting=true) ->
+    _ = [begin
+            Msg = setelement(6, Message, K),
+            dht_node_cache:cached_send(Key, Msg, _LookupEnvPos=3)
+         end
+        || K <- replication:get_keys(Key)],
+    ok;
 
+send_to_all_replicas(Key, Message, _CachedRouting=false) ->
+    Dest = pid_groups:find_a(routing_table),
     _ = [begin
             LookupEnvelope = dht_node_lookup:envelope(3, setelement(6, Message, K)),
             comm:send_local(Dest, {?lookup_aux, K, 0, LookupEnvelope})
          end
         || K <- replication:get_keys(Key)],
-
     ok.
 
 -spec inform_client(write_done, entry()) -> ok.
@@ -717,5 +727,6 @@ next_write_batching_interval() ->
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(read_batching_interval) andalso
-    config:cfg_is_integer(write_batching_interval).
+    config:cfg_is_integer(write_batching_interval) andalso
+    config:cfg_is_bool(cache_dht_nodes).
 
