@@ -523,7 +523,7 @@ send_to_all_replicas(Key, Message) ->
 send_to_all_replicas(Key, Message, _CachedRouting=true) ->
     _ = [begin
             Msg = setelement(6, Message, K),
-            dht_node_cache:cached_send(Key, Msg, _LookupEnvPos=3)
+            dht_node_cache:cached_send(K, Msg, _LookupEnvPos=3)
          end
         || K <- replication:get_keys(Key)],
     ok;
