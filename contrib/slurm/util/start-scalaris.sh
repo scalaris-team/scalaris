@@ -74,7 +74,7 @@ function start_servers() {
     VM_IDX=1
     JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
     # start first node on head node
-    $BINDIR/scalarisctl -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first  ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
+    $BINDIR/scalarisctl -c "chocolate chip cookie" -j "$JOIN_KEYS" -n first -p 14195 -y 8000 --nodes-per-vm $DHT_NODES_PER_VM --screen -d -m -t first  ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
     let VM_IDX+=1
 
     ## @todo use auto-binding
@@ -86,7 +86,7 @@ function start_servers() {
     YAWSPORT=8001
     for TASKSPERNODE in `seq 2 $VMS_PER_NODE`; do
         JOIN_KEYS=`erl -name bench_ -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
-        $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
+        $BINDIR/scalarisctl -c "chocolate chip cookie" -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
         let VM_IDX+=1
         let PORT+=1
         let YAWSPORT+=1

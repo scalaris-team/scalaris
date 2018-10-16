@@ -20,7 +20,7 @@ start_vm(){
     JOIN_KEYS=`erl -name bench_${GLOBAL_OFFSET} -noinput -eval "L = lists:nth($VM_IDX, $KEYLIST), io:format('~p', [L]), halt(0)."`
     PORT=$((BASE_PORT+LOCAL_OFFSET))
     YAWSPORT=$((BASE_YAWSPORT+LOCAL_OFFSET))
-    $BINDIR/scalarisctl -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
+    $BINDIR/scalarisctl -c "chocolate chip cookie" -j "$JOIN_KEYS" -n node$PORT -p $PORT -y $YAWSPORT --nodes-per-vm $DHT_NODES_PER_VM --screen -d -t joining ${SCALARISCTL_PARAMS:+$SCALARISCTL_PARAMS} start
     # ERL_SCHED_FLAGS=$old_erl_sched_flags
 }
 
