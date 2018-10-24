@@ -3,9 +3,16 @@ language: generic
 matrix:
   include:
     - os: osx
-      osx_image: xcode9.1
-      env:
-        - OSX_PACKAGES="boost erlang python python3 ant bash coreutils openssl"
+      osx_image: xcode10
+      addons:
+        homebrew:
+          packages:
+            - boost
+            - erlang
+            - python
+            - ant
+            - bash
+            - openssl
     - os: linux
       sudo: false
       addons:
@@ -20,18 +27,9 @@ matrix:
             - erlang
             - erlang-dev
 
-install:
-  - |
-     if [[ $TRAVIS ]] && [[ "X$TRAVIS_OS_NAME" = "Xosx" ]]; then
-         brew update > /dev/null
-         for pkg in $OSX_PACKAGES; do
-           [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
-         done
-     fi
-
 script:
-  - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   - env | grep TRAVIS
+  - clang++ -v
   - 'if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then CXX=clang++ ./configure --with-openssl=/usr/local/opt/openssl; fi'
   - 'if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then CXX=clang++ ./configure; fi'
   - touch TAGS.root
