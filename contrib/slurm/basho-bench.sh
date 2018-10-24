@@ -69,6 +69,11 @@ trap 'trap_cleanup' SIGTERM SIGINT
 #=============================
 
 main() {
+    is_lg_external
+    if ! $EXTERNAL_LG ; then
+        LG_HOSTS=`scontrol show hostnames`
+        LG_HOSTS=($LG_HOSTS)
+    fi
     source $(pwd)/config/basho-bench.cfg
     check_wdir
     check_result_dir
@@ -101,7 +106,6 @@ main_lgs(){
         repeat_benchmark
     done
 }
-
 
 main_value() {
     for VALUE_SIZE in $VALUE_SIZES; do
@@ -142,14 +146,22 @@ main_size(){
 main_load(){
     for WORKERS_PER_LG in $WORKERS_PER_LG_SERIES; do
         WORKERS=$((WORKERS_PER_LG*LOAD_GENERATORS))
-        log info "WORKERS=$WORKERS"
-        log info "WORKERS_PER_LG=$WORKERS_PER_LG"
 
-        WORKERS=$(printf "%04i" $WORKERS)
-        PREFIX="load$WORKERS"
-        log info "starting load benchmark with $WORKERS ($WORKERS_PER_LG*$LOAD_GENERATORS)"
+        var=1
+        for OPS in $OPERATIONS_SERIES; do
+            log info "WORKERS=$WORKERS"
+            log info "WORKERS_PER_LG=$WORKERS_PER_LG"
 
-        repeat_benchmark
+            OPERATIONS=$OPS
+            log info "OPERATIONS=$OPERATIONS"
+
+            WORKERS=$(printf "%04i" $WORKERS)
+            PREFIX="load$WORKERS-$var"
+            log info "starting load benchmark with $WORKERS ($WORKERS_PER_LG*$LOAD_GENERATORS)"
+
+            let "var++"
+            repeat_benchmark
+        done
     done
 }
 
@@ -298,7 +310,11 @@ start_collectl() {
         if [[ $(hostname -f) = $host ]]; then
             collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &
         else
-            ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh $host collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &
+            else
+                srun --nodelist=$host -N1 bash -c "collectl $COLLECTL_SUBSYSTEMS $COLLECTL_INTERVAL $COLLECTL_FLUSH -f $WD/$NAME/collectl/lg_$host 2>/dev/null &"
+            fi
         fi
     done
 }
@@ -310,7 +326,11 @@ stop_collectl(){
         if [[ $(hostname -f) = $host ]]; then
             pkill -f lg_$host
         else
-            ssh $host pkill -f lg_$host
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh $host pkill -f lg_$host
+            else
+                srun --nodelist=$host -N1 bash -c "pkill -f lg_$host"
+            fi
         fi
     done
 }
@@ -322,7 +342,11 @@ start_toplog() {
         if [[ $(hostname -f) = $host ]]; then
             $SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &
         else
-            ssh $host $SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh $host $SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &
+            else
+                srun --nodelist=$host -N1 bash -c "$SCALARIS_DIR/contrib/slurm/util/toplog.sh "$WD/$NAME" &"
+            fi
         fi
     done
 }
@@ -334,7 +358,11 @@ stop_toplog(){
         if [[ $(hostname -f) = $host ]]; then
             pkill -f toplog.sh
         else
-            ssh $host pkill -f toplog.sh
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh $host pkill -f toplog.sh
+            else
+                srun --nodelist=$host -N1 bash -c "pkill -f toplog.sh"
+            fi
         fi
     done
 }
@@ -483,9 +511,7 @@ write_config() {
 {scalarisclient_mynode, ['benchclient${PARALLEL_ID}']}.
 {scalarisclient_cookie, 'chocolate chip cookie'}.
 
-%{remote_nodes, [{'buildbot2.zib.de', 'nodeB'}]}.
-%{distribute_work, true}.
-{report_interval, 5}.
+{report_interval, 1}.
 {log_level, info}.
 
 {scalarisclient_nodes, [$HOSTLIST]}.
@@ -520,7 +546,14 @@ run_bbench() {
         else
             # using -t (pseudo-tty allocation) allows to terminate children of the
             # ssh cmd at the remote node through kill the ssh process at the local node
-            ssh -t -t $host $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh -t -t $host $SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh ${args[@]} &
+            else
+                ARGSTRING=$(printf '%s ' "${args[@]}")
+                echo "Starting LG on $host (Total nummber of LG hosts $no_of_hosts)"
+                echo "Argstring = $ARGSTRING"
+                srun --nodelist=$host -N1 bash -c "$SCALARIS_DIR/contrib/slurm/util/start-basho-bench.sh $ARGSTRING" &
+            fi
             lg_pids[$i]=$!
         fi
     done
@@ -531,6 +564,15 @@ run_bbench() {
     done
 }
 
+is_lg_external() {
+    if  [ -n ${SLURM_NODELIST} ]; then
+        EXTERNAL_LG=false
+    else
+        EXTERNAL_LG=true
+    fi
+}
+
+
 check_result_dir() {
     for host in ${LG_HOSTS[@]}; do
         local res=0
@@ -539,7 +581,11 @@ check_result_dir() {
             $SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR
             res=$((res+=$?))
         else
-            ssh -t -t $host "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh -t -t $host "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
+            else
+                srun --nodelist=$host -N1 bash -c "$SCALARIS_DIR/contrib/slurm/util/checkdir.sh $RESULT_DIR"
+            fi
             res=$((res+=$?))
         fi
 
@@ -557,7 +603,11 @@ create_result_dir() {
         if [[ $(hostname -f) = $host ]]; then
             mkdir -p $RESULT_DIR/$NAME
         else
-            ssh -t -t $host "bash -c \"mkdir -p $RESULT_DIR/$NAME\""
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh -t -t $host "bash -c \"mkdir -p $RESULT_DIR/$NAME\""
+            else
+                srun --nodelist=$host -N1 bash -c "mkdir -p $RESULT_DIR/$NAME"
+            fi
         fi
     done
 }
@@ -572,10 +622,18 @@ collect_bbench_results() {
                 rm -r $RESULT_DIR/$PREFIX*
             fi
         else
-            ssh -t -t $host "bash -c \"rsync -ayhx --progress $RESULT_DIR/ $WD/\""
-            if [[ $? == 0 ]]; then
-                log info "deleting $RESULT_DIR/$PREFIX* on $host"
-                ssh -t -t $host "bash -c \"rm -r $RESULT_DIR/$PREFIX*\""
+            if [[ $EXTERNAL_LG = true ]]; then
+                ssh -t -t $host "bash -c \"rsync -ayhx --progress $RESULT_DIR/ $WD/\""
+                if [[ $? == 0 ]]; then
+                    log info "deleting $RESULT_DIR/$PREFIX* on $host"
+                    ssh -t -t $host "bash -c \"rm -r $RESULT_DIR/$PREFIX*\""
+                fi
+            else
+                srun --nodelist=$host -N1 bash -c "rsync -ayhx --progress $RESULT_DIR/ $WD/"
+                if [[ $? == 0 ]]; then
+                    log info "deleting $RESULT_DIR/$PREFIX* on $host"
+                    srun --nodelist=$host -N1 bash -c "rm -r $RESULT_DIR/$PREFIX*"
+                fi
             fi
         fi
     done
