@@ -6,6 +6,17 @@ matrix:
       osx_image: xcode9.1
       env:
         - OSX_PACKAGES="boost erlang python python3 ant bash coreutils openssl"
+      addons:
+        homebrew:
+          packages:
+            - boost
+            - erlang
+            - python
+            - python3
+            - ant
+            - bash
+            - coreutils
+            - openssl
     - os: linux
       sudo: false
       addons:
@@ -19,15 +30,6 @@ matrix:
             - python3
             - erlang
             - erlang-dev
-
-install:
-  - |
-     if [[ $TRAVIS ]] && [[ "X$TRAVIS_OS_NAME" = "Xosx" ]]; then
-         brew update > /dev/null
-         for pkg in $OSX_PACKAGES; do
-           [[ "$(brew ls --versions $pkg)" ]] || brew install --force-bottle $pkg
-         done
-     fi
 
 script:
   - export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
