@@ -11,7 +11,6 @@ matrix:
             - erlang
             - python
             - ant
-            - bash
             - openssl
     - os: linux
       sudo: false
