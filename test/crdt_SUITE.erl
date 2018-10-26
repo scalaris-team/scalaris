@@ -24,13 +24,14 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
--define(NUM_REPEATS, 10).
+-define(NUM_REPEATS, 5).
 -define(RANDOMIZE_RING, true).
 
 all()   -> [
             tester_type_check_crdt,
             {group, gcounter_group},
             {group, pncounter_group},
+            {group, optorset_group},
             {group, proto_sched_group}
            ].
 
@@ -47,6 +48,10 @@ groups() -> [
         {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
           crdt_pncounter_banking
+         ]},
+        {optorset_group, [sequence, {repeat, ?NUM_REPEATS}],
+         [
+          crdt_optorset_lteq
          ]},
         {proto_sched_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
@@ -78,7 +83,7 @@ init_per_testcase(_TestCase, Config) ->
             false -> false;
             {batching, Enabled} -> Enabled
         end,
-    Size = randoms:rand_uniform(5, 6),
+    Size = randoms:rand_uniform(2, 8),
 
     unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
                                                {ordered_links, false},
@@ -98,8 +103,8 @@ crdt_gcounter_inc(_Config) ->
     Key = randoms:getRandomString(),
     UnitTestPid = self(),
 
-    Parallel = randoms:rand_uniform(5, 10),
-    Count = 10 div Parallel,
+    Parallel = randoms:rand_uniform(1, 10),
+    Count = 1000 div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -363,6 +368,60 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
         || L1Idx <- lists:seq(1, ReaderCount), L2Idx <- lists:seq(1, ReaderCount), L1Idx =< L2Idx],
 
     ok.
+
+crdt_optorset_lteq(_Config) ->
+    %% Checks if the optimized lteq implementation is equivalent to the paper
+    %% version
+
+    %% Generate some Sets
+    InitSeeds = 1,
+    SetNumber = 1000,
+
+    ct:pal("Generating sets..."),
+    ReplicaCount = config:read(replication_factor),
+    MaxElement = 50, %% do not choose to large.. no sets will be removed otherwise
+
+    InitSets = [optorset:new() || _ <- lists:seq(1, InitSeeds)],
+    Generated = lists:foldl(
+                  fun(_, Acc) ->
+                        % take a random existing set
+                        Idx = randoms:rand_uniform(1, min(length(Acc) + 1, 30)),
+                        S = lists:nth(Idx, Acc),
+
+                        % add or remove some random element on a random replica
+                        E = randoms:rand_uniform(1, MaxElement + 1),
+                        R = randoms:rand_uniform(1, ReplicaCount + 1),
+                        NewS =
+                            case optorset:query_contains(E, S) of
+                                false -> optorset:update_add(R, E, S);
+                                true -> optorset:update_remove(E, S)
+                            end,
+                        [NewS | Acc]
+                  end, InitSets, lists:seq(1, SetNumber)),
+
+    %% check all pairs of sets in generated list and look for lteq lteq/2
+    %% discrepencies
+
+    ct:pal("Generating set pairs..."),
+    Pairs = [{A, B} || A <- Generated, B <- Generated],
+    ct:pal("verifying equivalence..."),
+    Mismatches = lists:foldl(
+                   fun(E={A, B}, Acc) ->
+                        R1 = optorset:lteq(A, B),
+                        R2 = optorset:lteq2(A, B),
+                        case R1 =:= R2 of
+                            true -> Acc;
+                            false ->
+                                ct:pal("ERROR: ~n ~p ~n ~p ~n~n lteq: ~p lteq2: ~p",
+                                       [A, B, R1, R2]),
+                                [E | Acc]
+                        end
+                   end, [], Pairs),
+
+    ?equals_w_note(length(Mismatches), 0, "Results form lteq and lteq2 does not match"),
+
+    ok.
+
 
 crdt_proto_sched_write(_Config) ->
     Key = randoms:getRandomString(),
@@ -742,5 +801,4 @@ check_monotonic_reader_failure() ->
     after 100 ->
         ok
     end.
-
 
