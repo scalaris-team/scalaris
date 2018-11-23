@@ -1,0 +1,36 @@
+module scalaris_Connection {
+       module Connection      { header "connection.hpp"  }
+}
+
+module scalaris_Converter {
+       module Converter      { header "converter.hpp"  }
+}
+
+module scalaris_Exceptions {
+       module Exceptions      { header "exceptions.hpp"  }
+}
+
+module scalaris_Rbr {
+       module Rbr      { header "rbr.hpp"  }
+}
+
+module scalaris_ReqList {
+       module ReqList      { header "req-list.hpp"  }
+}
+
+module scalaris_RoutingTable {
+       module RoutingTable      { header "routing-table.hpp"  }
+}
+
+module scalaris_SSLConnection {
+       module SSLConnection      { header "ssl-connection.hpp"  }
+}
+
+module scalaris_TCPConnection {
+       module TCPConnection      { header "tcp-connection.hpp"  }
+}
+
+module scalaris_TransactionSingleOp {
+       module TransactionSingleOp      { header "transaction-single-op.hpp"  }
+}
+

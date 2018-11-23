@@ -18,11 +18,12 @@
 #include <string>
 #include <stdexcept>
 
+#include <sys/time.h> // evil hack
 #include <boost/asio.hpp>
-#include "exceptions.hpp"
-#include "json/json.h"
 
 #include "connection.hpp"
+#include "exceptions.hpp"
+#include "json/json.h"
 
 namespace scalaris {
   /// \brief Executes a single read or write.

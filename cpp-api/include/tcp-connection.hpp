@@ -19,6 +19,8 @@
 #include "exceptions.hpp"
 #include "json/json.h"
 
+#include <sys/time.h> // evil hack
+
 #include <boost/asio.hpp>
 
 #include <array>
