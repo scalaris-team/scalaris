@@ -43,10 +43,11 @@
 
 -include("gen_component.hrl").
 
--type undelivered_msg() :: {?RT:key(), comm:message()}.
--type cached_dht_node() :: {intervals:interval(), comm:mypid()}.
--type local_dht_node() :: {unknown, unknown, unknown} |
-                         {intervals:interval(), comm:mypid(), comm:mypid()}.
+-type undelivered_msg() ::  {{local, ?RT:key(), non_neg_integer()}, comm:message()} |
+                            {?RT:key(), comm:message()}.
+-type cached_dht_node() ::  {intervals:interval(), comm:mypid()}.
+-type local_dht_node() ::   {unknown, unknown, unknown} |
+                            {intervals:interval(), comm:mypid(), comm:erl_local_pid()}.
 -type state() :: {
                     [undelivered_msg()],
                     [cached_dht_node()],
@@ -176,12 +177,13 @@ send_to_local_if_possible(Key, KeyPos, Msg, LocalDhtPid, LocalInterval) ->
             comm:send_local(LocalDhtPid, NewMsg)
     end.
 
--spec add_undelivered_message(state(), ?RT:key(), comm:message()) -> state().
+-spec add_undelivered_message(state(), {local, ?RT:key(), non_neg_integer()} |
+                              ?RT:key(), comm:message()) -> state().
 add_undelivered_message(State, Key, Msg) ->
     MsgList = element(1, State),
     setelement(1, State, [{Key, Msg} | MsgList]).
 
--spec pop_undelivered_messages(state(), intervals:interval()) -> [undelivered_msg()].
+-spec pop_undelivered_messages(state(), intervals:interval()) -> {state(), [undelivered_msg()]}.
 pop_undelivered_messages(State, Interval) ->
     AllMsgs = element(1, State),
     {Matching, Rest} = lists:partition(fun({Key, _Msg}) ->
@@ -189,7 +191,7 @@ pop_undelivered_messages(State, Interval) ->
                                        end, AllMsgs),
     {setelement(1, State, Rest), Matching}.
 
--spec pop_undelivered_local_messages(state()) -> [undelivered_msg()].
+-spec pop_undelivered_local_messages(state()) -> {state(), [undelivered_msg()]}.
 pop_undelivered_local_messages(State) ->
     AllMsgs = element(1, State),
     {Matching, Rest} = lists:partition(fun({{local, _Key, _KeyPos}, _Msg}) -> true;
@@ -202,8 +204,7 @@ add_dht_node(State, DhtNodePid, Interval) ->
     DhtList = element(2, State),
     setelement(2, State, [{Interval, DhtNodePid} | DhtList]).
 
--spec responsible_dht_node(state() | [cached_dht_node()], ?RT:key()) ->
-    unknown | cached_dht_node().
+-spec responsible_dht_node(state() | [cached_dht_node()], ?RT:key()) -> unknown | comm:mypid().
 responsible_dht_node([], _Key) -> unknown;
 responsible_dht_node([{Interval, Pid} | T], Key) ->
     case intervals:in(Key, Interval) of
@@ -213,9 +214,9 @@ responsible_dht_node([{Interval, Pid} | T], Key) ->
 responsible_dht_node(State, Key) ->
     responsible_dht_node(element(2, State), Key).
 
--spec set_local_dht_node(state(), comm:mypid(), comm:mypid(), intervals:interval()) -> state().
+-spec set_local_dht_node(state(), comm:mypid(), comm:erl_local_pid(), intervals:interval()) -> state().
 set_local_dht_node(State, GlobalPid, LocalPid, Interval) ->
     setelement(3, State, {Interval, GlobalPid, LocalPid}).
--spec local_dht_node(state()) -> cached_dht_node().
+-spec local_dht_node(state()) -> local_dht_node().
 local_dht_node(State) -> element(3, State).
 
