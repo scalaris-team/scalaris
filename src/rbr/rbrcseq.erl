@@ -558,6 +558,11 @@ on({qread_collect,
                                          {qread_done,
                                           readval, WriteState#write_state.highest_write_round,
                                           WriteState#write_state.value}),
+                    %% In contrast to retrying the request, in which case we are interestet in
+                    %% the highest seen round number, the second phase (write) must be performed
+                    %% with the same round that was accepted in the first phase.
+                    %% This prevents multiple proposals with the same round number but differing IDs
+                    NewEntry2 = entry_set_my_round(NewEntry, MyRwithId),
                     inform_client(qread_done, NewEntry, WriteState#write_state.highest_write_round,
                                    WriteState#write_state.value),
                     delete_entry(NewEntry, tablename(State)),
@@ -698,7 +703,7 @@ on({qread_initiate_write_through, RoundTried, ReadEntry}, State) ->
                                [WTI]),
                         WTI
                  end,
-            WriteRound = pr:set_wti(entry_my_round(ReadEntry), PreviousWTI),
+            WriteRound = pr:set_wti(RoundTried, PreviousWTI),
 
             Filters = {fun prbr:noop_read_filter/1,
                        fun(_,_,_) -> {true, WTUI} end,
