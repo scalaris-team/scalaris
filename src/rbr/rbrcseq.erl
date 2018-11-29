@@ -563,9 +563,9 @@ on({qread_collect,
                     %% with the same round that was accepted in the first phase.
                     %% This prevents multiple proposals with the same round number but differing IDs
                     NewEntry2 = entry_set_my_round(NewEntry, MyRwithId),
-                    inform_client(qread_done, NewEntry, WriteState#write_state.highest_write_round,
+                    inform_client(qread_done, NewEntry2, WriteState#write_state.highest_write_round,
                                    WriteState#write_state.value),
-                    delete_entry(NewEntry, tablename(State)),
+                    delete_entry(NewEntry2, tablename(State)),
                     State;
                 write_through ->
                     %% in case a consensus was started, but not yet finished,
