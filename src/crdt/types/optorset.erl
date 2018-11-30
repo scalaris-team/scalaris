@@ -138,7 +138,7 @@ update_remove(Element, _CRDT={E, V}) ->
     E2 = ?SET:filter(fun({TE, _TC, _TI}) -> Element =/= TE end, E),
     {E2, V}.
 
--spec query_elements(crdt()) -> ?SET:ordset().
+-spec query_elements(crdt()) -> ?SET:ordset(element()).
 query_elements(_CRDT={Elements, _V}) ->
     ?SET:fold(fun({E, _C, _I}, AccSet) -> ?SET:add_element(E, AccSet) end,
               ?SET:new(), Elements).
