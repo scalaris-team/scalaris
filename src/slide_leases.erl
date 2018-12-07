@@ -1,4 +1,4 @@
-%% @copyright 2010-2017 Zuse Institute Berlin
+%% @copyright 2010-2018 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -210,7 +210,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
                                                                  State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
-            log:log("error in finish_delta_ack2"),
+            log:log("error in finish_delta_ack2 (~p)", comm:self()),
             {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
@@ -258,8 +258,8 @@ find_lease(State, SlideOp, Mode) ->
                 [Lease] ->
                     {ok, Lease};
                 _ ->
-                    log:log("did not found requested lease in passive list:~n~w~n~w~n~w~n",
-                            [Interval, ActiveLease, PassiveLeases]),
+                    log:log("did not found requested lease in passive list:~n~w~n~w~n~w (~p)~n",
+                            [Interval, ActiveLease, PassiveLeases, comm:self()]),
                     error
             end
     end.

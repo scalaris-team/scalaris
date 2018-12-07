@@ -1,4 +1,4 @@
-%% @copyright 2015-2017 Zuse Institute Berlin
+%% @copyright 2015-2018 Zuse Institute Berlin
 
 %%   Licensed under the Apache License, Version 2.0 (the "License");
 %%   you may not use this file except in compliance with the License.
@@ -255,7 +255,8 @@ remove_node(Config) ->
 
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
-            _ = admin:add_nodes(1),
+            NewNode = admin:add_nodes(1),
+            ct:pal("added node: ~p~n", NewNode),
             ct:pal("sleep"),
             timer:sleep(3000),
             ct:pal("check_ring_size_fully_joined"),
