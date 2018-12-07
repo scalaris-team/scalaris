@@ -210,7 +210,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
                                                                  State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
-            log:log("error in finish_delta_ack2 (~p)", comm:self()),
+            log:log("error in finish_delta_ack2 (~p)", comm:this()),
             {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
@@ -259,7 +259,7 @@ find_lease(State, SlideOp, Mode) ->
                     {ok, Lease};
                 _ ->
                     log:log("did not found requested lease in passive list:~n~w~n~w~n~w (~p)~n",
-                            [Interval, ActiveLease, PassiveLeases, comm:self()]),
+                            [Interval, ActiveLease, PassiveLeases, comm:this()]),
                     error
             end
     end.
