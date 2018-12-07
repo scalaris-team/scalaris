@@ -256,7 +256,7 @@ remove_node(Config) ->
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
             NewNode = admin:add_nodes(1),
-            ct:pal("added node: ~p~n", NewNode),
+            ct:pal("added node: ~p~n", [NewNode]),
             ct:pal("sleep"),
             timer:sleep(3000),
             ct:pal("check_ring_size_fully_joined"),
