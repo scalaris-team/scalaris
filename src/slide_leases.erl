@@ -210,7 +210,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
                                                                  State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
-            log:log("error in finish_delta_ack2 (~p)", comm:this()),
+            log:log("error in finish_delta_ack2 (~p)", [comm:this()]),
             {abort, {protocol_error, Msg}, State, SlideOp}
     end.
 
