@@ -90,6 +90,8 @@ init_per_group(Group, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config3),
     unittest_helper:make_ring(RingSize, [{config, [{log_path, PrivDir},
                                                       {leases, true},
+                                                      {replication_factor, ring_size()},
+                                                      {round, 1},
                                                       {leases_delta, ?LEASES_DELTA},
                                                       {db_backend, db_mnesia}]}]),
     unittest_helper:check_ring_size_fully_joined(ring_size()),
@@ -178,13 +180,15 @@ read(Config) ->
                                                   {start_type, recover}]}]),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     %% ring restored -> checking KV data integrity
-    _ = check_data_integrity(),
+    _ = check_data_integrity(1),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% test remove_node/1 remove a node and ensure data integrity after recovery
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 remove_node(Config) ->
+    Round = config:read(round),
+    ct:pal("round: ~w", [Round]),
     ct:pal("wait for check_leases"),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     SaveNode = lease_checker:get_random_save_node(),
@@ -200,8 +204,8 @@ remove_node(Config) ->
             lease_checker2:get_kv_db(RandomNode),
 
             ct:pal("PRBR state before node is removed"),
-            print_prbr_data(kv_db),
-            _ = print_leases_data(),
+            print_prbr_data(kv_db, Round),
+            _ = print_leases_data(Round),
 
             %% get relative range of node to remove and check if it is not to large
             {true, LL} = lease_checker:get_dht_node_state_unittest(comm:make_global(RandomNode), lease_list),
@@ -240,19 +244,19 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
 
             ct:pal("PRBR state after leases expired"),
-            print_prbr_data(kv_db),
-            _ = print_leases_data(),
+            print_prbr_data(kv_db, Round),
+            _ = print_leases_data(Round),
 
             %% check data integrity
             ct:pal("check data integrity"),
-            _ = check_data_integrity(),
+            _ = check_data_integrity(Round),
             %% "repair" replicas
             ct:pal("repair replicas"),
             _ = repair_replicas(),
 
             ct:pal("PRBR state after calling repair_replicas"),
-            print_prbr_data(kv_db),
-            _ = print_leases_data(),
+            print_prbr_data(kv_db, Round),
+            _ = print_leases_data(Round),
 
             %% add node to reform ring_size() node ring
             ct:pal("add node"),
@@ -266,13 +270,15 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
 
             ct:pal("PRBR state after node was inserted"),
-            print_prbr_data(kv_db),
-            _ = print_leases_data(),
+            print_prbr_data(kv_db, Round),
+            _ = print_leases_data(Round),
 
             true
-    end.
+    end,
+    config:write(round, Round + 1),
+    true.
 
-check_data_integrity() ->
+check_data_integrity(Round) ->
     io:format("show prbr statistics for the ring~n"),
     lease_checker2:get_kv_db(),
     Pred = fun (Id) ->
@@ -291,7 +297,7 @@ check_data_integrity() ->
             ct:pal("Missing elements are:~n~w", [Missing]),
             ct:pal("Printing missing element data..."),
             [print_element_data(E, kv_db) || E <- Missing],
-            print_prbr_data(kv_db),
+            print_prbr_data(kv_db, Round),
 
             100 = X
     end.
@@ -314,7 +320,7 @@ wait_for_expired_leases(Config) ->
 
 %%@doc Prints a list of tuples showing which value is stored in which dht node
 %%     Format : [{Value, [list_of_dht_nodes_value_is_stored_in]}]
-print_prbr_data(DB) ->
+print_prbr_data(DB, Round) ->
     PrbrData = get_prbr_data(fun(NodePid, E) ->
                                 {prbr:entry_val(E), NodePid}
                              end, DB),
@@ -330,16 +336,25 @@ print_prbr_data(DB) ->
                                 length(NodeList) <
                                  quorum:majority_for_accept(config:read(replication_factor))],
 
+    Uniques = [length(lists:usort(NodeList)) || {_Entry, NodeList} <- WoBottom],
+
+    {Min, Max} = case length(Uniques) of
+                     0 -> {bottom, bottom};
+                     _ -> {lists:min(Uniques), lists:max(Uniques)}
+                 end,
+
+    ct:pal("# unique replicas: min:~w; max:~w~n", [Min, Max]),
     ct:pal("PRBR state ~w:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
            "~100p", [DB, GroupedValues]),
     case length(Bad) of
         0 -> true;
-        _ -> ct:fail("entries with not enough replicas")
+        _ -> ct:fail("entries with not enough replicas (round:~w, db=~w)", [Round, DB])
     end,
     ok.
 
-print_leases_data() ->
-    _ = [print_prbr_data({lease_db, I}) || I <- lists:seq(1, config:read(replication_factor))].
+print_leases_data(Round) ->
+    _ = [print_prbr_data({lease_db, I}, Round) || I <-
+                             lists:seq(1, config:read(replication_factor))].
 
 print_element_data(Id, DB) ->
     HashedKey = ?RT:hash_key(integer_to_list(Id)),
