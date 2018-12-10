@@ -348,7 +348,9 @@ print_prbr_data(DB, Round) ->
            "~100p", [DB, GroupedValues]),
     case length(Bad) of
         0 -> true;
-        _ -> ct:fail("entries with not enough replicas (round:~w, db=~w)", [Round, DB])
+        _ -> S = io_lib:format("entries with not enough replicas (round:~w, db=~w)", [Round, DB]),
+             S2 = lists:flatten(S),
+             ct:fail(S2) %% 14B04 ...
     end,
     ok.
 
