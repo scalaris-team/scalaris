@@ -117,7 +117,7 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
     ?TRACE("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, _OldWriteRound, prbr_bottom} ->
-            log:log("not so well-formed qread-response"),
+            log:log("not so well-formed qread-response: ~p", [Result]),
             State;
         {qread_done, _ReqId, _Round, _OldWriteRound, Lease} ->
             LeaseId = l_on_cseq:get_id(Lease),
@@ -126,7 +126,7 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
             l_on_cseq:lease_takeover(Lease, Pid),
             add_takeover(State, Lease);
         _ ->
-            log:log("not so well-formed qread-response"),
+            log:log("not so well-formed qread-response: ~p", [Result]),
             State
     end;
 

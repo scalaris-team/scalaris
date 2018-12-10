@@ -36,7 +36,8 @@ repeater_num_executions() ->
     1000.
 
 ring_size() ->
-    config:read(replication_factor).
+    5.
+    %% config:read(replication_factor).
 
 all() -> [
           {group, make_ring_group},
@@ -321,8 +322,20 @@ print_prbr_data(DB) ->
                                              dict:new(), PrbrData),
     GroupedValues = lists:sort(dict:to_list(GroupedByValueDict)),
 
+    WoBottom = [{Entry, NodeList} || {Entry, NodeList} <- GroupedValues,
+                                Entry =/= prbr_bottom],
+
+
+    Bad = [{Entry, NodeList} || {Entry, NodeList} <- WoBottom,
+                                length(NodeList) <
+                                 quorum:majority_for_accept(config:read(replication_factor))],
+
     ct:pal("PRBR state ~w:~nFormat [{Value, [list_of_dht_nodes_value_is_stored_in]}]~n"
            "~100p", [DB, GroupedValues]),
+    case length(Bad) of
+        0 -> true;
+        _ -> ct:fail("entries with not enough replicas")
+    end,
     ok.
 
 print_leases_data() ->
