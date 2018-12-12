@@ -180,7 +180,7 @@ read(Config) ->
                                                   {start_type, recover}]}]),
     lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
     %% ring restored -> checking KV data integrity
-    _ = check_data_integrity(1),
+    _ = check_data_integrity(1, read_test),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -204,7 +204,7 @@ remove_node(Config) ->
             lease_checker2:get_kv_db(RandomNode),
 
             ct:pal("PRBR state before node is removed"),
-            print_prbr_data(kv_db, Round, true),
+            print_prbr_data(kv_db, Round, before_kill, true),
             _ = print_leases_data(Round),
 
             %% get relative range of node to remove and check if it is not to large
@@ -244,18 +244,18 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()-1}]),
 
             ct:pal("PRBR state after leases expired"),
-            print_prbr_data(kv_db, Round, true),
+            print_prbr_data(kv_db, Round, after_kill, true),
             _ = print_leases_data(Round),
 
             %% check data integrity
             ct:pal("check data integrity"),
-            _ = check_data_integrity(Round),
+            _ = check_data_integrity(Round, before_rrepair),
             %% "repair" replicas
             ct:pal("repair replicas"),
             _ = repair_replicas(),
 
             ct:pal("PRBR state after calling repair_replicas"),
-            print_prbr_data(kv_db, Round, true),
+            print_prbr_data(kv_db, Round, after_rrepair, true),
             _ = print_leases_data(Round),
 
             %% add node to reform ring_size() node ring
@@ -270,7 +270,7 @@ remove_node(Config) ->
             lease_checker2:wait_for_clean_leases(500, [{ring_size, ring_size()}]),
 
             ct:pal("PRBR state after node was inserted"),
-            print_prbr_data(kv_db, Round, true),
+            print_prbr_data(kv_db, Round, after_insert, true),
             _ = print_leases_data(Round),
 
             true
@@ -278,7 +278,7 @@ remove_node(Config) ->
     config:write(round, Round + 1),
     true.
 
-check_data_integrity(Round) ->
+check_data_integrity(Round, Label) ->
     io:format("show prbr statistics for the ring~n"),
     lease_checker2:get_kv_db(),
     Pred = fun (Id) ->
@@ -297,7 +297,7 @@ check_data_integrity(Round) ->
             ct:pal("Missing elements are:~n~w", [Missing]),
             ct:pal("Printing missing element data..."),
             [print_element_data(E, kv_db) || E <- Missing],
-            print_prbr_data(kv_db, Round, true),
+            print_prbr_data(kv_db, Round, Label, true),
 
             100 = X
     end.
@@ -320,7 +320,7 @@ wait_for_expired_leases(Config) ->
 
 %%@doc Prints a list of tuples showing which value is stored in which dht node
 %%     Format : [{Value, [list_of_dht_nodes_value_is_stored_in]}]
-print_prbr_data(DB, Round, MayCrash) ->
+print_prbr_data(DB, Round, Label, MayCrash) ->
     PrbrData = get_prbr_data(fun(NodePid, E) ->
                                 {prbr:entry_val(E), NodePid}
                              end, DB),
@@ -350,8 +350,8 @@ print_prbr_data(DB, Round, MayCrash) ->
         true ->
             case length(Bad) of
                 0 -> true;
-                _ -> S = io_lib:format("entries with not enough replicas (round:~w, db=~w)",
-                                       [Round, DB]),
+                _ -> S = io_lib:format("entries with not enough replicas (round:~w, db=~w, label=~w)",
+                                       [Round, DB, Label]),
                      S2 = lists:flatten(S),
                      ct:fail(S2) %% 14B04 ...
             end;
@@ -359,7 +359,7 @@ print_prbr_data(DB, Round, MayCrash) ->
     end.
 
 print_leases_data(Round) ->
-    _ = [print_prbr_data({lease_db, I}, Round, false) || I <-
+    _ = [print_prbr_data({lease_db, I}, Round, leases_db, false) || I <-
                              lists:seq(1, config:read(replication_factor))].
 
 print_element_data(Id, DB) ->
