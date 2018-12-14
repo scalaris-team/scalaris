@@ -149,6 +149,7 @@ test_make_ring(Config) ->
     wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover([{config, [{log_path, PrivDir},
                                                  {leases, true},
+                                                 {replication_factor, ring_size()},
                                                  {leases_delta, ?LEASES_DELTA},
                                                  {db_backend, db_mnesia},
                                                  {start_type, recover}]}]),
@@ -175,6 +176,7 @@ read(Config) ->
     wait_for_expired_leases(Config),
     unittest_helper:make_ring_recover( [{config, [{log_path, PrivDir},
                                                   {leases, true},
+                                                  {replication_factor, ring_size()},
                                                   {leases_delta, ?LEASES_DELTA},
                                                   {db_backend, db_mnesia},
                                                   {start_type, recover}]}]),
@@ -219,7 +221,7 @@ remove_node(Config) ->
             SaveFraction = quorum:minority(R) / R,
             ct:pal("Safe relative range to remove ~p", [SaveFraction]),
             ?assert_w_note(RelativeRange =< SaveFraction, "Removing a safe node means that only"
-                           " one replica should be affected"),
+                           " a minority should be affected"),
 
             %% prbr data of node for diagnostic purpose...
             comm:send_local(RandomNode, {prbr, tab2list_raw, kv_db, self()}),
