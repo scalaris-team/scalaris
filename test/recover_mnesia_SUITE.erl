@@ -219,7 +219,7 @@ remove_node(Config) ->
             %% prbr data of node for diagnostic purpose...
             comm:send_local(RandomNode, {prbr, tab2list_raw, kv_db, self()}),
             receive
-                {_, NodeData} -> NodeData
+                {kv_db, NodeData} -> NodeData
             end,
             Values = [prbr:entry_val(E) || E <- NodeData],
             ct:pal("Number of values: ~p~nNumber of unique values: ~p~nValue list:~p",
@@ -382,9 +382,10 @@ get_prbr_data(DataExtractFun, DB) ->
         [begin
             comm:send_local(ThisNode, {prbr, tab2list_raw, DB, self()}),
             receive
-                {_, List} -> [DataExtractFun(ThisNode, E) || E <- List]
-            after 1000 ->
-                ct:pal("DHT node ~p does not reply...", [ThisNode]),
-                []
+                {DB, List} -> [DataExtractFun(ThisNode, E) || E <- List]
+%% Do not risk losing answers and receiving them in the next call, so do not use 'after'
+%%            after 1000 ->
+%%                ct:pal("DHT node ~p does not reply...", [ThisNode]),
+%%                []
             end
          end || ThisNode <- DhtNodes]).
