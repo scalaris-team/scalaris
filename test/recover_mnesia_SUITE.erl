@@ -298,16 +298,20 @@ check_data_integrity(Round, Label) ->
     end.
 
 repair_replicas() ->
-    case config:read(replication_factor) rem 2 =:= 1 of
-        true -> %% only repair for odd replication factors
-            io:format("show prbr statistics for the ring~n"),
-            lease_checker2:get_kv_db(),
-            _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
-            io:format("show prbr statistics for the ring~n"),
-            lease_checker2:get_kv_db();
-        false ->
-            ok
-    end.
+    %% we need repair also for even replication degrees
+    %%    case config:read(replication_factor) rem 2 =:= 1 of
+    %%        true -> %% only repair for odd replication factors
+    io:format("show prbr statistics for the ring before repair~n"),
+    lease_checker2:get_kv_db(),
+    _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
+    %% let also arrive messages to remaining minority
+    timer:sleep(100),
+    io:format("show prbr statistics for the ring after repair~n"),
+    lease_checker2:get_kv_db()%;
+    %%     false ->
+    %%         ok
+    %% end.
+.
 
 wait_for_expired_leases(Config) ->
     {leases_timeout, LeasesTimeout} = lists:keyfind(leases_timeout, 1, Config),
