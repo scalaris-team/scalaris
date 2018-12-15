@@ -258,7 +258,7 @@ remove_node(Config) ->
             NewNode = admin:add_nodes(1),
             ct:pal("added node: ~p~n", [NewNode]),
             ct:pal("sleep"),
-            timer:sleep(3000),
+            timer:sleep(1000),
             ct:pal("check_ring_size_fully_joined"),
             unittest_helper:check_ring_size_fully_joined(ring_size()),
             ct:pal("wait for check_leases"),
