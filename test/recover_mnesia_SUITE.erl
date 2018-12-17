@@ -305,7 +305,7 @@ repair_replicas() ->
     lease_checker2:get_kv_db(),
     _ = [kv_on_cseq:write(integer_to_list(X),X) || X <- lists:seq(1, 100)],
     %% let also arrive messages to remaining minority
-    timer:sleep(100),
+    timer:sleep(200),
     io:format("show prbr statistics for the ring after repair~n"),
     lease_checker2:get_kv_db()%;
     %%     false ->
