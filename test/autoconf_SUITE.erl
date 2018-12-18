@@ -137,11 +137,11 @@ test_with_rand(_Config) ->
 
 -ifdef(have_ssl_handshake).
 test_have_ssl_handshake(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["20", "21", "22"])),
     ok.
 -else.
 test_have_ssl_handshake(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "R14B04"])),
     ok.
 -endif.
 
@@ -153,11 +153,11 @@ test_have_ssl_handshake(_Config) ->
 
 -ifdef(have_ssl_getstat).
 test_have_ssl_getstat(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["19", "20", "21", "22"])),
     ok.
 -else.
 test_have_ssl_getstat(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "R14B04"])),
     ok.
 -endif.
 
@@ -169,11 +169,11 @@ test_have_ssl_getstat(_Config) ->
 
 -ifdef(have_new_stacktrace).
 test_have_new_stacktrace(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["20", "21", "22"])),
     ok.
 -else.
 test_have_new_stacktrace(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "R14B04"])),
     ok.
 -endif.
 
