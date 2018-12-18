@@ -30,7 +30,8 @@ all() ->
      test_with_rand,
      test_have_ssl_handshake,
      test_have_ssl_getstat,
-     test_have_new_stacktrace
+     test_have_new_stacktrace,
+     test_HAVE_ERLANG_NOW
      ].
 
 
@@ -53,11 +54,11 @@ end_per_suite(_Config) ->
 
 -ifdef(have_crypto_randuniform_support).
 test_have_crypto_randuniform_support(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "20", "21", "22"])),
     ok.
 -else.
 test_have_crypto_randuniform_support(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ?assert(lists:member(erlang:system_info(otp_release), [])),
     ok.
 -endif.
 
@@ -189,5 +190,21 @@ test_namespaced_dict(_Config) ->
 -else.
 test_namespaced_dict(_Config) ->
     ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% HAVE_ERLANG_NOW
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(HAVE_ERLANG_NOW).
+test_HAVE_ERLANG_NOW(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "18", "19", "20", "21", "22"])),
+    ok.
+-else.
+test_HAVE_ERLANG_NOW(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), [])),
     ok.
 -endif.
