@@ -27,7 +27,10 @@ all() ->
      test_with_crypto_hash,
      test_with_crypto_bytes_to_integer,
      test_with_maps,
-     test_with_rand
+     test_with_rand,
+     test_have_ssl_handshake,
+     test_have_ssl_getstat,
+     test_have_new_stacktrace
      ].
 
 
@@ -125,3 +128,66 @@ test_with_rand(_Config) ->
     ok.
 -endif.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_ssl_handshake
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(have_ssl_handshake).
+test_have_ssl_handshake(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ok.
+-else.
+test_have_ssl_handshake(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_ssl_getstat
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(have_ssl_getstat).
+test_have_ssl_getstat(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ok.
+-else.
+test_have_ssl_getstat(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_new_stacktrace
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(have_new_stacktrace).
+test_have_new_stacktrace(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ok.
+-else.
+test_have_new_stacktrace(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% namespaced_dict
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(namespaced_dict).
+test_namespaced_dict(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ok.
+-else.
+test_namespaced_dict(_Config) ->
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ok.
+-endif.
