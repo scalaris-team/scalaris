@@ -48,13 +48,13 @@ end_per_suite(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% with_crypto_randuniform_support
+% have_crypto_randuniform_support
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -ifdef(have_crypto_randuniform_support).
 test_have_crypto_randuniform_support(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "18", "19", "20", "21", "22"])),
     ok.
 -else.
 test_have_crypto_randuniform_support(_Config) ->
@@ -71,7 +71,7 @@ test_have_crypto_randuniform_support(_Config) ->
 
 -ifdef(with_crypto_hash).
 test_with_crypto_hash(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
     ok.
 -else.
 test_with_crypto_hash(_Config) ->
@@ -88,7 +88,7 @@ test_with_crypto_hash(_Config) ->
 
 -ifdef(with_crypto_bytes_to_integer).
 test_with_crypto_bytes_to_integer(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
     ok.
 -else.
 test_with_crypto_bytes_to_integer(_Config) ->
@@ -201,10 +201,10 @@ test_namespaced_dict(_Config) ->
 
 -ifdef(HAVE_ERLANG_NOW).
 test_HAVE_ERLANG_NOW(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "18", "19", "20", "22"])),
     ok.
 -else.
 test_HAVE_ERLANG_NOW(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), [])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["21"])),
     ok.
 -endif.
