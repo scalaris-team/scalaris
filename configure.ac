@@ -454,7 +454,7 @@ AS_IF([test "${crypto_start}" = "ok"],
       [AC_MSG_NOTICE([crypto:start() is available])],
       [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-crypto_rand_uniform=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,rand_uniform,2)]]), erlang:halt().' | tail -1`
+crypto_rand_uniform=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,rand_uniform,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_rand_uniform}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_crypto_randuniform_support}"
        EDOCMACROS="${EDOCMACROS}, {have_crypto_randuniform_support, true}"
@@ -462,7 +462,7 @@ AS_IF([test "${crypto_rand_uniform}" = "true"],
        AC_MSG_NOTICE([crypto:rand_uniform/2 is available])],
       [AC_MSG_NOTICE([crypto:rand_uniform/2 is not available])])
 
-crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,hash,2)]]), erlang:halt().' | tail -1`
+crypto_hash=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,hash,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_hash}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_hash}"
        EDOCMACROS="${EDOCMACROS}, {with_crypto_hash, true}"
@@ -470,7 +470,7 @@ AS_IF([test "${crypto_hash}" = "true"],
        AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
       [AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
 
-crypto_bytes_to_integer=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,bytes_to_integer,1)]]), erlang:halt().' | tail -1`
+crypto_bytes_to_integer=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,bytes_to_integer,1)]]), erlang:halt().' | tail -1`
 AS_IF([test "${crypto_bytes_to_integer}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_bytes_to_integer}"
        EDOCMACROS="${EDOCMACROS}, {with_crypto_bytes_to_integer, true}"
@@ -478,7 +478,7 @@ AS_IF([test "${crypto_bytes_to_integer}" = "true"],
        AC_MSG_NOTICE([crypto:bytes_to_integer/1 is available and usable])],
       [AC_MSG_NOTICE([crypto:bytes_to_integer/1 is not available or not usable, falling back to rand:uniform/2])])
 
-ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(ct_line,parse_transform,2)]]), erlang:halt().' | tail -1`
+ct_line=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(ct_line,parse_transform,2)]]), erlang:halt().' | tail -1`
 AS_IF([test "${ct_line}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ctline_support}"
        EDOCMACROS="${EDOCMACROS}, {have_ctline_support, true}"
@@ -486,7 +486,7 @@ AS_IF([test "${ct_line}" = "true"],
        AC_MSG_NOTICE([ct_line is available])],
       [AC_MSG_NOTICE([ct_line is not available])])
 
-rand_module=`"${ERL}" -noshell -eval 'code:load_file(rand), io:format("~p~n", [[erlang:function_exported(rand,uniform,0)]]), erlang:halt().' | tail -1`
+rand_module=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(rand), io:format("~p~n", [[erlang:function_exported(rand,uniform,0)]]), erlang:halt().' | tail -1`
 AS_IF([test "${rand_module}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_rand}"
        EDOCMACROS="${EDOCMACROS}, {with_rand, true}"
@@ -502,7 +502,7 @@ AC_RUN_IFELSE(
         AC_MSG_NOTICE([-callback is available])],
        [AC_MSG_NOTICE([-callback is not available])])
 
-maps_module=`"${ERL}" -noshell -eval 'code:load_file(maps), io:format("~p~n", [[erlang:function_exported(maps,new,0)]]), erlang:halt().' | tail -1`
+maps_module=`"${ERL}" -noshell -eval 'error_logger:tty(false), code:load_file(maps), io:format("~p~n", [[erlang:function_exported(maps,new,0)]]), erlang:halt().' | tail -1`
 AS_IF([test "${maps_module}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_maps}"
        EDOCMACROS="${EDOCMACROS}, {with_maps, true}"
