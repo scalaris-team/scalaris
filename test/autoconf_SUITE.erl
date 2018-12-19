@@ -55,7 +55,9 @@ end_per_suite(_Config) ->
 
 -ifdef(have_crypto_randuniform_support).
 test_have_crypto_randuniform_support(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B", "18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B", "18", "19",
+                                                           "20", "21", "22"])),
     ok.
 -else.
 test_have_crypto_randuniform_support(_Config) ->
@@ -72,7 +74,8 @@ test_have_crypto_randuniform_support(_Config) ->
 
 -ifdef(with_crypto_hash).
 test_with_crypto_hash(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R16B", "18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R16B", "18", "19",
+                                                           "20", "21", "22"])),
     ok.
 -else.
 test_with_crypto_hash(_Config) ->
@@ -89,11 +92,13 @@ test_with_crypto_hash(_Config) ->
 
 -ifdef(with_crypto_bytes_to_integer).
 test_with_crypto_bytes_to_integer(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20",
+                                                           "21", "22"])),
     ok.
 -else.
 test_with_crypto_bytes_to_integer(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B"])),
     ok.
 -endif.
 
@@ -106,11 +111,13 @@ test_with_crypto_bytes_to_integer(_Config) ->
 
 -ifdef(with_maps).
 test_with_maps(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["17", "18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["17", "18", "19",
+                                                           "20", "21", "22"])),
     ok.
 -else.
 test_with_maps(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B"])),
     ok.
 -endif.
 
@@ -122,11 +129,13 @@ test_with_maps(_Config) ->
 
 -ifdef(with_rand).
 test_with_rand(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21",
+                                                           "22"])),
     ok.
 -else.
 test_with_rand(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B"])),
     ok.
 -endif.
 
@@ -142,7 +151,8 @@ test_have_ssl_handshake(_Config) ->
     ok.
 -else.
 test_have_ssl_handshake(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B", "18", "19"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B", "18", "19"])),
     ok.
 -endif.
 
@@ -154,11 +164,13 @@ test_have_ssl_handshake(_Config) ->
 
 -ifdef(have_ssl_getstat).
 test_have_ssl_getstat(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["19", "20", "21",
+                                                           "22"])),
     ok.
 -else.
 test_have_ssl_getstat(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B", "18"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B", "18"])),
     ok.
 -endif.
 
@@ -174,7 +186,8 @@ test_have_new_stacktrace(_Config) ->
     ok.
 -else.
 test_have_new_stacktrace(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B", "18", "19"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B", "18", "19"])),
     ok.
 -endif.
 
@@ -186,11 +199,13 @@ test_have_new_stacktrace(_Config) ->
 
 -ifdef(namespaced_dict).
 test_namespaced_dict(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20", "21", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["18", "19", "20",
+                                                           "21", "22"])),
     ok.
 -else.
 test_namespaced_dict(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B"])),
     ok.
 -endif.
 
@@ -202,10 +217,12 @@ test_namespaced_dict(_Config) ->
 
 -ifdef(HAVE_ERLANG_NOW).
 test_HAVE_ERLANG_NOW(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["20", "22"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["20"])),
     ok.
 -else.
 test_HAVE_ERLANG_NOW(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R16B", "18", "19", "21"])),
+    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                           "R16B", "18", "19",
+                                                           "21", "22"])),
     ok.
 -endif.
