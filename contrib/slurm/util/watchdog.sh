@@ -11,7 +11,7 @@ SACCT_RES=$(sacct -j $SLURM_JOB_ID -b)
 if [[ $? -eq 0 ]]; then
     IS_RUNNING=($(echo "$SACCT_RES" | grep $SLURM_JOB_ID | awk '{print $2}'))
 fi
-while [[ ${IS_RUNNING[0]} == "RUNNING" ]]; do
+while [[ ${IS_RUNNING[0]} == "RUNNING" ]] || [[ ${IS_RUNNING[0]} == "PENDING" ]] ; do
     sleep $WATCHDOG_INTERVAL
     SACCT_RES=$(sacct -j $SLURM_JOB_ID -b)
     if [[ $? -eq 0 ]]; then

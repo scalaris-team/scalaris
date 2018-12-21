@@ -117,7 +117,7 @@ function wait_for_servers_to_start {
 
 function start_watchdog() {
     # start watchdog
-    srun -N$SLURM_NNODES screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./util/watchdog.sh
+    srun -N$SLURM_NNODES --nodelist=$SLURM_JOB_NODELIST screen -S scalaris_watchdog_${SLURM_JOBID} -d -m ./util/watchdog.sh
 }
 
 function start_collectl(){
