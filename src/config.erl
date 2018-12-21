@@ -235,12 +235,17 @@ cfg_exists(Key) ->
 %%      prints an error message if not, also returns the result.
 -spec cfg_test_and_error(Key::atom(), Pred::fun((any()) -> boolean()), Msg::list()) -> boolean().
 cfg_test_and_error(Key, Pred, Msg) ->
-    Value = read(Key),
-    case cfg_exists(Key) andalso Pred(Value) of
-        true -> true;
-        false -> error_logger:error_msg("~p = ~p ~s (see scalaris.cfg and scalaris.local.cfg)~n",
+    case read(Key) of
+        failed ->
+            error_logger:error_msg("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n", [Key]),
+            false;
+        Value ->
+            case Pred(Value) of
+                true -> true;
+                _ -> error_logger:error_msg("~p = ~p ~s (see scalaris.cfg and scalaris.local.cfg)~n",
                                             [Key, Value, lists:flatten(Msg)]),
-                 false
+                     false
+            end
     end.
 
 -spec cfg_is_atom(Key::atom()) -> boolean().
