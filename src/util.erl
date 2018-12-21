@@ -1108,24 +1108,36 @@ lists_takewith_iter(_Pred, [], _Acc) ->
 %%      compared to the original list!
 -spec lists_split([A], Partitions::pos_integer()) -> [[A]]
      when is_subtype(A, any()).
-lists_split([X], _Partitions) -> [[X]];
+lists_split([X], _Partitions) -> [[X]]; %% redundant shortcut
 lists_split([_|_] = List, 1) -> [lists:reverse(List)];
 lists_split([_|_] = List, Partitions) ->
-    BlockSize = length(List) div Partitions,
+    Len = length(List),
+    BlockSize = Len div Partitions,
+    Rem = Len rem Partitions,
     case BlockSize =< 1 of
-        true -> lists:foldl(fun(E, Acc) -> [[E] | Acc] end, [], List);
-        _    -> lists_split(List, BlockSize, 0, [], [])
+        true ->
+            %% more partitions than elements, return list of single element lists
+            lists:foldl(fun(E, Acc) -> [[E] | Acc] end, [], List);
+        _ -> lists_split(List, BlockSize, Rem, 0, [], []) % do fair partitioning
     end;
 lists_split([], _Partitions) -> [].
 
 %% @doc Helper for lists_split/2.
--spec lists_split([A], BlockSize::pos_integer(), CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]]
+-spec lists_split([A], BlockSize::pos_integer(), Rem::pos_integer(),
+                  CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]]
      when is_subtype(A, any()).
-lists_split([_|_] = List, BlockSize, BlockSize, CurBlock, Result) ->
-    lists_split(List, BlockSize, 0, [], [CurBlock | Result]);
-lists_split([H | T], BlockSize, CurBlockSize, CurBlock, Result) ->
-    lists_split(T, BlockSize, CurBlockSize + 1, [H | CurBlock], Result);
-lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
+lists_split([_|_] = List, BlockSize, 0, BlockSize, CurBlock, Result) ->
+    %% blocksize reached and no remainder to distribute: start new block
+    lists_split(List, BlockSize, 0, 0, [], [CurBlock | Result]);
+lists_split([H | T], BlockSize, Rem, BlockSize, CurBlock, Result) ->
+    %% blocksize reached but remainder to distribute: add this element
+    %% to the current block and start the next block
+    lists_split(T, BlockSize, Rem-1, 0, [], [[H | CurBlock] | Result]);
+lists_split([H | T], BlockSize, Rem, CurBlockSize, CurBlock, Result) ->
+    %% add an element to the currently build block
+    lists_split(T, BlockSize, Rem, CurBlockSize + 1, [H | CurBlock], Result);
+lists_split([], _BlockSize, _Rem, _CurBlockSize, CurBlock, Result) ->
+    %% return last block and previously build ones as complete result
     [CurBlock | Result].
 
 -spec lists_keystore2(Key::term(), NC::pos_integer(), List::[tuple()],
