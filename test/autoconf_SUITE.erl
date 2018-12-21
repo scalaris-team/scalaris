@@ -171,8 +171,10 @@ test_have_ssl_getstat(_Config) ->
     ok.
 -else.
 test_have_ssl_getstat(_Config) ->
-    ?assert(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B", "R15B01"
-                                                           "R16B", "17", "18"])),
+    ?assert_w_note(lists:member(erlang:system_info(otp_release), ["R14B04", "R15B",
+                                                                  "R15B01" "R16B",
+                                                                  "17", "18"]),
+                   erlang:system_info(otp_release)),
     ok.
 -endif.
 
