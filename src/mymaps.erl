@@ -62,7 +62,20 @@ get(Key, Map, Default) ->
 
 -spec take(Key::term(), Map::mymap()) -> {Value::term(),  Map2::mymap()} | error.
 -ifdef(with_maps).
-take(Key, Map) -> maps:take(Key, Map).
+take(Key, Map) ->
+    try maps:take(Key, Map) of
+        Value -> Value
+    catch error:undef ->
+            %% no longer necessary when we drop support for Erlang < 19.0
+            %% Erlang 18.0 to 18.3 do not have a maps:take/2 function
+            %% get and delete can do the same logic
+            try maps:get(Key, Map) of
+                X ->
+                    NewMap = maps:remove(Key, Map),
+                    {X, NewMap}
+            catch error:_ -> error
+            end
+    end.
 -else.
 take(Key, Map) ->
     try gb_trees:take(Key, Map) of
