@@ -1,4 +1,4 @@
-% @copyright 2013-2018 Zuse Institute Berlin,
+% @copyright 2013-2019 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@
 -spec start() -> ok.
 start() ->
   FullDataDir = config:read(db_directory) ++ "/" ++ atom_to_list(node()),
+  io:format("FullDataDir: ~p", [FullDataDir]),
   application:set_env(mnesia, dir, FullDataDir),
 %  case config:read(_type) of
   case config:read(start_type) of
@@ -112,7 +113,7 @@ traverse_table_and_show(Table_name)->
     true -> mnesia:foldl(Iterator,[],Table_name);
     false ->
       Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
-      mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
+      mnesia:activity(sync_transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
   end.
 
 %% @doc Return all the tables owned by PidGroup
@@ -190,6 +191,7 @@ put(DBName, Entry) ->
                         element(1, Entry) =/= '$end_of_table'
                 end),
     {atomic, _} = mnesia:transaction(fun() -> mnesia:write({DBName, element(1, Entry), Entry}) end),
+    mnesia:sync_log(),
     DBName.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
@@ -382,5 +384,5 @@ tab2list(Table_name) ->
         true -> mnesia:foldl(Iterator,[],Table_name);
         false ->
             Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
-            mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
+            mnesia:activity(sync_transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
     end.
