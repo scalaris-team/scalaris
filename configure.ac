@@ -1,4 +1,4 @@
-#   Copyright 2007-2018 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2019 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -767,6 +767,13 @@ AC_SUBST(ENABLEPYTHON3INSTALL)
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
+
+SAVECFLAGS=$CFLAGS
+CFLAGS="-I$ERLANG_ROOT_DIR/erts-$ERLANG_LIB_VER_erts/include $CFLAGS"
+AC_LANG_PUSH([C])
+AC_CHECK_HEADER([erl_nif.h], [], [])
+AC_LANG_POP([C])
+CFLAGS=$SAVECFLAGS
 
 #http://unix.stackexchange.com/questions/35183/how-do-i-identify-which-linux-distro-is-running
 
