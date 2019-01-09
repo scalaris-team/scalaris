@@ -1,4 +1,4 @@
-% @copyright 2018 Zuse Institute Berlin
+% @copyright 2018-2019 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ otp_rel() ->
 
 -ifdef(have_crypto_randuniform_support).
 test_have_crypto_randuniform_support(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17", "18", "19", "20", "21", "22"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -77,7 +77,8 @@ test_have_crypto_randuniform_support(_Config) ->
 
 -ifdef(with_crypto_hash).
 test_with_crypto_hash(_Config) ->
-    Releases = ["R16B", "R16B01", "17", "18", "19", "20", "21", "22"],
+    Releases = ["R15B02", "R15B03", "R16B", "R16B01", "17", "18", "19", "20",
+                "21", "22"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -101,7 +102,7 @@ test_with_crypto_bytes_to_integer(_Config) ->
     ok.
 -else.
 test_with_crypto_bytes_to_integer(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B"],
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -endif.
@@ -120,7 +121,7 @@ test_with_maps(_Config) ->
     ok.
 -else.
 test_with_maps(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -139,7 +140,7 @@ test_with_rand(_Config) ->
     ok.
 -else.
 test_with_rand(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -158,7 +159,7 @@ test_have_ssl_handshake(_Config) ->
     ok.
 -else.
 test_have_ssl_handshake(_Config) ->
-    Releases = ["R14B04" , "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04" , "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17", "18", "19", "20"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -177,7 +178,7 @@ test_have_ssl_getstat(_Config) ->
     ok.
 -else.
 test_have_ssl_getstat(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17", "18"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -196,7 +197,7 @@ test_have_new_stacktrace(_Config) ->
     ok.
 -else.
 test_have_new_stacktrace(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17", "18", "19", "20"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
@@ -215,7 +216,7 @@ test_namespaced_dict(_Config) ->
     ok.
 -else.
 test_namespaced_dict(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01"],
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -endif.
@@ -232,7 +233,7 @@ test_HAVE_ERLANG_NOW(_Config) ->
     ok.
 -else.
 test_HAVE_ERLANG_NOW(_Config) ->
-    Releases = ["R14B04", "R15B", "R15B01", "R16B", "R16B01",
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "17", "18", "19", "20", "21", "22"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
