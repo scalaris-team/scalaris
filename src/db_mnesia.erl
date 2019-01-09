@@ -191,6 +191,9 @@ put(DBName, Entry) ->
                         element(1, Entry) =/= '$end_of_table'
                 end),
     {atomic, _} = mnesia:transaction(fun() -> mnesia:write({DBName, element(1, Entry), Entry}) end),
+    %% FUTOPT (future optimization): remove the 'catch' when we
+    %% drop support for Erlang < 17.0
+    catch %% when undefined; Erlang < 17.0-rc2 does not have this function
     mnesia:sync_log(),
     DBName.
 
