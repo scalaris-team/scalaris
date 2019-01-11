@@ -193,8 +193,9 @@ put(DBName, Entry) ->
     {atomic, _} = mnesia:transaction(fun() -> mnesia:write({DBName, element(1, Entry), Entry}) end),
     %% FUTOPT (future optimization): remove the 'catch' when we
     %% drop support for Erlang < 17.0
-    catch %% when undefined; Erlang < 17.0-rc2 does not have this function
-    mnesia:sync_log(),
+    %% greatly kills performance...
+    %% catch %% when undefined; Erlang < 17.0-rc2 does not have this function
+    %% mnesia:sync_log(),
     DBName.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
