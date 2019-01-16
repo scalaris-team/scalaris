@@ -21,18 +21,13 @@
 
 #include <sys/time.h> // evil hack
 
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
 #include <array>
 #include <iostream>
 #include <stdexcept>
 #include <string>
-
-namespace boost {
-  namespace asio {
-    class io_context;
-  }
-}
 
 namespace scalaris {
 

@@ -22,16 +22,11 @@
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
 
 #include "connection.hpp"
-
-namespace boost {
-  namespace asio {
-    class io_context;
-  } // namespace asio
-} // namespace boost
 
 namespace scalaris {
 
