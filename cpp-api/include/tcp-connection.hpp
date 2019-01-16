@@ -21,7 +21,7 @@
 
 #include <sys/time.h> // evil hack
 
-#include <boost/asio/io_context.hpp>
+#include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
 #include <array>
@@ -33,7 +33,7 @@ namespace scalaris {
 
   /// represents a TCP connection to Scalaris to execute JSON-RPC requests
   class TCPConnection final : public Connection {
-    boost::asio::io_context ioservice;
+    boost::asio::io_service ioservice;
     boost::asio::ip::tcp::socket socket;
 
     bool hasToConnect = true;

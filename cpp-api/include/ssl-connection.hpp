@@ -22,7 +22,7 @@
 #include "converter.hpp"
 #include "exceptions.hpp"
 #include "json/json.h"
-#include <boost/asio/io_context.hpp>
+#include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
 
@@ -32,7 +32,7 @@ namespace scalaris {
 
   /// represents a SSL connection to Scalaris to execute JSON-RPC requests
   class SSLConnection final : public Connection {
-    boost::asio::io_context ioservice;
+    boost::asio::io_service ioservice;
     boost::asio::ssl::context ctx;
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket;
     std::string password = {""};
