@@ -1,4 +1,4 @@
-// Copyright 2017-2018 Zuse Institute Berlin
+// Copyright 2017-2019 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,18 +21,24 @@
 
 #include <sys/time.h> // evil hack
 
-#include <boost/asio.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 #include <array>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 
+namespace boost {
+  namespace asio {
+    class io_context;
+  }
+}
+
 namespace scalaris {
 
   /// represents a TCP connection to Scalaris to execute JSON-RPC requests
   class TCPConnection final : public Connection {
-    boost::asio::io_service ioservice;
+    boost::asio::io_context ioservice;
     boost::asio::ip::tcp::socket socket;
 
     bool hasToConnect = true;

@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Zuse Institute Berlin
+// Copyright 2015-2019 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
 #include "ssl-connection.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 
 namespace scalaris {
 
@@ -22,8 +24,10 @@ namespace scalaris {
       : Connection(hostname, link),
         ctx(boost::asio::ssl::context_base::method::sslv23),
         socket(ioservice, ctx) {
-    try {connect();}
-    catch(scalaris::ConnectionError) {}
+    try {
+      connect();
+    } catch (scalaris::ConnectionError) {
+    }
   }
 
   void SSLConnection::connect() {
@@ -80,16 +84,19 @@ namespace scalaris {
 
   void SSLConnection::set_certificate_file(const std::string& file) {
     //  Use a certificate from a file.
-    ctx.use_certificate_file(file, boost::asio::ssl::context_base::file_format::pem);
+    ctx.use_certificate_file(file,
+                             boost::asio::ssl::context_base::file_format::pem);
   }
   void SSLConnection::set_private_key(const std::string& file) {
     // Use a private key from a file.
-    ctx.use_private_key_file(file, boost::asio::ssl::context_base::file_format::pem);
+    ctx.use_private_key_file(file,
+                             boost::asio::ssl::context_base::file_format::pem);
   }
 
   void SSLConnection::set_rsa_private_key(const std::string& file) {
     // Use an RSA private key from a file.
-    ctx.use_rsa_private_key_file(file, boost::asio::ssl::context_base::file_format::pem);
+    ctx.use_rsa_private_key_file(
+        file, boost::asio::ssl::context_base::file_format::pem);
   }
 
   void SSLConnection::set_password(const std::string& pw) { password = pw; }

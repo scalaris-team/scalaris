@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Zuse Institute Berlin
+// Copyright 2015-2019 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
 #include "tcp-connection.hpp"
 
 #include <boost/algorithm/string.hpp>
+
+#include <boost/asio.hpp>
 
 namespace scalaris {
 

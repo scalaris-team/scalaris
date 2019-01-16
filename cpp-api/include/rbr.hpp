@@ -1,4 +1,4 @@
-// Copyright 2018 Zuse Institute Berlin
+// Copyright 2018-2019 Zuse Institute Berlin
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
-
-#include <sys/time.h> // evil hack
-#include <boost/asio.hpp>
 
 #include "connection.hpp"
 #include "exceptions.hpp"
