@@ -15,8 +15,9 @@
 #pragma once
 
 #include <iostream>
-#include <string>
+#include <memory>
 #include <stdexcept>
+#include <string>
 
 #include "connection.hpp"
 #include "exceptions.hpp"
@@ -28,6 +29,7 @@ namespace scalaris {
   /// It uses kv_on_cseq to perform reads and writes.
   class Rbr {
     Connection& c;
+
   public:
     /**
      * Creates a <code>Rbr</code> instance
@@ -52,26 +54,26 @@ namespace scalaris {
 
       // std::cout << "read: " << Json::StyledWriter().write(val) << std::endl;
 
-      if(!val.isObject())
+      if (!val.isObject())
         throw MalFormedJsonError();
       Json::Value status = val["status"];
 
-      if(!status.isString())
+      if (!status.isString())
         throw MalFormedJsonError();
 
       std::string status_str = status.asString();
-        if(status_str.compare("ok") != 0)
-            throw ReadFailedError(val["reason"].asString());
+      if (status_str.compare("ok") != 0)
+        throw ReadFailedError(val["reason"].asString());
 
       Json::Value value = val["value"];
-      if(!value.isObject())
+      if (!value.isObject())
         throw MalFormedJsonError();
 
       Json::Value value_type = value["type"];
-      if(!value_type.isString())
+      if (!value_type.isString())
         throw MalFormedJsonError();
       Json::Value value_type_str = value_type.asString();
-      if(value_type_str.compare("as_is") != 0)
+      if (value_type_str.compare("as_is") != 0)
         throw ReadFailedError("unsupported value type");
 
       Json::Value value_value = value["value"];
@@ -87,16 +89,16 @@ namespace scalaris {
     void write(const std::string key, const Json::Value& value) {
       Json::Value val = c.rpc("rbr_write", key, value);
 
-      //std::cout << "write: " << Json::StyledWriter().write(val) << std::endl;
+      // std::cout << "write: " << Json::StyledWriter().write(val) << std::endl;
 
-      if(!val.isObject())
+      if (!val.isObject())
         throw MalFormedJsonError();
       Json::Value status = val["status"];
-      if(!status.isString())
+      if (!status.isString())
         throw MalFormedJsonError();
       std::string status_str = status.asString();
-      if(status_str.compare("ok") != 0)
+      if (status_str.compare("ok") != 0)
         throw WriteFailedError(val["reason"].asString());
     }
   };
-}
+} // namespace scalaris
