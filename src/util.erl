@@ -1,4 +1,4 @@
-% @copyright 2007-2018 Zuse Institute Berlin
+% @copyright 2007-2019 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1123,7 +1123,7 @@ lists_split([_|_] = List, Partitions) ->
 lists_split([], _Partitions) -> [].
 
 %% @doc Helper for lists_split/2.
--spec lists_split([A], BlockSize::pos_integer(), Rem::pos_integer(),
+-spec lists_split([A], BlockSize::pos_integer(), Rem::non_neg_integer(),
                   CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]]
      when is_subtype(A, any()).
 lists_split([_|_] = List, BlockSize, 0, BlockSize, CurBlock, Result) ->
