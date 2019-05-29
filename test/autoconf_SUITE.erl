@@ -59,7 +59,7 @@ otp_rel() ->
 -ifdef(have_crypto_randuniform_support).
 test_have_crypto_randuniform_support(_Config) ->
     Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
-                "R16B03-1", "17", "18", "19", "20", "21", "22"],
+                "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -78,7 +78,7 @@ test_have_crypto_randuniform_support(_Config) ->
 -ifdef(with_crypto_hash).
 test_with_crypto_hash(_Config) ->
     Releases = ["R15B02", "R15B03", "R16B", "R16B01", "R16B03-1", "17", "18",
-                "19", "20", "21", "22"],
+                "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -97,7 +97,7 @@ test_with_crypto_hash(_Config) ->
 
 -ifdef(with_crypto_bytes_to_integer).
 test_with_crypto_bytes_to_integer(_Config) ->
-    Releases = ["R16B01", "R16B03-1", "17", "18", "19", "20", "21", "22"],
+    Releases = ["R16B01", "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -116,7 +116,7 @@ test_with_crypto_bytes_to_integer(_Config) ->
 
 -ifdef(with_maps).
 test_with_maps(_Config) ->
-    Releases = ["18", "19", "20", "21", "22"],
+    Releases = ["18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -135,7 +135,7 @@ test_with_maps(_Config) ->
 
 -ifdef(with_rand).
 test_with_rand(_Config) ->
-    Releases = ["18", "19", "20", "21", "22"],
+    Releases = ["18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -154,7 +154,7 @@ test_with_rand(_Config) ->
 
 -ifdef(have_ssl_handshake).
 test_have_ssl_handshake(_Config) ->
-    Releases = ["21", "22"],
+    Releases = ["21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -173,7 +173,7 @@ test_have_ssl_handshake(_Config) ->
 
 -ifdef(have_ssl_getstat).
 test_have_ssl_getstat(_Config) ->
-    Releases = ["19", "20", "21", "22"],
+    Releases = ["19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -192,7 +192,7 @@ test_have_ssl_getstat(_Config) ->
 
 -ifdef(have_new_stacktrace).
 test_have_new_stacktrace(_Config) ->
-    Releases = ["21", "22"],
+    Releases = ["21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -211,7 +211,7 @@ test_have_new_stacktrace(_Config) ->
 
 -ifdef(namespaced_dict).
 test_namespaced_dict(_Config) ->
-    Releases = ["17", "18", "19", "20", "21", "22"],
+    Releases = ["17", "18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -else.
@@ -235,7 +235,7 @@ test_HAVE_ERLANG_NOW(_Config) ->
 -else.
 test_HAVE_ERLANG_NOW(_Config) ->
     Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
-                "R16B03-1", "17", "18", "19", "20", "21", "22"],
+                "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -endif.
