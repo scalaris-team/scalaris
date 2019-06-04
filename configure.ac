@@ -803,21 +803,25 @@ case `uname -s` in
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      OS=$LINUXVERSION
+     ARCHIVECMD="ar rv"
      ;;
  Linux*)
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      OS=$LINUXVERSION
+     ARCHIVECMD="ar rv"
      ;;
  Darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      OS="OSX `sw_vers -productVersion`"
+     ARCHIVECMD="@LIBTOOL@ -static -o"
      ;;
  darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      OS="OSX `sw_vers -productVersion`"
+     ARCHIVECMD="@LIBTOOL@ -static -o"
      ;;
 esac
 
@@ -845,6 +849,7 @@ fi
 echo "detected OS is: '$OS' $SRC $CONFIGURESTATUS"
 AC_SUBST(DRIVER_OS)
 AC_SUBST(NIFFLAGS)
+AC_SUBST(ARCHIVECMD)
 
 mkdir -p ~/.yaws 2> /dev/null
 

@@ -35,7 +35,7 @@ ssl-tests: $(OBJS_TEST_SSL) libscalaris.a
 
 libscalaris.a: $(OBJS)
 	$(NVC)echo -e "\e[0;33mCreating archive" $@ "\033[39m"
-	$(VC)@LIBTOOL@ -static -o $@ $(OBJS)
+	$(VC)@ARCHIVECMD@ $@ $(OBJS)
 
 .cpp.o: Makefile
 	$(NVC)echo -e "\e[0;32mCompiling" $< "\033[39m"
