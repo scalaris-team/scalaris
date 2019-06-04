@@ -31,6 +31,8 @@ AC_PROG_SED
 AC_PATH_PROG(DOXYGEN, doxygen)
 AC_SUBST(DOXYGEN)
 
+AC_PATH_PROG(AR, ar)
+AC_SUBST(AR)
 AC_PATH_PROG(LIBTOOL, libtool)
 AC_SUBST(LIBTOOL)
 
@@ -803,25 +805,25 @@ case `uname -s` in
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      OS=$LINUXVERSION
-     ARCHIVECMD="ar rv"
+     ARCHIVECMD="$ac_cv_path_AR rv"
      ;;
  Linux*)
      NIFFLAGS="-shared"
      DRIVER_OS=LINUX
      OS=$LINUXVERSION
-     ARCHIVECMD="ar rv"
+     ARCHIVECMD="$ac_cv_path_AR rv"
      ;;
  Darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      OS="OSX `sw_vers -productVersion`"
-     ARCHIVECMD="@LIBTOOL@ -static -o"
+     ARCHIVECMD="$ac_cv_path_LIBTOOL -static -o"
      ;;
  darwin*)
      NIFFLAGS="-flat_namespace -undefined dynamic_lookup"
      DRIVER_OS=MACOSX
      OS="OSX `sw_vers -productVersion`"
-     ARCHIVECMD="@LIBTOOL@ -static -o"
+     ARCHIVECMD="$ac_cv_path_LIBTOOL -static -o"
      ;;
 esac
 
