@@ -746,6 +746,7 @@ CPPFLAGS
 LDFLAGS
 CXXFLAGS
 CXX
+LIBTOOL
 DOXYGEN
 SED
 TRUE
@@ -3166,6 +3167,48 @@ fi
 
 
 
+# Extract the first word of "libtool", so it can be a program name with args.
+set dummy libtool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_LIBTOOL+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $LIBTOOL in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_LIBTOOL="$LIBTOOL" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_LIBTOOL="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+LIBTOOL=$ac_cv_path_LIBTOOL
+if test -n "$LIBTOOL"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LIBTOOL" >&5
+$as_echo "$LIBTOOL" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+
+
 ###########################################################
 #
 # check for C++ and boost
@@ -3173,7 +3216,6 @@ fi
 ###########################################################
 
 ENABLE_CPP=
-ENABLE_SSL=
 # Check whether --enable-cpp was given.
 if test "${enable_cpp+set}" = set; then :
   enableval=$enable_cpp; ENABLE_CPP=$enableval
@@ -12073,9 +12115,9 @@ else
 fi
 
 if test "x$SSL_GETSTAT" = "xfalse" ; then
-  echo "  Erlang ssl                  : no"
+  echo "  ssl                  : no"
 else
-  echo "  Erlang ssl                  : yes"
+  echo "  ssl                  : yes"
 fi
 
 if test "x$enabled_cxx" = "x0" ; then

@@ -31,6 +31,9 @@ AC_PROG_SED
 AC_PATH_PROG(DOXYGEN, doxygen)
 AC_SUBST(DOXYGEN)
 
+AC_PATH_PROG(LIBTOOL, libtool)
+AC_SUBST(LIBTOOL)
+
 ###########################################################
 #
 # check for C++ and boost
