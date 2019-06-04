@@ -28,11 +28,11 @@ all: libscalaris.a scalaris tests ssl-tests
 cpp-test : tests
 	$(VC)./tests --report_level=detailed
 
-tests: $(OBJS_TEST_NOSSL) $(OBJS)
+tests: $(OBJS_TEST_NOSSL) libscalaris.a
 	$(NVC)echo -e "\e[0;33mCreating tests\033[39m"
 	$(VC)$(CXX) -o $@ $(OBJS_TEST_NOSSL) libscalaris.a $(LDFLAGS)
 
-ssl-tests: $(OBJS_TEST_SSL) $(OBJS)
+ssl-tests: $(OBJS_TEST_SSL) libscalaris.a
 	$(NVC)echo -e "\e[0;33mCreating ssl-tests\033[39m"
 	$(VC)$(CXX) -o $@ $(OBJS_TEST_SSL) libscalaris.a $(LDFLAGS)
 
@@ -50,8 +50,9 @@ scalaris: libscalaris.a src/cli.o
 
 clean:
 	@-rm -rf $(shell find . -type f -name '*.o')
+	@-rm -rf $(shell find . -type f -name '*.o.json')
 	@-rm -rf $(shell find . -type f -name '*.d')
-	@-rm -f ./tests ./ssl-tests ./scalaris
+	@-rm -f ./tests ./ssl-tests ./scalaris ./libscalaris.a
 
 # note, double $ because of escaping in Makefiles
 compile_commands.json: $(SRC_CPP) $(SRC_TEST_CPP) Makefile
