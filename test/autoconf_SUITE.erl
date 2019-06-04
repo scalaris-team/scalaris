@@ -32,7 +32,9 @@ all() ->
      test_have_ssl_getstat,
      test_have_new_stacktrace,
      test_namespaced_dict,
-     test_HAVE_ERLANG_NOW
+     test_HAVE_ERLANG_NOW,
+     test_have_ctline_support,
+     test_have_callback_support
      ].
 
 
@@ -236,6 +238,44 @@ test_HAVE_ERLANG_NOW(_Config) ->
 test_HAVE_ERLANG_NOW(_Config) ->
     Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_ctline_support
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(have_ctline_support).
+test_have_ctline_support(_Config) ->
+    Releases = ["R14B04"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-else.
+test_have_ctline_support(_Config) ->
+    Releases = ["R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
+                "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_callback_support
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(have_callback_support).
+test_have_callback_support(_Config) ->
+    Releases = ["R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
+                "R16B03-1", "17", "18", "19", "20", "21", "22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-else.
+test_have_callback_support(_Config) ->
+    Releases = ["R14B04"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
     ok.
 -endif.
