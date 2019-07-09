@@ -25,6 +25,7 @@ matrix:
             - python3
             - erlang
             - erlang-dev
+            - ant
 
 script:
   - env | grep TRAVIS
