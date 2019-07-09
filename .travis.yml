@@ -21,7 +21,7 @@ matrix:
           packages:
             - automake
             - clang
-            - libboost1.55-all-dev
+            - libboost1.60-all-dev
             - python3
             - erlang
             - erlang-dev
