@@ -28,7 +28,6 @@ matrix:
 
 script:
   - env | grep TRAVIS
-  - sudo apt-cache search libboost
   - clang++ -v
   - 'if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then CXX=clang++ ./configure --with-openssl=/usr/local/opt/openssl; fi'
   - 'if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then CXX=clang++ ./configure; fi'
