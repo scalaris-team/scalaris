@@ -21,10 +21,11 @@ matrix:
           packages:
             - automake
             - clang
-            - libboost1.55-all-dev
+            - libboost-all-dev
             - python3
             - erlang
             - erlang-dev
+            - ant
 
 script:
   - env | grep TRAVIS
