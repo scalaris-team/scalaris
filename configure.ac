@@ -630,6 +630,21 @@ AS_IF([test "${erlang_cv_new_stacktrace}" = "true"],
        AC_MSG_NOTICE([new stacktrace syntax is available])],
       [AC_MSG_NOTICE([new stacktrace syntax is not available])])
 
+###########################################################
+#
+# check for socket:open/2 since 22.0
+#
+###########################################################
+# https://github.com/erlang/otp/commit/3ca71520bfb664f0ea809ffdf41505936e4d5e90
+SOCKET_OPEN=false
+socket_open=`"${ERL}" -noshell -eval 'code:ensure_loaded(socket),io:format("~p~n", [[erlang:function_exported(socket,open,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${socket_open}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_socket_open}"
+       EDOCMACROS="${EDOCMACROS}, {have_socket_open, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_socket_open"
+       SSL_HANDSHAKE=true
+       AC_MSG_NOTICE([socket:open() is available])],
+      [AC_MSG_NOTICE([socket:open() is not available])])
 
 ###########################################################
 #
