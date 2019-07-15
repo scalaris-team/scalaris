@@ -35,6 +35,7 @@
 -spec read(client_key()) -> {ok, client_value()} | {fail, not_found}.
 read(Key) ->
     rbrcseq:qread(kv_db, self(), ?RT:hash_key(Key), ?MODULE, fun ?MODULE:rf_val/1),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, _OldWriteRound, Value},
                        case Value of

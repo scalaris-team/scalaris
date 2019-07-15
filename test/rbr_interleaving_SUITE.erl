@@ -33,13 +33,15 @@
 -include("client_types.hrl").
 
 all() -> [
-          test_link_slowing,
-          test_link_slowing2,
-          test_interleaving,
-          test_write_once_1,
-          test_write_once_2,
-          test_write_once_3,
-          test_read_write_commuting
+            test_link_slowing,
+            test_link_slowing2,
+            test_interleaving,
+            test_write_once_1,
+            test_write_once_2,
+            test_write_once_3,
+            test_read_retry_returns_older,
+            test_read_retry_returns_newer,
+            test_read_write_commuting
          ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -331,6 +333,96 @@ test_write_once_3(_Config) ->
 
     ok.
 
+test_read_retry_returns_older(_Config) ->
+    %% This test checks if a delayed round requests responses properly complete
+    %% a read request if an inconsistent quorum was already established.
+    %% Setup:
+    %%  A: Write value to replica 1
+    %%  B: Submit read... this will observer only replies from replica 1-3
+    %%      thus moving from round_request to read phase.
+    %%     Afterwards, B receives replies from replica 4.. thus 3 replies with no value in total
+    %%     B should deliver an empty value without triggering a write-through
+    TestPid = self(),
+    Key = "123",
+
+    % Write A: Write only to replica 1
+    ct:pal("partial write to replica 1"),
+    print_prbr_data(),
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I<-lists:seq(1, 1)],
+    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(2, 4)],
+    spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    print_prbr_data(),
+
+    %% Execute read B
+    ct:pal("inconsistent read"),
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I<-lists:seq(1, 1)],
+    _LinkB = [slow_link(2, kv_db, I, dht_node, read) || I <- lists:seq(2, 4)],
+    LinkC = slow_link(2, kv_db, 4, dht_node, round_request),
+    spawn(fun() ->
+        {ok, Value} = read_via_node(2, Key, element(1, filter_list_append())),
+            TestPid ! {read_req_done, Value}
+        end),
+    % message_received -> internally seen inconsistent quorum and moved to read stage
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    print_prbr_data(),
+    %% deliver slow messages from replica 4
+    ct:pal("remove slow link"),
+    remove_slow_link(LinkC),
+    print_prbr_data(),
+    receive {read_req_done, Value} ->
+        ?equals_w_note(Value, [], "Values must match exactly with this interleaving")
+    end,
+    %% check that no write-through happened (max write round of 1)
+    WriteThroughRounds = lists:filter(fun(E) -> E > 1 end, lists:flatten(prbr_w_rounds())),
+    ?equals_w_note(WriteThroughRounds, [], "No write through should have happend"),
+    ok.
+
+test_read_retry_returns_newer(_Config) ->
+    %% This test checks if a delayed round requests responses properly complete
+    %% a read request if an inconsistent quorum was already established.
+    %% Setup:
+    %%  A: Write value to replica 1-3
+    %%  B: Submit read... this will observer only replies from replica 2-4
+    %%      thus moving from round_request to read phase.
+    %%     Afterwards, B receives replies from replica 1.. thus 3 replies with new value in total
+    %%     B should deliver the new value without triggering a write-through
+    TestPid = self(),
+    Key = "123",
+
+    % Write A: Write only to replica 1
+    ct:pal("write to replica 1-3"),
+    print_prbr_data(),
+    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I<-lists:seq(1, 3)],
+    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(4, 4)],
+    spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 3)],
+    print_prbr_data(),
+
+    %% Execute read B
+    ct:pal("inconsistent read"),
+    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(4, 4)],
+    _LinkB = [slow_link(2, kv_db, I, dht_node, read) || I <- lists:seq(1, 3)],
+    LinkC = slow_link(2, kv_db, 1, dht_node, round_request),
+    spawn(fun() ->
+        {ok, Value} = read_via_node(2, Key, element(1, filter_list_append())),
+            TestPid ! {read_req_done, Value}
+        end),
+    % message_received -> internally seen inconsistent quorum and moved to read stage
+    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    print_prbr_data(),
+    %% deliver slow messages from replica 4
+    ct:pal("remove slow link"),
+    remove_slow_link(LinkC),
+    print_prbr_data(),
+    receive {read_req_done, Value} ->
+        ?equals_w_note(Value, ["WriteA"], "Values must match exactly with this interleaving")
+    end,
+    %% check that no write-through happened (max write round of 1)
+    WriteThroughRounds = lists:filter(fun(E) -> E > 1 end, lists:flatten(prbr_w_rounds())),
+    ?equals_w_note(WriteThroughRounds, [], "No write through should have happend"),
+    ok.
+
 test_read_write_commuting(_Config) ->
     %% Write tuple {A,B} on every replica. Update second element to C for
     %% 3 out of 4 replicas. Read first element and make sure the outdated replica
@@ -375,7 +467,6 @@ get_commuting_wf_for_rf(ReadFilter) ->
         {?MODULE, rf_first} ->
             [fun ?MODULE:wf_second/3];
         _ ->
-            ct:pal("~p", [[Name, Module]]),
             []
     end.
 
@@ -460,7 +551,7 @@ prbr_data() ->
      [begin
         comm:send_local(N, {prbr, tab2list_raw, kv_db, self()}),
         receive
-            {_, List} -> List
+            {kv_db, List} -> List
         end
       end || N <- lists:sort(pid_groups:find_all(dht_node))].
 
@@ -474,7 +565,13 @@ prbr_values() ->
 %%      Removes write_through infos
 prbr_w_rounds_with_values() ->
     [
-     [{pr:set_wti(element(3, E), none), prbr:entry_val(E)} || E <- Replica]
+        [{pr:set_wti(element(3, E), none), prbr:entry_val(E)} || E <- Replica]
+    || Replica <- prbr_data()].
+
+%% @doc Returns all write round numbers for each node as a list.
+prbr_w_rounds() ->
+    [
+        [pr:get_r(element(3, E)) || E <- Replica] 
     || Replica <- prbr_data()].
 
 %% @doc Flush all slow messages of a link

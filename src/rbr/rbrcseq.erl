@@ -80,7 +80,7 @@
 -record(rr_replies, {reply_count :: non_neg_integer(),        %% total number of replies recieved
                      highest_read_count :: non_neg_integer(), %% number of replies seen with highest read round
                      highest_read_round :: pr:pr(),           %% highest read round received in replies
-                     write_state :: #write_state{}
+                     write_state :: [#write_state{}]
                     }).
 
 %% Aggregator for read replies.
@@ -111,10 +111,17 @@
                   is_read | any(), %% value to write if entry belongs to write
                   read | write | denied_write, %% operation type
                   pr:pr(), %% my round
-                  any(), %% read retry information
+                  none | read_retry_info(), %% read retry information
                   replies() %% maintains replies to check for consistent quorums
 %%% Attention: There is a case that checks the size of this tuple below!!
                  }.
+
+-type read_retry_info() :: {
+      non_neg_integer(), %% number of retries left
+      non_neg_integer(), %% maximum read round number seen in prev iteration
+      non_neg_integer()  %% maximum write round number seen in prev iteration
+}.
+
 
 -type check_next_step() :: fun((term(), term()) -> term()).
 
@@ -410,28 +417,31 @@ on({qround_request_collect,
                     update_entry(NewEntry, tablename(State)),
                     State;
                 consistent ->
-                    WriteState = NewReplies#rr_replies.write_state,
+                    WriteState = get_highest_seen_write_state(NewReplies#rr_replies.write_state),
                     %% majority replied and we have a consistent quorum ->
                     %% we can skip read with explicit round number and deliver directly
                     trace_mpath:log_info(self(),
                                           {qread_done, readval,
                                            WriteState#write_state.highest_write_round,
                                            WriteState#write_state.value}),
+                    delete_entry(NewEntry, tablename(State)),
                     inform_client(qread_done, NewEntry,
                                   WriteState#write_state.highest_write_round,
                                   WriteState#write_state.value),
-                    delete_entry(NewEntry, tablename(State)),
                     State;
                 inconsistent ->
                     %% majority replied, but we do not have a consistent quorum
-                    delete_entry(NewEntry, tablename(State)),
-
                     {RetryWithoutIncrement, ReadRetryInfo} =
                         case entry_optype(NewEntry) =:= read of
                             true ->
+                                %% as this is a read, keep this entry open for lagging behind messages
+                                %% we might get a consistent quorum with the remaining replies, which
+                                %% would save us the need to do a write-through
+                                update_entry(NewEntry, tablename(State)),
+
                                 %% check if read can be retried because we made progress since
                                 %% last read or our attempt number is not depleted
-                                WriteState = NewReplies#rr_replies.write_state,
+                                WriteState = get_highest_seen_write_state(NewReplies#rr_replies.write_state),
                                 SeenMaxRR = pr:get_r(NewReplies#rr_replies.highest_read_round),
                                 SeenMaxWR = pr:get_r(WriteState#write_state.highest_write_round),
                                 {RetriesRemaining, PrevMaxRR, PrevMaxWR} =
@@ -451,6 +461,7 @@ on({qround_request_collect,
                             false ->
                                 %% writes always modify acceptor states during
                                 %% first phase
+                                delete_entry(NewEntry, tablename(State)),
                                 {false, none}
                         end,
 
@@ -1353,7 +1364,7 @@ create_open_entry_register(TableName) ->
 %% abstract data type to collect quorum read/write replies
 -spec entry_new_round_request(any(), any(), any(), ?RT:key(), module(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
-                     non_neg_integer(), read | write, any())
+                     non_neg_integer(), read | write, read_retry_info())
                     -> entry().
 entry_new_round_request(Debug, ReqId, EntryReg, Key, DataType, Client, Period, Filter, RetriggerAfter,
                         OpType, ReadRetryInfo) ->
@@ -1366,19 +1377,19 @@ entry_new_round_request(Debug, ReqId, EntryReg, Key, DataType, Client, Period, F
                     -> entry().
 entry_new_read(Debug, ReqId, EntryReg,  Key, DataType, Client, Period, Filter, RetriggerAfter, OpType) ->
     {ReqId, EntryReg, Debug, Period, Period + RetriggerAfter + 20, Key, DataType, Client,
-     Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), 0, new_read_replies()}.
+     Filter, _ValueToWrite = is_read, OpType, _MyRound = pr:new(0,0), none, new_read_replies()}.
 
 -spec entry_new_write(any(), any(), any(), ?RT:key(), module(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, EntryReg, Key, DataType, Client, Period, Filters, Value, RetriggerAfter) ->
     {ReqId, EntryReg, Debug, Period, Period + RetriggerAfter, Key, DataType, Client,
-     Filters, _ValueToWrite = Value, write, _MyRound = pr:new(0,0), 0, new_write_replies()}.
+     Filters, _ValueToWrite = Value, write, _MyRound = pr:new(0,0), none, new_write_replies()}.
 
 -spec new_rr_replies() -> #rr_replies{}.
 new_rr_replies() ->
     #rr_replies{reply_count = 0, highest_read_count = 0,
-                highest_read_round = pr:new(0,0), write_state = new_write_state()}.
+                highest_read_round = pr:new(0,0), write_state = []}. %% keep all replies from different rounds
 
 -spec new_read_replies() -> #r_replies{}.
 new_read_replies() ->
@@ -1424,7 +1435,7 @@ entry_set_optype(Entry, OpType)   -> setelement(11, Entry, OpType).
 entry_my_round(Entry)             -> element(12, Entry).
 -spec entry_set_my_round(entry(), pr:pr()) -> entry().
 entry_set_my_round(Entry, Round)  -> setelement(12, Entry, Round).
--spec entry_get_read_retry_info(entry()) -> any().
+-spec entry_get_read_retry_info(entry()) -> read_retry_info() | none.
 entry_get_read_retry_info(Entry) -> element(13, Entry).
 -spec entry_replies(entry())      -> replies().
 entry_replies(Entry)              -> element(14, Entry).
@@ -1463,9 +1474,32 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
     %% If enough replicas have replied, decide on the next action
     %% to take.
     {Result, R4} =
-        case ?REDUNDANCY:quorum_accepted(ReplyCount) of
-            true ->
-                NewHighestWF = NewWriteState#write_state.highest_write_filter,
+        case {?REDUNDANCY:quorum_accepted(ReplyCount), ?REDUNDANCY:quorum_accepted(ReplyCount-1)} of
+            {true, true} ->
+              %% We have received more replies than necessary for a quorum. This means, that an
+              %% the initial quorum was inconsistent. Collect lagging behind message to mavbe reach
+              %% an consistent quorum, as this would help us to prevent write-throughs in case of a read.
+              case OpType =:= read of
+                true ->
+                  case get_write_state_quorum(NewWriteState) of
+                    none -> {false, R3};
+                    WS ->
+                        ReadFilter =
+                          case Filters of
+                            {RF, _, _}   -> RF;
+                            RF           -> RF
+                          end,
+                        CollectedVal = WS#write_state.value,
+                        ReadValue = ?REDUNDANCY:get_read_value(CollectedVal, ReadFilter),
+                        T1 = R3#rr_replies{write_state=[WS#write_state{value=ReadValue}]},
+                        {consistent, T1}
+                    end;
+                _ -> 
+                  {false, R3}
+              end;
+            {true, false} -> %% we have received the minimum number of replies necessary for a quorum
+                HighestWriteState = get_highest_seen_write_state(NewWriteState),
+                NewHighestWF = HighestWriteState#write_state.highest_write_filter,
                 ReadFilter =
                     case Filters of
                         {RF, _, _}   -> RF;
@@ -1473,7 +1507,7 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                     end,
 
                 ConsReadRounds = ReplyCount =:= R3#rr_replies.highest_read_count,
-                ConsWriteRounds = ReplyCount =:= NewWriteState#write_state.highest_write_count,
+                ConsWriteRounds = ReplyCount =:= HighestWriteState#write_state.highest_write_count,
                 ConsQuorum = ConsReadRounds andalso ConsWriteRounds,
 
                 IsRead = OpType =:= read,
@@ -1491,9 +1525,9 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                     IsCommutingRead ->
                         %% construct value from received replies (has no effect when
                         %% data is simply replicated).
-                        CollectedVal = NewWriteState#write_state.value,
+                        CollectedVal = HighestWriteState#write_state.value,
                         ReadValue = ?REDUNDANCY:get_read_value(CollectedVal, ReadFilter),
-                        T1 = R3#rr_replies{write_state=NewWriteState#write_state{value=ReadValue}},
+                        T1 = R3#rr_replies{write_state=[HighestWriteState#write_state{value=ReadValue}]},
                         {consistent, T1};
 
                     %% For everything else, the default is starting a qread which
@@ -1501,7 +1535,7 @@ add_rr_reply(Replies, _DBSelector, SeenReadRound, SeenWriteRound, Value,
                     true ->
                         {inconsistent, R3}
                 end;
-            false ->
+            {false, _} ->
                 %% no majority yet
                 {false, R3}
         end,
@@ -1565,7 +1599,27 @@ add_read_reply(Replies, _DBSelector, AssignedRound, Val, SeenWriteRound,
     NewRound = erlang:max(CurrentRound, AssignedRound),
     {Result, R4, NewRound}.
 
--spec update_write_state(#write_state{}, pr:pr(), prbr:write_filter(), any(), module()) -> #write_state{}.
+%%
+-spec get_highest_seen_write_state(nonempty_list(#write_state{})) -> #write_state{}.
+get_highest_seen_write_state(_WriteStateList=[H |_]) -> H.
+
+-spec update_write_state(#write_state{} | [#write_state{}], pr:pr(), prbr:write_filter(),
+                        any(), module()) -> #write_state{} | [#write_state{}].
+% full list of write state entries as sometimes all replies are keepts
+update_write_state([], SeenRound, SeenLastWF, SeenValue, Datatype) ->
+    [update_write_state(new_write_state(), SeenRound, SeenLastWF, SeenValue, Datatype)];
+update_write_state(_WriteStates=[H|T], SeenRound, SeenLastWF, SeenValue, Datatype) ->
+    CurrentRoundNoWTI = pr:set_wti(H#write_state.highest_write_round, none),
+    SeenRoundNoWTI = pr:set_wti(SeenRound, none),  
+
+    if  CurrentRoundNoWTI =:= SeenRoundNoWTI ->
+          [update_write_state(H, SeenRound, SeenLastWF, SeenValue, Datatype) | T];
+        CurrentRoundNoWTI < SeenRoundNoWTI ->
+          [update_write_state(new_write_state(), SeenRound, SeenLastWF, SeenValue, Datatype) | [H|T]];
+        true ->
+          [H | update_write_state(T, SeenRound, SeenLastWF, SeenValue, Datatype)]
+    end;
+% update single write state entry.
 update_write_state(WriteState, SeenRound, SeenLastWF, SeenValue, Datatype) ->
     %% extract write through info for round comparisons since
     %% they can be key-dependent if something different than
@@ -1588,10 +1642,22 @@ update_write_state(WriteState, SeenRound, SeenLastWF, SeenValue, Datatype) ->
              };
        true ->
             WriteState#write_state{
-              value = ?REDUNDANCY:collect_older_read_value(CurrentValue, SeenValue, Datatype)
+              value=?REDUNDANCY:collect_older_read_value(CurrentValue, SeenValue, Datatype)
              }
     end.
 
+%% checks if we collected writes states where a quorum has voted in the same round
+-spec get_write_state_quorum([#write_state{}]) -> none | #write_state{}.
+get_write_state_quorum([]) -> none;
+get_write_state_quorum([H|T]) ->
+  case ?REDUNDANCY:quorum_accepted(H#write_state.highest_write_count) of
+    true -> H;
+    false -> get_write_state_quorum(T)
+  end.
+
+%%
+%% functions for aggregating denies start here
+%%
 -spec add_read_deny(#r_replies{}, dht_node_state:db_selector(), pr:pr(), pr:pr(), boolean())
                     -> {retry | false, #r_replies{}, pr:pr()}.
 add_read_deny(Replies, _DBSelector, CurrentRound, ReceivedRound, _Cons) ->
