@@ -62,8 +62,8 @@ test_link_slowing(_Config) ->
     %% Slow down a link. One replica should not receive any prbr messages during the
     %% test. After the slow link is removed (messages will be flushed), all replicase should
     %% be consistent. Assumes R=4.
-    get_notified_by_message(self(), 1, kv_db, 2, dht_node, write),
-    Link = slow_link(1, kv_db, 2, dht_node),
+    get_notified_by_message(1, 2, write),
+    Link = slow_link(1, 2),
     {ok, _} = write_via_node(1, "1", filter_list_append(), "TestWrite"),
 
     %% replica 2 should be empty, and the other three have the value written
@@ -73,7 +73,7 @@ test_link_slowing(_Config) ->
                             [["TestWrite"]]]),
 
     remove_slow_link(Link),
-    receive {message_received} -> ok end,
+    wait_until_notification(1),
 
     %% all replicas should have received the written value
     ?equals(prbr_values(), [[["TestWrite"]],
@@ -84,12 +84,11 @@ test_link_slowing(_Config) ->
 test_link_slowing2(_Config) ->
     %% slow down one link, but use a different client to send write request
     %% slow link should have no impact. Assumes R=4.
-    _Link = slow_link(1, kv_db, 2, dht_node),
+    _Link = slow_link(1, 2),
 
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) ||
-       I <- lists:seq(1, 4)],
+    get_notified_by_message(2, [1,2,3,4], write),
     {ok, _} = write_via_node(2, "1", filter_list_append(), "TestWrite"),
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 4)],
+    wait_until_notification(4),
 
     %% all replicas should have received the written value
     ?equals(prbr_values(), [[["TestWrite"]],
@@ -112,22 +111,22 @@ test_interleaving(_Config) ->
     Key = "A",
 
     %% write of client A
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I<-lists:seq(2, 4)],
-    get_notified_by_message(self(), 1, kv_db, 1, dht_node, write),
-    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(2, 4)],
+    get_notified_by_message(1, [2,3,4], round_request),
+    get_notified_by_message(1, 1, write),
+    _ = slow_link(1, [2,3,4], write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 4)],
+    wait_until_notification(4),
 
     %% read of client B
-    _LinkB = slow_link(2, kv_db, 1, dht_node),
+    _LinkB = slow_link(2, 1),
     {ok, _} = read_via_node(2, Key, element(1, filter_list_append())),
 
     %% write of client C
-    get_notified_by_message(self(), 3, kv_db, 1, dht_node, write),
-    LinkC = slow_link(3, kv_db, 1, dht_node),
+    get_notified_by_message( 3, 1, write),
+    LinkC = slow_link(3, 1),
     {ok, _} = write_via_node(3, Key, filter_list_append(), "WriteB"),
     remove_slow_link(LinkC),
-    receive {message_received} -> ok end,
+    wait_until_notification(1),
 
     ct:pal("PRBR state after interleaved operations: ~n~p", [prbr_data()]),
     %% Test that there aren't two different values
@@ -146,11 +145,11 @@ test_interleaving(_Config) ->
     %% Do a read over replica 1, 2, 3
     %% It should be an inconsistent read and currently diverging replica 1
     %% should be repaired,
-    get_notified_by_message(self(), 4, kv_db, 4, dht_node, write),
-    LinkD = slow_link(4, kv_db, 4, dht_node),
+    get_notified_by_message(4, 4, write),
+    LinkD = slow_link(4, 4),
     {ok, _} = read_via_node(4, Key, element(1, filter_list_append())),
     remove_slow_link(LinkD),
-    receive {message_received} -> ok end,
+    wait_until_notification(1),
 
     ct:pal("PRBR state after inconsistent read: ~n~p", [prbr_data()]),
     PrbrData2 = prbr_values(),
@@ -168,9 +167,9 @@ test_write_once_1(_Config) ->
     TestPid = self(),
     Key = "1234",
 
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I <- lists:seq(1,2)],
-    _LinkA = slow_link(1, kv_db, 3, dht_node, write),
-    _LinkB = slow_link(1, kv_db, 4, dht_node, write),
+    get_notified_by_message(1, [1,2], write),
+    _ = slow_link(1, 3, write),
+    _ = slow_link(1, 4, write),
 
     % start write A which will not finish since it only gets two write ack.
     spawn(fun() ->
@@ -179,7 +178,7 @@ test_write_once_1(_Config) ->
           end),
 
     % wait until A has written the two remaining replicas
-    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+    wait_until_notification(2),
 
     % write B should now trigger a write through which should finish write A
     % once write B retries, a notification should be sent to write A
@@ -208,48 +207,48 @@ test_write_once_2(_Config) ->
     print_prbr_data(),
 
     %% Write A: phase 1 reaches all replicas, write msg only replica 4
-    get_notified_by_message(self(), 1, kv_db, 4, dht_node, write),
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
-    _SlowLinksA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(1, 3)],
+    get_notified_by_message(1, 4, write),
+    get_notified_by_message(1, [1,2,3,4], round_request),
+    _ = slow_link(1, [1,2,3], write),
     spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    wait_until_notification(5),
 
     print_prbr_data(),
     ct:pal("write A done"),
 
     %% Write B: writes replica 1 to 3. gets deny from replica 4 before quorum of acks
     %% --> it retries its request
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(1,4)],
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+    get_notified_by_message(2, [1,2,3,4], round_request),
+    get_notified_by_message(2, [1,2,3,4], read),
+    get_notified_by_message(2, [1,2,3,4], write),
 
-    SlowLinksB1 = slow_link(2, kv_db, 4, dht_node, round_request),
-    SlowLinksB3 = slow_link(2, kv_db, 3, dht_node, write),
-    SlowLinksB4 = slow_link(2, kv_db, 2, dht_node, read),
+    SlowLinksB1 = slow_link(2, 4, round_request),
+    SlowLinksB3 = slow_link(2, 3, write),
+    SlowLinksB4 = slow_link(2, 2, read),
     spawn(fun() -> _ =
             write_via_node(2, Key, filter_list_append(), "WriteB"),
             TestPid ! {write_b_done}
           end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    wait_until_notification(5),
     print_prbr_data(),
 
     ct:pal("flush slow link 4"),
     flush_slow_link(SlowLinksB1),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,3)],
+    wait_until_notification(3),
     print_prbr_data(),
 
     ct:pal("flush slow link 3"),
     flush_slow_link(SlowLinksB3),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+    wait_until_notification(2),
     print_prbr_data(),
 
     %% Write C: observer consistent quorum from repliica 1 to 3
     %% write any follow-up value to all replicas
-    [get_notified_by_message(self(), 3, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
-    SlowLinkC = slow_link(3, kv_db, 4, dht_node, round_request),
+    get_notified_by_message(3, [1,2,3,4], write),
+    SlowLinkC = slow_link(3, 4, round_request),
     _ = write_via_node(3, Key, filter_list_append(), "WriteC"),
     remove_slow_link(SlowLinkC),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,4)],
+    wait_until_notification(4),
     ct:pal("write C done"),
     print_prbr_data(),
 
@@ -283,39 +282,39 @@ test_write_once_3(_Config) ->
     print_prbr_data(),
 
     %% Write A: phase 1 reaches all replicas, write msg only replica 4
-    get_notified_by_message(self(), 1, kv_db, 4, dht_node, write),
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
-    _SlowLinksA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(1, 3)],
+    get_notified_by_message(1, [1,2,3,4], round_request),
+    get_notified_by_message(1, 4, write),
+    _ = slow_link(1, [1,2,3], write),
     spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    wait_until_notification(5),
 
     print_prbr_data(),
     ct:pal("write A done"),
 
     %% Write B: writes replica 1 to 3. gets deny from replica 4 before quorum of acks
     %% --> it retries its request
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, round_request) || I <- lists:seq(1,4)],
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(1,4)],
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+    get_notified_by_message(2, [1,2,3,4], round_request),
+    get_notified_by_message(2, [1,2,3,4], read),
+    get_notified_by_message(2, [1,2,3,4], write),
 
-    SlowLinksB1 = slow_link(2, kv_db, 4, dht_node, round_request),
-    SlowLinksB3 = slow_link(2, kv_db, 3, dht_node, write),
-    SlowLinksB4 = slow_link(2, kv_db, 2, dht_node, read),
+    SlowLinksB1 = slow_link(2, 4, round_request),
+    SlowLinksB3 = slow_link(2, 3, write),
+    SlowLinksB4 = slow_link(2, 2, read),
     spawn(fun() -> _ =
             write_via_node(2, Key, filter_list_append(), "WriteB"),
             TestPid ! {write_b_done}
           end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,5)],
+    wait_until_notification(5),
     print_prbr_data(),
 
     ct:pal("flush slow link 4"),
     flush_slow_link(SlowLinksB1),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,3)],
+    wait_until_notification(3),
     print_prbr_data(),
 
     ct:pal("flush slow link 3"),
     flush_slow_link(SlowLinksB3),
-    [receive {message_received} -> ok end || _ <- lists:seq(1,2)],
+    wait_until_notification(2),
     print_prbr_data(),
 
     %% Write B: should not be able to retry as it gets notified earlier
@@ -348,23 +347,23 @@ test_read_retry_returns_older(_Config) ->
     % Write A: Write only to replica 1
     ct:pal("partial write to replica 1"),
     print_prbr_data(),
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I<-lists:seq(1, 1)],
-    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(2, 4)],
+    get_notified_by_message(1, 1, write),
+    _ = slow_link(1, [2, 3, 4], write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    wait_until_notification(1),
     print_prbr_data(),
 
     %% Execute read B
     ct:pal("inconsistent read"),
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I<-lists:seq(1, 1)],
-    _LinkB = [slow_link(2, kv_db, I, dht_node, read) || I <- lists:seq(2, 4)],
-    LinkC = slow_link(2, kv_db, 4, dht_node, round_request),
+    get_notified_by_message(2, 1, read),
+    _ = slow_link(2, [2,3,4], read),
+    LinkC = slow_link(2, 4, round_request),
     spawn(fun() ->
         {ok, Value} = read_via_node(2, Key, element(1, filter_list_append())),
             TestPid ! {read_req_done, Value}
         end),
     % message_received -> internally seen inconsistent quorum and moved to read stage
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    wait_until_notification(1),
     print_prbr_data(),
     %% deliver slow messages from replica 4
     ct:pal("remove slow link"),
@@ -390,28 +389,30 @@ test_read_retry_returns_newer(_Config) ->
     TestPid = self(),
     Key = "123",
 
-    % Write A: Write only to replica 1
+    % Write A: Write to replica 1-3
     ct:pal("write to replica 1-3"),
     print_prbr_data(),
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I<-lists:seq(1, 3)],
-    _LinkA = [slow_link(1, kv_db, I, dht_node, write) || I <- lists:seq(4, 4)],
+    get_notified_by_message(1, [1,2,3], write),
+    _ = slow_link(1, 4, write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 3)],
+    wait_until_notification(3),
     print_prbr_data(),
 
     %% Execute read B
     ct:pal("inconsistent read"),
-    [get_notified_by_message(self(), 2, kv_db, I, dht_node, read) || I <- lists:seq(4, 4)],
-    _LinkB = [slow_link(2, kv_db, I, dht_node, read) || I <- lists:seq(1, 3)],
-    LinkC = slow_link(2, kv_db, 1, dht_node, round_request),
+    get_notified_by_message(2, 4, read),
+    _ = slow_link(2, [1,2,3], read),
+    LinkC = slow_link(2, 1, round_request),
     spawn(fun() ->
         {ok, Value} = read_via_node(2, Key, element(1, filter_list_append())),
             TestPid ! {read_req_done, Value}
         end),
+
     % message_received -> internally seen inconsistent quorum and moved to read stage
-    [receive {message_received} -> ok end || _ <- lists:seq(1, 1)],
+    wait_until_notification(1),
     print_prbr_data(),
-    %% deliver slow messages from replica 4
+
+    %% deliver slow messages from replica 1
     ct:pal("remove slow link"),
     remove_slow_link(LinkC),
     print_prbr_data(),
@@ -430,22 +431,21 @@ test_read_write_commuting(_Config) ->
     %% triggered.
     Key = "123",
 
-    % write baseline
-    [get_notified_by_message(self(), 1, kv_db, I, dht_node, write) || I <- lists:seq(1,4)],
+    % write baseline 
+    get_notified_by_message(1, [1,2,3,4], write),
     _ = write_via_node(1, Key, {fun prbr:noop_read_filter/1,
                                 fun ?MODULE:cc_noop/3,
                                 fun prbr:noop_write_filter/3},
                        {"A", "B"}),
+    wait_until_notification(4),
 
-    [receive {message_received} -> ok end || _ <- lists:seq(1,4)],
-
-    _ = slow_link(1, kv_db, 4, dht_node, write),
+    _ = slow_link(1, 4, write),
     _ = write_via_node(1, Key, {fun ?MODULE:rf_second/1,
                                 fun ?MODULE:cc_noop/3,
                                 fun ?MODULE:wf_second/3}, "C"),
 
     PrbrValuesBeforeRead = prbr_values(),
-    _ = slow_link(4, kv_db, 1, dht_node),
+    _ = slow_link(4, 1),
     {ok, "A"} = read_via_node(4, Key, fun ?MODULE:rf_first/1),
     PrbrValuesAfterRead = prbr_values(),
 
@@ -528,6 +528,19 @@ get_notified_by_message(PidToNotify, FromId, FromType, ToId, ToType, MessageType
                             ToType, MessageType, BpName),
     gen_component:bp_set_cond(ToPid, NotifyFun, BpName).
 
+%% @doc Wrapper for get_notified_by_message/6
+get_notified_by_message(FromId, ToIds, MessageType) ->
+    get_notified_by_message(self(), FromId, ToIds, MessageType).
+    
+get_notified_by_message(PidToNotify, FromId, ToIds, MessageType) when is_list(ToIds) ->
+    [get_notified_by_message(PidToNotify, FromId, ToId, MessageType) || ToId <- ToIds],
+    ok;
+get_notified_by_message(PidToNotify, FromId, ToId, MessageType) ->
+    get_notified_by_message(PidToNotify, FromId, kv_db, ToId, dht_node, MessageType).
+
+wait_until_notification(NotificationCount) ->
+    [receive {message_received} -> ok end || _ <- lists:seq(1, NotificationCount)].
+
 notify_fun(PidToNotify, FromPid, ToPid, _ToType=dht_node, MessageType, BpName) ->
     fun(Msg, _State) ->
         case Msg of
@@ -578,10 +591,24 @@ prbr_w_rounds() ->
 flush_slow_link({_BPName, LoopPid, _Node}) ->
     comm:send_local(LoopPid, {flush}).
 
+
 %% @doc Stops slowing messages down and flushes message queue.
+remove_slow_link([]) -> ok;
+remove_slow_link(LinkList) when is_list(LinkList) ->
+    [remove_slow_link(Link) || Link <- LinkList],
+    ok;
 remove_slow_link({BPName, LoopPid, Node}) ->
     gen_component:bp_del(Node, BPName),
     comm:send_local(LoopPid, {flush_and_stop}).
+
+
+%% @doc Wrappers for slow_link/5.
+slow_link(FromNodeId, ToNodeIds) -> slow_link(FromNodeId, ToNodeIds, always_slow).
+
+slow_link(FromNodeId, ToNodeIds, FastUntilMessageType) when is_list(ToNodeIds) ->
+    [slow_link(FromNodeId, To, FastUntilMessageType) || To <- ToNodeIds];
+slow_link(FromNodeId, ToNodeId, FastUntilMessageType) ->
+    slow_link(FromNodeId, kv_db, ToNodeId, dht_node, FastUntilMessageType).
 
 %% @doc See slow_link/5. But link is slow from the beginning.
 slow_link(From, FromType, To, ToType) ->
