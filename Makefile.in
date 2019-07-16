@@ -1,5 +1,5 @@
 
-# Copyright 2007-2019 Zuse Institute Berlin
+# Copyright 2007-2018 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ PYTHON2=@PYTHON2@
 PYTHON3=@PYTHON3@
 PYTHON3_2TO3=@PYTHON3_2TO3@
 VERSION=@PACKAGE_VERSION@
-OTP_ERLANG_VERSION=22.0
+OTP_ERLANG_VERSION=1.6.1
 COMMONS_CLI_VERSION=1.2
 
 SESSIONKEY:=$(shell cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 32 | head -n 1)

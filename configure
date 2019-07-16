@@ -10003,10 +10003,9 @@ fi
 
 ###########################################################
 #
-# check for socket:open/2 since 22.0
+# check for socket:open/2
 #
 ###########################################################
-# https://github.com/erlang/otp/commit/3ca71520bfb664f0ea809ffdf41505936e4d5e90
 SOCKET_OPEN=false
 socket_open=`"${ERL}" -noshell -eval 'code:ensure_loaded(socket),io:format("~p~n", [erlang:function_exported(socket,open,2)]), erlang:halt().' | tail -1`
 if test "${socket_open}" = "true"; then :
@@ -10020,6 +10019,7 @@ else
   { $as_echo "$as_me:${as_lineno-$LINENO}: socket:open() is not available" >&5
 $as_echo "$as_me: socket:open() is not available" >&6;}
 fi
+
 
 ###########################################################
 #

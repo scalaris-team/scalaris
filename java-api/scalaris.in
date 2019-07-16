@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#  Copyright 2007-2019 Zuse Institute Berlin
+#  Copyright 2007-2011 Zuse Institute Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 # inspired by the start script of ant
 
-OTP_VERSION=22.0
+OTP_VERSION=1.6.1
 JAKARTA_COMMONS_VERSION=1.2
 ERL=@ERL@
 
