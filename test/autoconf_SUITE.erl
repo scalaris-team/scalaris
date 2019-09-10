@@ -22,7 +22,7 @@
 
 -include_lib("unittest.hrl").
 
-%% todo: add have_persistent_term_get and have_counters_get
+%% todo: add have_persistent_term_get, have_counters_get, and have_atomics_new
 
 all() ->
     [test_have_crypto_randuniform_support,

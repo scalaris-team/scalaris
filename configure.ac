@@ -680,6 +680,22 @@ AS_IF([test "${counters_get}" = "true"],
 
 ###########################################################
 #
+# check for atomics:new/2 since 21.2.
+#
+###########################################################
+# https://github.com/erlang/otp/commit/1315c6457e49595fdd3f91693c0506964416c9f0
+ATOMICS_NEW=false
+atomics_new=`"${ERL}" -noshell -eval 'code:ensure_loaded(atomics),io:format("~p~n", [[erlang:function_exported(atomics,new,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${atomics_new}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_atomics_new}"
+       EDOCMACROS="${EDOCMACROS}, {have_atomics_new, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_atomics_new"
+       ATOMICS_NEW=true
+       AC_MSG_NOTICE([atomics:new/2 is available])],
+      [AC_MSG_NOTICE([atomics:new/2 is not available])])
+
+###########################################################
+#
 # all defines together...
 #
 ###########################################################
