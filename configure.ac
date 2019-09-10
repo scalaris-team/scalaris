@@ -642,9 +642,41 @@ AS_IF([test "${socket_open}" = "true"],
       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_socket_open}"
        EDOCMACROS="${EDOCMACROS}, {have_socket_open, true}"
        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_socket_open"
-       SSL_HANDSHAKE=true
-       AC_MSG_NOTICE([socket:open() is available])],
-      [AC_MSG_NOTICE([socket:open() is not available])])
+       SOCKET_OPEN=true
+       AC_MSG_NOTICE([socket:open/2 is available])],
+      [AC_MSG_NOTICE([socket:open/2 is not available])])
+
+###########################################################
+#
+# check for persistent_term:get/2 since 21.2.
+#
+###########################################################
+# https://github.com/erlang/otp/commit/805748eb668d5562fe17f3172cdae07a86166c3f
+PERSISTENT_TERM_GET=false
+persistent_term_get=`"${ERL}" -noshell -eval 'code:ensure_loaded(persistent_term),io:format("~p~n", [[erlang:function_exported(persistent_term,get,1)]]), erlang:halt().' | tail -1`
+AS_IF([test "${persistent_term_get}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_persistent_term_get}"
+       EDOCMACROS="${EDOCMACROS}, {have_persistent_term_get, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_persistent_term_get"
+       PERSISTENT_TERM_GET=true
+       AC_MSG_NOTICE([persistent_term:get/2 is available])],
+      [AC_MSG_NOTICE([persistent_term:get/2 is not available])])
+
+###########################################################
+#
+# check for counters:get/2 since 21.2.
+#
+###########################################################
+# https://github.com/erlang/otp/commit/fefb5d039e87ff7137e78b3d5f2eaf01e498ec4d
+COUNTERS_GET=false
+counters_get=`"${ERL}" -noshell -eval 'code:ensure_loaded(counters),io:format("~p~n", [[erlang:function_exported(counters,get,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${counters_get}" = "true"],
+      [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_counters_get}"
+       EDOCMACROS="${EDOCMACROS}, {have_counters_get, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_counters_get"
+       COUNTERS_GET=true
+       AC_MSG_NOTICE([counters:get/2 is available])],
+      [AC_MSG_NOTICE([counters:get/2 is not available])])
 
 ###########################################################
 #

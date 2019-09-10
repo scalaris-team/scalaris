@@ -22,6 +22,8 @@
 
 -include_lib("unittest.hrl").
 
+%% todo: add have_persistent_term_get and have_counters_get
+
 all() ->
     [test_have_crypto_randuniform_support,
      test_with_crypto_hash,
