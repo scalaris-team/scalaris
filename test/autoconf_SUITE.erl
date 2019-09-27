@@ -41,7 +41,7 @@
 all() ->
     [test_has_maps_get_2,
      test_has_mnesia_sync_log_0,
-     test_has_cerl_sets_0,
+     test_has_cerl_sets_new_0,
      test_has_maps_take_2,
      test_has_maps_iterator_1,
      test_has_maps_next_1,
@@ -83,6 +83,9 @@ otp_rel() ->
 % maps:get/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/erlang/otp/commit/c3a45ed9ae4f84018a63df18666d0752beb8458a
+% stdlib: Add Map module
 
 % maps:get/2, OTP-17
 has_maps_get_2() ->
@@ -132,12 +135,15 @@ test_has_mnesia_sync_log_0(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% https://github.com/erlang/otp/commit/c957cb3887aaadffa75b5bb70f12e79edc841396
+% compiler: Add cerl_sets module
+
 % cerl_sets:new/0, OTP-18
 has_cerl_sets_new_0() ->
     code:ensure_loaded(cerl_sets),
     erlang:function_exported(cerl_sets, new, 0).
 
-test_has_cerl_sets_0(_Config) ->
+test_has_cerl_sets_new_0(_Config) ->
     FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
                      "R16B01", "R16B02", "R16B03-1", "17"],
     TrueReleases = ["18", "19", "20", "21", "22", "23"],
@@ -156,6 +162,7 @@ test_has_cerl_sets_0(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % https://github.com/erlang/otp/commit/65bd8ade865eebe0d8a3c3210a4e2e9f334e229f
+% erts: Add BIF maps:take/2
 
 % maps:take/2, OTP-19
 has_maps_take_2() ->
@@ -180,6 +187,9 @@ test_has_maps_take_2(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% https://github.com/erlang/otp/commit/0149a73d15df1f80cb46752ec3829f48c38dd230
+% erts: Implement maps path iterator
+
 % maps:iterator/1, OTP-21
 has_maps_iterator_1() ->
     code:ensure_loaded(maps),
@@ -203,6 +213,9 @@ test_has_maps_iterator_1(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% https://github.com/erlang/otp/commit/d945d6f1c71d5442a25e4be60f84fc49ae8b6b4e
+% stdlib: Introduce maps iterator API
+
 % maps:next/1, OTP-21
 has_maps_next_1() ->
     code:ensure_loaded(maps),
@@ -225,6 +238,9 @@ test_has_maps_next_1(_Config) ->
 % logger:add_handler/3
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/erlang/otp/commit/0deea4a8f369013ec00e231d0c2c37e4ab3f0ba1
+% Add logger
 
 % logger:add_handler/3, OTP-21
 has_logger_add_handler_3() ->
@@ -478,6 +494,9 @@ test_have_callback_support(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% https://github.com/erlang/otp/commit/3ca71520bfb664f0ea809ffdf41505936e4d5e90
+% [socket-nif] preliminary version of the new socket interface (nififying)
+
 -ifdef(have_socket_open).
 test_have_socket_open(_Config) ->
     Releases = ["22", "23"],
@@ -496,6 +515,9 @@ test_have_socket_open(_Config) ->
 % have_persistent_term_get
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/erlang/otp/commit/805748eb668d5562fe17f3172cdae07a86166c3f
+% Add a persistent term storage
 
 %% OTP 21.2
 
@@ -518,6 +540,9 @@ test_have_persistent_term_get(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% https://github.com/erlang/otp/commit/fefb5d039e87ff7137e78b3d5f2eaf01e498ec4d
+% erts: Add new module 'counters'
+
 %% OTP 21.2
 
 -ifdef(have_counters_get).
@@ -539,6 +564,9 @@ test_have_counters_get(_Config) ->
 % have_atomics_new
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/erlang/otp/commit/1315c6457e49595fdd3f91693c0506964416c9f0
+% erts: Add new module 'atomics'
 
 %% OTP 21.2
 
