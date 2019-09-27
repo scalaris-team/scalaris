@@ -40,6 +40,7 @@
 
 all() ->
     [test_has_maps_get_2,
+     test_has_mnesia_sync_log_0,
      test_has_cerl_sets_0,
      test_has_maps_take_2,
      test_has_maps_iterator_1,
@@ -93,6 +94,31 @@ test_has_maps_get_2(_Config) ->
                      "R16B01", "R16B02", "R16B03-1"],
     TrueReleases = ["17", "18", "19", "20", "21", "22", "23"],
     case has_maps_get_2() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% mnesia:sync_log/0
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/scalaris-team/scalaris/commit/659eb6e44d82d4fbcba133b31ca7a372daf9bfc4
+
+% mnesia:sync_log/0, OTP-17
+has_mnesia_sync_log_0() ->
+    code:ensure_loaded(mnesia),
+    erlang:function_exported(mnesia, sync_log, 0).
+
+test_has_mnesia_sync_log_0(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1"],
+    TrueReleases = ["17", "18", "19", "20", "21", "22", "23"],
+    case has_mnesia_sync_log_0() of
         true ->
             ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
         false ->
