@@ -15,6 +15,22 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Unit tests for autoconf
 %% @end
+
+
+%% |----------+------------|
+%% | Erlang   |    Release |
+%% |----------+------------|
+%% | R14B04   | 2011-10-04 |
+%% | R15B     | 2011-12-14 |
+%% | R16A     | 2013-01-29 |
+%% | OTP 17.0 | 2014-04-07 |
+%% | OTP 18.0 | 2015-06-24 |
+%% | OTP 19.0 | 2016-06-21 |
+%% | OTP 20.0 | 2017-06-21 |
+%% | OTP 21.0 | 2018-06-19 |
+%% | OTP 22.0 | 2019-05-14 |
+%% |----------+------------|
+
 -module(autoconf_SUITE).
 -author('schuett@zib.de').
 
@@ -22,10 +38,13 @@
 
 -include_lib("unittest.hrl").
 
-%% todo: add have_persistent_term_get, have_counters_get, and have_atomics_new
-
 all() ->
-    [test_have_crypto_randuniform_support,
+    [test_has_maps_get_2,
+     test_has_cerl_sets_0,
+     test_has_maps_iterator_1,
+     test_has_maps_next_1,
+     test_has_logger_add_handler_3,
+     test_have_crypto_randuniform_support,
      test_with_crypto_hash,
      test_with_crypto_bytes_to_integer,
      test_with_maps,
@@ -37,9 +56,11 @@ all() ->
      test_HAVE_ERLANG_NOW,
      test_have_ctline_support,
      test_have_callback_support,
-     test_have_socket_open
+     test_have_socket_open,
+     test_have_persistent_term_get,
+     test_have_counters_get,
+     test_have_atomics_new
      ].
-
 
 suite() ->
     [
@@ -54,6 +75,121 @@ end_per_suite(_Config) ->
 
 otp_rel() ->
     erlang:system_info(otp_release).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% maps:get/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% maps:get/2, OTP-17
+has_maps_get_2() ->
+    code:ensure_loaded(maps),
+    erlang:function_exported(maps, get, 2).
+
+test_has_maps_get_2(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1"],
+    TrueReleases = ["17", "18", "19", "20", "21", "22", "23"],
+    case has_maps_get_2() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% cerl_sets:new/0
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% cerl_sets:new/0, OTP-18
+has_cerl_sets_new_0() ->
+    code:ensure_loaded(cerl_sets),
+    erlang:function_exported(cerl_sets, new, 0).
+
+test_has_cerl_sets_0(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1", "17"],
+    TrueReleases = ["18", "19", "20", "21", "22", "23"],
+    case has_cerl_sets_new_0() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% maps:iterator/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% maps:iterator/1, OTP-21
+has_maps_iterator_1() ->
+    code:ensure_loaded(maps),
+    erlang:function_exported(maps, iterator, 1).
+
+test_has_maps_iterator_1(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1", "17", "18", "19", "20"],
+    TrueReleases = ["21", "22", "23"],
+    case has_maps_iterator_1() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% maps:next/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% maps:next/1, OTP-21
+has_maps_next_1() ->
+    code:ensure_loaded(maps),
+    erlang:function_exported(maps, next, 1).
+
+test_has_maps_next_1(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1", "17", "18", "19", "20"],
+    TrueReleases = ["21", "22", "23"],
+    case has_maps_next_1() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% logger:add_handler/3
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% logger:add_handler/3, OTP-21
+has_logger_add_handler_3() ->
+    code:ensure_loaded(logger),
+    erlang:function_exported(logger, add_handler, 3).
+
+test_has_logger_add_handler_3(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1", "17", "18", "19", "20"],
+    TrueReleases = ["21", "22", "23"],
+    case has_logger_add_handler_3() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -297,6 +433,70 @@ test_have_socket_open(_Config) ->
     ok.
 -else.
 test_have_socket_open(_Config) ->
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
+                "R16B02", "R16B03-1", "17", "18", "19", "20", "21"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_persistent_term_get
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% OTP 21.2
+
+-ifdef(have_persistent_term_get).
+test_have_persistent_term_get(_Config) ->
+    Releases = ["22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-else.
+test_have_persistent_term_get(_Config) ->
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
+                "R16B02", "R16B03-1", "17", "18", "19", "20", "21"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_counters_get
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% OTP 21.2
+
+-ifdef(have_counters_get).
+test_have_counters_get(_Config) ->
+    Releases = ["22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-else.
+test_have_counters_get(_Config) ->
+    Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
+                "R16B02", "R16B03-1", "17", "18", "19", "20", "21"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-endif.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% have_atomics_new
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% OTP 21.2
+
+-ifdef(have_atomics_new).
+test_have_atomics_new(_Config) ->
+    Releases = ["22", "23"],
+    ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
+    ok.
+-else.
+test_have_atomics_new(_Config) ->
     Releases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B", "R16B01",
                 "R16B02", "R16B03-1", "17", "18", "19", "20", "21"],
     ?assert_w_note(lists:member(otp_rel(), Releases), otp_rel()),
