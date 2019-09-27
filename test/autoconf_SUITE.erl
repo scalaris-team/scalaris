@@ -41,6 +41,7 @@
 all() ->
     [test_has_maps_get_2,
      test_has_cerl_sets_0,
+     test_has_maps_take_2,
      test_has_maps_iterator_1,
      test_has_maps_next_1,
      test_has_logger_add_handler_3,
@@ -115,6 +116,31 @@ test_has_cerl_sets_0(_Config) ->
                      "R16B01", "R16B02", "R16B03-1", "17"],
     TrueReleases = ["18", "19", "20", "21", "22", "23"],
     case has_cerl_sets_new_0() of
+        true ->
+            ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
+        false ->
+            ?assert_w_note(lists:member(otp_rel(), FalseReleases), otp_rel())
+    end,
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% maps:take/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% https://github.com/erlang/otp/commit/65bd8ade865eebe0d8a3c3210a4e2e9f334e229f
+
+% maps:take/2, OTP-19
+has_maps_take_2() ->
+    code:ensure_loaded(maps),
+    erlang:function_exported(maps, take, 2).
+
+test_has_maps_take_2(_Config) ->
+    FalseReleases = ["R14B04", "R15B", "R15B01", "R15B02", "R15B03", "R16B",
+                     "R16B01", "R16B02", "R16B03-1", "17", "18"],
+    TrueReleases = ["19", "20", "21", "22", "23"],
+    case has_maps_take_2() of
         true ->
             ?assert_w_note(lists:member(otp_rel(), TrueReleases), otp_rel());
         false ->
