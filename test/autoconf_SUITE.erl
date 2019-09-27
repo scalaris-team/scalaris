@@ -84,8 +84,8 @@ otp_rel() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% https://github.com/erlang/otp/commit/c3a45ed9ae4f84018a63df18666d0752beb8458a
-% stdlib: Add Map module
+% https://github.com/erlang/otp/commit/6fdad74f41803089a0f9026c98f319daecda9a50
+% erts,stdlib: Change map module name to maps
 
 % maps:get/2, OTP-17
 has_maps_get_2() ->
