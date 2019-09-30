@@ -1,4 +1,4 @@
-%% @copyright 2013-2018 Zuse Institute Berlin
+%% @copyright 2013-2019 Zuse Institute Berlin
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -539,7 +539,7 @@ get_notified_by_message(PidToNotify, FromId, ToId, MessageType) ->
     get_notified_by_message(PidToNotify, FromId, kv_db, ToId, dht_node, MessageType).
 
 wait_until_notification(NotificationCount) ->
-    [receive {message_received} -> ok end || _ <- lists:seq(1, NotificationCount)].
+    _ = [receive {message_received} -> ok end || _ <- lists:seq(1, NotificationCount)].
 
 notify_fun(PidToNotify, FromPid, ToPid, _ToType=dht_node, MessageType, BpName) ->
     fun(Msg, _State) ->
