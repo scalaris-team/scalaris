@@ -89,7 +89,7 @@ otp_rel() ->
 
 % maps:get/2, OTP-17
 has_maps_get_2() ->
-    code:ensure_loaded(maps),
+    _ = code:ensure_loaded(maps),
     erlang:function_exported(maps, get, 2).
 
 test_has_maps_get_2(_Config) ->
@@ -114,7 +114,7 @@ test_has_maps_get_2(_Config) ->
 
 % mnesia:sync_log/0, OTP-17
 has_mnesia_sync_log_0() ->
-    code:ensure_loaded(mnesia),
+    _ = code:ensure_loaded(mnesia),
     erlang:function_exported(mnesia, sync_log, 0).
 
 test_has_mnesia_sync_log_0(_Config) ->
@@ -140,7 +140,7 @@ test_has_mnesia_sync_log_0(_Config) ->
 
 % cerl_sets:new/0, OTP-18
 has_cerl_sets_new_0() ->
-    code:ensure_loaded(cerl_sets),
+    _ = code:ensure_loaded(cerl_sets),
     erlang:function_exported(cerl_sets, new, 0).
 
 test_has_cerl_sets_new_0(_Config) ->
@@ -166,7 +166,7 @@ test_has_cerl_sets_new_0(_Config) ->
 
 % maps:take/2, OTP-19
 has_maps_take_2() ->
-    code:ensure_loaded(maps),
+    _ = code:ensure_loaded(maps),
     erlang:function_exported(maps, take, 2).
 
 test_has_maps_take_2(_Config) ->
@@ -192,7 +192,7 @@ test_has_maps_take_2(_Config) ->
 
 % maps:iterator/1, OTP-21
 has_maps_iterator_1() ->
-    code:ensure_loaded(maps),
+    _ = code:ensure_loaded(maps),
     erlang:function_exported(maps, iterator, 1).
 
 test_has_maps_iterator_1(_Config) ->
@@ -218,7 +218,7 @@ test_has_maps_iterator_1(_Config) ->
 
 % maps:next/1, OTP-21
 has_maps_next_1() ->
-    code:ensure_loaded(maps),
+    _ = code:ensure_loaded(maps),
     erlang:function_exported(maps, next, 1).
 
 test_has_maps_next_1(_Config) ->
@@ -244,7 +244,7 @@ test_has_maps_next_1(_Config) ->
 
 % logger:add_handler/3, OTP-21
 has_logger_add_handler_3() ->
-    code:ensure_loaded(logger),
+    _ = code:ensure_loaded(logger),
     erlang:function_exported(logger, add_handler, 3).
 
 test_has_logger_add_handler_3(_Config) ->
