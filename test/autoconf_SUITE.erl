@@ -78,6 +78,13 @@ end_per_suite(_Config) ->
 otp_rel() ->
     erlang:system_info(otp_release).
 
+otp_rel_long() ->
+   Name = filename:join([code:root_dir(), "releases",
+                         erlang:system_info(otp_release), "OTP_VERSION"]),
+   {ok, IO} = file:open(Name, read),
+   {ok, VSN} = file:read_line(IO),
+   string:strip(VSN, right, $\n).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % maps:get/2
