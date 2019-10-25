@@ -81,7 +81,7 @@ otp_rel() ->
 otp_rel_long() ->
    Name = filename:join([code:root_dir(), "releases",
                          erlang:system_info(otp_release), "OTP_VERSION"]),
-    case file:open(Name, read) of
+    case file:open(Name, [read]) of
         {ok, IO} ->
             {ok, VSN} = file:read_line(IO),
             string:strip(VSN, right, $\n);
