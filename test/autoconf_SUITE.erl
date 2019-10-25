@@ -85,7 +85,7 @@ otp_rel_long() ->
         {ok, IO} ->
             {ok, VSN} = file:read_line(IO),
             string:strip(VSN, right, $\n);
-        {'error', _Reason} ->
+        {error, _Reason} ->
             "unknown"
 end.
 
