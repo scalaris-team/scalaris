@@ -73,7 +73,7 @@ test_link_slowing(_Config) ->
                             [["TestWrite"]]]),
 
     remove_slow_link(Link),
-    wait_until_notification(1),
+    _= wait_until_notification(1),
 
     %% all replicas should have received the written value
     ?equals(prbr_values(), [[["TestWrite"]],
@@ -88,7 +88,7 @@ test_link_slowing2(_Config) ->
 
     get_notified_by_message(2, [1,2,3,4], write),
     {ok, _} = write_via_node(2, "1", filter_list_append(), "TestWrite"),
-    wait_until_notification(4),
+    _= wait_until_notification(4),
 
     %% all replicas should have received the written value
     ?equals(prbr_values(), [[["TestWrite"]],
@@ -115,7 +115,7 @@ test_interleaving(_Config) ->
     get_notified_by_message(1, 1, write),
     _ = slow_link(1, [2,3,4], write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    wait_until_notification(4),
+    _= wait_until_notification(4),
 
     %% read of client B
     _LinkB = slow_link(2, 1),
