@@ -126,7 +126,7 @@ test_interleaving(_Config) ->
     LinkC = slow_link(3, 1),
     {ok, _} = write_via_node(3, Key, filter_list_append(), "WriteB"),
     remove_slow_link(LinkC),
-    wait_until_notification(1),
+    _ = wait_until_notification(1),
 
     ct:pal("PRBR state after interleaved operations: ~n~p", [prbr_data()]),
     %% Test that there aren't two different values
@@ -149,7 +149,7 @@ test_interleaving(_Config) ->
     LinkD = slow_link(4, 4),
     {ok, _} = read_via_node(4, Key, element(1, filter_list_append())),
     remove_slow_link(LinkD),
-    wait_until_notification(1),
+    _ = wait_until_notification(1),
 
     ct:pal("PRBR state after inconsistent read: ~n~p", [prbr_data()]),
     PrbrData2 = prbr_values(),
@@ -178,7 +178,7 @@ test_write_once_1(_Config) ->
           end),
 
     % wait until A has written the two remaining replicas
-    wait_until_notification(2),
+    _ = wait_until_notification(2),
 
     % write B should now trigger a write through which should finish write A
     % once write B retries, a notification should be sent to write A
@@ -211,7 +211,7 @@ test_write_once_2(_Config) ->
     get_notified_by_message(1, [1,2,3,4], round_request),
     _ = slow_link(1, [1,2,3], write),
     spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    wait_until_notification(5),
+    _ = wait_until_notification(5),
 
     print_prbr_data(),
     ct:pal("write A done"),
@@ -229,17 +229,17 @@ test_write_once_2(_Config) ->
             write_via_node(2, Key, filter_list_append(), "WriteB"),
             TestPid ! {write_b_done}
           end),
-    wait_until_notification(5),
+    _ = wait_until_notification(5),
     print_prbr_data(),
 
     ct:pal("flush slow link 4"),
     flush_slow_link(SlowLinksB1),
-    wait_until_notification(3),
+    _ = wait_until_notification(3),
     print_prbr_data(),
 
     ct:pal("flush slow link 3"),
     flush_slow_link(SlowLinksB3),
-    wait_until_notification(2),
+    _ = wait_until_notification(2),
     print_prbr_data(),
 
     %% Write C: observer consistent quorum from repliica 1 to 3
@@ -248,7 +248,7 @@ test_write_once_2(_Config) ->
     SlowLinkC = slow_link(3, 4, round_request),
     _ = write_via_node(3, Key, filter_list_append(), "WriteC"),
     remove_slow_link(SlowLinkC),
-    wait_until_notification(4),
+    _ = wait_until_notification(4),
     ct:pal("write C done"),
     print_prbr_data(),
 
@@ -286,7 +286,7 @@ test_write_once_3(_Config) ->
     get_notified_by_message(1, 4, write),
     _ = slow_link(1, [1,2,3], write),
     spawn(fun() -> _ = write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    wait_until_notification(5),
+    _ = wait_until_notification(5),
 
     print_prbr_data(),
     ct:pal("write A done"),
@@ -304,17 +304,17 @@ test_write_once_3(_Config) ->
             write_via_node(2, Key, filter_list_append(), "WriteB"),
             TestPid ! {write_b_done}
           end),
-    wait_until_notification(5),
+    _ = wait_until_notification(5),
     print_prbr_data(),
 
     ct:pal("flush slow link 4"),
     flush_slow_link(SlowLinksB1),
-    wait_until_notification(3),
+    _ = wait_until_notification(3),
     print_prbr_data(),
 
     ct:pal("flush slow link 3"),
     flush_slow_link(SlowLinksB3),
-    wait_until_notification(2),
+    _ = wait_until_notification(2),
     print_prbr_data(),
 
     %% Write B: should not be able to retry as it gets notified earlier
@@ -350,7 +350,7 @@ test_read_retry_returns_older(_Config) ->
     get_notified_by_message(1, 1, write),
     _ = slow_link(1, [2, 3, 4], write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    wait_until_notification(1),
+    _ = wait_until_notification(1),
     print_prbr_data(),
 
     %% Execute read B
@@ -363,7 +363,7 @@ test_read_retry_returns_older(_Config) ->
             TestPid ! {read_req_done, Value}
         end),
     % message_received -> internally seen inconsistent quorum and moved to read stage
-    wait_until_notification(1),
+    _ = wait_until_notification(1),
     print_prbr_data(),
     %% deliver slow messages from replica 4
     ct:pal("remove slow link"),
@@ -395,7 +395,7 @@ test_read_retry_returns_newer(_Config) ->
     get_notified_by_message(1, [1,2,3], write),
     _ = slow_link(1, 4, write),
     spawn(fun() -> write_via_node(1, Key, filter_list_append(), "WriteA") end),
-    wait_until_notification(3),
+    _ = wait_until_notification(3),
     print_prbr_data(),
 
     %% Execute read B
@@ -409,7 +409,7 @@ test_read_retry_returns_newer(_Config) ->
         end),
 
     % message_received -> internally seen inconsistent quorum and moved to read stage
-    wait_until_notification(1),
+    _ = wait_until_notification(1),
     print_prbr_data(),
 
     %% deliver slow messages from replica 1
@@ -431,13 +431,13 @@ test_read_write_commuting(_Config) ->
     %% triggered.
     Key = "123",
 
-    % write baseline 
+    % write baseline
     get_notified_by_message(1, [1,2,3,4], write),
     _ = write_via_node(1, Key, {fun prbr:noop_read_filter/1,
                                 fun ?MODULE:cc_noop/3,
                                 fun prbr:noop_write_filter/3},
                        {"A", "B"}),
-    wait_until_notification(4),
+    _ = wait_until_notification(4),
 
     _ = slow_link(1, 4, write),
     _ = write_via_node(1, Key, {fun ?MODULE:rf_second/1,

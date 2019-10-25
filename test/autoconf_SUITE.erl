@@ -81,9 +81,13 @@ otp_rel() ->
 otp_rel_long() ->
    Name = filename:join([code:root_dir(), "releases",
                          erlang:system_info(otp_release), "OTP_VERSION"]),
-   {ok, IO} = file:open(Name, read),
-   {ok, VSN} = file:read_line(IO),
-   string:strip(VSN, right, $\n).
+    case file:open(Name, read) of
+        {ok, IO} ->
+            {ok, VSN} = file:read_line(IO),
+            string:strip(VSN, right, $\n);
+        {'error', _Reason} ->
+            "unknown"
+end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
