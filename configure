@@ -7175,6 +7175,8 @@ if test -f /usr/local/bin/bash; then
   CXXSHELL=/usr/local/bin/bash
 elif test -f /bin/bash; then
   CXXSHELL=/bin/bash
+elif test -f /bin/zsh; then
+  CXXSHELL=/bin/zsh
 fi
 
 # Extract the first word of "clang-format", so it can be a program name with args.

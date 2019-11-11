@@ -86,6 +86,8 @@ if test -f /usr/local/bin/bash; then
   CXXSHELL=/usr/local/bin/bash
 elif test -f /bin/bash; then
   CXXSHELL=/bin/bash
+elif test -f /bin/zsh; then
+  CXXSHELL=/bin/zsh
 fi
 
 AC_PATH_PROG(CLANGFORMAT, clang-format, $ac_cv_path_TRUE)
