@@ -39,7 +39,6 @@ namespace scalaris {
     bool hasToConnect = true;
 
   public:
-    TCPConnection() = default;
 
     /**
      * creates a connection instance
