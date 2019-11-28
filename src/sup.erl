@@ -66,29 +66,31 @@
 -spec sup_start(sup_name(), module(), term()) -> startlink_ret().
 sup_start(Supervisor, Module, Options) ->
     InitialPrefix = "+",
-    sup_start([InitialPrefix], Supervisor, Module, Options).
+    Ret = sup_start([InitialPrefix], Supervisor, Module, Options),
+    progress("~n"),
+    Ret.
 
 -spec sup_start(prefix(),
                 sup_name() | no_name, module(), term())
                -> startlink_ret().
 sup_start(Prefix, Supervisor, Module, Options) ->
-    progress(Prefix ++ "~p ~p.erl~n", [Supervisor, Module]),
+    progress(Prefix ++ "~.0p ~.0p.erl~n", [Supervisor, Module]),
     SupSpec = trycall(Prefix, Module, supspec, Options, unknown_supspec),
     Res = case Supervisor of
               no_name -> supervisor:start_link(Module, Options);
               _ -> supervisor:start_link(Supervisor, Module, Options)
           end,
-    progress(Prefix ++ "~p done~n", [Supervisor]),
+    progress(Prefix ++ "~.0p done~n", [Supervisor]),
     case Res of
         {ok, SupRef} ->
-            progress(Prefix ++ "`-~p ~p~n", [SupSpec, SupRef]),
+            progress(Prefix ++ "`-~.0p ~.0p", [SupSpec, SupRef]),
             Childs = trycall(Prefix, Module, childs, Options, []),
             ChildPrefix = last_prefix_to_space(Prefix),
             ChildsRes = add_childs(ChildPrefix ++ ["  +-"], SupRef, Childs),
             if is_tuple(ChildsRes) andalso element(1, ChildsRes) =:= ok ->
                    Res; %% return pid of supervisor as it may be linked to externally;
                true ->
-                   io:format("Startup raised ~p.~n", [ChildsRes]),
+                   io:format("Startup raised ~.0p.~n", [ChildsRes]),
                    sup_terminate(SupRef),
                    ChildsRes
             end;
@@ -102,7 +104,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
                          supervisor:child_spec())
                -> supervisor:startchild_ret().
 start_sup_as_child(Prefix, AtSup, SupAsChild) ->
-    progress(Prefix ++ "supervisor ~.0p ~.0p~n",
+    progress(Prefix ++ "supervisor ~.0p ~.0p",
              [element(1, SupAsChild), element(2, SupAsChild)]),
     Module = element(1, element(2, SupAsChild)),
     Args = element(3, element(2, SupAsChild)),
@@ -122,19 +124,19 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
             SupRef = element(2, X),
             case SupSpec of
                 unknown_supspec ->
-                    progress(PipePrefix ++ "started childs at ~p:~n",
+                    progress(PipePrefix ++ "started childs at ~.0p:~n",
                              [SupRef]),
                     show_started_childs(PipePrefix ++ ["+-"], SupRef),
                     Res;
                 _ ->
                     progress(PipePrefix
-                             ++ "~.0p ~.0p~n", [SupSpec, SupRef]),
+                             ++ "~.0p ~.0p", [SupSpec, SupRef]),
                     Childs = trycall(PipePrefix, Module, childs, Args, []),
                     ChildsRes = add_childs(PipePrefix ++ ["+-"], SupRef, Childs),
                     if is_tuple(ChildsRes) andalso element(1, ChildsRes) =:= ok ->
                            Res; %% return pid of supervisor as it may be linked to externally;
                        true ->
-                           io:format("Startup raised ~p.~n", [ChildsRes]),
+                           io:format("Startup raised ~.0p.~n", [ChildsRes]),
                            SupName = element(1, SupAsChild),
                            sup_terminate_childs(SupRef),
                            _ = supervisor:terminate_child(AtSup, SupName),
@@ -143,7 +145,7 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                     end
                end;
         Error ->
-            progress(Prefix ++ " ~p~n", [Error]),
+            progress(Prefix ++ " ~.0p~n", [Error]),
             Error
     end.
 
@@ -151,10 +153,10 @@ trycall(Prefix, Module, Func, Args, DefaultReturnValue) ->
     try Module:Func(Args)
     catch error:undef ->
             FlatPrefix = lists:flatten(Prefix),
-            progress(FlatPrefix ++ "~p provides no ~p/1 function. Fall back to normal supervisor startup here.~n", [Module, Func]),
+            progress(FlatPrefix ++ "~.0p provides no ~.0p/1 function. Fall back to normal supervisor startup here.", [Module, Func]),
             DefaultReturnValue;
           X:Y ->
-            io:format("~p:~p failed with ~p:~p ~p~n",
+            io:format("~.0p:~.0p failed with ~.0p:~.0p ~.0p~n",
                       [Module, Func, X, Y, util:get_stacktrace()]),
             DefaultReturnValue
     end.
@@ -182,13 +184,13 @@ add_child(Prefix, SupRef, Child) ->
             Res = supervisor:start_child(SupRef, Child),
             _ = case Res of
                 {ok, undefined} ->
-                    progress("not started~n");
-                {ok, Pid} -> progress("~p.~n", [Pid]);
+                    progress("not started");
+                {ok, Pid} -> progress("~.0p.", [Pid]);
                 {ok, Pid, GroupInfo} ->
                         progress("~.0p ~.0p.", [Pid, GroupInfo]);
                 Error ->
-                    progress("~nFailed to start ~p reason ~p~n", [Child, Error]),
-                    progress("Supervisor ~p has childs: ~p~n",
+                    progress("~nFailed to start ~.0p reason ~.0p~n", [Child, Error]),
+                    progress("Supervisor ~.0p has childs: ~.0p~n",
                               [SupRef, sup_which_children(SupRef)]),
                     Error
             end,
