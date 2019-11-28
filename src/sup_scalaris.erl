@@ -40,13 +40,15 @@
                                         | term()}.
 start_link() -> start_link([]).
 
-%% called by unittest_helper.erl
+%% called by scalaris.erl and by unittest_helper.erl
 -spec start_link([tuple()])
         -> {ok, Pid::pid()} |
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
     ServiceGroup = basic_services,
-    Pid = spawn(fun() -> timer:sleep(5*1000), dump_processes() end),
+    %% start watching the startup
+    %% (StartupWatcher is killed below when we succeed)
+    StartupWatcher = spawn(fun() -> timer:sleep(5*1000), dump_processes() end),
     Link = sup:sup_start({local, main_sup}, ?MODULE,
                          [{service_group, ServiceGroup} | Options]),
     case Link of
@@ -61,7 +63,8 @@ start_link(Options) ->
                     end
             end,
             add_additional_nodes(),
-            exit(Pid, kill),
+            %% startup successful, stop watching the startup
+            exit(StartupWatcher, kill),
             case util:is_unittest() of
                 true -> ok;
                 _    -> io:format("Scalaris started successfully."
@@ -287,6 +290,7 @@ dump_processes() ->
                   || X <- processes()],
     io:format("~p~n", [lists:last(Processes)]),
     ok.
+
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
