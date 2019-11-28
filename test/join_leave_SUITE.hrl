@@ -1,4 +1,4 @@
-% @copyright 2010-2015 Zuse Institute Berlin
+% @copyright 2010-2019 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -243,6 +243,10 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
     ct:pal("######## waiting for bench finish ########").
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
+prop_join_at(SameId, SameId, _Incremental) ->
+    %% tester chose same id twice, which is not supported by this test
+    %% (join at an existing id), so we skip this case
+    true;
 prop_join_at(FirstId, SecondId, Incremental) ->
     OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2,
@@ -278,8 +282,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
 tester_join_at(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
-    prop_join_at(rt_SUITE:number_to_key(0), rt_SUITE:number_to_key(0), false),
-    tester:test(?MODULE, prop_join_at, 3, 5).
+    tester:test(?MODULE, prop_join_at, _Arity = 3, _Iterations = 5).
 
 -spec reply_to_join_response(Msg::comm:message(), State, Reason::abort | crash | send_error) -> State
         when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).

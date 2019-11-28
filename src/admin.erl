@@ -1,4 +1,4 @@
-% @copyright 2008-2015 Zuse Institute Berlin
+% @copyright 2008-2019 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -52,7 +52,12 @@ add_node_at_id(Id) ->
 
 -spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
-    DhtNodeId = randoms:getRandomString(),
+    DhtNodeId = case lists:keyfind({dht_node, id}, 1, Options) of
+                    %% supervisor Id for a dht_node has to be a string
+                    {{dht_node, id}, Id} when is_integer(Id) -> integer_to_list(Id);
+                    {{dht_node, id}, Id} -> Id;
+                    _ -> randoms:getRandomString()
+                end,
     Group = pid_groups:new(dht_node),
     Desc = sup:supervisor_desc(
              DhtNodeId, sup_dht_node, start_link,
