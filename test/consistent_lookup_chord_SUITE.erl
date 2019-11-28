@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2019 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -67,7 +67,11 @@ test_consistent_send(_Config) ->
     Ev = dht_node_lookup:envelope(3, {unittest_consistent_send, Self, '_'}),
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"),
                                   Ev),
+    ExpectConsistent = case config:read(leases) of
+                           true -> true;
+                           _ -> false
+                       end,
     receive
-        {unittest_consistent_send, Self, false} = Msg ->
+        {unittest_consistent_send, Self, ExpectConsistent} = Msg ->
             ct:pal("message ~p", [Msg])
     end.
