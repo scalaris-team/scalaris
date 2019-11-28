@@ -754,8 +754,13 @@ get_predspred_pred_node_succ(DhtNode) ->
     ?equals_w_note(Node2, Node, wrong_succ_info_in_pred),
 
     % make sure, all pred/succ info is correct:
-    ?equals(admin:check_ring(), ok),
-
+    case admin:check_ring() of
+        ok -> ok;
+        _ ->
+            %% only temporarily wrong?
+            timer:sleep(20),
+            ?equals(admin:check_ring(), ok)
+    end,
     {PredsPred, Pred, Node, Succ}.
 
 -spec set_breakpoint(Pid::pid(), gen_component:bp_name()) -> ok.
