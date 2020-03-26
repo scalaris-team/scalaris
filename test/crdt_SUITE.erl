@@ -38,12 +38,14 @@ all()   -> [
 groups() -> [
         {gcounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
-          crdt_gcounter_inc,
-          crdt_gcounter_read_your_write,
-          crdt_gcounter_read_monotonic,
-          crdt_gcounter_read_monotonic2,
-          crdt_gcounter_concurrent_read_monotonic,
-          crdt_gcounter_ordered_concurrent_read
+            crdt_gcounter_inc,
+            crdt_gcounter_read_your_write,
+            crdt_gcounter_read_monotonic,
+            crdt_gcounter_read_monotonic2,
+            crdt_gcounter_concurrent_read_monotonic,
+            crdt_gcounter_ordered_concurrent_read,
+            crdt_submit_update_command_list,
+            crdt_submit_query_command_list
          ]},
         {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
@@ -91,6 +93,65 @@ init_per_testcase(_TestCase, Config) ->
 
 end_per_testcase(_TestCase, _Config) ->
     ok.
+
+test_wait_freedom(_Config) ->
+    gcounter_on_cseq:inc("1"),
+
+    ct:pal("UPDATER DONE", []),
+
+    gcounter_on_cseq:read("1"),
+
+    ok.
+
+crdt_submit_update_command_list(_Config) ->
+    %% submit a list of update commands
+    Key = randoms:getRandomString(),
+
+    Count = randoms:rand_uniform(1, 1000),
+    ct:pal("Submitting lists of ~p updates", [Count]),
+    UpdateList =
+        [fun(ReplicaId, Crdt) ->
+            gcounter:update_add(ReplicaId, I, Crdt)
+         end || I <- lists:seq(1, Count)],
+    ok = crdt_on_cseq:write(Key, gcounter, UpdateList),
+
+    {ok, Result} = gcounter_on_cseq:read(Key),
+    ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
+    ?equals(Count*(Count+1) div 2, Result).
+
+crdt_submit_query_command_list(_Config) ->
+    %% Check that query ordering is preserverd when submitting a list of
+    %% queries
+    Key = randoms:getRandomString(),
+
+    %% filling counter
+    Count = randoms:rand_uniform(1, 1000),
+    Update = fun(RepId, Crdt) -> gcounter:update_add(RepId, Count, Crdt) end,
+    ok = crdt_on_cseq:write(Key, gcounter, Update),
+
+    %% sanity check
+    {ok, Result} = gcounter_on_cseq:read(Key),
+    ?equals(Count, Result),
+
+    QueryListLength = randoms:rand_uniform(1, 50),
+    QueryList =
+        [case randoms:rand_uniform(1, 10000) rem 2 of
+            0 ->
+                fun crdt:query_noop/1;
+            1 ->
+               fun gcounter:query_counter/1
+        end || _ <- lists:seq(1, QueryListLength)],
+
+    ct:pal("Submitting lists of ~p queries", [QueryListLength]),
+    {ok, Results} = crdt_on_cseq:read(Key, gcounter, QueryList),
+
+    %% check that result matches queries
+    ?equals(QueryListLength, length(Results)),
+    [?equals(Result, lists:sum(lists:flatten([R]))) || R <- Results],
+
+    List = lists:zip(QueryList, Results),
+    [?equals(Q =:= fun crdt:query_noop/1, is_list(R)) || {Q, R} <- List].
+
 
 crdt_gcounter_inc(_Config) ->
     %% start random number of writers

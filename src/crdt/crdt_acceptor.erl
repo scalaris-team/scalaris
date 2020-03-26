@@ -99,7 +99,7 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(tuple(), state()) -> state().
-on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, State) ->
+on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFuns}, State) ->
     ?TRACE("crdt_acceptor:update: ~p ~p ", [Key, Proposer]),
     TableName = tablename(State),
     Entry = get_entry(Key, TableName),
@@ -109,7 +109,11 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, St
     ThisReplicaId = length(Keys) - length(Tmp) + 1,
 
     CVal = entry_val(Entry, DataType),
-    NewCVal = DataType:apply_update(UpdateFun, ThisReplicaId, CVal),
+    NewCVal =
+      lists:foldl(
+        fun(UpdateFun, TmpVal) ->
+          DataType:apply_update(UpdateFun, ThisReplicaId, TmpVal)
+        end, CVal, UpdateFuns),
     ?ASSERT(DataType:lteq(CVal, NewCVal)),
 
     NewEntry = entry_set_val(Entry, NewCVal),

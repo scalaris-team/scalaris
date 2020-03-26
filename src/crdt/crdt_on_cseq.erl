@@ -25,39 +25,52 @@
 -export([read/3]).
 -export([write/3]).
 
--spec read(client_key(), crdt:crdt_module(), crdt:query_fun()) -> {ok, client_value()}.
+-spec read(client_key(), crdt:crdt_module(), crdt:query_fun() | [crdt:query_fun()])
+    -> {ok, client_value() | [client_value()]}.
 read(Key, DataType, QueryFun) ->
     Mod = crdt:proposer_module(),
     FunName = read,
     read_helper(Key, Mod, FunName, DataType, QueryFun).
 
--spec read_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:query_fun()) ->
-    {ok, client_value()}.
+-spec read_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:query_fun()
+    | [crdt:query_fun()]) -> {ok, client_value() | [client_value()]}.
 read_helper(Key, ApiMod, ApiFun, DataType, QueryFun) ->
     ApiMod:ApiFun(crdt_db, self(), ?RT:hash_key(Key), DataType, QueryFun),
     trace_mpath:thread_yield(),
+   
+    Return = 
     receive
-        ?SCALARIS_RECV({read_done, CounterValue}, {ok, CounterValue})
+        ?SCALARIS_RECV({read_done, ReturnValues}, ReturnValues)
     after 1000 ->
         log:log("read hangs ~p~n", [erlang:process_info(self(), messages)]),
         receive
-            ?SCALARIS_RECV({read_done, CounterValue},
+            ?SCALARIS_RECV({read_done, ReturnValues},
                             begin
                                 log:log("~p read was only slow at key ~p~n",
                                         [self(), Key]),
-                                {ok, CounterValue}
+                                ReturnValues
                             end)
         end
+    end,
+
+    %% is we got a list of queries, return a list of results.
+    %% Otherwise a single value.
+    case is_list(QueryFun) of
+        true ->
+            {ok, Return};
+        false ->
+            {ok, hd(Return)}
     end.
 
 
--spec write(client_key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
+-spec write(client_key(), crdt:crdt_module(), crdt:update_fun() | [crdt:update_fun()]) -> ok.
 write(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
     FunName = write,
     write_helper(Key, Mod, FunName, DataType, UpdateFun).
 
--spec write_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:update_fun()) -> ok.
+-spec write_helper(client_key(), module(), atom(), crdt:crdt_module(),
+    crdt:update_fun() | [crdt:update_fun()]) -> ok.
 write_helper(Key, ApiMod, ApiFun, DataType, UpdateFun) ->
     ApiMod:ApiFun(crdt_db, self(), ?RT:hash_key(Key), DataType, UpdateFun),
     trace_mpath:thread_yield(),

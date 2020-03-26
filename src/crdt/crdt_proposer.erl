@@ -58,12 +58,13 @@
                   comm:erl_local_pid(), %% client
                   ?RT:key(),    %% key
                   crdt:crdt_module(),     %% data type
-                  crdt:query_fun() | crdt:update_fun(), %% fun used to read/write crdt state
+                  [crdt_function()], %% fun used to read/write crdt state
                   replies(),     %% aggregates replies
                   non_neg_integer() %% round trips executed
                  }.
 
 -type replies() :: #w_replies{} | #r_replies{}.
+-type crdt_function() :: crdt:query_fun() | crdt:update_fun().
 
 -include("gen_component.hrl").
 
@@ -81,13 +82,21 @@ init(DBSelector) ->
 
 %%%% API
 
--spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
-read(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    start_request(CSeqPidName, {req_start, {read, Client, Key, DataType, QueryFun, none, 0}}).
+-spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
+    [crdt:query_fun()] | crdt:query_fun()) -> ok.
+read(CSeqPidName, Client, Key, DataType, QueryFun) when is_function(QueryFun) ->
+    read(CSeqPidName, Client, Key, DataType, [QueryFun]);
 
--spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
-write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
-    start_request(CSeqPidName, {req_start, {write, Client, Key, DataType, UpdateFun}}).
+read(CSeqPidName, Client, Key, DataType, QueryFuns) when is_list(QueryFuns) ->
+    start_request(CSeqPidName, {req_start, {read, Client, Key, DataType, QueryFuns, none, 0}}).
+
+-spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
+    [crdt:update_fun()] | crdt:update_fun()) -> ok.
+write(CSeqPidName, Client, Key, DataType, UpdateFun) when is_function(UpdateFun) ->
+    write(CSeqPidName, Client, Key, DataType, [UpdateFun]);
+
+write(CSeqPidName, Client, Key, DataType, UpdateFuns) when is_list(UpdateFuns) ->
+    start_request(CSeqPidName, {req_start, {write, Client, Key, DataType, UpdateFuns}}).
 
 -spec start_request(pid_groups:pidname(), comm:message()) -> ok.
 start_request(CSeqPidName, Msg) ->
@@ -99,9 +108,9 @@ start_request(CSeqPidName, Msg) ->
 -spec on(comm:message(), state()) -> state().
 
 %%%%%%%% Query protocol (as query is a keyword, use read/write terminology)
-on({req_start, {read, Client, Key, DataType, QueryFun, PreviousRound, PreviousRoundTrips}}, State) ->
+on({req_start, {read, Client, Key, DataType, QueryFuns, PreviousRound, PreviousRoundTrips}}, State) ->
     ReqId = uid:get_pids_uid(),
-    Entry = entry_new_read(ReqId, Client, Key, DataType, QueryFun, DataType:new()),
+    Entry = entry_new_read(ReqId, Client, Key, DataType, QueryFuns, DataType:new()),
 
     Round = case PreviousRound of
                 none ->
@@ -137,13 +146,15 @@ on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
                         State;
                     cons_read ->
                         %% value is already established in a quorum, skip 2. phase
-                        QueryFun = entry_fun(NewEntry),
+                        QueryFuns = entry_funs(NewEntry),
                         Type = entry_datatype(NewEntry),
-                        ReturnVal = Type:apply_query(QueryFun, NewReplies#r_replies.value),
+                        ReturnVals = 
+                            [Type:apply_query(QueryFun, NewReplies#r_replies.value)
+                             || QueryFun <- QueryFuns],
                         trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
-                                                      return_value, ReturnVal}),
-                        inform_client(read_done, Entry, ReturnVal),
+                                                      return_value, ReturnVals}),
+                        inform_client(read_done, Entry, ReturnVals),
                         delete_entry(Entry, tablename(State)),
                         State;
                     retry_read ->
@@ -164,7 +175,7 @@ on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
                                                 entry_client(NewEntry),
                                                 entry_key(NewEntry),
                                                 Type,
-                                                entry_fun(NewEntry),
+                                                entry_funs(NewEntry),
                                                 Type:new()),
                         T2Entry = entry_set_round_trips(TEntry, entry_round_trips(NewEntry) + 1),
                         %% keep the merged value we have collected in this phase, which will
@@ -195,13 +206,15 @@ on({read, {vote_reply, ReqId, done}}, State) ->
                 case Done of
                     false -> save_entry(NewEntry, tablename(State));
                     true ->
-                        QueryFun = entry_fun(NewEntry),
+                        QueryFuns = entry_funs(NewEntry),
                         DataType = entry_datatype(NewEntry),
-                        ReturnVal = DataType:apply_query(QueryFun, NewReplies#r_replies.value),
+                        ReturnVals = 
+                            [DataType:apply_query(QueryFun, NewReplies#r_replies.value)
+                                || QueryFun <- QueryFuns],
                         trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
-                                                      return_value, ReturnVal}),
-                        inform_client(read_done, Entry, ReturnVal),
+                                                      return_value, ReturnVals}),
+                        inform_client(read_done, Entry, ReturnVals),
                         delete_entry(Entry, tablename(State))
                 end
         end,
@@ -235,7 +248,7 @@ on({read, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, State) ->
                                         entry_client(Entry),
                                         entry_key(Entry),
                                         entry_datatype(Entry),
-                                        entry_fun(Entry),
+                                        entry_funs(Entry),
                                         NextRound,
                                         RoundTrips}})
         end,
@@ -244,13 +257,13 @@ on({read, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, State) ->
 
 %%%%% UPDATE protocol (as query is a keyword, use read/write terminology)
 
-on({req_start, {write, Client, Key, DataType, UpdateFun}}, State) ->
+on({req_start, {write, Client, Key, DataType, UpdateFuns}}, State) ->
     ReqId = uid:get_pids_uid(),
-    Entry = entry_new_write(ReqId, Client, Key, DataType, UpdateFun),
+    Entry = entry_new_write(ReqId, Client, Key, DataType, UpdateFuns),
     save_entry(Entry, tablename(State)),
 
     This = comm:reply_as(comm:this(), 2, {write, '_'}),
-    Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
+    Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFuns},
     send_to_local_replica(Key, Msg),
 
     State;
@@ -367,15 +380,15 @@ inform_client(write_done, Entry) ->
             comm:send_local(entry_client(Entry), {write_done})
     end.
 
--spec inform_client(read_done, entry(), any()) -> ok.
-inform_client(read_done, Entry, QueryResult) ->
+-spec inform_client(read_done, entry(), [any()]) -> ok.
+inform_client(read_done, Entry, QueryResults) ->
     Client = entry_client(Entry),
     case is_tuple(Client) of
         true ->
             % must unpack envelope
-            comm:send(entry_client(Entry), {read_done, QueryResult});
+            comm:send(entry_client(Entry), {read_done, QueryResults});
         false ->
-            comm:send_local(entry_client(Entry), {read_done, QueryResult})
+            comm:send_local(entry_client(Entry), {read_done, QueryResults})
     end.
 
 -spec add_write_reply(#w_replies{}) -> {boolean(), #w_replies{}}.
@@ -443,16 +456,17 @@ add_vote_reply(Replies) ->
     Done = replication:quorum_accepted(ReplyCount),
     {Done, NewReplies}.
 
--spec entry_new_read(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun(),
-                    crdt:crdt()) -> entry().
-entry_new_read(ReqId, Client, Key, DataType, QueryFun, EmptyVal) ->
-    {ReqId, Client, Key, DataType, QueryFun,
+-spec entry_new_read(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
+        [crdt:query_fun()], crdt:crdt()) -> entry().
+entry_new_read(ReqId, Client, Key, DataType, QueryFuns, EmptyVal) ->
+    {ReqId, Client, Key, DataType, QueryFuns,
      #r_replies{reply_count=0, highest_seen_round=pr:new(0,0), highest_replies=0,
                 value=EmptyVal, cons_value=true}, _RoundTrips=0}.
 
--spec entry_new_write(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> entry().
-entry_new_write(ReqId, Client, Key, DataType, UpdateFun) ->
-    {ReqId, Client, Key, DataType, UpdateFun, #w_replies{reply_count=0}, _RoundTrips=0}.
+-spec entry_new_write(any(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
+        [crdt:update_fun()]) -> entry().
+entry_new_write(ReqId, Client, Key, DataType, UpdateFuns) ->
+    {ReqId, Client, Key, DataType, UpdateFuns, #w_replies{reply_count=0}, _RoundTrips=0}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -462,8 +476,8 @@ entry_client(Entry)               -> element(2, Entry).
 entry_key(Entry)                  -> element(3, Entry).
 -spec entry_datatype(entry())     -> crdt:crdt_module().
 entry_datatype(Entry)             -> element(4, Entry).
--spec entry_fun(entry())          -> crdt:update_fun() | crdt:query_fun().
-entry_fun(Entry)                  -> element(5, Entry).
+-spec entry_funs(entry())         -> [crdt_function()].
+entry_funs(Entry)                 -> element(5, Entry).
 -spec entry_replies(entry())      -> replies().
 entry_replies(Entry)              -> element(6, Entry).
 -spec entry_set_replies(entry(), replies()) -> entry().
