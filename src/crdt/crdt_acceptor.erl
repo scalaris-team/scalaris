@@ -63,10 +63,6 @@ msg_update_reply(Client, ReqId, CVal) ->
 msg_merge_reply(Client, ReqId) ->
     comm:send(Client, {merge_reply, ReqId, done}).
 
--spec msg_query_reply(comm:mypid(), any(), any()) -> ok.
-msg_query_reply(Client, ReqId, QueryResult) ->
-    comm:send(Client, {query_reply, ReqId, QueryResult}).
-
 -spec msg_prepare_reply(comm:mypid(), any(), pr:pr(), pr:pr(), crdt:crdt()) -> ok.
 msg_prepare_reply(Client, ReqId, ReadRound, WriteRound, CVal) ->
     comm:send(Client, {prepare_reply, ReqId, ReadRound, WriteRound, CVal}).
@@ -144,22 +140,6 @@ on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, S
                                   key, Key,
                                   old_value, CVal,
                                   new_value, NewCVal}),
-    State;
-
-%% eventual consistent read
-on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, State) ->
-    ?TRACE("crdt:query_req: ~p", [Key]),
-    TableName = tablename(State),
-    Entry = get_entry(Key, TableName),
-
-    CVal = entry_val(Entry, DataType),
-    QueryResult = DataType:apply_query(QueryFun, CVal),
-
-    msg_query_reply(Proposer, ReqId, QueryResult),
-
-    trace_mpath:log_info(self(), {acceptor_query,
-                                  key, Key,
-                                  value, CVal}),
     State;
 
 %% SC-read phase 1

@@ -1,4 +1,4 @@
-% @copyright 2012-2018 Zuse Institute Berlin,
+% @copyright 2012-2020 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,9 +30,7 @@
 -behaviour(gen_component).
 
 -export([write/5]).
--export([write_eventual/5]).
 -export([read/5]).
--export([read_eventual/5]).
 
 -export([start_link/3]).
 -export([init/1, on/2]).
@@ -80,21 +78,11 @@ init(DBSelector) ->
 
 -spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
-    start_request(CSeqPidName, {req_start, {write, strong, Client, Key, DataType, UpdateFun}}).
+    start_request(CSeqPidName, {req_start, {write, Client, Key, DataType, UpdateFun}}).
 
 -spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
 read(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun}}).
-
-%% eventual operations are not really supported -> use stronger ops
--spec write_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
-write_eventual(CSeqPidName, Client, Key, DataType, UpdateFun) ->
-    write(CSeqPidName, Client, Key, DataType, UpdateFun).
-
--spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
-read_eventual(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    read(CSeqPidName, Client, Key, DataType, QueryFun).
-
+    start_request(CSeqPidName, {req_start, {read, Client, Key, DataType, QueryFun}}).
 
 -spec start_request(pid_groups:pidname(), comm:message()) -> ok.
 start_request(CSeqPidName, Msg) ->
@@ -105,10 +93,10 @@ start_request(CSeqPidName, Msg) ->
 
 -spec on(comm:message(), state()) -> state().
 
-%%%% strong consistent read
-on({req_start, {read, strong, Client, Key, DataType, QueryFun}}, State) ->
+%%%% read
+on({req_start, {read, Client, Key, DataType, QueryFun}}, State) ->
     This = comm:reply_as(comm:this(), 6, {read_write_done, Client, Key, DataType, QueryFun, '_'}),
-    gen_component:post_op({req_start, {write, strong, This, Key, DataType, fun crdt:update_noop/2}}, State);
+    gen_component:post_op({req_start, {write, This, Key, DataType, fun crdt:update_noop/2}}, State);
 
 on({read_write_done, Client, Key, DataType, QueryFun, _Msg}, State) ->
     This = comm:reply_as(comm:this(), 5, {apply_query, Client, DataType, QueryFun, '_'}),
@@ -124,10 +112,10 @@ on({apply_query, Client, DataType, QueryFun, {LearntValue}}, State) ->
     inform_client(read_done, Client, DataType:apply_query(QueryFun, CrdtVal)),
     State;
 
-%%%%% strong consistent write
+%%%%% write
 
 %% procedure ExecuteUpdate
-on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
+on({req_start, {write, Client, Key, DataType, UpdateFun}}, State) ->
     NewState =
         case get_entry(Key, tablename(State)) of
             undefined ->

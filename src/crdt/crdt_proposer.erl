@@ -33,8 +33,8 @@
 
 -behaviour(gen_component).
 
--export([write/5, write_eventual/5]).
--export([read/5, read_eventual/5]).
+-export([write/5]).
+-export([read/5]).
 
 -export([send_to_all_replicas/2]).
 
@@ -98,12 +98,8 @@ read(CSeqPidName, Client, Key, DataType, QueryFun) ->
         true ->
             start_request(CSeqPidName, {add_to_read_batch, Client, Key, DataType, QueryFun});
         false ->
-            start_request(CSeqPidName, {req_start, {read, strong, Client, Key, DataType, QueryFun, none, 0}})
+            start_request(CSeqPidName, {req_start, {read, Client, Key, DataType, QueryFun, none, 0}})
     end.
-
--spec read_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:query_fun()) -> ok.
-read_eventual(CSeqPidName, Client, Key, DataType, QueryFun) ->
-    start_request(CSeqPidName, {req_start, {read, eventual, Client, Key, DataType, QueryFun}}).
 
 -spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
 write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
@@ -111,12 +107,8 @@ write(CSeqPidName, Client, Key, DataType, UpdateFun) ->
         true ->
             start_request(CSeqPidName, {add_to_write_batch, Client, Key, DataType, UpdateFun});
         false ->
-            start_request(CSeqPidName, {req_start, {write, strong, Client, Key, DataType, UpdateFun}})
+            start_request(CSeqPidName, {req_start, {write, Client, Key, DataType, UpdateFun}})
     end.
-
--spec write_eventual(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
-write_eventual(CSeqPidName, Client, Key, DataType, UpdateFun) ->
-    start_request(CSeqPidName, {req_start, {write, eventual, Client, Key, DataType, UpdateFun}}).
 
 -spec start_request(pid_groups:pidname(), comm:message()) -> ok.
 start_request(CSeqPidName, Msg) ->
@@ -157,7 +149,7 @@ on({read_batch_trigger}, State) ->
                 fun(K, ReqsForThisKey=[{_, DataType, _}|_]) ->
                     This = comm:reply_as(comm:this(), 3, {read_batch_reply, ReqsForThisKey, '_'}),
                     comm:send_local(self(),
-                        {req_start, {read, strong, This, K, DataType, fun crdt:query_noop/1, none, 0}})
+                        {req_start, {read, This, K, DataType, fun crdt:query_noop/1, none, 0}})
                 end, Reqs),
             _ = save_entry({Id, 0, dict:new()}, tablename(State))
     end,
@@ -207,7 +199,7 @@ on({write_batch_trigger}, State) ->
                                                     end, Crdt, UpdateFuns)
                                    end,
                     comm:send_local(self(),
-                        {req_start, {write, strong, This, K, DataType, CompositeFun}})
+                        {req_start, {write, This, K, DataType, CompositeFun}})
                 end, Reqs),
             _ = save_entry({Id, 0, dict:new()}, tablename(State))
     end,
@@ -222,9 +214,9 @@ on({write_batch_reply, Reqs, {write_done}}, State) ->
     State;
 
 
-%%%%% strong consistent read
+%%%%%%%% Query protocol (as query is a keyword, use read/write terminology)
 
-on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound, PreviousRoundTrips}}, State) ->
+on({req_start, {read, Client, Key, DataType, QueryFun, PreviousRound, PreviousRoundTrips}}, State) ->
     ReqId = uid:get_pids_uid(),
     Entry = entry_new_read(ReqId, Client, Key, DataType, QueryFun, DataType:new()),
 
@@ -235,7 +227,7 @@ on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound, Pr
                     round_inc(PreviousRound, ReqId)
             end,
 
-    This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
+    This = comm:reply_as(comm:this(), 2, {read, '_'}),
     Msg = {crdt_acceptor, prepare, '_', This, ReqId, key, DataType, Round, DataType:new()},
 
     NewEntry = entry_set_round_trips(Entry, PreviousRoundTrips + 1),
@@ -244,7 +236,7 @@ on({req_start, {read, strong, Client, Key, DataType, QueryFun, PreviousRound, Pr
 
     State;
 
-on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
+on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests (i.e. because we already
@@ -265,7 +257,7 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         QueryFun = entry_fun(NewEntry),
                         Type = entry_datatype(NewEntry),
                         ReturnVal = Type:apply_query(QueryFun, NewReplies#r_replies.value),
-                        trace_mpath:log_info(self(), {read_strong_cons_done,
+                        trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
                                                       return_value, ReturnVal}),
                         inform_client(read_done, Entry, ReturnVal),
@@ -275,7 +267,7 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         %% we received inconsistent read rounds... thus we have
                         %% concurrency and must retry to get consistent rounds accepts
                         %% entry will be deleted in post_op call to on handler
-                        gen_component:post_op({read, strong,
+                        gen_component:post_op({read,
                                                {read_deny, ReqId, fixed, UsedReadRound,
                                                 round_inc(NewReplies#r_replies.highest_seen_round)}},
                                              State);
@@ -297,10 +289,10 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                         NextStepEntry = entry_set_replies(T2Entry, NewReplies#r_replies{reply_count=0}),
                         save_entry(NextStepEntry, tablename(State)),
 
-                        trace_mpath:log_info(self(), {read_strong_phase2_start,
+                        trace_mpath:log_info(self(), {read_phase2_start,
                                                       round, UsedReadRound,
                                                       value, NewReplies#r_replies.value}),
-                        This = comm:reply_as(comm:this(), 3, {read, strong, '_'}),
+                        This = comm:reply_as(comm:this(), 2, {read, '_'}),
                         Msg = {crdt_acceptor, vote, '_', This, NewReqId, key,
                                entry_datatype(NewEntry), UsedReadRound, NewReplies#r_replies.value},
                         send_to_all_replicas(entry_key(NewEntry), Msg),
@@ -308,7 +300,7 @@ on({read, strong, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, Stat
                 end
         end;
 
-on({read, strong, {vote_reply, ReqId, done}}, State) ->
+on({read, {vote_reply, ReqId, done}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 ok;
@@ -323,7 +315,7 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
                         QueryFun = entry_fun(NewEntry),
                         DataType = entry_datatype(NewEntry),
                         ReturnVal = DataType:apply_query(QueryFun, NewReplies#r_replies.value),
-                        trace_mpath:log_info(self(), {read_strong_done,
+                        trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
                                                       return_value, ReturnVal}),
                         inform_client(read_done, Entry, ReturnVal),
@@ -332,7 +324,7 @@ on({read, strong, {vote_reply, ReqId, done}}, State) ->
         end,
     State;
 
-on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, State) ->
+on({read, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests
@@ -346,7 +338,7 @@ on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, Sta
                                 fixed -> round_inc(RequiredRound)
                             end,
 
-                trace_mpath:log_info(self(), {read_strong_deny,
+                trace_mpath:log_info(self(), {read_deny,
                                               retry_mode, RetryMode,
                                               round_tried, TriedRound,
                                               round_requed, RequiredRound
@@ -356,7 +348,7 @@ on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, Sta
                 RoundTrips = entry_round_trips(Entry),
                 Delay = randoms:rand_uniform(0, 10),
                 comm:send_local_after(Delay, self(),
-                                        {req_start, {read, strong,
+                                        {req_start, {read,
                                         entry_client(Entry),
                                         entry_key(Entry),
                                         entry_datatype(Entry),
@@ -367,50 +359,21 @@ on({read, strong, {read_deny, ReqId, RetryMode, TriedRound, RequiredRound}}, Sta
     State;
 
 
-%%%%% eventual consistent read
+%%%%% UPDATE protocol (as query is a keyword, use read/write terminology)
 
-on({req_start, {read, eventual, Client, Key, DataType, QueryFun}}, State) ->
-    ReqId = uid:get_pids_uid(),
-    Entry = entry_new_read(ReqId, Client, Key, DataType, QueryFun, DataType:new()),
-    save_entry(Entry, tablename(State)),
-
-    This = comm:reply_as(comm:this(), 3, {read, eventual, '_'}),
-    Msg = {crdt_acceptor, query_req, '_', This, ReqId, key, DataType, QueryFun},
-    send_to_local_replica(Key, Msg),
-
-    State;
-
-on({read, eventual, {query_reply, ReqId, QueryResult}}, State) ->
-    _ = case get_entry(ReqId, tablename(State)) of
-            undefined ->
-                %% ignore replies for unknown requests (i.e. because we already
-                %% have processed them)
-                ok;
-            Entry ->
-                trace_mpath:log_info(self(), {read_eventual_done}),
-                % eventual consistent writes just write on a single replica
-                % and expect the update to eventual spread through gossiping
-                % or similiar behaviour
-                inform_client(read_done, Entry, QueryResult),
-                delete_entry(Entry, tablename(State))
-        end,
-    State;
-
-%%%%% strong consistent write
-
-on({req_start, {write, strong, Client, Key, DataType, UpdateFun}}, State) ->
+on({req_start, {write, Client, Key, DataType, UpdateFun}}, State) ->
     ReqId = uid:get_pids_uid(),
     Entry = entry_new_write(ReqId, Client, Key, DataType, UpdateFun),
     save_entry(Entry, tablename(State)),
 
-    This = comm:reply_as(comm:this(), 3, {write, strong, '_'}),
+    This = comm:reply_as(comm:this(), 2, {write, '_'}),
     Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
     send_to_local_replica(Key, Msg),
 
     State;
 
-on({write, strong, {update_reply, ReqId, CVal}}, State) ->
-    This = comm:reply_as(comm:this(), 3, {write, strong, '_'}),
+on({write, {update_reply, ReqId, CVal}}, State) ->
+    This = comm:reply_as(comm:this(), 2, {write, '_'}),
 
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
@@ -420,7 +383,7 @@ on({write, strong, {update_reply, ReqId, CVal}}, State) ->
             Entry ->
                 Msg = {crdt_acceptor, merge, '_', This, ReqId, key,
                        entry_datatype(Entry), CVal},
-                trace_mpath:log_info(self(), {write_strong_start,
+                trace_mpath:log_info(self(), {write_start,
                                              value, CVal}),
                 NewEntry = entry_inc_round_trips(Entry),
                 save_entry(NewEntry, tablename(State)),
@@ -428,7 +391,7 @@ on({write, strong, {update_reply, ReqId, CVal}}, State) ->
         end,
     State;
 
-on({write, strong, {merge_reply, ReqId, done}}, State) ->
+on({write, {merge_reply, ReqId, done}}, State) ->
     _ = case get_entry(ReqId, tablename(State)) of
             undefined ->
                 %% ignore replies for unknown requests
@@ -440,39 +403,10 @@ on({write, strong, {merge_reply, ReqId, done}}, State) ->
                 case Done of
                     false -> save_entry(NewEntry, tablename(State));
                     true ->
-                        trace_mpath:log_info(self(), {write_strong_done}),
+                        trace_mpath:log_info(self(), {write_done}),
                         inform_client(write_done, Entry),
                         delete_entry(Entry, tablename(State))
                 end
-        end,
-    State;
-
-%%%%% eventual consistent write
-
-on({req_start, {write, eventual, Client, Key, DataType, UpdateFun}}, State) ->
-    ReqId = uid:get_pids_uid(),
-    Entry = entry_new_write(ReqId, Client, Key, DataType, UpdateFun),
-    save_entry(Entry, tablename(State)),
-
-    This = comm:reply_as(comm:this(), 3, {write, eventual, '_'}),
-    Msg = {crdt_acceptor, update, '_', This, ReqId, key, DataType, UpdateFun},
-    send_to_local_replica(Key, Msg),
-
-    State;
-
-on({write, eventual, {update_reply, ReqId, _CVal}}, State) ->
-    _ = case get_entry(ReqId, tablename(State)) of
-            undefined ->
-                %% ignore replies for unknown requests (i.e. because we already
-                %% have processed them)
-                ok;
-            Entry ->
-                trace_mpath:log_info(self(), {write_eventual_done}),
-                % eventual consistent writes just write on a single replica
-                % and expect the update to eventual spread through gossiping
-                % or similiar behaviour
-                inform_client(write_done, Entry),
-                delete_entry(Entry, tablename(State))
         end,
     State;
 

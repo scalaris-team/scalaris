@@ -24,10 +24,8 @@
 
 -export([read/1]).
 -export([read_state/1]).
--export([read_eventual/1]).
 
 -export([inc/1]).
--export([inc_eventual/1]).
 
 %% Reads counter with strong consistency semantics
 -spec read(client_key()) -> {ok, client_value()}.
@@ -39,20 +37,9 @@ read(Key) ->
 read_state(Key) ->
     crdt_on_cseq:read(Key, gcounter, fun crdt:query_noop/1).
 
-%% Reads counter with eventual consistency semantics
--spec read_eventual(client_key()) -> {ok, client_value()}.
-read_eventual(Key) ->
-    crdt_on_cseq:read_eventual(Key, gcounter, fun gcounter:query_counter/1).
-
 %% Increments counter with strong consistency semantics
 -spec inc(client_key()) -> ok.
 inc(Key) ->
     UpdateFun = fun(ReplicaId, CRDT) -> gcounter:update_add(ReplicaId, 1, CRDT) end,
     crdt_on_cseq:write(Key, gcounter, UpdateFun).
-
-%% Increments counter with evenutally strong consistency semantics
--spec inc_eventual(client_key()) -> ok.
-inc_eventual(Key) ->
-    UpdateFun = fun(ReplicaId, CRDT) -> gcounter:update_add(ReplicaId, 1, CRDT) end,
-    crdt_on_cseq:write_eventual(Key, gcounter, UpdateFun).
 

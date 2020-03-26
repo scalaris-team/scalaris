@@ -25,20 +25,10 @@
 -export([read/3]).
 -export([write/3]).
 
-%% API with strong eventual consistency semantics
--export([read_eventual/3]).
--export([write_eventual/3]).
-
 -spec read(client_key(), crdt:crdt_module(), crdt:query_fun()) -> {ok, client_value()}.
 read(Key, DataType, QueryFun) ->
     Mod = crdt:proposer_module(),
     FunName = read,
-    read_helper(Key, Mod, FunName, DataType, QueryFun).
-
--spec read_eventual(client_key(), crdt:crdt_module(), crdt:query_fun()) -> {ok, client_value()}.
-read_eventual(Key, DataType, QueryFun) ->
-    Mod = crdt:proposer_module(),
-    FunName = read_eventual,
     read_helper(Key, Mod, FunName, DataType, QueryFun).
 
 -spec read_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:query_fun()) ->
@@ -65,12 +55,6 @@ read_helper(Key, ApiMod, ApiFun, DataType, QueryFun) ->
 write(Key, DataType, UpdateFun) ->
     Mod = crdt:proposer_module(),
     FunName = write,
-    write_helper(Key, Mod, FunName, DataType, UpdateFun).
-
--spec write_eventual(client_key(), crdt:crdt_module(), crdt:update_fun()) -> ok.
-write_eventual(Key, DataType, UpdateFun) ->
-    Mod = crdt:proposer_module(),
-    FunName = write_eventual,
     write_helper(Key, Mod, FunName, DataType, UpdateFun).
 
 -spec write_helper(client_key(), module(), atom(), crdt:crdt_module(), crdt:update_fun()) -> ok.

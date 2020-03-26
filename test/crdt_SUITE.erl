@@ -166,28 +166,10 @@ crdt_gcounter_read_your_write(_Config) ->
     Parallel = randoms:rand_uniform(20, 21),
     Count = 1000 div Parallel,
     WriteFun = fun (_) ->
-                    %% note: by desing, when mixing a strong read with a eventual write
-                    %% or vice verca, a process must not necessarly observer the write.
-                    %% this is because eventual ops send their
-                    %% request to a specific replica. the quorum ops waits for
-                    %% an arbitrary quorum, meaning that the replica used for the eventual
-                    %% op might not be included...
-                    {O, N} = case randoms:rand_uniform(1, 2) of
-                        1 ->
-                            {ok, Old} = gcounter_on_cseq:read(Key),
-                            ok = gcounter_on_cseq:inc(Key),
-                            {ok, New} = gcounter_on_cseq:read(Key),
-                            {Old, New};
-                        2 ->
-                            %% TODO: if there is more than one local dht node
-                            %% request will be sent to a random one. Thus, one might
-                            %% not see the effects of an eventual write
-                            {ok, Old} = gcounter_on_cseq:read_eventual(Key),
-                            ok = gcounter_on_cseq:inc_eventual(Key),
-                            {ok, New} = gcounter_on_cseq:read_eventual(Key),
-                            {Old, New}
-                    end,
-                    ?equals(true, O < N)
+                    {ok, Old} = gcounter_on_cseq:read(Key),
+                    ok = gcounter_on_cseq:inc(Key),
+                    {ok, New} = gcounter_on_cseq:read(Key),
+                    ?equals(true, Old < New)
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -195,7 +177,7 @@ crdt_gcounter_read_your_write(_Config) ->
     ok.
 
 crdt_gcounter_read_monotonic(_Config) ->
-    %% starts random number of (strong and eventual) writers
+    %% starts random number of writers
     %% start one reader
     %% values read should increase monotonic
     Key = randoms:getRandomString(),
@@ -209,9 +191,8 @@ crdt_gcounter_read_monotonic(_Config) ->
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
     Count = 1000 div Parallel,
-    WriteFun = fun
-                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+    WriteFun = fun (_) ->
+                    ok = gcounter_on_cseq:inc(Key)
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -223,7 +204,7 @@ crdt_gcounter_read_monotonic(_Config) ->
     ok.
 
 crdt_gcounter_read_monotonic2(_Config) ->
-    %% starts random number of (strong and eventual) writers
+    %% starts random number of writers
     %% start multiple reader, which submit reads sequentially
     %% values read should increase monotonic
     Key = randoms:getRandomString(),
@@ -260,9 +241,8 @@ crdt_gcounter_read_monotonic2(_Config) ->
     %% do all the writes
     Parallel = randoms:rand_uniform(1, 50),
     Count = 1000 div Parallel,
-    WriteFun = fun
-                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+    WriteFun = fun (_) ->
+                    ok = gcounter_on_cseq:inc(Key)
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -278,7 +258,7 @@ crdt_gcounter_read_monotonic2(_Config) ->
 
 
 crdt_gcounter_concurrent_read_monotonic(_Config) ->
-    %% starts random number of (strong and eventual) writers
+    %% starts random number of writers
     %% start multiple reader
     %% for each reader, the sequence of seen values should increase
     Key = randoms:getRandomString(),
@@ -294,9 +274,8 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
     Count = 1000 div Parallel,
-    WriteFun = fun
-                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+    WriteFun = fun (_) ->
+                    ok = gcounter_on_cseq:inc(Key)
                end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -336,9 +315,8 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
     Count = 500 div WriterCount,
-    WriteFun = fun
-                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+    WriteFun = fun (_) ->
+                    ok = gcounter_on_cseq:inc(Key)
                end,
     _ = spawn_writers(UnitTestPid, WriterCount, Count, WriteFun),
     wait_writers_completion(WriterCount),
@@ -449,7 +427,7 @@ crdt_proto_sched_write(_Config) ->
     ok.
 
 crdt_proto_sched_concurrent_read_monotonic(_Config) ->
-    %% starts random number of (strong and eventual) writers
+    %% starts random number of writers
     %% start one reader
     %% values read should increase monotonic
     Key = randoms:getRandomString(),
@@ -517,9 +495,8 @@ crdt_proto_sched_concurrent_read_ordered(_Config) ->
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
     Count = 100 div WriterCount,
-    WriteFun = fun
-                    (I) when I div 2 == 0 -> ok = gcounter_on_cseq:inc(Key);
-                    (_)                   -> ok = gcounter_on_cseq:inc_eventual(Key)
+    WriteFun = fun (_) ->
+                    gcounter_on_cseq:inc(Key)
                end,
     _ = spawn_writers(UnitTestPid, WriterCount, Count, WriteFun, TraceId),
 
@@ -615,9 +592,7 @@ tester_type_check_crdt(_Config) ->
             {start_gen_component, 5},   % unsupported types
             {on, 2},                    % sends messages
             {read, 5},                  % needs fun as input
-            {read_eventual, 5},       % needs fun as input
             {write, 5},                 % needs fun as input
-            {write_eventual, 5},       % needs fun as input
             {send_to_all_replicas, 2}  % sends messages
            ],
            [
@@ -648,7 +623,6 @@ tester_type_check_crdt(_Config) ->
             {tab2list_raw, 1},          % needs valid ets:tid()
             {msg_update_reply, 3},      % sends messages
             {msg_merge_reply, 2},       % sends messages
-            {msg_query_reply, 3},       % sends messages
             {msg_prepare_reply, 5},     % sends messages
             {msg_prepare_deny, 4},      % sends messages
             {msg_vote_deny, 4},         % sends messages
@@ -661,9 +635,7 @@ tester_type_check_crdt(_Config) ->
             {start_gen_component, 5},   % unsupported types
             {on, 2},                    % sends messages
             {read, 5},                  % needs fun as input
-            {read_eventual, 5},       % needs fun as input
-            {write, 5},                 % needs fun as input
-            {write_eventual, 5}       % needs fun as input
+            {write, 5}                  % needs fun as input
            ],
            [
             {send_to_all_replicas, 2},  % sends messages
