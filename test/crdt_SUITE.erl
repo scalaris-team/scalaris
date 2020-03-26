@@ -86,8 +86,9 @@ init_per_testcase(_TestCase, Config) ->
     Size = randoms:rand_uniform(2, 8),
 
     unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
-                                               {ordered_links, false},
-                                               {read_batching, EnableBatching}]}]),
+                                                {crdt_rsm, crdt_paxos},
+                                                {ordered_links, false},
+                                                {read_batching, EnableBatching}]}]),
 
     ct:pal("Start test with ringsize ~p", [Size]),
     [{stop_ring, true} | Config].
@@ -616,11 +617,11 @@ tester_type_check_crdt(_Config) ->
             {read, 5},                  % needs fun as input
             {read_eventual, 5},       % needs fun as input
             {write, 5},                 % needs fun as input
-            {write_eventual, 5}       % needs fun as input
+            {write_eventual, 5},       % needs fun as input
+            {send_to_all_replicas, 2}  % sends messages
            ],
            [
             {add_read_reply, 5},        % needs value matching db_type
-            {send_to_all_replicas, 2},  % sends messages
             {send_to_all_replicas, 3},  % sends messages
             {send_to_local_replica, 2}, % sends messages
             {send_to_local_replica, 3},  % sends messages
