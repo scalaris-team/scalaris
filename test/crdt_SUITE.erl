@@ -70,25 +70,21 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-init_per_group(Group, Config) ->
-    [{batching, Group =/= proto_sched_group} | Config].
+init_per_group(_Group, Config) ->
+    Config.
 
 end_per_group(_Group, _Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    EnableBatching =
-        case lists:keyfind(batching, 1, Config) of
-            false -> false;
-            {batching, Enabled} -> Enabled
-        end,
     Size = randoms:rand_uniform(2, 8),
 
-    unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
-                                                {crdt_rsm, crdt_paxos},
-                                                {ordered_links, false},
-                                                {read_batching, EnableBatching}]}]),
+    unittest_helper:make_ring(Size, [{config, [
+                                        {log_path, PrivDir},
+                                        {crdt_rsm, crdt_paxos},
+                                        {ordered_links, false}]
+                                    }]),
 
     ct:pal("Start test with ringsize ~p", [Size]),
     [{stop_ring, true} | Config].
