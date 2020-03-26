@@ -32,7 +32,6 @@
 -type update_fun()  :: fun((crdt()) -> crdt()) | fun((non_neg_integer(), crdt()) -> crdt()).
 -type query_fun()   :: fun((crdt()) -> term()).
 
-
 -spec update_noop(crdt()) -> crdt().
 update_noop(CRDT) -> CRDT.
 
@@ -51,7 +50,8 @@ tester_create_query_fun(0) -> fun query_noop/1.
 -spec rsm_implementation() -> {module(), module()}.
 rsm_implementation() ->
     Available =
-        [{crdt_paxos, {crdt_proposer, crdt_acceptor}},
+        [{wf_crdt_paxos, {crdt_wait_free_wrapper, crdt_acceptor}},
+         {crdt_paxos, {crdt_proposer, crdt_acceptor}},
          {lattice, {gla_proposer, gla_acceptor}}],
     element(2, lists:keyfind(config:read(crdt_rsm), 1, Available)).
 

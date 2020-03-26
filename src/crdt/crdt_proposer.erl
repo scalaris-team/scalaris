@@ -36,6 +36,8 @@
 -export([write/5, write_eventual/5]).
 -export([read/5, read_eventual/5]).
 
+-export([send_to_all_replicas/2]).
+
 -export([check_config/0]).
 -export([start_link/3]).
 -export([init/1, on/2]).

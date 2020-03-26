@@ -45,7 +45,7 @@
 -export_type([state/0]).
 -export_type([entry/0]).
 
--type state() :: ?PDB:db().
+-type state() :: {?PDB:db(), [comm:mypid_plain()]}.
 
 %% so there are no longer any read denies, all reads succeed.
 -type entry() :: { any(), %% key
@@ -83,10 +83,13 @@ msg_vote_reply(Client, ReqId) ->
 msg_vote_deny(Client, ReqId, TriedWriteRound, RequiredReadRound) ->
     comm:send(Client, {read_deny, ReqId, inc, TriedWriteRound, RequiredReadRound}).
 
+-spec msg_registered_proposers(comm:mypid_plain(), [comm:mypid_plain()]) -> ok.
+msg_registered_proposers(Proposer, ListOfProposers) ->
+  comm:send(Proposer, {registered_proposers, ListOfProposers}).
 
 %% initialize: return initial state.
 -spec init(atom() | tuple()) -> state().
-init(DBName) -> ?PDB:new(DBName).
+init(DBName) -> {?PDB:new(DBName), []}.
 
 
 %% @doc Closes the given DB (it may be recoverable using open/1 depending on
@@ -100,8 +103,9 @@ close(State) -> ?PDB:close(State).
 close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(tuple(), state()) -> state().
-on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, TableName) ->
+on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, State) ->
     ?TRACE("crdt_acceptor:update: ~p ~p ", [Key, Proposer]),
+    TableName = tablename(State),
     Entry = get_entry(Key, TableName),
 
     Keys = lists:sort(replication:get_keys(Key)),
@@ -120,10 +124,11 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFun}, Ta
                                   key, Key,
                                   old_value, CVal,
                                   new_value, NewCVal}),
-    TableName;
+    State;
 
-on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, TableName) ->
+on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, State) ->
     ?TRACE("crdt_acceptor:merge: ~p ~p", [Key, Proposer]),
+    TableName = tablename(State),
     Entry = get_entry(Key, TableName),
 
     CVal = entry_val(Entry, DataType),
@@ -139,11 +144,12 @@ on({crdt_acceptor, merge, _Cons, Proposer, ReqId, Key, DataType, CValToMerge}, T
                                   key, Key,
                                   old_value, CVal,
                                   new_value, NewCVal}),
-    TableName;
+    State;
 
 %% eventual consistent read
-on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, TableName) ->
+on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, State) ->
     ?TRACE("crdt:query_req: ~p", [Key]),
+    TableName = tablename(State),
     Entry = get_entry(Key, TableName),
 
     CVal = entry_val(Entry, DataType),
@@ -154,11 +160,12 @@ on({crdt_acceptor, query_req, _Cons, Proposer, ReqId, Key, DataType, QueryFun}, 
     trace_mpath:log_info(self(), {acceptor_query,
                                   key, Key,
                                   value, CVal}),
-    TableName;
+    State;
 
 %% SC-read phase 1
-on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round, CValToMerge}, TableName) ->
+on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round, CValToMerge}, State) ->
     ?TRACE("crdt:prepare: ~p in round ~p~n", [Key, ProposalRound]),
+    TableName = tablename(State),
     Entry = get_entry(Key, TableName),
     CVal = entry_val(Entry, DataType),
     NewCVal = DataType:merge(CValToMerge, CVal),
@@ -189,11 +196,12 @@ on({crdt_acceptor, prepare, _Cons, Proposer, ReqId, Key, DataType, Round, CValTo
                                   key, Key,
                                   round, Round,
                                   merge_value, CValToMerge}),
-    TableName;
+    State;
 
 %% SC-read phase 2
-on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, CValToMerge}, TableName) ->
+on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, CValToMerge}, State) ->
     ?TRACE("prbr:vote for key: ~p in round ~p~n", [Key, ProposalRound]),
+    TableName = tablename(State),
     Entry = get_entry(Key, TableName),
     CurrentReadRound = entry_r_read(Entry),
     CVal = entry_val(Entry, DataType),
@@ -220,15 +228,34 @@ on({crdt_acceptor, vote, _Cons, Proposer, ReqId, Key, DataType, ProposalRound, C
                                   tried_round, ProposalRound,
                                   merge_value, CValToMerge,
                                   full_value, NewCVal}),
-    TableName;
+    State;
 
-on({crdt_acceptor, get_entry, _DB, Client, Key}, TableName) ->
-    comm:send_local(Client, {entry, get_entry(Key, TableName)}),
-    TableName;
+%% discovery of all proposers. Needed as write-free wrapper must communicate
+%% between proposer processes.
+on({crdt_acceptor, register_proposer, _Cons, Proposer, _ReqId, _Key}, State) ->
+  ProposerList = proposerlist(State),
+  NewProposerList = lists:usort([Proposer | ProposerList]),
+  NewState = set_proposerlist(State, NewProposerList),
+  [msg_registered_proposers(P, NewProposerList) || P <- NewProposerList],
+  NewState;
 
-on({crdt_acceptor, tab2list_raw, DB, Client}, TableName) ->
-    comm:send_local(Client, {DB, tab2list_raw(TableName)}),
-    TableName.
+on({crdt_acceptor, get_entry, _DB, Client, Key}, State) ->
+    comm:send_local(Client, {entry, get_entry(Key, tablename(State))}),
+    State;
+
+on({crdt_acceptor, tab2list_raw, DB, Client}, State) ->
+    comm:send_local(Client, {DB, tab2list_raw(tablename(State))}),
+    State.
+
+-spec tablename(state()) -> ?PDB:db().
+tablename(State) -> element(1, State).
+
+-spec proposerlist(state()) -> [comm:mypid_plain()].
+proposerlist(State) -> element(2, State).
+
+-spec set_proposerlist(state(), [comm:mypid_plain()]) -> state().
+set_proposerlist(State, PropList) -> setelement(2, State, PropList).
+
 
 -spec get_entry(any(), state()) -> entry().
 get_entry(Id, TableName) ->
