@@ -68,7 +68,7 @@
 
 -type buffer() :: [buffer_element()].
 -type buffer_element() :: {{comm:mypid(), non_neg_integer()} | comm:erl_local_pid(),
-	module(), crdt:query_fun() | crdt:update_fun()}.
+	crdt:crdt_module(), crdt:query_fun() | crdt:update_fun()}.
 
 -type waitlist() :: [{comm:mypid_plain(), non_neg_integer()}].
 
@@ -295,8 +295,8 @@ set_field(FieldIdx, PState, NewValue) ->
 -spec new_buffer() -> buffer().
 new_buffer() -> [].
 
--spec add_to_buffer(non_neg_integer(), comm:erl_pid(), module(),
-	crdt:query_fun() | crdt:update_fun(), #pstate{}) -> #pstate{}.
+-spec add_to_buffer(non_neg_integer(), {comm:mypid(), non_neg_integer()} | comm:erl_local_pid(),
+	crdt:crdt_module(), crdt:query_fun() | crdt:update_fun(), #pstate{}) -> #pstate{}.
 add_to_buffer(BufIdx, Client, DataType, Fun, PState) ->
 	BufEle = {Client, DataType, Fun},
 	NewBuf = [BufEle | element(BufIdx, PState)],

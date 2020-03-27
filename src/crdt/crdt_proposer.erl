@@ -28,6 +28,8 @@
 
 -behaviour(gen_component).
 
+-export_type([state/0]).
+
 -export([write/5]).
 -export([read/5]).
 
