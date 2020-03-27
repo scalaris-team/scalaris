@@ -37,10 +37,8 @@ read(Key, DataType, QueryFun) ->
 read_helper(Key, ApiMod, ApiFun, DataType, QueryFun) ->
     ApiMod:ApiFun(crdt_db, self(), ?RT:hash_key(Key), DataType, QueryFun),
     trace_mpath:thread_yield(),
-   
-    Return = 
     receive
-        ?SCALARIS_RECV({read_done, ReturnValues}, ReturnValues)
+        ?SCALARIS_RECV({read_done, ReturnValues}, {ok,ReturnValues})
     after 1000 ->
         log:log("read hangs ~p~n", [erlang:process_info(self(), messages)]),
         receive
@@ -48,18 +46,9 @@ read_helper(Key, ApiMod, ApiFun, DataType, QueryFun) ->
                             begin
                                 log:log("~p read was only slow at key ~p~n",
                                         [self(), Key]),
-                                ReturnValues
+                                {ok, ReturnValues}
                             end)
         end
-    end,
-
-    %% is we got a list of queries, return a list of results.
-    %% Otherwise a single value.
-    case is_list(QueryFun) of
-        true ->
-            {ok, Return};
-        false ->
-            {ok, hd(Return)}
     end.
 
 

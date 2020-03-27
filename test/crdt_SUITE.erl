@@ -32,10 +32,23 @@ all()   -> [
             {group, gcounter_group},
             {group, pncounter_group},
             {group, optorset_group},
-            {group, proto_sched_group}
+            {group, proto_sched_group},
+            {group, wait_free_group} %% subset of other tests with using the wrapper
            ].
 
 groups() -> [
+        {wait_free_group, [sequence, {repeat, ?NUM_REPEATS}],
+         [
+            crdt_gcounter_inc,
+            crdt_gcounter_read_your_write,
+            crdt_gcounter_read_monotonic,
+            crdt_gcounter_concurrent_read_monotonic,
+            crdt_gcounter_ordered_concurrent_read,
+            crdt_pncounter_banking,
+            crdt_optorset_lteq,
+            crdt_submit_update_command_list,
+            crdt_submit_query_command_list
+         ]},
         {gcounter_group, [sequence, {repeat, ?NUM_REPEATS}],
          [
             crdt_gcounter_inc,
@@ -72,19 +85,26 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
+init_per_group(wait_free_group, Config) ->
+    [{crdt_rsm, wf_crdt_paxos} | Config];
 init_per_group(_Group, Config) ->
-    Config.
+    [{crdt_rsm, crdt_paxos} | Config].
 
 end_per_group(_Group, _Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    {crdt_rsm, RSM} =
+        case lists:keyfind(crdt_rsm, 1, Config) of
+            false -> {crdt_rsm, crdt_paxos};
+            Any -> Any
+        end,
     Size = randoms:rand_uniform(2, 8),
 
     unittest_helper:make_ring(Size, [{config, [
                                         {log_path, PrivDir},
-                                        {crdt_rsm, crdt_paxos},
+                                        {crdt_rsm, RSM},
                                         {ordered_links, false}]
                                     }]),
 
@@ -92,15 +112,6 @@ init_per_testcase(_TestCase, Config) ->
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, _Config) ->
-    ok.
-
-test_wait_freedom(_Config) ->
-    gcounter_on_cseq:inc("1"),
-
-    ct:pal("UPDATER DONE", []),
-
-    gcounter_on_cseq:read("1"),
-
     ok.
 
 crdt_submit_update_command_list(_Config) ->
@@ -656,7 +667,7 @@ tester_type_check_crdt(_Config) ->
             {add_read_reply, 5},        % needs value matching db_type
             {send_to_all_replicas, 3},  % sends messages
             {send_to_local_replica, 2}, % sends messages
-            {send_to_local_replica, 3},  % sends messages
+            {send_to_local_replica, 3}, % sends messages
             {start_request, 2},         % sends messages
             {inform_client, 3},         % cannot create valid envelopes
             {inform_client, 2},         % cannot create valid envelopes
@@ -685,6 +696,28 @@ tester_type_check_crdt(_Config) ->
             {msg_vote_deny, 4},         % sends messages
             {msg_vote_reply, 2}         % sends messages
            ]
+          },
+          {crdt_wait_free_wrapper,
+            [
+             {init, 1},                 % sends messages
+             {start_link, 3},           % starts processes
+             {start_gen_component, 5},  % unsupported types
+             {on, 2},                   % sends messages
+             {read, 5},                 % needs fun as input
+             {write, 5}                 % needs fun as input
+            ],
+            [
+             {get_field, 2},            %% needs in bounds index
+             {set_field, 3},            %% needs in bounds index
+             {add_to_buffer, 5},        %% needs in bounds index
+             {get_pstate, 2},           % needs valid ets:tid()
+             {save_pstate, 3},          % needs valid ets:tid()
+             {send_to_all_proposers, 2}, % sends messages
+             {notify_waiting_progress, 2}, % sends messages
+             {inform_all_clients, 2},   % sends messages
+             {inform_client, 2},        % sends messagse
+             {inform_client, 3}         % sends messagse
+            ]
           },
           {gla_proposer,
            [

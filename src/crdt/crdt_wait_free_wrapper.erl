@@ -57,9 +57,11 @@
 		curr_update_buffer = new_buffer() :: buffer(),
 
 		%% state needed to execute queries
-		query_id = 0 :: non_neg_integer(),
+		query_id = 0 :: non_neg_integer(), %% needed to prevent sending multiple replies to client
 		query_in_progress = false :: boolean(),
 		query_buffer = new_buffer() :: buffer(),
+		curr_query_buffer = new_buffer() :: buffer(),
+
 		pending_queries = [] :: waitlist(),
 		updates_waiting = [] :: waitlist()
 	}).
@@ -75,7 +77,8 @@
 	{
 		?PDB:tableid(),
 		dht_node_state:db_selector(),
-		[comm:mypid_plain()]
+		[comm:mypid_plain()],
+		crdt_proposer:state()	%% it this wrapper is running, crdt_proposer gen_component isn't!
 	}.
 
 
@@ -91,7 +94,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 init(DBSelector) ->
 	crdt_proposer:send_to_all_replicas(?RT:hash_key("1"),
 		{crdt_acceptor, register_proposer, '_', comm:this(), 0, key}),
-    {?PDB:new(?MODULE, [set]), DBSelector, [comm:this()]}.
+    {?PDB:new(?MODULE, [set]), DBSelector, [comm:this()], crdt_proposer:init(DBSelector)}.
 
 
 %%%%%%%%% API
@@ -100,9 +103,6 @@ init(DBSelector) ->
 	crdt:crdt_module(), crdt:query_fun()) -> ok.
 read(CSeqPidName, Client, Key, DataType, QueryFun) ->
 	Pid = pid_groups:find_a(CSeqPidName),
-	%% send to every proposer! TODO: make so that it works with distributed proposers?
-	%% This is needed to guarantee wait freedom, as only progress of a
-	%% single proposer can be ensured.
 	comm:send_local(Pid, {new_request, {read, Client, Key, DataType, QueryFun}}).
 
 -spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(),
@@ -121,6 +121,9 @@ on({new_request, {read, Client, Key, DataType, QueryFun}}, State) ->
 	NP1 = ?set(query_id, PState, QueryId),
 	NP2 = add_to_pending(Client, QueryId, NP1),
 	save_pstate(Key, NP2, State),
+	%% send to every proposer!
+	%% This is needed to guarantee wait freedom, as only progress of a
+	%% single proposer can be ensured.
 	send_to_all_proposers({query_internal, {comm:this(), QueryId}, Key, DataType, QueryFun}, State),
 	State;
 
@@ -142,19 +145,31 @@ on({process_query, Key}, State) ->
 			NP1 = ?set(query_in_progress, PState, true),
 
 			%% base protocol query execution...
-
-			[
-				comm:send(Proposer, {query_done, Key, QueryId, 0}) ||
-				{{Proposer, QueryId}, _, _} <- QueryBuf
-			],
+			DataType = element(2, hd(QueryBuf)), %% assumes every op access same datatype!
+			QueryFuns = [element(3, E) || E <- QueryBuf],
+			
 			NP2 = ?set(query_buffer, NP1, new_buffer()),
-			NP3 = ?set(query_in_progress, NP2, false),
+			NP3 = ?set(curr_query_buffer, NP2, QueryBuf),
+			save_pstate(Key, NP3, State),
 
-			notify_waiting_progress(Key, NP3),
-			NP4 = clear_waitlist(NP3),
-			save_pstate(Key, NP4, State),
-			gen_component:post_op({process_query, Key}, State)
+			This = comm:reply_as(comm:this(), 3, {query_buffer_done, Key, '_'}),
+			crdt_proposer:read(crdt_db, This, Key, DataType, QueryFuns),
+			State
 	end;
+
+on({query_buffer_done, Key, _Result={read_done, Results}}, State) ->
+	PState = get_pstate(Key, State),
+	QueryBuf = ?get(curr_query_buffer, PState),
+	notify_waiting_progress(Key, PState),
+	NP1 = clear_waitlist(PState),
+	NP2 = ?set(query_in_progress, NP1, false),
+	save_pstate(Key, NP2, State),
+
+	[
+		comm:send(Proposer, {query_done, Key, QueryId, Result}) ||
+		{{{Proposer, QueryId}, _, _}, Result} <- lists:zip(QueryBuf, Results)
+	],
+	gen_component:post_op({process_query, Key}, State);
 
 on({query_done, Key, QueryId, Result}, State) ->
 	PState = get_pstate(Key, State),
@@ -185,11 +200,8 @@ on({process_update, Key}, State) ->
 			State;
 		false -> 
 			NP1 = ?set(update_in_progress, PState, true),
-			NP2 = ?set(curr_update_buffer, NP1, UpdateBuf),
-			NP3 = ?set(update_buffer, NP2, new_buffer()),
-			BuffId = ?get(buffer_id, NP3) + 1,
-			NP4 = ?set(buffer_id, NP3, BuffId),
-			save_pstate(Key, NP4, State),
+			BuffId = ?get(buffer_id, NP1),
+			save_pstate(Key, NP1, State),
 			case ?get(query_in_progress, PState) of
 				true ->
 					send_to_all_proposers({wait_for_progess, comm:this(), Key, BuffId}, State),
@@ -199,21 +211,36 @@ on({process_update, Key}, State) ->
 			end
 	end;
 
-on({progress_made, Key, BuffId}, State) ->
+on({progress_made, Key, ThisBuffId}, State) ->
 	PState = get_pstate(Key, State),
-	case ?get(buffer_id, PState) =/= BuffId of
+	BuffId = ?get(buffer_id, PState),
+	case ?get(buffer_id, PState) =/= ThisBuffId of
 		true ->
 			%% this is an outdated progress message which we can ignore
 			State;
 		false ->
-			CurrBuff = ?get(curr_update_buffer, PState),
-			%% TODO: base_protocol_update
-			%% wait for completion...
-			NP1 = ?set(update_in_progress, PState, false),
-			inform_all_clients(write_done, CurrBuff),
-			save_pstate(Key, NP1, State),
-			gen_component:post_op({process_update, Key}, State)
+			UpdateBuf = ?get(update_buffer, PState),
+			NP1 = ?set(curr_update_buffer, PState, UpdateBuf),
+			NP2 = ?set(update_buffer, NP1, new_buffer()),
+			NP3 = ?set(buffer_id, NP2,BuffId + 1),
+			
+			%% base protocol query execution...
+			DataType = element(2, hd(UpdateBuf)), %% assumes every op access same datatype!
+			UpdateFuns = [element(3, E) || E <- UpdateBuf],
+			save_pstate(Key, NP3, State),
+
+			This = comm:reply_as(comm:this(), 3, {update_buffer_done, Key, '_'}),
+			crdt_proposer:write(crdt_db, This, Key, DataType, UpdateFuns),
+			State
 	end;
+
+on({update_buffer_done, Key, {write_done}}, State) ->
+	PState = get_pstate(Key, State),
+	CurrBuff = ?get(curr_update_buffer, PState),
+	NP1 = ?set(update_in_progress, PState, false),
+	inform_all_clients(write_done, CurrBuff),
+	save_pstate(Key, NP1, State),
+	gen_component:post_op({process_update, Key}, State);
 
 on({wait_for_progess, Proposer, Key, BuffId}, State) ->
 	PState = get_pstate(Key, State),
@@ -223,10 +250,9 @@ on({wait_for_progess, Proposer, Key, BuffId}, State) ->
 			save_pstate(Key, NP1, State);
 		false ->
 			%% no query in progress -> we can immediately reply
-			comm:send({progress_made, Key, BuffId}, State)
+			comm:send(Proposer, {progress_made, Key, BuffId})
 	end,
 	State;
-
 
 on({registered_proposers, ProposerList}, State) ->
 	OldList = proposerlist(State),
@@ -235,7 +261,14 @@ on({registered_proposers, ProposerList}, State) ->
 			State;
 		false ->
 			set_proposerlist(State, ProposerList)
-	end.
+	end;
+
+%% forward unknown messages to crdt_proposer!
+on(UnknownMessage, State) ->
+	%?TRACE("crdt_proposer msg ~n~p", UnknownMessage),
+	ProposerState = proposerstate(State),
+	NewProposerState = crdt_proposer:on(UnknownMessage, ProposerState),
+	set_proposerstate(State, NewProposerState).
 
 %%%%%%% STATE MANAGEMENT
 -spec get_pstate(client_key(), state()) -> #pstate{}.
@@ -250,10 +283,6 @@ get_pstate(Key, State) ->
 -spec save_pstate(client_key(), #pstate{}, state()) -> ok.
 save_pstate(Key, PState, State) ->
     ?PDB:set({Key, PState}, tablename(State)).
-
--spec delete_pstate(client_key(), state()) -> ok.
-delete_pstate(Key, State) ->
-    ?PDB:delete(Key, tablename(State)).
 
 -spec get_field(non_neg_integer(), #pstate{}) -> any().
 get_field(FieldIdx, PState) ->
@@ -279,13 +308,15 @@ add_to_pending(Client, Id, PState) ->
 	NewPending = [{Client, Id} | Pending],
 	?set(pending_queries, PState, NewPending).
 
--spec remove_pending(non_neg_integer(), #pstate{}) -> #pstate{}.
+-spec remove_pending(non_neg_integer(), #pstate{}) ->
+	{none | {comm:mypid_plain(), non_neg_integer()}, #pstate{}}.
 remove_pending(Id, PState) -> 
 	Pending = ?get(pending_queries, PState),
 	{Removed, NewPending} = pd_helper(Id, Pending, []),
 	{Removed, ?set(pending_queries, PState, NewPending)}.
 
--spec pd_helper(non_neg_integer(), waitlist(), waitlist()) -> waitlist().
+-spec pd_helper(non_neg_integer(), waitlist(), waitlist()) -> 
+	{none | {comm:mypid_plain(), non_neg_integer()}, waitlist()}.
 pd_helper(_Id, [], Pending) -> {none, Pending};
 pd_helper(Id, [E={_, Id} | T], Pending) -> {E, T ++ Pending};
 pd_helper(Id, [H | T], Pending) -> pd_helper(Id, T, [H | Pending]).
@@ -314,6 +345,10 @@ proposerlist(State) -> element(3, State).
 -spec set_proposerlist(state(), [comm:mypid_plain()]) -> state().
 set_proposerlist(State, ProposerList) -> setelement(3, State, ProposerList).
 
+-spec proposerstate(state()) -> crdt_proposer:state().
+proposerstate(State) -> element(4, State).
+-spec set_proposerstate(state(), crdt_proposer:state()) -> state().
+set_proposerstate(State, ProposerState) -> setelement(4, State, ProposerState).
 
 %%%%% Communication helper
 -spec send_to_all_proposers(any(), state()) -> ok.

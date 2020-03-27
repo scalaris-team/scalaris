@@ -113,7 +113,7 @@ on({crdt_acceptor, update, _Cons, Proposer, ReqId, Key, DataType, UpdateFuns}, S
       lists:foldl(
         fun(UpdateFun, TmpVal) ->
           DataType:apply_update(UpdateFun, ThisReplicaId, TmpVal)
-        end, CVal, UpdateFuns),
+        end, CVal, lists:flatten(UpdateFuns)),
     ?ASSERT(DataType:lteq(CVal, NewCVal)),
 
     NewEntry = entry_set_val(Entry, NewCVal),

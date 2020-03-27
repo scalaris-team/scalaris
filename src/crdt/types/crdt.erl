@@ -29,8 +29,9 @@
 -type crdt()        :: gcounter:crdt() | pncounter:crdt() | gset:crdt().
 -type crdt_module() :: gcounter | pncounter | gset.
 
--type update_fun()  :: fun((crdt()) -> crdt()) | fun((non_neg_integer(), crdt()) -> crdt()).
--type query_fun()   :: fun((crdt()) -> term()).
+-type update_fun()  :: fun((crdt()) -> crdt()) | fun((non_neg_integer(), crdt()) -> crdt()) |
+						[fun((crdt()) -> crdt())] | [fun((non_neg_integer(), crdt()) -> crdt())].
+-type query_fun()   :: fun((crdt()) -> term()) | [fun((crdt()) -> term())].
 
 -spec update_noop(crdt()) -> crdt().
 update_noop(CRDT) -> CRDT.

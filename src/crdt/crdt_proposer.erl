@@ -84,10 +84,7 @@ init(DBSelector) ->
 
 -spec read(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
     [crdt:query_fun()] | crdt:query_fun()) -> ok.
-read(CSeqPidName, Client, Key, DataType, QueryFun) when is_function(QueryFun) ->
-    read(CSeqPidName, Client, Key, DataType, [QueryFun]);
-
-read(CSeqPidName, Client, Key, DataType, QueryFuns) when is_list(QueryFuns) ->
+read(CSeqPidName, Client, Key, DataType, QueryFuns) ->
     start_request(CSeqPidName, {req_start, {read, Client, Key, DataType, QueryFuns, none, 0}}).
 
 -spec write(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key(), crdt:crdt_module(),
@@ -139,7 +136,6 @@ on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
                 {Done, NewReplies} = add_read_reply(Replies, UsedReadRound, WriteRound,
                                                     CVal, entry_datatype(Entry)),
                 NewEntry = entry_set_replies(Entry, NewReplies),
-
                 case Done of
                     false ->
                         save_entry(NewEntry, tablename(State)),
@@ -148,9 +144,8 @@ on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
                         %% value is already established in a quorum, skip 2. phase
                         QueryFuns = entry_funs(NewEntry),
                         Type = entry_datatype(NewEntry),
-                        ReturnVals = 
-                            [Type:apply_query(QueryFun, NewReplies#r_replies.value)
-                             || QueryFun <- QueryFuns],
+                        ReturnVals = apply_queries(Type, QueryFuns, NewReplies#r_replies.value),
+
                         trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
                                                       return_value, ReturnVals}),
@@ -160,11 +155,9 @@ on({read, {prepare_reply, ReqId, UsedReadRound, WriteRound, CVal}}, State) ->
                     retry_read ->
                         %% we received inconsistent read rounds... thus we have
                         %% concurrency and must retry to get consistent rounds accepts
-                        %% entry will be deleted in post_op call to on handler
-                        gen_component:post_op({read,
-                                               {read_deny, ReqId, fixed, UsedReadRound,
-                                                round_inc(NewReplies#r_replies.highest_seen_round)}},
-                                             State);
+                        %% entry will be deleted in called onhandler
+                        on({read, {read_deny, ReqId, fixed, UsedReadRound,
+                                round_inc(NewReplies#r_replies.highest_seen_round)}}, State);
                     true ->
                         delete_entry(NewEntry, tablename(State)),
 
@@ -208,9 +201,8 @@ on({read, {vote_reply, ReqId, done}}, State) ->
                     true ->
                         QueryFuns = entry_funs(NewEntry),
                         DataType = entry_datatype(NewEntry),
-                        ReturnVals = 
-                            [DataType:apply_query(QueryFun, NewReplies#r_replies.value)
-                                || QueryFun <- QueryFuns],
+                        ReturnVals = apply_queries(DataType, QueryFuns, NewReplies#r_replies.value),
+
                         trace_mpath:log_info(self(), {read_done,
                                                       crdt_value, NewReplies#r_replies.value,
                                                       return_value, ReturnVals}),
@@ -329,6 +321,12 @@ on({local_range_req, Key, Message, {get_state_response, LocalRange}}, State) ->
     State.
 
 %%%%%% internal helper
+%% Apply all queries. Can handle nested lists of queries.
+-spec apply_queries(crdt:crdt_module(), [crdt:query_fun()] | crdt:query_fun(), crdt:crdt()) -> any() | [any()].
+apply_queries(DataType, QueryFun, Crdt) when is_function(QueryFun) ->
+    DataType:apply_query(QueryFun, Crdt);
+apply_queries(DataType, QueryFuns, Crdt) ->
+   [apply_queries(DataType, Fun, Crdt) || Fun <- QueryFuns].
 
 -spec send_to_local_replica(?RT:key(), tuple()) -> ok.
 send_to_local_replica(Key, Message) ->
