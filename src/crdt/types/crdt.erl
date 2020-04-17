@@ -53,6 +53,7 @@ rsm_implementation() ->
     Available =
         [{wf_crdt_paxos, {crdt_wait_free_wrapper, crdt_acceptor}},
          {crdt_paxos, {crdt_proposer, crdt_acceptor}},
+         {zheng, {zheng_proposer, zheng_acceptor}},
          {lattice, {gla_proposer, gla_acceptor}}],
     element(2, lists:keyfind(config:read(crdt_rsm), 1, Available)).
 

@@ -233,8 +233,8 @@ on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
     NewRBRState = prbr:on(X, PRBRState),
     dht_node_state:set_prbr_state(State, DBKind, NewRBRState);
 
-on(X, State) when is_tuple(X) andalso
-                  (element(1, X) =:= crdt_acceptor orelse element(1,X) =:= gla_acceptor) ->
+on(X, State) when is_tuple(X) andalso (element(1, X) =:= crdt_acceptor
+        orelse element(1,X) =:= zheng_acceptor orelse element(1,X) =:= gla_acceptor) ->
     Module = element(1, X),
     CrdtState = dht_node_state:get(State, crdt_db),
     NewCrdtState = Module:on(X, CrdtState),
