@@ -27,6 +27,7 @@
 -define(NUM_REPEATS, 5).
 -define(RANDOMIZE_RING, true).
 -define(CMD_PER_TEST, 1000).
+-define(CMD_PER_PROTO_TEST, 100).
 -define(IMPLEMENTATIONS,
     [%zheng, not working properly yet
     wf_crdt_paxos,
@@ -490,7 +491,7 @@ crdt_proto_sched_write(_Config) ->
     UnitTestPid = self(),
 
     Parallel = randoms:rand_uniform(1, 10),
-    Count = (?CMD_PER_TEST div 10) div Parallel,
+    Count = ?CMD_PER_PROTO_TEST div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
 
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun, TraceId),
@@ -525,7 +526,7 @@ crdt_proto_sched_concurrent_read_monotonic(_Config) ->
 
     %% Start writer
     ParallelWriter = randoms:rand_uniform(1, 10),
-    Count = (?CMD_PER_TEST div 10) div ParallelWriter,
+    Count = ?CMD_PER_PROTO_TEST div ParallelWriter,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
     _ = spawn_writers(UnitTestPid, ParallelWriter, Count, WriteFun, TraceId),
 
@@ -576,7 +577,7 @@ crdt_proto_sched_concurrent_read_ordered(_Config) ->
 
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
-    Count = (?CMD_PER_TEST div 10) div WriterCount,
+    Count = ?CMD_PER_PROTO_TEST div WriterCount,
     WriteFun = fun (_) ->
                     gcounter_on_cseq:inc(Key)
                end,
@@ -630,7 +631,7 @@ crdt_proto_sched_read_your_write(_Config) ->
 
     %% Start clinets
     Parallel = randoms:rand_uniform(1, 10),
-    Count = (?CMD_PER_TEST div 10) div Parallel,
+    Count = ?CMD_PER_PROTO_TEST div Parallel,
     WriteFun = fun (_) ->
                 {ok, Old} = gcounter_on_cseq:read(Key),
                 ok = gcounter_on_cseq:inc(Key),
