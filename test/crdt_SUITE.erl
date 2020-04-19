@@ -26,56 +26,50 @@
 
 -define(NUM_REPEATS, 5).
 -define(RANDOMIZE_RING, true).
+-define(CMD_PER_TEST, 1000).
+-define(IMPLEMENTATIONS,
+    [%zheng, not working properly yet
+    wf_crdt_paxos,
+    crdt_paxos]).
+-define(DEFAULT_IMPLEMENTATION, crdt_paxos).
 
-all()   -> [
-            tester_type_check_crdt,
-            {group, gcounter_group},
-            {group, pncounter_group},
-            {group, optorset_group},
-            {group, proto_sched_group},
-            {group, wait_free_group} %% subset of other tests with using the wrapper
-           ].
 
-groups() -> [
-        {wait_free_group, [sequence, {repeat, ?NUM_REPEATS}],
-         [
-            crdt_gcounter_inc,
-            crdt_gcounter_read_your_write,
-            crdt_gcounter_read_monotonic,
-            crdt_gcounter_concurrent_read_monotonic,
-            crdt_gcounter_ordered_concurrent_read,
-            crdt_pncounter_banking,
-            crdt_optorset_lteq,
-            crdt_submit_update_command_list,
-            crdt_submit_query_command_list
-         ]},
-        {gcounter_group, [sequence, {repeat, ?NUM_REPEATS}],
-         [
-            crdt_gcounter_inc,
-            crdt_gcounter_read_your_write,
-            crdt_gcounter_read_monotonic,
-            crdt_gcounter_read_monotonic2,
-            crdt_gcounter_concurrent_read_monotonic,
-            crdt_gcounter_ordered_concurrent_read,
-            crdt_submit_update_command_list,
-            crdt_submit_query_command_list
-         ]},
-        {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
-         [
-          crdt_pncounter_banking
-         ]},
-        {optorset_group, [sequence, {repeat, ?NUM_REPEATS}],
-         [
-          crdt_optorset_lteq
-         ]},
-        {proto_sched_group, [sequence, {repeat, ?NUM_REPEATS}],
-         [
-          crdt_proto_sched_write,
-          crdt_proto_sched_concurrent_read_monotonic,
-          crdt_proto_sched_concurrent_read_ordered,
-          crdt_proto_sched_read_your_write
-        ]}
-    ].
+all()   -> 
+    [
+        {group, Implementation}
+    || Implementation <- ?IMPLEMENTATIONS] ++ [tester_type_check_crdt].
+
+groups() ->
+    [{I, [],
+        [sanity,
+            {gcounter_group, [sequence, {repeat, ?NUM_REPEATS}],
+             [
+                crdt_gcounter_inc,
+                crdt_gcounter_read_your_write,
+                crdt_gcounter_read_monotonic,
+                crdt_gcounter_read_monotonic2,
+                crdt_gcounter_concurrent_read_monotonic,
+                crdt_gcounter_ordered_concurrent_read,
+                crdt_submit_update_command_list,
+                crdt_submit_query_command_list
+             ]},
+            {pncounter_group, [sequence, {repeat, ?NUM_REPEATS}],
+             [
+              crdt_pncounter_banking
+             ]},
+            {optorset_group, [sequence, {repeat, ?NUM_REPEATS}],
+             [
+              crdt_optorset_lteq
+             ]},
+            {proto_sched_group, [sequence, {repeat, ?NUM_REPEATS}],
+             [
+              crdt_proto_sched_write,
+              crdt_proto_sched_concurrent_read_monotonic,
+              crdt_proto_sched_concurrent_read_ordered,
+              crdt_proto_sched_read_your_write
+            ]}
+        ]
+    } || I <- ?IMPLEMENTATIONS].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -85,10 +79,11 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-init_per_group(wait_free_group, Config) ->
-    [{crdt_rsm, wf_crdt_paxos} | Config];
-init_per_group(_Group, Config) ->
-    [{crdt_rsm, crdt_paxos} | Config].
+init_per_group(Group, Config) ->
+    case lists:member(Group, ?IMPLEMENTATIONS) of
+        true -> [{crdt_rsm, Group} | Config];
+        false -> Config
+    end.
 
 end_per_group(_Group, _Config) ->
     ok.
@@ -97,28 +92,47 @@ init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     {crdt_rsm, RSM} =
         case lists:keyfind(crdt_rsm, 1, Config) of
-            false -> {crdt_rsm, crdt_paxos};
+            false -> {crdt_rsm, ?DEFAULT_IMPLEMENTATION};
             Any -> Any
         end,
-    Size = randoms:rand_uniform(2, 8),
+    {Size, R} =
+        case ?RANDOMIZE_RING of
+            true ->
+                {randoms:rand_uniform(2, 8), randoms:rand_uniform(2, 8)};
+            false ->
+                {3, 3}
+        end,
 
     unittest_helper:make_ring(Size, [{config, [
                                         {log_path, PrivDir},
+                                        {replication_factor, R},
                                         {crdt_rsm, RSM},
                                         {ordered_links, false}]
                                     }]),
 
-    ct:pal("Start test with ringsize ~p", [Size]),
+    ct:pal("Start test with ringsize ~p, replication factor ~p and CRDT implementation ~p",
+        [Size, R, RSM]),
     [{stop_ring, true} | Config].
 
 end_per_testcase(_TestCase, _Config) ->
+    ok.
+
+sanity(_Config) ->
+
+    Key = randoms:getRandomString(),
+
+    ok = gcounter_on_cseq:inc(Key),
+    {ok, Result} = gcounter_on_cseq:read(Key),
+
+    ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
+    ?equals(Result, 1),
     ok.
 
 crdt_submit_update_command_list(_Config) ->
     %% submit a list of update commands
     Key = randoms:getRandomString(),
 
-    Count = randoms:rand_uniform(1, 1000),
+    Count = randoms:rand_uniform(1, ?CMD_PER_TEST),
     ct:pal("Submitting lists of ~p updates", [Count]),
     UpdateList =
         [fun(ReplicaId, Crdt) ->
@@ -144,7 +158,7 @@ crdt_submit_query_command_list(_Config) ->
     {ok, Result} = gcounter_on_cseq:read(Key),
     ?equals(Count, Result),
 
-    QueryListLength = randoms:rand_uniform(1, 50),
+    QueryListLength = randoms:rand_uniform(1, ?CMD_PER_TEST div 10),
     QueryList =
         [case randoms:rand_uniform(1, 10000) rem 2 of
             0 ->
@@ -172,8 +186,8 @@ crdt_gcounter_inc(_Config) ->
     Key = randoms:getRandomString(),
     UnitTestPid = self(),
 
-    Parallel = randoms:rand_uniform(1, 10),
-    Count = 1000 div Parallel,
+    Parallel = randoms:rand_uniform(2, 10),
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun),
     wait_writers_completion(Parallel),
@@ -181,7 +195,7 @@ crdt_gcounter_inc(_Config) ->
     {ok, Result} = gcounter_on_cseq:read(Key),
     ct:pal("gcounter state is: ~p", [gcounter_on_cseq:read_state(Key)]),
     ct:pal("Planned ~p increments, done ~p~n", [Count*Parallel, Result]),
-    ?equals(Count*Parallel, Result),
+    ?equals(Result, Count*Parallel),
     ok.
 
 crdt_pncounter_banking(_Config) ->
@@ -201,7 +215,7 @@ crdt_pncounter_banking(_Config) ->
 
     %% spawn worker
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 1000 div Parallel,
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun =  fun(_I) ->
                     TransactAmount = randoms:rand_uniform(1, StartMoney),
                     From = lists:nth(randoms:rand_uniform(1, AccountNum+1), Accounts),
@@ -232,7 +246,7 @@ crdt_gcounter_read_your_write(_Config) ->
 
     %% Start writer
     Parallel = randoms:rand_uniform(20, 21),
-    Count = 1000 div Parallel,
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun = fun (_) ->
                     {ok, Old} = gcounter_on_cseq:read(Key),
                     ok = gcounter_on_cseq:inc(Key),
@@ -258,7 +272,7 @@ crdt_gcounter_read_monotonic(_Config) ->
 
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 1000 div Parallel,
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun = fun (_) ->
                     ok = gcounter_on_cseq:inc(Key)
                end,
@@ -308,7 +322,7 @@ crdt_gcounter_read_monotonic2(_Config) ->
 
     %% do all the writes
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 1000 div Parallel,
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun = fun (_) ->
                     ok = gcounter_on_cseq:inc(Key)
                end,
@@ -341,7 +355,7 @@ crdt_gcounter_concurrent_read_monotonic(_Config) ->
 
     %% Start writer
     Parallel = randoms:rand_uniform(1, 50),
-    Count = 1000 div Parallel,
+    Count = ?CMD_PER_TEST div Parallel,
     WriteFun = fun (_) ->
                     ok = gcounter_on_cseq:inc(Key)
                end,
@@ -382,7 +396,7 @@ crdt_gcounter_ordered_concurrent_read(_Config) ->
 
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
-    Count = 500 div WriterCount,
+    Count = (?CMD_PER_TEST div 10) div WriterCount,
     WriteFun = fun (_) ->
                     ok = gcounter_on_cseq:inc(Key)
                end,
@@ -422,7 +436,7 @@ crdt_optorset_lteq(_Config) ->
 
     %% Generate some Sets
     InitSeeds = 1,
-    SetNumber = 1000,
+    SetNumber = ?CMD_PER_TEST div 10,
 
     ct:pal("Generating sets..."),
     ReplicaCount = config:read(replication_factor),
@@ -476,7 +490,7 @@ crdt_proto_sched_write(_Config) ->
     UnitTestPid = self(),
 
     Parallel = randoms:rand_uniform(1, 10),
-    Count = 500 div Parallel,
+    Count = (?CMD_PER_TEST div 10) div Parallel,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
 
     _ = spawn_writers(UnitTestPid, Parallel, Count, WriteFun, TraceId),
@@ -511,7 +525,7 @@ crdt_proto_sched_concurrent_read_monotonic(_Config) ->
 
     %% Start writer
     ParallelWriter = randoms:rand_uniform(1, 10),
-    Count = 100 div ParallelWriter,
+    Count = (?CMD_PER_TEST div 10) div ParallelWriter,
     WriteFun = fun(_I) -> ok = gcounter_on_cseq:inc(Key) end,
     _ = spawn_writers(UnitTestPid, ParallelWriter, Count, WriteFun, TraceId),
 
@@ -562,7 +576,7 @@ crdt_proto_sched_concurrent_read_ordered(_Config) ->
 
     %% Start writers
     WriterCount = randoms:rand_uniform(1, 20),
-    Count = 100 div WriterCount,
+    Count = (?CMD_PER_TEST div 10) div WriterCount,
     WriteFun = fun (_) ->
                     gcounter_on_cseq:inc(Key)
                end,
@@ -616,7 +630,7 @@ crdt_proto_sched_read_your_write(_Config) ->
 
     %% Start clinets
     Parallel = randoms:rand_uniform(1, 10),
-    Count = 100 div Parallel,
+    Count = (?CMD_PER_TEST div 10) div Parallel,
     WriteFun = fun (_) ->
                 {ok, Old} = gcounter_on_cseq:read(Key),
                 ok = gcounter_on_cseq:inc(Key),
