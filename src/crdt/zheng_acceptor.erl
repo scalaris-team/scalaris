@@ -81,14 +81,16 @@
     crdt_type = null :: null | crdt:crdt_module(),
     cmd_set = new_buffer() :: buffer(),
     crdt = null :: null | crdt:crdt(),
-    replies = #replies{} :: #replies{} | done
+    replies = #replies{} :: #replies{} | done,
+
+    loop_val = null :: buffer(),
+    loop_iter = null :: non_neg_integer(),
+
+    prop_wait_list = [] :: [tuple()]
   }).
 
 %% More sensible management of query commands... these do not have to be sent
 %% to remotely as they are noops for updates?
-
-%% Replace reply_as from proposer .. no evelope saves space and we have to
-%% detect when we get multiple replies from the same request
 
 -type buffer() :: set:sets(buffer_element()).
 -type buffer_element() ::
@@ -98,7 +100,8 @@
 
 %% initialize: return initial state.
 -spec init(atom() | tuple()) -> state().
-init(DBName) -> {?PDB:new(DBName), []}.
+init(DBName) ->
+  {?PDB:new(DBName), []}.
 
 %% @doc Closes the given DB (it may be recoverable using open/1 depending on
 %%      the DB back-end).
@@ -112,7 +115,6 @@ close_and_delete(State) -> ?PDB:close_and_delete(State).
 
 -spec on(tuple(), state()) -> state().
 on({zheng_acceptor, new_read, _Cons, Proposer, Key, ReqId, DataType, QueryFuns}, State) ->
-    %?TRACE("zheng_acceptor: new query at key: ~p~n~p ", [Key, Proposer]),
     comm:send_local(self(),
       {zheng_acceptor, new_write, _Cons, Proposer, Key, ReqId, DataType, {qfun, QueryFuns}}),
     State;
@@ -120,39 +122,37 @@ on({zheng_acceptor, new_read, _Cons, Proposer, Key, ReqId, DataType, QueryFuns},
 
 %% Procedure ReceiveValue
 on({zheng_acceptor, new_write, _Cons, Proposer, Key, ReqId, DataType, UpdateFuns}, State) ->
+    ?TRACE("NEW WRITE ~p ~p", [Proposer, ReqId]),
     PState = get_pstate(Key, State),
-    NP1 =
-      case ?get(crdt, PState) =:= null of
+    NewPState = ?add(buff_val, {ReqId, Proposer}, UpdateFuns, PState),
+    save_pstate(Key, NewPState, State),
+    comm:send_local(self(), {zheng_acceptor, agree, Key, DataType}),
+    State;
+
+
+%% The following on-handlers implement the Agree Procedure in the paper
+on({zheng_acceptor, agree, Key, DataType}, State) ->
+  PState = get_pstate(Key, State),
+  NP1 =
+    case ?get(crdt, PState) =:= null of
         true ->
           T = ?set(crdt, DataType:new(), PState),
           ?set(crdt_type, DataType, T);
         false ->
           PState
-      end,
-    NewPState = ?add(buff_val, {ReqId, Proposer}, UpdateFuns, NP1),
-    save_pstate(Key, NewPState, State),
-
-    %?TRACE("zheng_acceptor: new update at key ~p~n Buffered Values: ~p", [{ReqId, Key}, ?get(buff_val, NewPState)]),
-
-    %comm:send(Proposer, {result, ok}),
-    comm:send_local(self(), {zheng_acceptor, agree, Key}),
-    State;
-
-
-%% The following on-handlers implement the Agree Procedure in the paper
-on({zheng_acceptor, agree, Key}, State) ->
-  PState = get_pstate(Key, State),
-  Buffered = ?get(buff_val, PState),
-  case ?get(active, PState) =:= false andalso
-    (not sets:is_empty(Buffered)  orelse ?get(max_seq, PState) >= ?get(seq, PState)) of
+    end,
+  Buffered = ?get(buff_val, NP1),
+  case ?get(active, NP1) =:= false andalso
+    (not sets:is_empty(Buffered)  orelse ?get(max_seq, NP1) >= ?get(seq, NP1)) of
     true ->
-      NP1 = ?set(active, true, PState),
-      NP2 = ?union(accept_val, Buffered, NP1),
-      NP3 = ?set(buff_val, new_buffer(), NP2),
+      ?TRACE("START AGREE ~p ~p", [Key, {?get(active, NP1), Buffered, ?get(max_seq, NP1), ?get(seq, NP1)}]),
+      NP2 = ?set(active, true, NP1),
+      NP3 = ?union(accept_val, Buffered, NP2),
+      NP4 = ?set(buff_val, new_buffer(), NP3),
 
       NewReplies = new_replies(),
-      NP4 = ?set(replies, NewReplies, NP3),
-      save_pstate(Key, NP4, State),
+      NP5 = ?set(replies, NewReplies, NP4),
+      save_pstate(Key, NP5, State),
       comm:send_local(self(), {zheng_acceptor, agree_loop, Key, _Iteration=1}),
       State;
     false ->
@@ -164,109 +164,174 @@ on({zheng_acceptor, agree, Key}, State) ->
 on({zheng_acceptor, agree_loop, Key, Iteration}, State) ->
   PState = get_pstate(Key, State),
   Val = ?get(accept_val, PState),
+  %?TRACE("~p ~p", [sets:size(Val),Val]),
   SeqNum = ?get(seq, PState),
+  DataType = ?get(crdt_type, PState),
+  ?TRACE("~p LOOP START SEQNUM ~p Iteration ~p", [Key, SeqNum, Iteration]),
 
-  This = comm:reply_as(comm:this(), 5, {zheng_acceptor, agree_loop_collect, Key, Iteration, '_'}),
-  Message = {zheng_acceptor, prop, Key, This, Val, Iteration, SeqNum, '_'},
-  send_to_all_replicas(Key, Message, _ConsLookup=8, _KeyReplacement=3),
+  NP1 = ?set(loop_iter, Iteration, PState),
+  NP2 = ?set(loop_val, Val, NP1),
+  NP3 = ?set(replies, #replies{}, NP2),
+  save_pstate(Key, NP3, State),
+
+  %% the second key entry is necesasry as this is not replaced by the dht and is used
+  %% for identification if one acceptor process manages multiple replicas
+  Message = {zheng_acceptor, prop, Key, Key, DataType, comm:this(), Val, Iteration, SeqNum, '_'},
+  send_to_all_replicas(Key, Message, _ConsLookup=10, _KeyReplacement=3),
 
   State;
 
-on({zheng_acceptor, agree_loop_collect, Key, Iteration,
-    {ReplyType, Val, Iter, SeqNum}}, State) ->
+on({zheng_acceptor, agree_loop_collect, Key,
+    {ReplyType, ReplyVal, Iter, SeqNum}}, State) ->
   PState = get_pstate(Key, State),
+  Val = ?get(loop_val, PState),
+  CurIter = ?get(loop_iter, PState),
+  CurSeqNum = ?get(seq, PState),
   Replies = ?get(replies, PState),
-  case ?get(seq, PState) =:= SeqNum andalso Iteration =:= Iter andalso Replies =/= done of
+
+  case CurSeqNum =:= SeqNum andalso CurIter =:= Iter andalso Replies =/= done of
     false ->
       %% is outdated reply from a previous iteration / seqnumber --> ignore msg
       State;
     true ->
-      Replies = ?get(replies, PState),
       NR1 = ?rinc(count, Replies),
       NR2 = 
         case ReplyType of
           accept ->
             ?rinc(accept_count, NR1);
           reject ->
-            ?radd(reject_val, Val, NR1);
+            ?radd(reject_val, ReplyVal, NR1);
           decide ->
-            ?radd(decide_val, Val, NR1)
+            ?radd(decide_val, ReplyVal, NR1)
         end,
       NP1 = ?set(replies, NR2, PState),
+      ?TRACE("~p LOOP COLLECT~n~p", [Key, {CurSeqNum, CurIter, NR2}]),
 
-      DecidedVals = ?rget(decide_val, NR2),
-      Accepted = ?rget(accept_count, NR2),
-      RejectVals = ?rget(reject_val, NR2),
-      NP2 =
-        case {DecidedVals =/= [], Accepted > (?n div 2)} of
-          {true, _} ->
-            LearnedVal = union(DecidedVals),
-            accept_loop_end(Key, LearnedVal, NP1);
-          {false, true} ->
-            LearnedVal = ?get(accept_val, NP1),
-            accept_loop_end(Key, LearnedVal, NP1);
-          {false, false} ->
-            AcceptVal = ?get(accept_val, NP1),
-            TP = ?set(accept_val, union([AcceptVal | RejectVals]), NP1),
-            %% check if we are doing another loop iteration
-            case Iteration =< ?f + 1 of
-              true ->
-                comm:send_local(self(), {zheng_acceptor, agree_loop, Key, Iteration+1}),
-                TP;
-              false ->
-                accept_loop_end(Key, AcceptVal, TP)
-            end
-        end,
-
-      save_pstate(Key, NP2, State),
-      State
+      TotalReplyCount = ?rget(count, NR2),
+      case TotalReplyCount =:= ?n - ?f of
+        false ->
+          %% not enough replies yet
+          save_pstate(Key, NP1, State),
+          State;
+        true ->
+          DecidedVals = ?rget(decide_val, NR2),
+          Accepted = ?rget(accept_count, NR2),
+          RejectVals = ?rget(reject_val, NR2),
+          NP2 =
+            case {DecidedVals =/= [], Accepted > (?n div 2)} of
+              {true, _} ->
+                LearnedVal = union(DecidedVals),
+                accept_loop_end(Key, LearnedVal, NP1, State);
+              {false, true} ->
+                accept_loop_end(Key, Val, NP1, State);
+              {false, false} ->
+                AcceptVal = ?get(accept_val, NP1),
+                TP = ?set(accept_val, union([AcceptVal | RejectVals]), NP1),
+                %% check if we are doing another loop iteration
+                case CurIter < ?f + 1 of
+                  true ->
+                    ?TRACE("~p LOOP NEW ITERATION ~p", [Key, CurSeqNum]),
+                    comm:send_local(self(), {zheng_acceptor, agree_loop, Key, CurIter+1}),
+                    TP;
+                  false ->
+                    accept_loop_end(Key, Val, TP, State)
+                end
+            end,
+          NP3 = ?set(replies, done, NP2),
+          save_pstate(Key, NP3, State),
+          State
+      end
   end;
 
-
-on({zheng_acceptor, prop, Key, Client, Val, Iteration, SeqNum, _Cons}, State) ->
+%%% prop function
+on({zheng_acceptor, prop, Key, SrcKey, DataType, Client, Val, Iteration, SeqNum, _Cons}, State) ->
+  ?TRACE("~p prop: receievd msg from ~p ", [Key, {SrcKey, Iteration, SeqNum}]),
   PState = get_pstate(Key, State),
   Seq = ?get(seq, PState),
 
   case SeqNum < Seq of
     true ->
+      ?TRACE("~p ADD TO BUFF ~p", [Key, Val]),
       NP1 = ?union(buff_val, Val, PState),
       Lv = ?get(learned_val, PState),
-      comm:send(Client, {decide, dict:fetch(SeqNum, Lv), Iteration, SeqNum}),
-      save_pstate(Key, NP1, State),
-      comm:send_local(self(), {zheng_acceptor, agree, Key});
+      send_prop_reply(Client, SrcKey, {decide, dict:fetch(SeqNum, Lv), Iteration, SeqNum}),
+      save_pstate(Key, NP1, State);
     false ->
       NP1 = ?set(max_seq, max(SeqNum, Seq), PState),
-      save_pstate(Key, NP1, State),
-      comm:send_local(self(), {zheng_acceptor, prop_wait, Key, Client, Val, Iteration, SeqNum})
+      PropWaitList = ?get(prop_wait_list, NP1),
+      %% Optimization: only keep for each client the entry wait entry with the
+      %% highest {seqnum, iteration} pair. As newer msgs with a higher pair indicate
+      %% that the previous iteration is already complete. This prevents a lacking
+      %% behind process from being overwhelmed by lots of wait-list entries, as
+      %% all entries have to be checked.
+      {Highest, FilteredList} = lists:foldl(
+        fun(E = {ESrcKey, EClient, EVal, EIter, ESeq},{AccHigh = {ASrcKey, AClient, AVal, AIter, ASeq}, L}) ->
+          case ESrcKey =:= ASrcKey of
+            true ->
+              {S, I, V, C} = max({ESeq, EIter, EVal, EClient}, {ASeq, AIter, AVal, AClient}),
+              {{ASrcKey, C, V, I, S}, L };
+            false ->
+              {AccHigh, [E | L]}
+          end
+        end, {{SrcKey, Client, Val, Iteration, SeqNum}, []}, PropWaitList),
+
+      ?TRACE("~p Propowaitlist ~nOld ~p~n New ~p ~n Added~p",[Key, PropWaitList, [Highest | FilteredList],
+        {SrcKey, Client, Val, Iteration, SeqNum}]),
+
+      NP2 = ?set(prop_wait_list, [Highest | FilteredList], NP1),
+      save_pstate(Key, NP2, State),
+      on({zheng_acceptor, prop_wait, Key}, State)
   end,
+  comm:send_local(self(), {zheng_acceptor, agree, Key, DataType}),
   State;
 
-on({zheng_acceptor, prop_wait, Key, Client, Val, Iteration, SeqNum}, State) ->
+on({zheng_acceptor, prop_wait, Key}, State) ->
   PState = get_pstate(Key, State),
+  WaitList = ?get(prop_wait_list, PState),
+  CurrentSeqNum = ?get(seq, PState),
 
-  case ?get(seq, PState) < SeqNum of
-    true ->
-      %% wait more
-      comm:send_local(self(), {zheng_acceptor, prop_wait, Key, Client, Val, Iteration, SeqNum});
-    false ->
-      AcceptVal = ?get(accept_val, PState),
-      case is_subset(AcceptVal, Val) andalso ?get(seq, PState) =:= SeqNum of
-        %% second part of condition is safeguard as it might be that local sequence number is already higher
-        %% and I do not know for certain if returning with accept is still correct...
-        %% but this should be pretty rare (impossible if messages are processed in order?)
-        %% and thus not affect performance noticable.
-        true ->
-          comm:send(Client, {accept, new_buffer(), Iteration, SeqNum}),
-          NP1 = ?set(accept_val, Val, PState),
-          save_pstate(Key, NP1, State);
-        false ->
-          comm:send(Client, {reject, AcceptVal, Iteration, SeqNum})
-      end
-  end,
+  NewWaitList =
+    lists:filter(
+      fun({SrcKey, Client, Val, Iteration, SeqNum}) ->
+        eval_prop_wait(Key, SrcKey, Client, Val, Iteration, CurrentSeqNum, SeqNum, State)
+      end, WaitList),
+  %?TRACE("TEST ~p", [length(NewWaitList)]),
+  NP1 = get_pstate(Key, State), %% TODO: eval_prop_wait is ugly and has side-effects...
+  NP2 = ?set(prop_wait_list, NewWaitList, NP1),
+
+  save_pstate(Key, NP2, State),
   State.
 
+eval_prop_wait(Key, SrcKey, Client, Val, Iteration, CurrentSeqNum, WaitForSeqNum, State) ->
+  ?TRACE("~p prop: waiting ~p ~p", [Key,CurrentSeqNum, WaitForSeqNum]),
+  case CurrentSeqNum < WaitForSeqNum of
+    true ->
+      %% wait more
+      true;
+    false ->
+      PState = get_pstate(Key, State),
+      ?TRACE("~p prop: wait done seqnum ~p ", [Key, ?get(seq, PState)]),
 
-accept_loop_end(Key, LearnedVal, PState) -> %% TODO: notify clients?
+      AcceptVal = ?get(accept_val, PState),
+      case {is_subset(AcceptVal, Val), CurrentSeqNum =:= WaitForSeqNum} of
+        {true, true} ->
+          send_prop_reply(Client, SrcKey, {accept, null, Iteration, WaitForSeqNum}),
+          NP1 = ?set(accept_val, Val, PState),
+          save_pstate(Key, NP1, State);
+        {false, true} ->
+          send_prop_reply(Client, SrcKey, {reject, AcceptVal, Iteration, WaitForSeqNum});
+        {_, false} ->
+          %% Should never happen
+          ?TRACE("SKIPPED PROP WAIT WITH SEQ NUMBER ~p!", [WaitForSeqNum]),
+          ok
+      end,
+      false
+  end.
+
+send_prop_reply(Client, Key, Msg) ->
+  comm:send(Client, {zheng_acceptor, agree_loop_collect, Key, Msg}).
+
+accept_loop_end(Key, LearnedVal, PState, State) -> 
   SeqNum = ?get(seq, PState),
   LearnedDict = ?get(learned_val, PState),
   AcceptedVal = ?get(accept_val, PState),
@@ -306,6 +371,7 @@ accept_loop_end(Key, LearnedVal, PState) -> %% TODO: notify clients?
   %% notify all clients of learned commands and apply queries
   [
     begin
+      ?TRACE("~p Responding to request ~p", [Key, R]),
       case Fun of
         {qfun, F} ->
           Result = apply_queries(DataType, F, NCrdt),
@@ -314,13 +380,17 @@ accept_loop_end(Key, LearnedVal, PState) -> %% TODO: notify clients?
           comm:send(Client, {write_result, ReqId, ok})
       end
     end
-  || {{ReqId, Client}, Fun} <- LearnedAsList],
+  || R = {{ReqId, Client}, Fun} <- LearnedAsList],
 
-  NP7 = ?set(replies, done, NP6),
 
-  comm:send_local(self(), {zheng_acceptor, agree, Key}),
-  %print_pstate("After learned", Key, NP7),
-  NP7.
+  comm:send_local(self(), {zheng_acceptor, agree, Key, DataType}),
+  save_pstate(Key, NP6, State),
+
+  %% must be executed immediately, so that sequence number is not missed
+  %% at prop_wait, but we cannot use gen_component:post_op(?)
+  on({zheng_acceptor, prop_wait, Key}, State), 
+  ?TRACE("~p RESPOND DONE seq number ~p", [Key, ?get(seq, NP6) - 1]),
+  NP6.
 
 apply_updates(DataType, Funs, ReplicaId, Crdt) when is_list(Funs) ->
   lists:foldl(

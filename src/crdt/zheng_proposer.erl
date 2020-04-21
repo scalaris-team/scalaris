@@ -23,7 +23,6 @@
 -define(TRACE(X,Y), ok).
 
 -define(CACHED_ROUTING, (config:read(cache_dht_nodes))).
--define(MSG_PREFIX, {crdt, zhen_acceptor}). % for dht_node to call correct module
 
 -include("scalaris.hrl").
 
