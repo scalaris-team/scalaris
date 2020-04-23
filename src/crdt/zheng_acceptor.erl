@@ -235,8 +235,14 @@ on({zheng_acceptor, agree_loop, Key, Iteration}, State) ->
 
   %% the second key entry is necesasry as this is not replaced by the dht and is used
   %% for identification if one acceptor process manages multiple replicas
-  Message = {zheng_acceptor, prop, Key, Key, DataType, comm:this(), Val, Iteration, SeqNum, '_'},
-  send_to_all_replicas(Key, Message, _ConsLookup=10, _KeyReplacement=3),
+  NewWaiting =
+    case Iteration =:= 1 of
+      true -> ?get(wait_for_learned, NP3);
+      false -> dict:new()
+    end,
+  Message = {zheng_acceptor, prop, Key, Key, DataType, comm:this(), Val, Iteration, SeqNum,
+    NewWaiting, '_'},
+  send_to_all_replicas(Key, Message, _ConsLookup=11, _KeyReplacement=3),
 
   State;
 
@@ -300,18 +306,34 @@ on({zheng_acceptor, agree_loop_collect, Key,
   end;
 
 %%% prop function
-on({zheng_acceptor, prop, Key, SrcKey, DataType, Client, Val, Iteration, SeqNum, _Cons}, State) ->
+on({zheng_acceptor, prop, Key, SrcKey, DataType, Client, Val, Iteration, SeqNum, NewWaiting,
+  _Cons}, State) ->
   ?TRACE("~p prop: receievd msg from~n~p ", [Key, {SrcKey, Iteration, SeqNum}]),
   PState = get_pstate(Key, State),
   Seq = ?get(seq, PState),
 
   case SeqNum < Seq of
     true ->
-      ?TRACE("~p ADD TO BUFF ~p", [Key, Val]),
+      ?TRACE("~p ADD TO BUFF ~n~p", [Key, Val]),
       NP1 = ?union(buff_val, Val, PState),
+      %% is the other replica is slower, merge the others' wait_for_learned dict
+      %% with ours, so that all clients of the included commands potentially receive
+      %% replies faster
+      NP2 =
+        case NewWaiting =:= dict:new() of
+          true -> NP1;
+          false -> 
+            NW = dict:merge(
+              fun(_K, A, _B) ->
+                %% If there is a conflict, then both dicts already included the same commands
+                A
+              end, NewWaiting, ?get(wait_for_learned, NP1)),
+            ?set(wait_for_learned, NW, NP1)
+        end,
+
       Lv = ?get(learned_val, PState),
       send_prop_reply(Client, SrcKey, {decide, dict:fetch(SeqNum, Lv), Iteration, SeqNum}),
-      save_pstate(Key, NP1, State);
+      save_pstate(Key, NP2, State);
     false ->
       NP1 = ?set(max_seq, max(SeqNum, Seq), PState),
       PropWaitList = ?get(prop_wait_list, NP1),
@@ -430,7 +452,7 @@ accept_loop_end(Key, LearnedVal, PState, State) ->
   NP6 = ?set(cmd_set, union(NewLearned, CrdtAppliedSet), NP5),
 
   %% notify all clients of learned commands and apply queries
-  NP7 = notify_clients(Key, DataType, NCrdt, LearnedAsList, NP6),
+  NP7 = notify_clients(Key, DataType, NCrdt, sets:to_list(LearnedVal), NP6),
 
   comm:send_local(self(), {zheng_acceptor, agree, Key, DataType}),
   save_pstate(Key, NP7, State),
@@ -490,7 +512,7 @@ get_replica_id(Key) ->
 
 notify_clients(_Key, DataType, Crdt, LearnedCmds, PState) ->
   ListenDict = ?get(wait_for_learned, PState),
-  ?TRACE("~p Notify_clients ~p ~n~p", [_Key, LearnedCmds, ListenDict]),
+  ?TRACE("~p Notify_clients ~n~p ~n~p", [_Key, LearnedCmds, ListenDict]),
   NewListenDict =
     lists:foldl(
       fun(Cmd, DictAcc) ->
