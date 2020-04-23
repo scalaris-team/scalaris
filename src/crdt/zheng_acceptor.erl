@@ -76,6 +76,9 @@
     max_seq = -1 :: integer(),
 
     buff_val = new_buffer() :: buffer(),
+    %% is used to track if commands are learned to avoid creating unnecesasry noops
+    %% for queries
+    last_update_cmd_received_in_buf = null :: null | cmd(),
     learned_val = dict:new() :: dict:dict(non_neg_integer(), buffer()),
 
     accept_val = new_buffer() :: buffer(),
@@ -155,7 +158,8 @@ on({zheng_acceptor, new_write, _Cons, Proposer, Key, ReqId, DataType, UpdateFuns
 
     NP2 = add_to_notify(Client, UpdateCmd, NP1),
     NP3 = ?add(buff_val, UpdateCmd, NP2),
-    save_pstate(Key, NP3, State),
+    NP4 = ?set(last_update_cmd_received_in_buf, UpdateCmd, NP3),
+    save_pstate(Key, NP4, State),
 
     comm:send_local(self(), {zheng_acceptor, agree, Key, DataType}),
     State;
@@ -184,11 +188,21 @@ on({zheng_acceptor, agree, Key, DataType}, State) ->
           true ->
             ?union(accept_val, UpdateCmds, NP1);
           false ->
-            {Cid, T1} = get_new_id(Key, NP1),
-            NoopCmd = new_noop(Cid),
-            T2 = ?union(accept_val, sets:add_element(NoopCmd, UpdateCmds), T1),
-            T3 = ?set(to_notify_pending, [], T2),
-            set_to_notify_after_cmd_learned(ToNotifyList, NoopCmd, T3)
+            %% As all newyly received commands in the UpdateCmd set are always learned together,
+            %% we can just use some existing update to listing for completion instead
+            %% of creating a noop every time. If none exists, create a noop
+            T3 =
+              case ?get(last_update_cmd_received_in_buf, NP1) of
+                null ->
+                  {Cid, T1} = get_new_id(Key, NP1),
+                  NoopCmd = new_noop(Cid),
+                  T2 = ?union(accept_val, sets:add_element(NoopCmd, UpdateCmds), T1),
+                  set_to_notify_after_cmd_learned(ToNotifyList, NoopCmd, T2);
+                Cmd ->
+                  T1 = ?union(accept_val, UpdateCmds, NP1),
+                  set_to_notify_after_cmd_learned(ToNotifyList, Cmd, T1)
+              end,
+            ?set(to_notify_pending, [], T3)
         end,
 
       ?TRACE("START AGREE ~p~n~p", [Key, {?get(active, NP1), ?get(accept_val, NP2),
@@ -196,7 +210,7 @@ on({zheng_acceptor, agree, Key, DataType}, State) ->
 
       NP3 = ?set(active, true, NP2),
       NP4 = ?set(buff_val, new_buffer(), NP3),
-      NP5 = ?set(replies, new_replies(), NP4),
+      NP5 = ?set(last_update_cmd_received_in_buf, null, NP4),
       save_pstate(Key, NP5, State),
       comm:send_local(self(), {zheng_acceptor, agree_loop, Key, _Iteration=1}),
       State;
@@ -216,7 +230,7 @@ on({zheng_acceptor, agree_loop, Key, Iteration}, State) ->
 
   NP1 = ?set(loop_iter, Iteration, PState),
   NP2 = ?set(loop_val, Val, NP1),
-  NP3 = ?set(replies, #replies{}, NP2),
+  NP3 = ?set(replies, new_replies(), NP2),
   save_pstate(Key, NP3, State),
 
   %% the second key entry is necesasry as this is not replaced by the dht and is used
