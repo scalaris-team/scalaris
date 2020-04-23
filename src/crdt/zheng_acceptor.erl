@@ -410,7 +410,15 @@ accept_loop_end(Key, LearnedVal, PState, State) ->
   CrdtAppliedSet = ?get(cmd_set, NP4),
   DataType = ?get(crdt_type, NP4),
   Crdt = ?get(crdt, NP4),
-  ReplicaId = get_replica_id(Key),
+
+  % No CRDT values are ever merged, only command sets.
+  %% Thus every command is applied at every replica. If using
+  %% the correct replica id (or own) here, this would result in possibe
+  %% differenct internal CRDT states for every replica
+  %% (e.g. increment the counter would only increment each respictive slot)
+  %% TODO: Is a fixed ID a problem? If yes, we musst attach the ID at the time
+  %% the command is recieved from the first replica before distribution.
+  ReplicaId = 1,
 
   NewLearned = subtract(LearnedVal, CrdtAppliedSet),
   LearnedAsList = sets:to_list(NewLearned),
