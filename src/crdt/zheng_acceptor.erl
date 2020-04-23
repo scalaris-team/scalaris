@@ -19,8 +19,8 @@
 -module(zheng_acceptor).
 -author('skrzypczak@zib.de').
 
--define(TRACE(X,Y), ct:pal(X,Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
 
 -define(PDB, db_prbr).
