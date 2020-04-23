@@ -61,7 +61,7 @@
 
 -record(replies,
   {
-    count = 0 :: non_neg_integer(), 
+    count = 0 :: non_neg_integer(),
     accept_count = 0 :: non_neg_integer(),
     decide_val = [] :: [buffer()],
     reject_val = [] :: [buffer()]
@@ -71,7 +71,7 @@
   {
     cid = 0 :: non_neg_integer(), %% used to give command unique identifier
 
-    %% core protocol variables 
+    %% core protocol variables
     seq = 0 :: non_neg_integer(),
     max_seq = -1 :: integer(),
 
@@ -178,7 +178,7 @@ on({zheng_acceptor, agree, Key, DataType}, State) ->
       %% As per otimization of the full paper, queries do not have be included
       %% into the set (should not filter anything if notify buffer below is empty)
       UpdateCmds = remove_query_commans(Buffered),
-      
+
       %% If we included commands from clients in this buffer that needs to be
       %% notified of the result as soon as the commands are learend, add a noop
       %% with an ID. If this noop is learned, notify all clients.
@@ -260,7 +260,7 @@ on({zheng_acceptor, agree_loop_collect, Key,
       State;
     true ->
       NR1 = ?rinc(count, Replies),
-      NR2 = 
+      NR2 =
         case ReplyType of
           accept -> ?rinc(accept_count, NR1);
           reject -> ?radd(reject_val, ReplyVal, NR1);
@@ -322,7 +322,7 @@ on({zheng_acceptor, prop, Key, SrcKey, DataType, Client, Val, Iteration, SeqNum,
       NP2 =
         case NewWaiting =:= dict:new() of
           true -> NP1;
-          false -> 
+          false ->
             NW = dict:merge(
               fun(_K, A, _B) ->
                 %% If there is a conflict, then both dicts already included the same commands
@@ -409,7 +409,7 @@ eval_prop_wait(Key, SrcKey, Client, Val, Iteration, CurrentSeqNum, WaitForSeqNum
       false
   end.
 
-accept_loop_end(Key, LearnedVal, PState, State) -> 
+accept_loop_end(Key, LearnedVal, PState, State) ->
   SeqNum = ?get(seq, PState),
   LearnedDict = ?get(learned_val, PState),
   AcceptedVal = ?get(accept_val, PState),
@@ -460,7 +460,7 @@ accept_loop_end(Key, LearnedVal, PState, State) ->
 
   %% must be executed immediately, so that sequence number is not missed
   %% at prop_wait, but we cannot use gen_component:post_op(?)
-  on({zheng_acceptor, prop_wait, Key}, State), 
+  on({zheng_acceptor, prop_wait, Key}, State),
   get_pstate(Key, State). %% retrieve state again as changes by prop_wait
 
 
