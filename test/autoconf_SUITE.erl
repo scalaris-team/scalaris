@@ -1,4 +1,4 @@
-% @copyright 2018-2019 Zuse Institute Berlin
+% @copyright 2018-2020 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 %% | OTP 20.0 | 2017-06-21 |
 %% | OTP 21.0 | 2018-06-19 |
 %% | OTP 22.0 | 2019-05-14 |
+%% | OTP 23.0 | 2020-05-13 |
 %% |----------+------------|
 
 -module(autoconf_SUITE).
