@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2018 Zuse Institute Berlin
+# Copyright 2007-2021 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -311,7 +311,7 @@ checkinstallation() {
     HOSTNAME_SYS=`get_sys_hostname`
     if [ "$HOSTNAME_ERL" != "$HOSTNAME_SYS" ]; then
         echo -e "$MSG_ATTENTION"
-        echo "WARNING: the hostnames reported by Erlang and the OS do not match."
+        echo "ERROR: the hostnames reported by Erlang and the OS do not match."
         echo "erlang (get_erlang_hostname): "
         echo "     -> $HOSTNAME_ERL"
         echo "system (get_sys_hostname):"
@@ -327,7 +327,7 @@ checkinstallation() {
         echo " Please refer to your system's manual to set your hostname, e.g. change the"
         echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
         echo " the DNS."
-        echo -n "Continuing basic tests..."
+        exit 1
     fi
 
     $SCALARISCLIENT_JAVA -h > /dev/null 2>&1
